@@ -52,7 +52,11 @@ def cmd_lessons(args: argparse.Namespace) -> None:
     lessons = db.get_lessons(
         conn,
         period=args.period if args.period != "all" else None,
-        category=args.category,
+        category=args.category or None,
+        project=args.project or None,
+        repository=args.repository or None,
+        branch=args.branch or None,
+        commit=args.commit or None,
     )
     conn.close()
 
@@ -60,24 +64,35 @@ def cmd_lessons(args: argparse.Namespace) -> None:
         console.print("[dim]No lessons found.[/dim]")
         return
 
+    has_meta = any(l.project or l.branch or l.commit_hash for l in lessons)
+
     table = Table(title="Lessons", box=box.ROUNDED, show_lines=False)
-    table.add_column("ID", style="dim", no_wrap=True, max_width=12)
     table.add_column("Date", no_wrap=True)
     table.add_column("Topic", style="cyan")
     table.add_column("Title")
     table.add_column("Level", justify="center")
     table.add_column("Categories")
+    if has_meta:
+        table.add_column("Project", style="dim")
+        table.add_column("Branch", style="magenta")
+        table.add_column("Commit", style="cyan", no_wrap=True)
 
     for lesson in lessons:
         level_color = {"junior": "green", "mid": "yellow", "senior": "red"}.get(lesson.level, "white")
-        table.add_row(
-            lesson.id[:10] + "…" if len(lesson.id) > 10 else lesson.id,
+        row = [
             lesson.timestamp[:10],
             lesson.topic_id,
             lesson.title,
             f"[{level_color}]{lesson.level}[/{level_color}]",
             ", ".join(lesson.categories),
-        )
+        ]
+        if has_meta:
+            row += [
+                lesson.project or "",
+                lesson.branch or "",
+                lesson.commit_hash[:7] if lesson.commit_hash else "",
+            ]
+        table.add_row(*row)
 
     console.print(table)
 
@@ -101,6 +116,19 @@ def cmd_lesson(args: argparse.Namespace) -> None:
     console.print(f"[dim]Level:[/dim]       [{level_color}]{lesson.level}[/{level_color}]")
     if lesson.task_context:
         console.print(f"[dim]Context:[/dim]     {lesson.task_context}")
+    if lesson.project or lesson.repository or lesson.branch or lesson.commit_hash or lesson.folder:
+        meta_parts = []
+        if lesson.project:
+            meta_parts.append(f"project={lesson.project}")
+        if lesson.repository:
+            meta_parts.append(f"repo={lesson.repository}")
+        if lesson.branch:
+            meta_parts.append(f"branch=[magenta]{lesson.branch}[/magenta]")
+        if lesson.commit_hash:
+            meta_parts.append(f"commit=[cyan]{lesson.commit_hash[:7]}[/cyan]")
+        if lesson.folder:
+            meta_parts.append(f"folder={lesson.folder}")
+        console.print(f"[dim]Git:[/dim]         {' · '.join(meta_parts)}")
     console.rule()
     console.print(lesson.summary)
 
@@ -160,6 +188,10 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Filter by time period",
     )
     p_lessons.add_argument("--category", default=None, help="Filter by category tag")
+    p_lessons.add_argument("--project", default=None, help="Filter by project name (fuzzy)")
+    p_lessons.add_argument("--repository", default=None, help="Filter by repository (fuzzy)")
+    p_lessons.add_argument("--branch", default=None, help="Filter by branch name (fuzzy)")
+    p_lessons.add_argument("--commit", default=None, help="Filter by commit hash prefix (fuzzy)")
 
     p_lesson = sub.add_parser("lesson", help="Show a single lesson in detail")
     p_lesson.add_argument("id", help="Lesson ID")
