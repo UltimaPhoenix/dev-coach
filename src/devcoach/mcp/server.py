@@ -45,6 +45,11 @@ def log_lesson(
     level: Literal["junior", "mid", "senior"],
     summary: str,
     task_context: Optional[str] = None,
+    project: Optional[str] = None,
+    repository: Optional[str] = None,
+    branch: Optional[str] = None,
+    commit_hash: Optional[str] = None,
+    folder: Optional[str] = None,
 ) -> str:
     """Save a delivered lesson to the coaching log. Returns 'ok' on success."""
     lesson = Lesson(
@@ -56,6 +61,11 @@ def log_lesson(
         level=level,
         summary=summary,
         task_context=task_context,
+        project=project,
+        repository=repository,
+        branch=branch,
+        commit_hash=commit_hash,
+        folder=folder,
     )
     try:
         conn = _get_conn()

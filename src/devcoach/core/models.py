@@ -18,6 +18,11 @@ class Lesson(BaseModel):
     level: Literal["junior", "mid", "senior"]
     summary: str
     task_context: Optional[str] = None
+    project: Optional[str] = None
+    repository: Optional[str] = None
+    branch: Optional[str] = None
+    commit_hash: Optional[str] = None
+    folder: Optional[str] = None
 
 
 class Profile(BaseModel):

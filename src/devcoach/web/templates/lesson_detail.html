@@ -47,6 +47,30 @@
   </div>
   {% endif %}
 
+  <!-- Git / project metadata -->
+  {% set has_meta = lesson.project or lesson.repository or lesson.branch or lesson.commit_hash or lesson.folder %}
+  {% if has_meta %}
+  <div class="mt-4 pt-4 border-t border-gray-800">
+    <div class="flex flex-wrap gap-x-5 gap-y-1 text-xs text-gray-500 font-mono">
+      {% if lesson.project %}
+      <span><span class="text-gray-600">project</span> <span class="text-gray-300">{{ lesson.project }}</span></span>
+      {% endif %}
+      {% if lesson.repository %}
+      <span><span class="text-gray-600">repo</span> <span class="text-gray-300">{{ lesson.repository }}</span></span>
+      {% endif %}
+      {% if lesson.branch %}
+      <span><span class="text-gray-600">branch</span> <span class="text-indigo-400">{{ lesson.branch }}</span></span>
+      {% endif %}
+      {% if lesson.commit_hash %}
+      <span><span class="text-gray-600">commit</span> <span class="text-cyan-400">{{ lesson.commit_hash[:7] }}</span></span>
+      {% endif %}
+      {% if lesson.folder %}
+      <span><span class="text-gray-600">folder</span> <span class="text-gray-300">{{ lesson.folder }}</span></span>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
   <!-- Footer -->
   <div class="mt-4 pt-4 border-t border-gray-800 text-xs text-gray-600">
     ID: {{ lesson.id }}

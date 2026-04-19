@@ -88,7 +88,12 @@ def init_schema(conn: sqlite3.Connection) -> None:
             title        TEXT NOT NULL,
             level        TEXT NOT NULL,
             summary      TEXT NOT NULL,
-            task_context TEXT
+            task_context TEXT,
+            project      TEXT,
+            repository   TEXT,
+            branch       TEXT,
+            commit_hash  TEXT,
+            folder       TEXT
         );
 
         CREATE TABLE IF NOT EXISTS knowledge (
@@ -103,7 +108,18 @@ def init_schema(conn: sqlite3.Connection) -> None:
         );
     """)
     conn.commit()
+    _migrate(conn)
     _seed_defaults(conn)
+
+
+def _migrate(conn: sqlite3.Connection) -> None:
+    """Add new columns to existing tables. Safe to run on every startup."""
+    new_columns = ["project", "repository", "branch", "commit_hash", "folder"]
+    existing = {row[1] for row in conn.execute("PRAGMA table_info(lessons)").fetchall()}
+    for col in new_columns:
+        if col not in existing:
+            conn.execute(f"ALTER TABLE lessons ADD COLUMN {col} TEXT")
+    conn.commit()
 
 
 def _seed_defaults(conn: sqlite3.Connection) -> None:
@@ -131,8 +147,9 @@ def insert_lesson(conn: sqlite3.Connection, lesson: Lesson) -> None:
     """Insert or replace a lesson record."""
     conn.execute(
         """INSERT OR REPLACE INTO lessons
-           (id, timestamp, topic_id, categories, title, level, summary, task_context)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+           (id, timestamp, topic_id, categories, title, level, summary,
+            task_context, project, repository, branch, commit_hash, folder)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (
             lesson.id,
             lesson.timestamp,
@@ -142,6 +159,11 @@ def insert_lesson(conn: sqlite3.Connection, lesson: Lesson) -> None:
             lesson.level,
             lesson.summary,
             lesson.task_context,
+            lesson.project,
+            lesson.repository,
+            lesson.branch,
+            lesson.commit_hash,
+            lesson.folder,
         ),
     )
     conn.commit()
@@ -298,4 +320,9 @@ def _row_to_lesson(row: sqlite3.Row) -> Lesson:
         level=row["level"],
         summary=row["summary"],
         task_context=row["task_context"],
+        project=row["project"],
+        repository=row["repository"],
+        branch=row["branch"],
+        commit_hash=row["commit_hash"],
+        folder=row["folder"],
     )
