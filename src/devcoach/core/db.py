@@ -31,6 +31,39 @@ DEFAULT_SETTINGS: dict[str, str] = {
     "min_hours_between": "4",
 }
 
+# Ordered category → topic list mapping for the knowledge map UI.
+# Topics not listed here land in "Other".
+KNOWLEDGE_CATEGORIES: dict[str, list[str]] = {
+    "Engineering Fundamentals": [
+        "general_engineering", "software_architecture",
+        "design_patterns", "debugging_mindset",
+    ],
+    "Languages": [
+        "python", "javascript", "typescript",
+    ],
+    "Backend": [
+        "node_js", "fastapi", "django",
+    ],
+    "Frontend": [
+        "react", "html_css",
+    ],
+    "Infrastructure & DevOps": [
+        "docker", "docker_compose", "traefik", "coolify", "ci_cd", "linux_cli",
+    ],
+    "Databases": [
+        "postgresql", "redis",
+    ],
+    "Networking & Security": [
+        "networking", "security",
+    ],
+    "Quality": [
+        "testing", "performance_optimization",
+    ],
+    "Version Control": [
+        "git",
+    ],
+}
+
 
 # ── Connection ─────────────────────────────────────────────────────────────
 

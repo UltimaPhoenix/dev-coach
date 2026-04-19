@@ -32,11 +32,26 @@ async def profile_page(request: Request) -> HTMLResponse:
     conn = _get_conn()
     knowledge = db.get_all_knowledge(conn)
     conn.close()
-    sorted_knowledge = sorted(knowledge.items(), key=lambda x: -x[1])
+
+    # Group by predefined categories; uncategorised topics go to "Other"
+    categorised: dict[str, list[tuple[str, int]]] = {}
+    seen: set[str] = set()
+    for category, topics in db.KNOWLEDGE_CATEGORIES.items():
+        entries = [(t, knowledge[t]) for t in topics if t in knowledge]
+        if entries:
+            categorised[category] = entries
+            seen.update(t for t, _ in entries)
+    other = sorted(
+        [(t, c) for t, c in knowledge.items() if t not in seen],
+        key=lambda x: -x[1],
+    )
+    if other:
+        categorised["Other"] = other
+
     return templates.TemplateResponse(
         request,
         "profile.html",
-        {"knowledge": sorted_knowledge},
+        {"categorised": categorised},
     )
 
 
