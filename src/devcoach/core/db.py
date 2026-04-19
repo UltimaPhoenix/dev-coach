@@ -173,11 +173,17 @@ def get_lessons(
     conn: sqlite3.Connection,
     period: Optional[str] = None,
     category: Optional[str] = None,
+    project: Optional[str] = None,
+    repository: Optional[str] = None,
+    branch: Optional[str] = None,
+    commit: Optional[str] = None,
 ) -> list[Lesson]:
-    """Return lessons filtered by period and/or category.
+    """Return lessons filtered by period, category, and/or git metadata.
 
     period: today | week | month | year | all | None (same as all)
     category: exact tag match inside the JSON categories array
+    project, repository, branch: exact match on metadata columns
+    commit: prefix match on commit_hash
     """
     conditions: list[str] = []
     params: list[object] = []
@@ -188,9 +194,24 @@ def get_lessons(
         params.append(cutoff)
 
     if category is not None:
-        # JSON array stored as text: match '"<tag>"' anywhere in the string
-        conditions.append('categories LIKE ?')
+        conditions.append("categories LIKE ?")
         params.append(f'%"{category}"%')
+
+    if project is not None:
+        conditions.append("project = ?")
+        params.append(project)
+
+    if repository is not None:
+        conditions.append("repository = ?")
+        params.append(repository)
+
+    if branch is not None:
+        conditions.append("branch = ?")
+        params.append(branch)
+
+    if commit is not None:
+        conditions.append("commit_hash LIKE ?")
+        params.append(f"{commit}%")
 
     where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
     rows = conn.execute(
@@ -198,6 +219,14 @@ def get_lessons(
         params,
     ).fetchall()
     return [_row_to_lesson(row) for row in rows]
+
+
+def get_distinct_column(conn: sqlite3.Connection, column: str) -> list[str]:
+    """Return sorted distinct non-null values for a metadata column."""
+    rows = conn.execute(
+        f"SELECT DISTINCT {column} FROM lessons WHERE {column} IS NOT NULL ORDER BY {column}"
+    ).fetchall()
+    return [row[0] for row in rows]
 
 
 def get_lesson_by_id(conn: sqlite3.Connection, lesson_id: str) -> Optional[Lesson]:

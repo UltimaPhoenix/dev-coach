@@ -8,26 +8,95 @@
 </div>
 
 <!-- Filters -->
-<form method="get" action="/lessons" class="flex flex-wrap gap-3 mb-6">
-  <select name="period" class="bg-gray-800 border border-gray-700 text-gray-200 rounded px-3 py-1.5 text-sm">
-    <option value="all" {% if selected_period == 'all' %}selected{% endif %}>All time</option>
-    <option value="today" {% if selected_period == 'today' %}selected{% endif %}>Today</option>
-    <option value="week" {% if selected_period == 'week' %}selected{% endif %}>Last 7 days</option>
-    <option value="month" {% if selected_period == 'month' %}selected{% endif %}>Last 30 days</option>
-    <option value="year" {% if selected_period == 'year' %}selected{% endif %}>Last year</option>
-  </select>
+{% set any_filter = selected_period != 'all' or selected_category or selected_project or selected_repository or selected_branch or selected_commit %}
+<form method="get" action="/lessons" class="mb-6 space-y-3">
 
-  <select name="category" class="bg-gray-800 border border-gray-700 text-gray-200 rounded px-3 py-1.5 text-sm">
-    <option value="" {% if not selected_category %}selected{% endif %}>All categories</option>
-    {% for cat in all_categories %}
-    <option value="{{ cat }}" {% if selected_category == cat %}selected{% endif %}>{{ cat }}</option>
-    {% endfor %}
-  </select>
+  <!-- Row 1: period + category -->
+  <div class="flex flex-wrap gap-3">
+    <select name="period" class="bg-gray-800 border border-gray-700 text-gray-200 rounded px-3 py-1.5 text-sm">
+      <option value="all"   {% if selected_period == 'all'   %}selected{% endif %}>All time</option>
+      <option value="today" {% if selected_period == 'today' %}selected{% endif %}>Today</option>
+      <option value="week"  {% if selected_period == 'week'  %}selected{% endif %}>Last 7 days</option>
+      <option value="month" {% if selected_period == 'month' %}selected{% endif %}>Last 30 days</option>
+      <option value="year"  {% if selected_period == 'year'  %}selected{% endif %}>Last year</option>
+    </select>
 
-  <button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white rounded px-4 py-1.5 text-sm transition">Filter</button>
-  {% if selected_period != 'all' or selected_category %}
-  <a href="/lessons" class="text-gray-400 hover:text-white text-sm py-1.5 transition">Clear</a>
+    <select name="category" class="bg-gray-800 border border-gray-700 text-gray-200 rounded px-3 py-1.5 text-sm">
+      <option value="" {% if not selected_category %}selected{% endif %}>All categories</option>
+      {% for cat in all_categories %}
+      <option value="{{ cat }}" {% if selected_category == cat %}selected{% endif %}>{{ cat }}</option>
+      {% endfor %}
+    </select>
+
+    {% if all_projects %}
+    <select name="project" class="bg-gray-800 border border-gray-700 text-gray-200 rounded px-3 py-1.5 text-sm">
+      <option value="" {% if not selected_project %}selected{% endif %}>All projects</option>
+      {% for p in all_projects %}
+      <option value="{{ p }}" {% if selected_project == p %}selected{% endif %}>{{ p }}</option>
+      {% endfor %}
+    </select>
+    {% endif %}
+
+    {% if all_repositories %}
+    <select name="repository" class="bg-gray-800 border border-gray-700 text-gray-200 rounded px-3 py-1.5 text-sm">
+      <option value="" {% if not selected_repository %}selected{% endif %}>All repositories</option>
+      {% for r in all_repositories %}
+      <option value="{{ r }}" {% if selected_repository == r %}selected{% endif %}>{{ r }}</option>
+      {% endfor %}
+    </select>
+    {% endif %}
+  </div>
+
+  <!-- Row 2: branch + commit freetext with autocomplete -->
+  {% if all_branches or all_commits %}
+  <div class="flex flex-wrap gap-3">
+    {% if all_branches %}
+    <div class="relative">
+      <input
+        type="text"
+        name="branch"
+        value="{{ selected_branch }}"
+        placeholder="Branch…"
+        list="branch-list"
+        autocomplete="off"
+        class="bg-gray-800 border border-gray-700 text-gray-200 rounded px-3 py-1.5 text-sm w-44 focus:outline-none focus:border-indigo-500"
+      />
+      <datalist id="branch-list">
+        {% for b in all_branches %}
+        <option value="{{ b }}">
+        {% endfor %}
+      </datalist>
+    </div>
+    {% endif %}
+
+    {% if all_commits %}
+    <div class="relative">
+      <input
+        type="text"
+        name="commit"
+        value="{{ selected_commit }}"
+        placeholder="Commit hash…"
+        list="commit-list"
+        autocomplete="off"
+        class="bg-gray-800 border border-gray-700 text-gray-200 rounded px-3 py-1.5 text-sm w-52 font-mono focus:outline-none focus:border-indigo-500"
+      />
+      <datalist id="commit-list">
+        {% for c in all_commits %}
+        <option value="{{ c }}">
+        {% endfor %}
+      </datalist>
+    </div>
+    {% endif %}
+  </div>
   {% endif %}
+
+  <!-- Actions -->
+  <div class="flex gap-3 items-center">
+    <button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white rounded px-4 py-1.5 text-sm transition">Filter</button>
+    {% if any_filter %}
+    <a href="/lessons" class="text-gray-400 hover:text-white text-sm transition">Clear</a>
+    {% endif %}
+  </div>
 </form>
 
 <!-- Lessons table -->

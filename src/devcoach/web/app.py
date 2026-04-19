@@ -72,10 +72,26 @@ async def lessons_page(
     request: Request,
     period: Optional[str] = None,
     category: Optional[str] = None,
+    project: Optional[str] = None,
+    repository: Optional[str] = None,
+    branch: Optional[str] = None,
+    commit: Optional[str] = None,
 ) -> HTMLResponse:
     conn = _get_conn()
-    lessons = db.get_lessons(conn, period=period, category=category)
+    lessons = db.get_lessons(
+        conn,
+        period=period,
+        category=category,
+        project=project or None,
+        repository=repository or None,
+        branch=branch or None,
+        commit=commit or None,
+    )
     all_categories = db.get_all_categories(conn)
+    all_projects = db.get_distinct_column(conn, "project")
+    all_repositories = db.get_distinct_column(conn, "repository")
+    all_branches = db.get_distinct_column(conn, "branch")
+    all_commits = db.get_distinct_column(conn, "commit_hash")
     conn.close()
     return templates.TemplateResponse(
         request,
@@ -83,8 +99,16 @@ async def lessons_page(
         {
             "lessons": lessons,
             "all_categories": all_categories,
+            "all_projects": all_projects,
+            "all_repositories": all_repositories,
+            "all_branches": all_branches,
+            "all_commits": all_commits,
             "selected_period": period or "all",
             "selected_category": category or "",
+            "selected_project": project or "",
+            "selected_repository": repository or "",
+            "selected_branch": branch or "",
+            "selected_commit": commit or "",
         },
     )
 
