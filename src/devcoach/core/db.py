@@ -198,12 +198,12 @@ def get_lessons(
         params.append(f'%"{category}"%')
 
     if project is not None:
-        conditions.append("project = ?")
-        params.append(project)
+        conditions.append("project LIKE ?")
+        params.append(f"%{project}%")
 
     if repository is not None:
-        conditions.append("repository = ?")
-        params.append(repository)
+        conditions.append("repository LIKE ?")
+        params.append(f"%{repository}%")
 
     if branch is not None:
         conditions.append("branch LIKE ?")

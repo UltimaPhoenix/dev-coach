@@ -80,8 +80,8 @@ async def lessons_page(
     conn = _get_conn()
     lessons = db.get_lessons(
         conn,
-        period=period,
-        category=category,
+        period=period or None,
+        category=category or None,
         project=project or None,
         repository=repository or None,
         branch=branch or None,

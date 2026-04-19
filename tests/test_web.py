@@ -1,0 +1,216 @@
+"""Web UI filter tests — exercises the FastAPI routes via TestClient."""
+
+from __future__ import annotations
+
+import sqlite3
+from pathlib import Path
+
+import pytest
+from fastapi.testclient import TestClient
+
+from devcoach.core import db
+from devcoach.web.app import app
+
+
+# ── Client fixture ─────────────────────────────────────────────────────────
+
+@pytest.fixture
+def client(db_path: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
+    """TestClient backed by the seeded test DB."""
+    monkeypatch.setattr(db, "DB_PATH", db_path)
+    return TestClient(app)
+
+
+# ── /lessons — no filter ───────────────────────────────────────────────────
+
+class TestLessonsNoFilter:
+    def test_returns_200(self, client):
+        assert client.get("/lessons").status_code == 200
+
+    def test_shows_all_lessons(self, client):
+        html = client.get("/lessons").text
+        assert "sqlite3_row_factory" in html
+        assert "sqlite_upsert_patterns" in html
+        assert "sqlite_pragma_introspection" in html
+
+    def test_shows_lesson_count(self, client):
+        html = client.get("/lessons").text
+        assert "3 lessons" in html
+
+
+# ── /lessons — empty-string params (the bug that caused blank results) ─────
+
+class TestLessonsEmptyParams:
+    def test_empty_category_returns_all(self, client):
+        # category="" must be treated as "no filter", not LIKE '%""%'
+        html = client.get("/lessons?category=").text
+        assert "sqlite3_row_factory" in html
+        assert "sqlite_upsert_patterns" in html
+
+    def test_empty_project_returns_all(self, client):
+        html = client.get("/lessons?project=").text
+        assert "sqlite3_row_factory" in html
+
+    def test_empty_branch_returns_all(self, client):
+        html = client.get("/lessons?branch=").text
+        assert "3 lessons" in html
+
+    def test_empty_commit_returns_all(self, client):
+        html = client.get("/lessons?commit=").text
+        assert "3 lessons" in html
+
+    def test_period_all_returns_all(self, client):
+        html = client.get("/lessons?period=all").text
+        assert "3 lessons" in html
+
+    def test_full_empty_form_submission_returns_all(self, client):
+        # Exactly what the browser sends when no filter is selected
+        html = client.get("/lessons?period=all&category=&project=&repository=&branch=&commit=").text
+        assert "3 lessons" in html
+
+
+# ── /lessons — project filter ──────────────────────────────────────────────
+
+class TestLessonsProjectFilter:
+    def test_project_devcoach_returns_two(self, client):
+        html = client.get("/lessons?project=devcoach").text
+        assert "sqlite_upsert_patterns" in html
+        assert "sqlite_pragma_introspection" in html
+        assert "sqlite3_row_factory" not in html
+
+    def test_project_no_match_shows_empty(self, client):
+        html = client.get("/lessons?project=other").text
+        assert "No lessons found" in html
+
+    def test_project_select_rendered(self, client):
+        html = client.get("/lessons").text
+        assert 'name="project"' in html
+        assert "devcoach" in html
+
+
+# ── /lessons — repository filter ──────────────────────────────────────────
+
+class TestLessonsRepositoryFilter:
+    def test_repository_exact_match(self, client):
+        html = client.get("/lessons?repository=UltimaPhoenix/dev-coach").text
+        assert "sqlite_upsert_patterns" in html
+        assert "sqlite_pragma_introspection" in html
+        assert "sqlite3_row_factory" not in html
+
+    def test_repository_fuzzy_match(self, client):
+        html = client.get("/lessons?repository=UltimaPhoenix").text
+        assert "sqlite_upsert_patterns" in html
+
+    def test_repository_no_match(self, client):
+        html = client.get("/lessons?repository=github").text
+        assert "No lessons found" in html
+
+    def test_repository_select_rendered(self, client):
+        html = client.get("/lessons").text
+        assert 'name="repository"' in html
+
+
+# ── /lessons — branch filter ───────────────────────────────────────────────
+
+class TestLessonsBranchFilter:
+    def test_branch_main(self, client):
+        html = client.get("/lessons?branch=main").text
+        assert "sqlite_upsert_patterns" in html
+        assert "sqlite_pragma_introspection" not in html
+
+    def test_branch_feature_fuzzy(self, client):
+        html = client.get("/lessons?branch=feature").text
+        assert "sqlite_pragma_introspection" in html
+        assert "sqlite_upsert_patterns" not in html
+
+    def test_branch_no_match(self, client):
+        html = client.get("/lessons?branch=develop").text
+        assert "No lessons found" in html
+
+    def test_branch_datalist_rendered(self, client):
+        html = client.get("/lessons").text
+        assert "branch-list" in html
+        assert "main" in html
+
+
+# ── /lessons — commit filter ───────────────────────────────────────────────
+
+class TestLessonsCommitFilter:
+    def test_commit_short_hash(self, client):
+        html = client.get("/lessons?commit=05f2f86").text
+        assert "sqlite_upsert_patterns" in html
+        assert "sqlite_pragma_introspection" not in html
+
+    def test_commit_prefix_of_full_hash(self, client):
+        html = client.get("/lessons?commit=f05377").text
+        assert "sqlite_pragma_introspection" in html
+
+    def test_commit_middle_of_hash(self, client):
+        # fuzzy: substring match anywhere in hash
+        html = client.get("/lessons?commit=da02f2").text
+        assert "sqlite_pragma_introspection" in html
+
+    def test_commit_no_match(self, client):
+        html = client.get("/lessons?commit=deadbeef").text
+        assert "No lessons found" in html
+
+    def test_commit_datalist_shows_short_hashes(self, client):
+        html = client.get("/lessons").text
+        assert "commit-list" in html
+        # Short hash (7 chars) must appear, not full hash
+        assert "05f2f86" in html
+        # Full 40-char hash must not appear as a datalist option value
+        assert 'value="f0537718da02f2e1a39c47158c04e8cd9f14452d"' not in html
+
+
+# ── /lessons — combined filters ────────────────────────────────────────────
+
+class TestLessonsCombinedFilters:
+    def test_project_and_branch(self, client):
+        html = client.get("/lessons?project=devcoach&branch=main").text
+        assert "sqlite_upsert_patterns" in html
+        assert "sqlite_pragma_introspection" not in html
+
+    def test_project_and_category(self, client):
+        html = client.get("/lessons?project=devcoach&category=python").text
+        assert "sqlite_upsert_patterns" in html
+
+    def test_all_empty_plus_period_all(self, client):
+        html = client.get("/lessons?period=all&category=&project=&branch=&commit=").text
+        assert "3 lessons" in html
+
+
+# ── /lessons/{id} — detail page ───────────────────────────────────────────
+
+class TestLessonDetail:
+    def test_returns_200(self, client):
+        assert client.get("/lessons/lesson-sqlite-upsert-patterns-001").status_code == 200
+
+    def test_shows_title(self, client):
+        html = client.get("/lessons/lesson-sqlite-upsert-patterns-001").text
+        assert "INSERT OR REPLACE" in html
+
+    def test_shows_git_metadata(self, client):
+        html = client.get("/lessons/lesson-sqlite-upsert-patterns-001").text
+        assert "devcoach" in html
+        assert "main" in html
+        assert "05f2f86" in html
+
+    def test_no_metadata_section_when_absent(self, client):
+        html = client.get("/lessons/lesson-sqlite3-row-factory-001").text
+        # Git metadata row must not render
+        assert 'class="text-indigo-400"' not in html  # branch colour
+
+    def test_unknown_id_returns_404(self, client):
+        assert client.get("/lessons/nonexistent-id").status_code == 404
+
+
+# ── / — profile page ──────────────────────────────────────────────────────
+
+class TestProfilePage:
+    def test_returns_200(self, client):
+        assert client.get("/").status_code == 200
+
+    def test_shows_knowledge_map(self, client):
+        html = client.get("/").text
+        assert "Knowledge Map" in html
