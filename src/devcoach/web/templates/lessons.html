@@ -82,7 +82,7 @@
       />
       <datalist id="commit-list">
         {% for c in all_commits %}
-        <option value="{{ c }}">
+        <option value="{{ c[:7] }}">
         {% endfor %}
       </datalist>
     </div>

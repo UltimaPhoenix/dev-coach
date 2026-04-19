@@ -206,12 +206,12 @@ def get_lessons(
         params.append(repository)
 
     if branch is not None:
-        conditions.append("branch = ?")
-        params.append(branch)
+        conditions.append("branch LIKE ?")
+        params.append(f"%{branch}%")
 
     if commit is not None:
         conditions.append("commit_hash LIKE ?")
-        params.append(f"{commit}%")
+        params.append(f"%{commit}%")
 
     where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
     rows = conn.execute(
