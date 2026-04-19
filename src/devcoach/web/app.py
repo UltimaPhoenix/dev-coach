@@ -34,8 +34,9 @@ async def profile_page(request: Request) -> HTMLResponse:
     conn.close()
     sorted_knowledge = sorted(knowledge.items(), key=lambda x: -x[1])
     return templates.TemplateResponse(
+        request,
         "profile.html",
-        {"request": request, "knowledge": sorted_knowledge},
+        {"knowledge": sorted_knowledge},
     )
 
 
@@ -62,9 +63,9 @@ async def lessons_page(
     all_categories = db.get_all_categories(conn)
     conn.close()
     return templates.TemplateResponse(
+        request,
         "lessons.html",
         {
-            "request": request,
             "lessons": lessons,
             "all_categories": all_categories,
             "selected_period": period or "all",
@@ -81,8 +82,9 @@ async def lesson_detail_page(request: Request, lesson_id: str) -> HTMLResponse:
     if lesson is None:
         return HTMLResponse("<h1>Lesson not found</h1>", status_code=404)
     return templates.TemplateResponse(
+        request,
         "lesson_detail.html",
-        {"request": request, "lesson": lesson},
+        {"lesson": lesson},
     )
 
 
@@ -92,8 +94,9 @@ async def settings_page(request: Request) -> HTMLResponse:
     settings = db.get_settings(conn)
     conn.close()
     return templates.TemplateResponse(
+        request,
         "settings.html",
-        {"request": request, "settings": settings},
+        {"settings": settings},
     )
 
 
