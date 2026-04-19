@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}{{ lesson.title }} — devcoach{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+  <a href="/lessons" class="text-gray-400 hover:text-white text-sm transition">← Back to lessons</a>
+</div>
+
+{% if lesson.level == 'junior' %}{% set level_class = 'text-green-400 bg-green-900/30 border-green-700' %}
+{% elif lesson.level == 'mid' %}{% set level_class = 'text-yellow-400 bg-yellow-900/30 border-yellow-700' %}
+{% else %}{% set level_class = 'text-red-400 bg-red-900/30 border-red-700' %}{% endif %}
+
+<div class="bg-gray-900 border border-gray-800 rounded-xl p-6">
+  <!-- Header -->
+  <div class="flex flex-wrap items-start justify-between gap-4 mb-4">
+    <h1 class="text-xl font-bold text-white">{{ lesson.title }}</h1>
+    <span class="text-xs font-semibold px-3 py-1 rounded-full border {{ level_class }}">{{ lesson.level }}</span>
+  </div>
+
+  <!-- Meta -->
+  <div class="flex flex-wrap gap-x-6 gap-y-1 text-sm text-gray-400 mb-4">
+    <span>🗓 {{ lesson.timestamp[:10] }}</span>
+    <span>🏷 <span class="text-cyan-400">{{ lesson.topic_id }}</span></span>
+  </div>
+
+  <!-- Categories -->
+  <div class="flex flex-wrap gap-2 mb-6">
+    {% for cat in lesson.categories %}
+    <a href="/lessons?category={{ cat }}"
+       class="inline-block bg-gray-800 hover:bg-indigo-900/50 text-gray-300 text-xs rounded px-2 py-1 transition border border-gray-700 hover:border-indigo-600">
+      {{ cat }}
+    </a>
+    {% endfor %}
+  </div>
+
+  <!-- Summary -->
+  <div class="prose prose-invert max-w-none text-gray-200 leading-relaxed whitespace-pre-wrap">{{ lesson.summary }}</div>
+
+  <!-- Task context -->
+  {% if lesson.task_context %}
+  <div class="mt-6 pt-4 border-t border-gray-800 text-sm text-gray-400">
+    <span class="text-gray-500">Context:</span> {{ lesson.task_context }}
+  </div>
+  {% endif %}
+
+  <!-- Footer -->
+  <div class="mt-4 pt-4 border-t border-gray-800 text-xs text-gray-600">
+    ID: {{ lesson.id }}
+  </div>
+</div>
+{% endblock %}

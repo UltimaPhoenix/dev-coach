@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}Lessons — devcoach{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+  <h1 class="text-2xl font-bold text-indigo-400">Lessons</h1>
+  <span class="text-sm text-gray-400">{{ lessons | length }} lesson{{ 's' if lessons | length != 1 }}</span>
+</div>
+
+<!-- Filters -->
+<form method="get" action="/lessons" class="flex flex-wrap gap-3 mb-6">
+  <select name="period" class="bg-gray-800 border border-gray-700 text-gray-200 rounded px-3 py-1.5 text-sm">
+    <option value="all" {% if selected_period == 'all' %}selected{% endif %}>All time</option>
+    <option value="today" {% if selected_period == 'today' %}selected{% endif %}>Today</option>
+    <option value="week" {% if selected_period == 'week' %}selected{% endif %}>Last 7 days</option>
+    <option value="month" {% if selected_period == 'month' %}selected{% endif %}>Last 30 days</option>
+    <option value="year" {% if selected_period == 'year' %}selected{% endif %}>Last year</option>
+  </select>
+
+  <select name="category" class="bg-gray-800 border border-gray-700 text-gray-200 rounded px-3 py-1.5 text-sm">
+    <option value="" {% if not selected_category %}selected{% endif %}>All categories</option>
+    {% for cat in all_categories %}
+    <option value="{{ cat }}" {% if selected_category == cat %}selected{% endif %}>{{ cat }}</option>
+    {% endfor %}
+  </select>
+
+  <button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white rounded px-4 py-1.5 text-sm transition">Filter</button>
+  {% if selected_period != 'all' or selected_category %}
+  <a href="/lessons" class="text-gray-400 hover:text-white text-sm py-1.5 transition">Clear</a>
+  {% endif %}
+</form>
+
+<!-- Lessons table -->
+{% if lessons %}
+<div class="overflow-x-auto">
+  <table class="w-full text-sm border-collapse">
+    <thead>
+      <tr class="text-left text-gray-400 border-b border-gray-800">
+        <th class="pb-2 pr-4">Date</th>
+        <th class="pb-2 pr-4">Topic</th>
+        <th class="pb-2 pr-4">Title</th>
+        <th class="pb-2 pr-4">Level</th>
+        <th class="pb-2">Categories</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for lesson in lessons %}
+      {% if lesson.level == 'junior' %}{% set level_class = 'text-green-400' %}
+      {% elif lesson.level == 'mid' %}{% set level_class = 'text-yellow-400' %}
+      {% else %}{% set level_class = 'text-red-400' %}{% endif %}
+      <tr class="border-b border-gray-800/50 hover:bg-gray-900/50 transition">
+        <td class="py-2 pr-4 text-gray-400 whitespace-nowrap">{{ lesson.timestamp[:10] }}</td>
+        <td class="py-2 pr-4 text-cyan-400">{{ lesson.topic_id }}</td>
+        <td class="py-2 pr-4">
+          <a href="/lessons/{{ lesson.id }}" class="hover:text-indigo-400 transition">{{ lesson.title }}</a>
+        </td>
+        <td class="py-2 pr-4 {{ level_class }}">{{ lesson.level }}</td>
+        <td class="py-2">
+          {% for cat in lesson.categories %}
+          <span class="inline-block bg-gray-800 text-gray-300 text-xs rounded px-2 py-0.5 mr-1">{{ cat }}</span>
+          {% endfor %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<p class="text-gray-500">No lessons found for the selected filters.</p>
+{% endif %}
+{% endblock %}
