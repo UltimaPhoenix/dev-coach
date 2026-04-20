@@ -15,11 +15,11 @@
     })();
   </script>
 
-  <script>
-    // Configure Tailwind before the CDN script loads
-    tailwind = { config: { darkMode: 'class' } }
-  </script>
   <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Config must come immediately after the CDN so it's set before DOMContentLoaded -->
+  <script>
+    tailwind.config = { darkMode: 'class' }
+  </script>
   <script src="https://unpkg.com/htmx.org@1.9.12"></script>
   <link rel="stylesheet" href="/static/style.css" />
   {% block head %}{% endblock %}
