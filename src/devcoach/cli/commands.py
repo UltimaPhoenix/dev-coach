@@ -49,6 +49,7 @@ def cmd_profile(_args: argparse.Namespace) -> None:
 
 def cmd_lessons(args: argparse.Namespace) -> None:
     conn = _get_conn()
+    starred_filter = True if getattr(args, "starred", False) else None
     lessons = db.get_lessons(
         conn,
         period=args.period if args.period != "all" else None,
@@ -57,6 +58,7 @@ def cmd_lessons(args: argparse.Namespace) -> None:
         repository=args.repository or None,
         branch=args.branch or None,
         commit=args.commit or None,
+        starred=starred_filter,
     )
     conn.close()
 
@@ -67,6 +69,7 @@ def cmd_lessons(args: argparse.Namespace) -> None:
     has_meta = any(l.project or l.branch or l.commit_hash for l in lessons)
 
     table = Table(title="Lessons", box=box.ROUNDED, show_lines=False)
+    table.add_column("", no_wrap=True, width=2)  # star column
     table.add_column("Date", no_wrap=True)
     table.add_column("Topic", style="cyan")
     table.add_column("Title")
@@ -79,10 +82,12 @@ def cmd_lessons(args: argparse.Namespace) -> None:
 
     for lesson in lessons:
         level_color = {"junior": "green", "mid": "yellow", "senior": "red"}.get(lesson.level, "white")
+        feedback_icon = " [green]✓[/green]" if lesson.feedback == "know" else (" [red]✗[/red]" if lesson.feedback == "dont_know" else "")
         row = [
+            "[yellow]★[/yellow]" if lesson.starred else "[dim]·[/dim]",
             lesson.timestamp[:10],
             lesson.topic_id,
-            lesson.title,
+            lesson.title + feedback_icon,
             f"[{level_color}]{lesson.level}[/{level_color}]",
             ", ".join(lesson.categories),
         ]
@@ -95,6 +100,50 @@ def cmd_lessons(args: argparse.Namespace) -> None:
         table.add_row(*row)
 
     console.print(table)
+
+
+def cmd_star(args: argparse.Namespace) -> None:
+    conn = _get_conn()
+    lesson = db.get_lesson_by_id(conn, args.id)
+    if lesson is None:
+        console.print(f"[red]Lesson '{args.id}' not found.[/red]")
+        conn.close()
+        sys.exit(1)
+    new_state = db.toggle_star(conn, args.id)
+    conn.close()
+    state_label = "[yellow]★ starred[/yellow]" if new_state else "[dim]☆ unstarred[/dim]"
+    console.print(f"Lesson [cyan]{args.id}[/cyan] → {state_label}")
+
+
+def cmd_feedback(args: argparse.Namespace) -> None:
+    valid = {"know", "dont_know", "clear"}
+    if args.feedback not in valid:
+        console.print(f"[red]Invalid feedback '{args.feedback}'. Use: know | dont_know | clear[/red]")
+        sys.exit(1)
+
+    conn = _get_conn()
+    feedback_value = None if args.feedback == "clear" else args.feedback
+    topic_id = db.set_feedback(conn, args.id, feedback_value)
+    if topic_id is None:
+        console.print(f"[red]Lesson '{args.id}' not found.[/red]")
+        conn.close()
+        sys.exit(1)
+
+    if feedback_value in ("know", "dont_know"):
+        knowledge = db.get_all_knowledge(conn)
+        current = knowledge.get(topic_id, 5)
+        delta = 1 if feedback_value == "know" else -1
+        db.upsert_knowledge(conn, topic_id, current + delta)
+        new_conf = max(0, min(10, current + delta))
+        conf_label = f"[cyan]{topic_id}[/cyan] confidence: {current} → [bold]{new_conf}[/bold]"
+    else:
+        conf_label = "feedback cleared"
+
+    conn.close()
+    icon = {"know": "[green]✓ I know this[/green]", "dont_know": "[red]✗ I don't know this[/red]"}.get(
+        feedback_value or "", "[dim]cleared[/dim]"
+    )
+    console.print(f"Lesson [cyan]{args.id}[/cyan] → {icon}  ({conf_label})")
 
 
 def cmd_lesson(args: argparse.Namespace) -> None:
@@ -114,6 +163,13 @@ def cmd_lesson(args: argparse.Namespace) -> None:
     console.print(f"[dim]Topic:[/dim]       {lesson.topic_id}")
     console.print(f"[dim]Categories:[/dim]  {', '.join(lesson.categories)}")
     console.print(f"[dim]Level:[/dim]       [{level_color}]{lesson.level}[/{level_color}]")
+    star_label = "[yellow]★ starred[/yellow]" if lesson.starred else "[dim]☆ not starred[/dim]"
+    feedback_label = (
+        "[green]✓ I know this[/green]" if lesson.feedback == "know"
+        else "[red]✗ I don't know this[/red]" if lesson.feedback == "dont_know"
+        else "[dim]no feedback[/dim]"
+    )
+    console.print(f"[dim]Star:[/dim]        {star_label}   [dim]Feedback:[/dim] {feedback_label}")
     if lesson.task_context:
         console.print(f"[dim]Context:[/dim]     {lesson.task_context}")
     if lesson.project or lesson.repository or lesson.branch or lesson.commit_hash or lesson.folder:
@@ -192,9 +248,17 @@ def _build_parser() -> argparse.ArgumentParser:
     p_lessons.add_argument("--repository", default=None, help="Filter by repository (fuzzy)")
     p_lessons.add_argument("--branch", default=None, help="Filter by branch name (fuzzy)")
     p_lessons.add_argument("--commit", default=None, help="Filter by commit hash prefix (fuzzy)")
+    p_lessons.add_argument("--starred", action="store_true", default=False, help="Show only starred lessons")
 
     p_lesson = sub.add_parser("lesson", help="Show a single lesson in detail")
     p_lesson.add_argument("id", help="Lesson ID")
+
+    p_star = sub.add_parser("star", help="Toggle starred flag on a lesson")
+    p_star.add_argument("id", help="Lesson ID")
+
+    p_feedback = sub.add_parser("feedback", help="Record know/dont_know feedback for a lesson")
+    p_feedback.add_argument("id", help="Lesson ID")
+    p_feedback.add_argument("feedback", choices=["know", "dont_know", "clear"], help="Feedback value")
 
     sub.add_parser("settings", help="Show current settings")
 
@@ -219,6 +283,8 @@ def run_cli() -> None:
         "profile": cmd_profile,
         "lessons": cmd_lessons,
         "lesson": cmd_lesson,
+        "star": cmd_star,
+        "feedback": cmd_feedback,
         "settings": cmd_settings,
         "set": cmd_set,
         "ui": cmd_ui,

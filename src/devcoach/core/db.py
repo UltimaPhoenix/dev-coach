@@ -114,11 +114,13 @@ def init_schema(conn: sqlite3.Connection) -> None:
 
 def _migrate(conn: sqlite3.Connection) -> None:
     """Add new columns to existing tables. Safe to run on every startup."""
-    new_columns = ["project", "repository", "branch", "commit_hash", "folder"]
     existing = {row[1] for row in conn.execute("PRAGMA table_info(lessons)").fetchall()}
-    for col in new_columns:
+    text_columns = ["project", "repository", "branch", "commit_hash", "folder", "feedback"]
+    for col in text_columns:
         if col not in existing:
             conn.execute(f"ALTER TABLE lessons ADD COLUMN {col} TEXT")
+    if "starred" not in existing:
+        conn.execute("ALTER TABLE lessons ADD COLUMN starred INTEGER NOT NULL DEFAULT 0")
     conn.commit()
 
 
@@ -148,8 +150,9 @@ def insert_lesson(conn: sqlite3.Connection, lesson: Lesson) -> None:
     conn.execute(
         """INSERT OR REPLACE INTO lessons
            (id, timestamp, topic_id, categories, title, level, summary,
-            task_context, project, repository, branch, commit_hash, folder)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            task_context, project, repository, branch, commit_hash, folder,
+            starred, feedback)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (
             lesson.id,
             lesson.timestamp,
@@ -164,6 +167,8 @@ def insert_lesson(conn: sqlite3.Connection, lesson: Lesson) -> None:
             lesson.branch,
             lesson.commit_hash,
             lesson.folder,
+            1 if lesson.starred else 0,
+            lesson.feedback,
         ),
     )
     conn.commit()
@@ -177,13 +182,15 @@ def get_lessons(
     repository: Optional[str] = None,
     branch: Optional[str] = None,
     commit: Optional[str] = None,
+    starred: Optional[bool] = None,
 ) -> list[Lesson]:
-    """Return lessons filtered by period, category, and/or git metadata.
+    """Return lessons filtered by period, category, git metadata, and/or starred flag.
 
     period: today | week | month | year | all | None (same as all)
     category: exact tag match inside the JSON categories array
-    project, repository, branch: exact match on metadata columns
-    commit: prefix match on commit_hash
+    project, repository, branch: fuzzy match on metadata columns
+    commit: fuzzy match on commit_hash
+    starred: True for starred only, False for unstarred only, None for all
     """
     conditions: list[str] = []
     params: list[object] = []
@@ -213,12 +220,40 @@ def get_lessons(
         conditions.append("commit_hash LIKE ?")
         params.append(f"%{commit}%")
 
+    if starred is not None:
+        conditions.append("starred = ?")
+        params.append(1 if starred else 0)
+
     where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
     rows = conn.execute(
         f"SELECT * FROM lessons {where} ORDER BY timestamp DESC",
         params,
     ).fetchall()
     return [_row_to_lesson(row) for row in rows]
+
+
+def toggle_star(conn: sqlite3.Connection, lesson_id: str) -> bool:
+    """Flip the starred flag on a lesson. Returns the new starred state."""
+    conn.execute(
+        "UPDATE lessons SET starred = CASE WHEN starred=1 THEN 0 ELSE 1 END WHERE id = ?",
+        (lesson_id,),
+    )
+    conn.commit()
+    row = conn.execute("SELECT starred FROM lessons WHERE id = ?", (lesson_id,)).fetchone()
+    return bool(row["starred"]) if row else False
+
+
+def set_feedback(
+    conn: sqlite3.Connection, lesson_id: str, feedback: Optional[str]
+) -> Optional[str]:
+    """Set feedback ('know'/'dont_know'/None) on a lesson. Returns topic_id for knowledge update."""
+    conn.execute(
+        "UPDATE lessons SET feedback = ? WHERE id = ?",
+        (feedback or None, lesson_id),
+    )
+    conn.commit()
+    row = conn.execute("SELECT topic_id FROM lessons WHERE id = ?", (lesson_id,)).fetchone()
+    return row["topic_id"] if row else None
 
 
 def get_distinct_column(conn: sqlite3.Connection, column: str) -> list[str]:
@@ -354,4 +389,6 @@ def _row_to_lesson(row: sqlite3.Row) -> Lesson:
         branch=row["branch"],
         commit_hash=row["commit_hash"],
         folder=row["folder"],
+        starred=bool(row["starred"]) if row["starred"] is not None else False,
+        feedback=row["feedback"],
     )

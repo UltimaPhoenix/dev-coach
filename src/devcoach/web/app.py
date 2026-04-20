@@ -76,8 +76,10 @@ async def lessons_page(
     repository: Optional[str] = None,
     branch: Optional[str] = None,
     commit: Optional[str] = None,
+    starred: Optional[str] = None,
 ) -> HTMLResponse:
     conn = _get_conn()
+    starred_filter = True if starred == "1" else None
     lessons = db.get_lessons(
         conn,
         period=period or None,
@@ -86,6 +88,7 @@ async def lessons_page(
         repository=repository or None,
         branch=branch or None,
         commit=commit or None,
+        starred=starred_filter,
     )
     all_categories = db.get_all_categories(conn)
     all_projects = db.get_distinct_column(conn, "project")
@@ -109,8 +112,37 @@ async def lessons_page(
             "selected_repository": repository or "",
             "selected_branch": branch or "",
             "selected_commit": commit or "",
+            "selected_starred": starred == "1",
         },
     )
+
+
+@app.post("/lessons/{lesson_id}/star")
+async def star_lesson(
+    lesson_id: str, next: str = Form(default="/lessons")
+) -> RedirectResponse:
+    conn = _get_conn()
+    db.toggle_star(conn, lesson_id)
+    conn.close()
+    return RedirectResponse(url=next, status_code=303)
+
+
+@app.post("/lessons/{lesson_id}/feedback")
+async def submit_feedback(
+    lesson_id: str,
+    feedback: str = Form(...),
+    next: str = Form(default="/lessons"),
+) -> RedirectResponse:
+    conn = _get_conn()
+    feedback_value = None if feedback in ("", "clear") else feedback
+    topic_id = db.set_feedback(conn, lesson_id, feedback_value)
+    if topic_id and feedback_value in ("know", "dont_know"):
+        knowledge = db.get_all_knowledge(conn)
+        current = knowledge.get(topic_id, 5)
+        delta = 1 if feedback == "know" else -1
+        db.upsert_knowledge(conn, topic_id, current + delta)
+    conn.close()
+    return RedirectResponse(url=next, status_code=303)
 
 
 @app.get("/lessons/{lesson_id}", response_class=HTMLResponse)

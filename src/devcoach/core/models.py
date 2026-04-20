@@ -23,6 +23,8 @@ class Lesson(BaseModel):
     branch: Optional[str] = None
     commit_hash: Optional[str] = None
     folder: Optional[str] = None
+    starred: bool = False
+    feedback: Optional[str] = None  # "know" | "dont_know" | None
 
 
 class Profile(BaseModel):

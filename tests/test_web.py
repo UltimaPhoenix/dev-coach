@@ -214,3 +214,123 @@ class TestProfilePage:
     def test_shows_knowledge_map(self, client):
         html = client.get("/").text
         assert "Knowledge Map" in html
+
+
+# ── /lessons — starred filter ──────────────────────────────────────────────
+
+class TestLessonsStarredFilter:
+    def test_starred_only_returns_one(self, client):
+        html = client.get("/lessons?starred=1").text
+        assert "INSERT OR REPLACE" in html
+        assert "sqlite3.Row" not in html
+
+    def test_no_starred_param_returns_all(self, client):
+        html = client.get("/lessons").text
+        assert "3 lessons" in html
+
+    def test_starred_checkbox_rendered(self, client):
+        html = client.get("/lessons").text
+        assert 'name="starred"' in html
+        assert 'value="1"' in html
+
+    def test_starred_checkbox_checked_when_active(self, client):
+        html = client.get("/lessons?starred=1").text
+        assert "checked" in html
+
+    def test_star_icon_shown_in_table(self, client):
+        html = client.get("/lessons").text
+        assert "⭐" in html  # lesson 2 is starred
+
+
+# ── POST /lessons/{id}/star ────────────────────────────────────────────────
+
+class TestStarEndpoint:
+    def test_star_redirects(self, client):
+        r = client.post(
+            "/lessons/lesson-sqlite3-row-factory-001/star",
+            data={"next": "/lessons"},
+            follow_redirects=False,
+        )
+        assert r.status_code == 303
+
+    def test_star_toggles_on(self, client):
+        # row_factory starts unstarred — POST stars it
+        client.post("/lessons/lesson-sqlite3-row-factory-001/star", data={"next": "/lessons"})
+        html = client.get("/lessons/lesson-sqlite3-row-factory-001").text
+        # After starring, the star button shows the starred state
+        assert "Unstar" in html
+
+    def test_star_toggles_off(self, client):
+        # upsert_patterns starts starred — POST unstars it
+        client.post("/lessons/lesson-sqlite-upsert-patterns-001/star", data={"next": "/lessons"})
+        html = client.get("/lessons/lesson-sqlite-upsert-patterns-001").text
+        assert "Star" in html  # "Star" (not "Unstar")
+
+    def test_star_detail_page_button_rendered(self, client):
+        html = client.get("/lessons/lesson-sqlite-upsert-patterns-001").text
+        assert "Unstar" in html  # lesson 2 is starred
+
+
+# ── POST /lessons/{id}/feedback ────────────────────────────────────────────
+
+class TestFeedbackEndpoint:
+    def test_feedback_redirects(self, client):
+        r = client.post(
+            "/lessons/lesson-sqlite3-row-factory-001/feedback",
+            data={"feedback": "know", "next": "/lessons/lesson-sqlite3-row-factory-001"},
+            follow_redirects=False,
+        )
+        assert r.status_code == 303
+
+    def test_feedback_know_shows_active_button(self, client):
+        client.post(
+            "/lessons/lesson-sqlite3-row-factory-001/feedback",
+            data={"feedback": "know", "next": "/lessons/lesson-sqlite3-row-factory-001"},
+        )
+        html = client.get("/lessons/lesson-sqlite3-row-factory-001").text
+        assert "I know this" in html
+
+    def test_feedback_dont_know_shows_active_button(self, client):
+        client.post(
+            "/lessons/lesson-sqlite3-row-factory-001/feedback",
+            data={"feedback": "dont_know", "next": "/lessons/lesson-sqlite3-row-factory-001"},
+        )
+        html = client.get("/lessons/lesson-sqlite3-row-factory-001").text
+        assert "I don't know this" in html
+
+    def test_feedback_know_bumps_knowledge(self, client, db_path):
+        import sqlite3 as _sqlite3
+        from devcoach.core import db as _db
+
+        # Read baseline confidence for sqlite3_row_factory
+        conn = _sqlite3.connect(str(db_path))
+        conn.row_factory = _sqlite3.Row
+        before = _db.get_all_knowledge(conn).get("sqlite3_row_factory", 5)
+        conn.close()
+
+        client.post(
+            "/lessons/lesson-sqlite3-row-factory-001/feedback",
+            data={"feedback": "know", "next": "/lessons/lesson-sqlite3-row-factory-001"},
+        )
+
+        conn = _sqlite3.connect(str(db_path))
+        conn.row_factory = _sqlite3.Row
+        after = _db.get_all_knowledge(conn).get("sqlite3_row_factory", 5)
+        conn.close()
+
+        assert after == before + 1
+
+    def test_feedback_clear_removes_feedback(self, client):
+        # upsert_patterns starts with feedback="know"; send "clear" to remove it
+        client.post(
+            "/lessons/lesson-sqlite-upsert-patterns-001/feedback",
+            data={"feedback": "clear", "next": "/lessons/lesson-sqlite-upsert-patterns-001"},
+        )
+        html = client.get("/lessons/lesson-sqlite-upsert-patterns-001").text
+        # Clear feedback button should be gone
+        assert "Clear feedback" not in html
+
+    def test_feedback_buttons_rendered_on_detail(self, client):
+        html = client.get("/lessons/lesson-sqlite-upsert-patterns-001").text
+        assert "I know this" in html
+        assert "I don't know this" in html

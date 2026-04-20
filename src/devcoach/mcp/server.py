@@ -124,20 +124,60 @@ def check_rate_limit() -> RateLimitResult:
 def get_lessons(
     period: Optional[Literal["today", "week", "month", "year", "all"]] = None,
     category: Optional[str] = None,
+    starred: Optional[bool] = None,
 ) -> list[Lesson]:
     """Query the coaching lesson history.
 
     period: today | week | month | year | all (default: all)
     category: filter by a specific category tag (e.g. "python", "docker")
-    Both filters can be combined.
+    starred: True to return only starred (favourite) lessons
+    All filters can be combined.
     """
     try:
         conn = _get_conn()
-        lessons = db.get_lessons(conn, period=period, category=category)
+        lessons = db.get_lessons(conn, period=period, category=category, starred=starred)
         conn.close()
         return lessons
     except Exception:
         return []
+
+
+@mcp.tool
+def star_lesson(lesson_id: str) -> str:
+    """Toggle the starred (favourite) flag on a lesson.
+
+    Returns 'starred' or 'unstarred' to indicate the new state.
+    """
+    try:
+        conn = _get_conn()
+        new_state = db.toggle_star(conn, lesson_id)
+        conn.close()
+        return "starred" if new_state else "unstarred"
+    except Exception as exc:
+        return f"error: {exc}"
+
+
+@mcp.tool
+def submit_feedback(lesson_id: str, feedback: str) -> Profile:
+    """Record user comprehension feedback for a lesson and update knowledge confidence.
+
+    feedback: "know" (understood) | "dont_know" (needs more practice) | "clear" (remove feedback)
+    Automatically adjusts the topic's confidence score by ±1 and returns the updated Profile.
+    """
+    try:
+        conn = _get_conn()
+        feedback_value = None if feedback == "clear" else feedback
+        topic_id = db.set_feedback(conn, lesson_id, feedback_value)
+        if topic_id and feedback_value in ("know", "dont_know"):
+            knowledge = db.get_all_knowledge(conn)
+            current = knowledge.get(topic_id, 5)
+            delta = 1 if feedback_value == "know" else -1
+            db.upsert_knowledge(conn, topic_id, current + delta)
+        knowledge = db.get_all_knowledge(conn)
+        conn.close()
+        return Profile(knowledge=knowledge)
+    except Exception:
+        return Profile(knowledge={})
 
 
 @mcp.tool
@@ -189,7 +229,7 @@ def devcoach_instructions() -> str:
 
 def main() -> None:
     """Start devcoach: CLI subcommand if given, else stdio MCP server."""
-    cli_commands = {"profile", "lessons", "lesson", "settings", "set", "ui"}
+    cli_commands = {"profile", "lessons", "lesson", "star", "feedback", "settings", "set", "ui"}
     if len(sys.argv) > 1 and sys.argv[1] in cli_commands:
         from devcoach.cli.commands import run_cli
         run_cli()

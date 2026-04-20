@@ -9,6 +9,7 @@ Test data mirrors the actual DB produced during devcoach development:
 from __future__ import annotations
 
 import sqlite3
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 import pytest
@@ -16,12 +17,16 @@ import pytest
 from devcoach.core import db
 from devcoach.core.models import Lesson
 
+# Use today's date so period="today" filters always match in tests.
+_TODAY = date.today().isoformat()
+
+
 # ── Canonical test dataset ─────────────────────────────────────────────────
 
 TEST_LESSONS: list[Lesson] = [
     Lesson(
         id="lesson-sqlite3-row-factory-001",
-        timestamp="2026-04-19T12:00:00Z",
+        timestamp=f"{_TODAY}T12:00:00Z",
         topic_id="sqlite3_row_factory",
         categories=["python", "sqlite", "databases"],
         title="sqlite3.Row: accessing query results by column name",
@@ -31,7 +36,7 @@ TEST_LESSONS: list[Lesson] = [
     ),
     Lesson(
         id="lesson-sqlite-upsert-patterns-001",
-        timestamp="2026-04-19T16:10:00Z",
+        timestamp=f"{_TODAY}T16:10:00Z",
         topic_id="sqlite_upsert_patterns",
         categories=["python", "sqlite", "databases"],
         title="INSERT OR REPLACE vs ON CONFLICT DO UPDATE",
@@ -43,10 +48,12 @@ TEST_LESSONS: list[Lesson] = [
         branch="main",
         commit_hash="05f2f86abc123456789",
         folder="src/devcoach/core",
+        starred=True,
+        feedback="know",
     ),
     Lesson(
         id="lesson-sqlite-pragma-introspection-001",
-        timestamp="2026-04-19T17:30:00Z",
+        timestamp=f"{_TODAY}T17:30:00Z",
         topic_id="sqlite_pragma_introspection",
         categories=["python", "sqlite", "databases"],
         title="PRAGMA table_info — zero-dependency schema migrations in SQLite",

@@ -17,8 +17,46 @@
 <div class="bg-gray-900 border border-gray-800 rounded-xl p-6">
   <!-- Header -->
   <div class="flex flex-wrap items-start justify-between gap-4 mb-4">
-    <h1 class="text-xl font-bold text-white">{{ lesson.title }}</h1>
+    <div class="flex items-center gap-3">
+      <form method="post" action="/lessons/{{ lesson.id }}/star">
+        <input type="hidden" name="next" value="/lessons/{{ lesson.id }}" />
+        <button type="submit" title="{% if lesson.starred %}Unstar{% else %}Star{% endif %}"
+                class="text-2xl leading-none transition {% if lesson.starred %}text-yellow-400 hover:text-yellow-300{% else %}text-gray-600 hover:text-yellow-400{% endif %}">
+          {% if lesson.starred %}⭐{% else %}☆{% endif %}
+        </button>
+      </form>
+      <h1 class="text-xl font-bold text-white">{{ lesson.title }}</h1>
+    </div>
     <span class="text-xs font-semibold px-3 py-1 rounded-full border {{ level_class }}">{{ lesson.level }}</span>
+  </div>
+
+  <!-- Feedback -->
+  <div class="flex flex-wrap gap-2 mb-4">
+    <form method="post" action="/lessons/{{ lesson.id }}/feedback">
+      <input type="hidden" name="feedback" value="know" />
+      <input type="hidden" name="next" value="/lessons/{{ lesson.id }}" />
+      <button type="submit"
+              class="px-3 py-1 rounded text-sm font-medium transition {% if lesson.feedback == 'know' %}bg-green-600 text-white{% else %}bg-gray-800 text-gray-400 hover:bg-green-800 hover:text-white{% endif %}">
+        ✓ I know this
+      </button>
+    </form>
+    <form method="post" action="/lessons/{{ lesson.id }}/feedback">
+      <input type="hidden" name="feedback" value="dont_know" />
+      <input type="hidden" name="next" value="/lessons/{{ lesson.id }}" />
+      <button type="submit"
+              class="px-3 py-1 rounded text-sm font-medium transition {% if lesson.feedback == 'dont_know' %}bg-red-700 text-white{% else %}bg-gray-800 text-gray-400 hover:bg-red-900 hover:text-white{% endif %}">
+        ✗ I don't know this
+      </button>
+    </form>
+    {% if lesson.feedback %}
+    <form method="post" action="/lessons/{{ lesson.id }}/feedback">
+      <input type="hidden" name="feedback" value="clear" />
+      <input type="hidden" name="next" value="/lessons/{{ lesson.id }}" />
+      <button type="submit" class="px-3 py-1 rounded text-xs text-gray-600 hover:text-gray-400 transition">
+        Clear feedback
+      </button>
+    </form>
+    {% endif %}
   </div>
 
   <!-- Meta -->

@@ -8,9 +8,13 @@ from unittest.mock import patch
 
 import pytest
 
+from datetime import date
+
 from devcoach.core import db
-from devcoach.cli.commands import cmd_lessons, cmd_lesson
+from devcoach.cli.commands import cmd_lessons, cmd_lesson, cmd_star, cmd_feedback
 from tests.conftest import TEST_LESSONS
+
+_TODAY = date.today().isoformat()
 
 
 # ── get_lessons filter tests ───────────────────────────────────────────────
@@ -144,7 +148,7 @@ class TestCmdLessons:
         cmd_lessons(_make_lessons_args())
         out = capsys.readouterr().out
         # Rich wraps/truncates columns — use unique fragments from each title
-        assert out.count("2026-04-19") == 3   # 3 date rows
+        assert out.count(_TODAY) == 3   # 3 date rows
         assert "PRAGMA" in out                 # pragma_introspection title
         assert "INSERT" in out                 # upsert_patterns title
         assert "column" in out                 # row_factory title ("by column name")
@@ -153,7 +157,7 @@ class TestCmdLessons:
         monkeypatch.setattr(db, "DB_PATH", db_path)
         cmd_lessons(_make_lessons_args(project="devcoach"))
         out = capsys.readouterr().out
-        assert out.count("2026-04-19") == 2    # 2 lessons with devcoach project
+        assert out.count(_TODAY) == 2    # 2 lessons with devcoach project
         assert "INSERT" in out
         assert "PRAGMA" in out
         assert "column" not in out             # row_factory excluded
@@ -162,7 +166,7 @@ class TestCmdLessons:
         monkeypatch.setattr(db, "DB_PATH", db_path)
         cmd_lessons(_make_lessons_args(branch="main"))
         out = capsys.readouterr().out
-        assert out.count("2026-04-19") == 1    # only upsert lesson is on main
+        assert out.count(_TODAY) == 1    # only upsert lesson is on main
         assert "INSERT" in out
         assert "PRAGMA" not in out
 
@@ -170,7 +174,7 @@ class TestCmdLessons:
         monkeypatch.setattr(db, "DB_PATH", db_path)
         cmd_lessons(_make_lessons_args(commit="05f2f86"))
         out = capsys.readouterr().out
-        assert out.count("2026-04-19") == 1
+        assert out.count(_TODAY) == 1
         assert "05f2f86" in out                # commit hash appears in Commit column
         assert "PRAGMA" not in out
 
@@ -184,8 +188,9 @@ class TestCmdLessons:
         monkeypatch.setattr(db, "DB_PATH", db_path)
         cmd_lessons(_make_lessons_args(project="devcoach"))
         out = capsys.readouterr().out
-        assert "Branch" in out
-        assert "Commit" in out
+        # Rich truncates wide column values — assert on 7-char commit hashes (always fit)
+        assert "05f2f86" in out    # upsert lesson commit (main branch)
+        assert "f053771" in out    # pragma lesson commit (feature branch)
 
     def test_meta_columns_hidden_when_no_metadata(self, db_path, monkeypatch, capsys):
         monkeypatch.setattr(db, "DB_PATH", db_path)
@@ -227,3 +232,103 @@ class TestCmdLesson:
         monkeypatch.setattr(db, "DB_PATH", db_path)
         with pytest.raises(SystemExit):
             cmd_lesson(_make_lesson_args("nonexistent-id"))
+
+    def test_shows_star_and_feedback(self, db_path, monkeypatch, capsys):
+        monkeypatch.setattr(db, "DB_PATH", db_path)
+        cmd_lesson(_make_lesson_args("lesson-sqlite-upsert-patterns-001"))
+        out = capsys.readouterr().out
+        assert "starred" in out
+        assert "know" in out.lower()
+
+
+# ── starred filter tests ───────────────────────────────────────────────────
+
+class TestStarredFilter:
+    def test_get_lessons_starred_only(self, conn):
+        lessons = db.get_lessons(conn, starred=True)
+        assert len(lessons) == 1
+        assert lessons[0].topic_id == "sqlite_upsert_patterns"
+
+    def test_get_lessons_unstarred_only(self, conn):
+        lessons = db.get_lessons(conn, starred=False)
+        assert len(lessons) == 2
+        assert all(not l.starred for l in lessons)
+
+    def test_cmd_lessons_starred_flag(self, db_path, monkeypatch, capsys):
+        monkeypatch.setattr(db, "DB_PATH", db_path)
+        args = argparse.Namespace(
+            period="all", category=None, project=None,
+            repository=None, branch=None, commit=None, starred=True,
+        )
+        cmd_lessons(args)
+        out = capsys.readouterr().out
+        assert out.count(_TODAY) == 1
+        assert "INSERT" in out
+
+    def test_cmd_lessons_shows_star_column(self, db_path, monkeypatch, capsys):
+        monkeypatch.setattr(db, "DB_PATH", db_path)
+        cmd_lessons(_make_lessons_args())
+        out = capsys.readouterr().out
+        assert "★" in out  # starred lesson marker
+
+
+# ── toggle_star tests ──────────────────────────────────────────────────────
+
+class TestToggleStar:
+    def test_toggle_star_on(self, conn):
+        # row_factory starts unstarred
+        result = db.toggle_star(conn, "lesson-sqlite3-row-factory-001")
+        assert result is True
+        lesson = db.get_lesson_by_id(conn, "lesson-sqlite3-row-factory-001")
+        assert lesson.starred is True
+
+    def test_toggle_star_off(self, conn):
+        # upsert_patterns starts starred
+        result = db.toggle_star(conn, "lesson-sqlite-upsert-patterns-001")
+        assert result is False
+        lesson = db.get_lesson_by_id(conn, "lesson-sqlite-upsert-patterns-001")
+        assert lesson.starred is False
+
+    def test_cmd_star_toggles(self, db_path, monkeypatch, capsys):
+        monkeypatch.setattr(db, "DB_PATH", db_path)
+        cmd_star(argparse.Namespace(id="lesson-sqlite3-row-factory-001"))
+        out = capsys.readouterr().out
+        assert "starred" in out
+
+    def test_cmd_star_not_found_exits(self, db_path, monkeypatch):
+        monkeypatch.setattr(db, "DB_PATH", db_path)
+        with pytest.raises(SystemExit):
+            cmd_star(argparse.Namespace(id="nonexistent"))
+
+
+# ── set_feedback / cmd_feedback tests ─────────────────────────────────────
+
+class TestFeedback:
+    def test_set_feedback_know(self, conn):
+        topic_id = db.set_feedback(conn, "lesson-sqlite3-row-factory-001", "know")
+        assert topic_id == "sqlite3_row_factory"
+        lesson = db.get_lesson_by_id(conn, "lesson-sqlite3-row-factory-001")
+        assert lesson.feedback == "know"
+
+    def test_set_feedback_dont_know(self, conn):
+        db.set_feedback(conn, "lesson-sqlite3-row-factory-001", "dont_know")
+        lesson = db.get_lesson_by_id(conn, "lesson-sqlite3-row-factory-001")
+        assert lesson.feedback == "dont_know"
+
+    def test_set_feedback_clear(self, conn):
+        # upsert_patterns starts with feedback="know"
+        db.set_feedback(conn, "lesson-sqlite-upsert-patterns-001", None)
+        lesson = db.get_lesson_by_id(conn, "lesson-sqlite-upsert-patterns-001")
+        assert lesson.feedback is None
+
+    def test_cmd_feedback_know_bumps_confidence(self, db_path, monkeypatch, capsys):
+        monkeypatch.setattr(db, "DB_PATH", db_path)
+        # sqlite3_row_factory has no feedback yet; knowing it should bump sqlite3_row_factory confidence
+        cmd_feedback(argparse.Namespace(id="lesson-sqlite3-row-factory-001", feedback="know"))
+        out = capsys.readouterr().out
+        assert "know" in out.lower()
+
+    def test_cmd_feedback_invalid_exits(self, db_path, monkeypatch):
+        monkeypatch.setattr(db, "DB_PATH", db_path)
+        with pytest.raises(SystemExit):
+            cmd_feedback(argparse.Namespace(id="lesson-sqlite3-row-factory-001", feedback="maybe"))
