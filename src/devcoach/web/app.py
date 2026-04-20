@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import io
 import json
+import zipfile
 from pathlib import Path
 from typing import Optional
 
@@ -208,11 +210,33 @@ async def settings_page(request: Request) -> HTMLResponse:
 @app.post("/settings", response_class=HTMLResponse)
 async def update_settings(
     max_per_day: int = Form(...),
-    min_hours: int = Form(...),
-    min_minutes: int = Form(...),
+    min_gap_minutes: int = Form(...),
 ) -> RedirectResponse:
     conn = _get_conn()
     db.set_setting(conn, "max_per_day", str(max_per_day))
-    db.set_setting(conn, "min_gap_minutes", str(min_hours * 60 + min_minutes))
+    db.set_setting(conn, "min_gap_minutes", str(min_gap_minutes))
     conn.close()
     return RedirectResponse(url="/settings", status_code=303)
+
+
+@app.get("/settings/export")
+async def export_settings_route() -> Response:
+    """Export full backup as zip: settings.json + lessons.json + knowledge.json."""
+    conn = _get_conn()
+    data = db.create_backup_zip(conn)
+    conn.close()
+    return Response(
+        content=data,
+        media_type="application/zip",
+        headers={"Content-Disposition": "attachment; filename=devcoach-backup.zip"},
+    )
+
+
+@app.post("/settings/import")
+async def import_settings_route(file: UploadFile = File(...)) -> RedirectResponse:
+    """Restore from a backup zip. Restores settings, knowledge map, and imports lessons."""
+    content = await file.read()
+    conn = _get_conn()
+    result = db.restore_backup_zip(conn, content)
+    conn.close()
+    return RedirectResponse(url=f"/settings?imported={result['lessons']}", status_code=303)

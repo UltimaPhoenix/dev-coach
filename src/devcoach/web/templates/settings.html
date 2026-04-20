@@ -10,72 +10,86 @@
 </div>
 {% endif %}
 
-<form method="post" action="/settings" class="max-w-sm">
-  <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-6 space-y-5">
+<div class="max-w-sm space-y-4">
 
-    <div>
-      <label class="block text-sm text-gray-600 dark:text-gray-400 mb-1">Max lessons per day</label>
-      <input
-        type="number" name="max_per_day" min="1" max="20"
-        value="{{ settings.max_per_day }}"
-        class="w-full bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white rounded px-3 py-2 text-sm focus:outline-none focus:border-indigo-500"
-      />
-      <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">How many lessons can be delivered in a 24-hour window.</p>
-    </div>
+  <!-- Coaching settings -->
+  <form method="post" action="/settings">
+    <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-6 space-y-5">
+      <p class="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">Coaching</p>
 
-    <div>
-      <label class="block text-sm text-gray-600 dark:text-gray-400 mb-1">Minimum gap between lessons</label>
-      <div class="flex items-center gap-2">
+      <div>
+        <label class="block text-sm text-gray-600 dark:text-gray-400 mb-1">Max lessons per day</label>
         <input
-          type="number" name="min_hours" min="0" max="168"
-          value="{{ gap_hours }}"
-          class="w-20 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white rounded px-3 py-2 text-sm focus:outline-none focus:border-indigo-500"
+          type="number" name="max_per_day" min="1" max="20"
+          value="{{ settings.max_per_day }}"
+          class="w-full bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white rounded px-3 py-2 text-sm focus:outline-none focus:border-indigo-500"
         />
-        <span class="text-sm text-gray-500 dark:text-gray-400">h</span>
-        <input
-          type="number" name="min_minutes" min="0" max="59"
-          value="{{ gap_minutes }}"
-          class="w-20 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white rounded px-3 py-2 text-sm focus:outline-none focus:border-indigo-500"
-        />
-        <span class="text-sm text-gray-500 dark:text-gray-400">min</span>
+        <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">How many lessons can be delivered in a 24-hour window.</p>
       </div>
-      <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">Minimum gap between consecutive lessons.</p>
+
+      <div>
+        <label class="block text-sm text-gray-600 dark:text-gray-400 mb-1">Minimum gap between lessons</label>
+        <select name="min_gap_minutes"
+                class="w-full bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white rounded px-3 py-2 text-sm focus:outline-none focus:border-indigo-500">
+          {% set gap = settings.min_gap_minutes %}
+          <option value="0"    {% if gap == 0    %}selected{% endif %}>No cooldown</option>
+          <option value="15"   {% if gap == 15   %}selected{% endif %}>15 minutes</option>
+          <option value="30"   {% if gap == 30   %}selected{% endif %}>30 minutes</option>
+          <option value="60"   {% if gap == 60   %}selected{% endif %}>1 hour</option>
+          <option value="90"   {% if gap == 90   %}selected{% endif %}>1 hour 30 min</option>
+          <option value="120"  {% if gap == 120  %}selected{% endif %}>2 hours</option>
+          <option value="180"  {% if gap == 180  %}selected{% endif %}>3 hours</option>
+          <option value="240"  {% if gap == 240  %}selected{% endif %}>4 hours</option>
+          <option value="360"  {% if gap == 360  %}selected{% endif %}>6 hours</option>
+          <option value="480"  {% if gap == 480  %}selected{% endif %}>8 hours</option>
+          <option value="720"  {% if gap == 720  %}selected{% endif %}>12 hours</option>
+          <option value="1440" {% if gap == 1440 %}selected{% endif %}>24 hours</option>
+        </select>
+        <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">Minimum gap between consecutive lessons.</p>
+      </div>
+
+      <button type="submit"
+              class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded px-4 py-2 text-sm transition">
+        Save settings
+      </button>
     </div>
+  </form>
 
-    <button
-      type="submit"
-      class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded px-4 py-2 text-sm transition"
-    >
-      Save settings
-    </button>
+  <!-- Backup & Restore -->
+  <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-6 space-y-4">
+    <p class="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">Backup &amp; Restore</p>
 
-    <!-- Data section -->
-    <div class="border-t border-gray-100 dark:border-gray-800 pt-4 space-y-3">
-      <p class="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">Data</p>
-
-      <a href="/lessons/export"
+    <!-- Export full backup -->
+    <div>
+      <p class="text-sm text-gray-600 dark:text-gray-400 mb-2">Export a full backup (settings + all lessons).</p>
+      <a href="/settings/export"
          class="block w-full text-center bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 font-medium rounded px-4 py-2 text-sm transition">
-        Export lessons (JSON)
+        Download backup
       </a>
     </div>
 
-  </div>
-</form>
-
-<!-- Import form (separate, multipart) -->
-<div class="max-w-sm mt-4">
-  <form method="post" action="/lessons/import" enctype="multipart/form-data"
-        class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl px-6 py-4 space-y-2">
-    <p class="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">Import lessons</p>
-    <div class="flex gap-2 items-center">
-      <input type="file" name="file" accept=".json"
-             class="flex-1 text-sm text-gray-600 dark:text-gray-300 file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:text-sm file:bg-indigo-50 dark:file:bg-indigo-900/30 file:text-indigo-700 dark:file:text-indigo-300 file:cursor-pointer" />
-      <button type="submit"
-              class="bg-indigo-600 hover:bg-indigo-500 text-white rounded px-3 py-1.5 text-sm transition shrink-0">
-        Import
-      </button>
+    <!-- Import / restore -->
+    <div class="border-t border-gray-100 dark:border-gray-800 pt-4">
+      <p class="text-sm text-gray-600 dark:text-gray-400 mb-2">Restore from a backup file. Settings are overwritten; duplicate lessons are skipped.</p>
+      <form method="post" action="/settings/import" enctype="multipart/form-data" class="space-y-2">
+        <input type="file" name="file" accept=".json"
+               class="w-full text-sm text-gray-600 dark:text-gray-300 file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:text-sm file:bg-indigo-50 dark:file:bg-indigo-900/30 file:text-indigo-700 dark:file:text-indigo-300 file:cursor-pointer" />
+        <button type="submit"
+                class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded px-4 py-2 text-sm transition">
+          Restore backup
+        </button>
+      </form>
     </div>
-    <p class="text-xs text-gray-400 dark:text-gray-500">Duplicate lessons (same ID) are skipped.</p>
-  </form>
+
+    <!-- Export lessons only -->
+    <div class="border-t border-gray-100 dark:border-gray-800 pt-4">
+      <p class="text-sm text-gray-600 dark:text-gray-400 mb-2">Export lessons only (no settings).</p>
+      <a href="/lessons/export"
+         class="block w-full text-center bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 font-medium rounded px-4 py-2 text-sm transition">
+        Download lessons
+      </a>
+    </div>
+  </div>
+
 </div>
 {% endblock %}

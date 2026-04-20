@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import io
 import json
 import sqlite3
+import zipfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
@@ -312,6 +314,52 @@ def import_lessons(conn: sqlite3.Connection, records: list[dict]) -> int:
         inserted += cur.rowcount
     conn.commit()
     return inserted
+
+
+def create_backup_zip(conn: sqlite3.Connection) -> bytes:
+    """Return a zip archive (bytes) containing settings.json, lessons.json, knowledge.json."""
+    settings = get_settings(conn)
+    lessons = export_lessons(conn)
+    knowledge = get_all_knowledge(conn)
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr("settings.json", json.dumps(settings.model_dump(), indent=2))
+        zf.writestr("lessons.json", json.dumps(lessons, indent=2, ensure_ascii=False))
+        zf.writestr("knowledge.json", json.dumps(knowledge, indent=2))
+    return buf.getvalue()
+
+
+def restore_backup_zip(conn: sqlite3.Connection, data: bytes) -> dict[str, int]:
+    """Restore from a backup zip.
+
+    Returns a dict with counts: {"settings": 1, "topics": N, "lessons": N}.
+    Settings are overwritten; knowledge entries are upserted; duplicate lessons are skipped.
+    """
+    result: dict[str, int] = {"settings": 0, "topics": 0, "lessons": 0}
+
+    with zipfile.ZipFile(io.BytesIO(data)) as zf:
+        names = zf.namelist()
+
+        if "settings.json" in names:
+            s = json.loads(zf.read("settings.json"))
+            if "max_per_day" in s:
+                set_setting(conn, "max_per_day", str(s["max_per_day"]))
+            if "min_gap_minutes" in s:
+                set_setting(conn, "min_gap_minutes", str(s["min_gap_minutes"]))
+            result["settings"] = 1
+
+        if "knowledge.json" in names:
+            knowledge = json.loads(zf.read("knowledge.json"))
+            for topic, confidence in knowledge.items():
+                upsert_knowledge(conn, topic, confidence)
+            result["topics"] = len(knowledge)
+
+        if "lessons.json" in names:
+            lessons_data = json.loads(zf.read("lessons.json"))
+            result["lessons"] = import_lessons(conn, lessons_data)
+
+    return result
 
 
 def get_distinct_column(conn: sqlite3.Connection, column: str) -> list[str]:

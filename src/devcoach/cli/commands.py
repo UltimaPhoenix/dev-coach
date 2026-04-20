@@ -3,7 +3,11 @@
 from __future__ import annotations
 
 import argparse
+import io
+import json
 import sys
+import zipfile
+from pathlib import Path
 
 from rich.console import Console
 from rich.table import Table
@@ -196,18 +200,21 @@ def cmd_settings(_args: argparse.Namespace) -> None:
     settings = db.get_settings(conn)
     conn.close()
 
+    gap_h, gap_m = divmod(settings.min_gap_minutes, 60)
+    gap_label = f"{gap_h}h {gap_m}m" if gap_h else f"{gap_m}m"
+
     table = Table(title="Settings", box=box.ROUNDED)
     table.add_column("Key", style="cyan")
     table.add_column("Value", justify="right")
 
     table.add_row("max_per_day", str(settings.max_per_day))
-    table.add_row("min_hours_between", str(settings.min_hours_between))
+    table.add_row("min_gap_minutes", f"{settings.min_gap_minutes} ({gap_label})")
 
     console.print(table)
 
 
 def cmd_set(args: argparse.Namespace) -> None:
-    valid_keys = {"max_per_day", "min_hours_between"}
+    valid_keys = {"max_per_day", "min_gap_minutes"}
     if args.key not in valid_keys:
         console.print(f"[red]Unknown key '{args.key}'. Valid keys: {', '.join(sorted(valid_keys))}[/red]")
         sys.exit(1)
@@ -216,6 +223,63 @@ def cmd_set(args: argparse.Namespace) -> None:
     db.set_setting(conn, args.key, args.value)
     conn.close()
     console.print(f"[green]Set {args.key} = {args.value}[/green]")
+
+
+def cmd_backup(args: argparse.Namespace) -> None:
+    """Export settings + knowledge map + lessons as a zip file."""
+    conn = _get_conn()
+    settings = db.get_settings(conn)
+    lessons = db.export_lessons(conn)
+    knowledge = db.get_all_knowledge(conn)
+    conn.close()
+
+    out_path = Path(args.output) if args.output else Path("devcoach-backup.zip")
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr("settings.json", json.dumps(settings.model_dump(), indent=2))
+        zf.writestr("lessons.json", json.dumps(lessons, indent=2, ensure_ascii=False))
+        zf.writestr("knowledge.json", json.dumps(knowledge, indent=2))
+    out_path.write_bytes(buf.getvalue())
+
+    console.print(f"[green]Backup saved:[/green] {out_path}  "
+                  f"([cyan]{len(lessons)}[/cyan] lessons, "
+                  f"[cyan]{len(knowledge)}[/cyan] topics)")
+
+
+def cmd_restore(args: argparse.Namespace) -> None:
+    """Restore settings + knowledge map + lessons from a backup zip file."""
+    in_path = Path(args.input)
+    if not in_path.exists():
+        console.print(f"[red]File not found: {in_path}[/red]")
+        sys.exit(1)
+
+    conn = _get_conn()
+    count = 0
+
+    with zipfile.ZipFile(in_path) as zf:
+        names = zf.namelist()
+
+        if "settings.json" in names:
+            s = json.loads(zf.read("settings.json"))
+            if "max_per_day" in s:
+                db.set_setting(conn, "max_per_day", str(s["max_per_day"]))
+            if "min_gap_minutes" in s:
+                db.set_setting(conn, "min_gap_minutes", str(s["min_gap_minutes"]))
+            console.print("[green]✓[/green] Settings restored")
+
+        if "knowledge.json" in names:
+            knowledge = json.loads(zf.read("knowledge.json"))
+            for topic, confidence in knowledge.items():
+                db.upsert_knowledge(conn, topic, confidence)
+            console.print(f"[green]✓[/green] Knowledge map restored ([cyan]{len(knowledge)}[/cyan] topics)")
+
+        if "lessons.json" in names:
+            lessons_data = json.loads(zf.read("lessons.json"))
+            count = db.import_lessons(conn, lessons_data)
+            console.print(f"[green]✓[/green] Lessons: [cyan]{count}[/cyan] new imported (duplicates skipped)")
+
+    conn.close()
 
 
 def cmd_ui(args: argparse.Namespace) -> None:
@@ -267,8 +331,14 @@ def _build_parser() -> argparse.ArgumentParser:
     sub.add_parser("settings", help="Show current settings")
 
     p_set = sub.add_parser("set", help="Update a setting")
-    p_set.add_argument("key", help="Setting key (max_per_day | min_hours_between)")
+    p_set.add_argument("key", help="Setting key (max_per_day | min_gap_minutes)")
     p_set.add_argument("value", help="New value")
+
+    p_backup = sub.add_parser("backup", help="Export a full backup (settings + knowledge + lessons) as zip")
+    p_backup.add_argument("output", nargs="?", default="devcoach-backup.zip", help="Output zip file path (default: devcoach-backup.zip)")
+
+    p_restore = sub.add_parser("restore", help="Restore from a backup zip file")
+    p_restore.add_argument("input", help="Path to backup zip file")
 
     p_ui = sub.add_parser("ui", help="Launch the web dashboard")
     p_ui.add_argument("--port", type=int, default=7860, help="Port (default: 7860)")
@@ -291,6 +361,8 @@ def run_cli() -> None:
         "feedback": cmd_feedback,
         "settings": cmd_settings,
         "set": cmd_set,
+        "backup": cmd_backup,
+        "restore": cmd_restore,
         "ui": cmd_ui,
     }
 
