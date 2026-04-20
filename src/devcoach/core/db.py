@@ -28,7 +28,7 @@ DEFAULT_PROFILE: dict[str, int] = {
 
 DEFAULT_SETTINGS: dict[str, str] = {
     "max_per_day": "2",
-    "min_hours_between": "4",
+    "min_gap_minutes": "240",  # replaces min_hours_between
 }
 
 # Ordered category → topic list mapping for the knowledge map UI.
@@ -183,14 +183,16 @@ def get_lessons(
     branch: Optional[str] = None,
     commit: Optional[str] = None,
     starred: Optional[bool] = None,
+    search: Optional[str] = None,
 ) -> list[Lesson]:
-    """Return lessons filtered by period, category, git metadata, and/or starred flag.
+    """Return lessons filtered by period, category, git metadata, starred flag, and/or search text.
 
     period: today | week | month | year | all | None (same as all)
     category: exact tag match inside the JSON categories array
     project, repository, branch: fuzzy match on metadata columns
     commit: fuzzy match on commit_hash
     starred: True for starred only, False for unstarred only, None for all
+    search: fuzzy match across title, topic_id, and summary
     """
     conditions: list[str] = []
     params: list[object] = []
@@ -224,6 +226,11 @@ def get_lessons(
         conditions.append("starred = ?")
         params.append(1 if starred else 0)
 
+    if search is not None:
+        conditions.append("(title LIKE ? OR topic_id LIKE ? OR summary LIKE ?)")
+        like = f"%{search}%"
+        params.extend([like, like, like])
+
     where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
     rows = conn.execute(
         f"SELECT * FROM lessons {where} ORDER BY timestamp DESC",
@@ -254,6 +261,50 @@ def set_feedback(
     conn.commit()
     row = conn.execute("SELECT topic_id FROM lessons WHERE id = ?", (lesson_id,)).fetchone()
     return row["topic_id"] if row else None
+
+
+def export_lessons(conn: sqlite3.Connection) -> list[dict]:
+    """Return all lessons as a list of plain dicts, suitable for JSON serialisation."""
+    rows = conn.execute("SELECT * FROM lessons ORDER BY timestamp DESC").fetchall()
+    return [dict(row) for row in rows]
+
+
+def import_lessons(conn: sqlite3.Connection, records: list[dict]) -> int:
+    """Insert lessons from a list of dicts, skipping duplicates by id.
+
+    Returns the number of newly inserted rows.
+    """
+    inserted = 0
+    for r in records:
+        cur = conn.execute(
+            """INSERT OR IGNORE INTO lessons
+               (id, timestamp, topic_id, categories, title, level, summary,
+                task_context, project, repository, branch, commit_hash, folder,
+                starred, feedback)
+               VALUES (:id, :timestamp, :topic_id, :categories, :title, :level, :summary,
+                       :task_context, :project, :repository, :branch, :commit_hash, :folder,
+                       :starred, :feedback)""",
+            {
+                "id": r.get("id"),
+                "timestamp": r.get("timestamp"),
+                "topic_id": r.get("topic_id"),
+                "categories": r.get("categories"),
+                "title": r.get("title"),
+                "level": r.get("level"),
+                "summary": r.get("summary"),
+                "task_context": r.get("task_context"),
+                "project": r.get("project"),
+                "repository": r.get("repository"),
+                "branch": r.get("branch"),
+                "commit_hash": r.get("commit_hash"),
+                "folder": r.get("folder"),
+                "starred": r.get("starred", 0),
+                "feedback": r.get("feedback"),
+            },
+        )
+        inserted += cur.rowcount
+    conn.commit()
+    return inserted
 
 
 def get_distinct_column(conn: sqlite3.Connection, column: str) -> list[str]:
@@ -333,12 +384,18 @@ def upsert_knowledge(
 # ── Settings ───────────────────────────────────────────────────────────────
 
 def get_settings(conn: sqlite3.Connection) -> Settings:
-    """Load settings from DB, falling back to defaults."""
+    """Load settings from DB, falling back to defaults. Migrates old min_hours_between."""
     rows = conn.execute("SELECT key, value FROM settings").fetchall()
     data: dict[str, str] = {row[0]: row[1] for row in rows}
+    if "min_gap_minutes" in data:
+        gap = int(data["min_gap_minutes"])
+    elif "min_hours_between" in data:
+        gap = int(data["min_hours_between"]) * 60  # migrate hours → minutes
+    else:
+        gap = int(DEFAULT_SETTINGS["min_gap_minutes"])
     return Settings(
         max_per_day=int(data.get("max_per_day", DEFAULT_SETTINGS["max_per_day"])),
-        min_hours_between=int(data.get("min_hours_between", DEFAULT_SETTINGS["min_hours_between"])),
+        min_gap_minutes=gap,
     )
 
 

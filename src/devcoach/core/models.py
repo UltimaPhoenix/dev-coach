@@ -37,7 +37,7 @@ class Settings(BaseModel):
     """Server configuration settings."""
 
     max_per_day: int = 2
-    min_hours_between: int = 4
+    min_gap_minutes: int = 240  # replaces min_hours_between (4h default)
 
 
 class KnowledgeUpdate(BaseModel):

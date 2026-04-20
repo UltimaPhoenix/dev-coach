@@ -41,15 +41,17 @@ def check_rate_limit(conn: sqlite3.Connection) -> RateLimitResult:
             last_dt = datetime.fromisoformat(last_ts)
             if last_dt.tzinfo is None:
                 last_dt = last_dt.replace(tzinfo=timezone.utc)
-            elapsed_hours = (now - last_dt).total_seconds() / 3600
-            if elapsed_hours < settings.min_hours_between:
-                remaining = settings.min_hours_between - elapsed_hours
+            elapsed_minutes = (now - last_dt).total_seconds() / 60
+            if elapsed_minutes < settings.min_gap_minutes:
+                remaining = settings.min_gap_minutes - elapsed_minutes
+                gap_h, gap_m = divmod(settings.min_gap_minutes, 60)
+                rem_h, rem_m = divmod(int(remaining), 60)
                 return RateLimitResult(
                     allowed=False,
                     reason=(
-                        f"Too soon: last lesson {elapsed_hours:.1f}h ago, "
-                        f"minimum interval is {settings.min_hours_between}h "
-                        f"({remaining:.1f}h remaining)"
+                        f"Too soon: last lesson {elapsed_minutes:.0f}m ago, "
+                        f"minimum interval is {gap_h}h {gap_m}m "
+                        f"({rem_h}h {rem_m}m remaining)"
                     ),
                 )
 

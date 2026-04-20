@@ -239,7 +239,7 @@ class TestLessonsStarredFilter:
 
     def test_star_icon_shown_in_table(self, client):
         html = client.get("/lessons").text
-        assert "⭐" in html  # lesson 2 is starred
+        assert "★" in html  # lesson 2 is starred (filled star character)
 
 
 # ── POST /lessons/{id}/star ────────────────────────────────────────────────

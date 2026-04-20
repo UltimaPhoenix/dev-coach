@@ -8,7 +8,7 @@
 </div>
 
 <!-- Filters -->
-{% set any_filter = selected_period != 'all' or selected_category or selected_project or selected_repository or selected_branch or selected_commit or selected_starred %}
+{% set any_filter = selected_period != 'all' or selected_category or selected_project or selected_repository or selected_branch or selected_commit or selected_starred or selected_search %}
 <form method="get" action="/lessons" class="mb-6">
 
   <!-- Single filter row: all selects + starred + advanced toggle + clear all -->
@@ -49,6 +49,13 @@
       {% endfor %}
     </select>
     {% endif %}
+
+    <div class="flex items-center gap-1">
+      <input type="text" name="search" value="{{ selected_search }}"
+             placeholder="Search…"
+             class="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded px-3 py-1.5 text-sm w-40 focus:outline-none focus:border-indigo-500" />
+      <button type="submit" class="text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-white transition px-1">🔍</button>
+    </div>
 
     <label class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300 cursor-pointer select-none">
       <input type="checkbox" name="starred" value="1" {% if selected_starred %}checked{% endif %}

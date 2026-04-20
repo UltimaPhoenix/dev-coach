@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI, Form, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi import FastAPI, File, Form, Request, UploadFile
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -67,6 +68,29 @@ async def adjust_knowledge(
     return RedirectResponse(url="/", status_code=303)
 
 
+@app.get("/lessons/export")
+async def export_lessons_route() -> Response:
+    conn = _get_conn()
+    records = db.export_lessons(conn)
+    conn.close()
+    payload = json.dumps(records, indent=2, ensure_ascii=False)
+    return Response(
+        content=payload,
+        media_type="application/json",
+        headers={"Content-Disposition": "attachment; filename=devcoach-lessons.json"},
+    )
+
+
+@app.post("/lessons/import")
+async def import_lessons_route(file: UploadFile = File(...)) -> RedirectResponse:
+    content = await file.read()
+    records = json.loads(content)
+    conn = _get_conn()
+    count = db.import_lessons(conn, records)
+    conn.close()
+    return RedirectResponse(url=f"/settings?imported={count}", status_code=303)
+
+
 @app.get("/lessons", response_class=HTMLResponse)
 async def lessons_page(
     request: Request,
@@ -77,6 +101,7 @@ async def lessons_page(
     branch: Optional[str] = None,
     commit: Optional[str] = None,
     starred: Optional[str] = None,
+    search: Optional[str] = None,
 ) -> HTMLResponse:
     conn = _get_conn()
     starred_filter = True if starred == "1" else None
@@ -89,6 +114,7 @@ async def lessons_page(
         branch=branch or None,
         commit=commit or None,
         starred=starred_filter,
+        search=search or None,
     )
     all_categories = db.get_all_categories(conn)
     all_projects = db.get_distinct_column(conn, "project")
@@ -113,6 +139,7 @@ async def lessons_page(
             "selected_branch": branch or "",
             "selected_commit": commit or "",
             "selected_starred": starred == "1",
+            "selected_search": search or "",
         },
     )
 
@@ -167,17 +194,22 @@ async def settings_page(request: Request) -> HTMLResponse:
     return templates.TemplateResponse(
         request,
         "settings.html",
-        {"settings": settings},
+        {
+            "settings": settings,
+            "gap_hours": settings.min_gap_minutes // 60,
+            "gap_minutes": settings.min_gap_minutes % 60,
+        },
     )
 
 
 @app.post("/settings", response_class=HTMLResponse)
 async def update_settings(
     max_per_day: int = Form(...),
-    min_hours_between: int = Form(...),
+    min_hours: int = Form(...),
+    min_minutes: int = Form(...),
 ) -> RedirectResponse:
     conn = _get_conn()
     db.set_setting(conn, "max_per_day", str(max_per_day))
-    db.set_setting(conn, "min_hours_between", str(min_hours_between))
+    db.set_setting(conn, "min_gap_minutes", str(min_hours * 60 + min_minutes))
     conn.close()
     return RedirectResponse(url="/settings", status_code=303)
