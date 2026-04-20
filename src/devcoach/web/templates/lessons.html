@@ -9,10 +9,10 @@
 
 <!-- Filters -->
 {% set any_filter = selected_period != 'all' or selected_category or selected_project or selected_repository or selected_branch or selected_commit or selected_starred %}
-<form method="get" action="/lessons" class="mb-6 space-y-2">
+<form method="get" action="/lessons" class="mb-6">
 
-  <!-- Row 1: period + category + project + repo (auto-submit on change) -->
-  <div class="flex flex-wrap gap-3">
+  <!-- Single filter row: all selects + starred + advanced toggle + clear all -->
+  <div class="flex flex-wrap items-center gap-3">
     <select name="period" onchange="this.form.submit()"
             class="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded px-3 py-1.5 text-sm">
       <option value="all"   {% if selected_period == 'all'   %}selected{% endif %}>All time</option>
@@ -49,79 +49,68 @@
       {% endfor %}
     </select>
     {% endif %}
-  </div>
 
-  <!-- Row 2: starred toggle (auto-submit on change) -->
-  <div class="flex items-center gap-3">
     <label class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300 cursor-pointer select-none">
       <input type="checkbox" name="starred" value="1" {% if selected_starred %}checked{% endif %}
              onchange="this.form.submit()"
              class="accent-yellow-400 w-4 h-4" />
-      <span>★ Starred only</span>
+      <span>★ Starred</span>
     </label>
+
+    {% if all_branches or all_commits %}
+    <button type="button" onclick="toggleAdv(this)"
+            class="text-xs select-none transition {% if selected_branch or selected_commit %}text-indigo-500 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300{% else %}text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300{% endif %}">
+      Advanced…
+    </button>
+    {% endif %}
+
+    {% if any_filter %}
+    <a href="/lessons" class="ml-auto text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-white text-sm transition">Clear all</a>
+    {% endif %}
   </div>
 
-  <!-- Advanced filters (branch + commit) — collapsible -->
+  <!-- Advanced panel: appears below the filter row, does not affect the row above -->
   {% if all_branches or all_commits %}
-  <details class="mt-1" {% if selected_branch or selected_commit %}open{% endif %}>
-    <summary class="text-xs text-gray-400 dark:text-gray-500 cursor-pointer select-none hover:text-gray-600 dark:hover:text-gray-300 transition w-fit">
-      Advanced filters…
-    </summary>
-    <div class="flex flex-wrap gap-3 mt-2 items-center">
-      {% if all_branches %}
-      <div class="relative">
-        <input
-          type="text"
-          name="branch"
-          value="{{ selected_branch }}"
-          placeholder="Branch…"
-          list="branch-list"
-          autocomplete="off"
-          class="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded px-3 py-1.5 text-sm w-44 focus:outline-none focus:border-indigo-500"
-        />
-        <datalist id="branch-list">
-          {% for b in all_branches %}
-          <option value="{{ b }}">
-          {% endfor %}
-        </datalist>
-      </div>
-      {% endif %}
+  <div id="adv-panel" class="{% if not (selected_branch or selected_commit) %}hidden{% endif %} flex flex-wrap gap-3 items-center mt-3">
+    {% if all_branches %}
+    <input
+      type="text"
+      name="branch"
+      value="{{ selected_branch }}"
+      placeholder="Branch…"
+      list="branch-list"
+      autocomplete="off"
+      class="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded px-3 py-1.5 text-sm w-44 focus:outline-none focus:border-indigo-500"
+    />
+    <datalist id="branch-list">
+      {% for b in all_branches %}
+      <option value="{{ b }}">
+      {% endfor %}
+    </datalist>
+    {% endif %}
 
-      {% if all_commits %}
-      <div class="relative">
-        <input
-          type="text"
-          name="commit"
-          value="{{ selected_commit }}"
-          placeholder="Commit hash…"
-          list="commit-list"
-          autocomplete="off"
-          class="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded px-3 py-1.5 text-sm w-52 font-mono focus:outline-none focus:border-indigo-500"
-        />
-        <datalist id="commit-list">
-          {% for c in all_commits %}
-          <option value="{{ c[:7] }}">
-          {% endfor %}
-        </datalist>
-      </div>
-      {% endif %}
+    {% if all_commits %}
+    <input
+      type="text"
+      name="commit"
+      value="{{ selected_commit }}"
+      placeholder="Commit hash…"
+      list="commit-list"
+      autocomplete="off"
+      class="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded px-3 py-1.5 text-sm w-52 font-mono focus:outline-none focus:border-indigo-500"
+    />
+    <datalist id="commit-list">
+      {% for c in all_commits %}
+      <option value="{{ c[:7] }}">
+      {% endfor %}
+    </datalist>
+    {% endif %}
 
-      <button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white rounded px-4 py-1.5 text-sm transition">Search</button>
-      {% if selected_branch or selected_commit %}
-      <a href="/lessons{% if selected_period != 'all' or selected_category or selected_project or selected_repository or selected_starred %}?period={{ selected_period }}{% if selected_category %}&category={{ selected_category }}{% endif %}{% if selected_project %}&project={{ selected_project }}{% endif %}{% if selected_repository %}&repository={{ selected_repository }}{% endif %}{% if selected_starred %}&starred=1{% endif %}{% endif %}"
-         class="text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-white text-sm transition">Clear</a>
-      {% endif %}
-    </div>
-  </details>
-  {% endif %}
-
-  {% if any_filter and not (selected_branch or selected_commit) %}
-  <div>
-    <a href="/lessons" class="text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-white text-sm transition">Clear all filters</a>
-  </div>
-  {% elif any_filter %}
-  <div>
-    <a href="/lessons" class="text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-white text-sm transition">Clear all filters</a>
+    <button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white rounded px-4 py-1.5 text-sm transition">Search</button>
+    {% if selected_branch or selected_commit %}
+    <a href="/lessons{% if selected_period != 'all' or selected_category or selected_project or selected_repository or selected_starred %}?period={{ selected_period }}{% if selected_category %}&category={{ selected_category }}{% endif %}{% if selected_project %}&project={{ selected_project }}{% endif %}{% if selected_repository %}&repository={{ selected_repository }}{% endif %}{% if selected_starred %}&starred=1{% endif %}{% endif %}"
+       class="text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-white text-sm transition">Clear</a>
+    {% endif %}
   </div>
   {% endif %}
 
@@ -175,4 +164,19 @@
 {% else %}
 <p class="text-gray-400 dark:text-gray-500">No lessons found for the selected filters.</p>
 {% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+  function toggleAdv(btn) {
+    var panel = document.getElementById('adv-panel');
+    if (!panel) return;
+    var hidden = panel.classList.toggle('hidden');
+    // Highlight button when panel is open
+    btn.classList.toggle('text-indigo-500', !hidden);
+    btn.classList.toggle('dark:text-indigo-400', !hidden);
+    btn.classList.toggle('text-gray-400', hidden);
+    btn.classList.toggle('dark:text-gray-500', hidden);
+  }
+</script>
 {% endblock %}
