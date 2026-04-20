@@ -44,8 +44,6 @@
     {% block content %}{% endblock %}
   </main>
 
-  {% block scripts %}{% endblock %}
-
   <script>
     function isDark() {
       return document.documentElement.classList.contains('dark');
@@ -74,5 +72,7 @@
     updateThemeIcon();
     updateHljsTheme();
   </script>
+
+  {% block scripts %}{% endblock %}
 </body>
 </html>
