@@ -9,11 +9,12 @@
 
 <!-- Filters -->
 {% set any_filter = selected_period != 'all' or selected_category or selected_project or selected_repository or selected_branch or selected_commit or selected_starred %}
-<form method="get" action="/lessons" class="mb-6 space-y-3">
+<form method="get" action="/lessons" class="mb-6 space-y-2">
 
-  <!-- Row 1: period + category -->
+  <!-- Row 1: period + category + project + repo (auto-submit on change) -->
   <div class="flex flex-wrap gap-3">
-    <select name="period" class="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded px-3 py-1.5 text-sm">
+    <select name="period" onchange="this.form.submit()"
+            class="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded px-3 py-1.5 text-sm">
       <option value="all"   {% if selected_period == 'all'   %}selected{% endif %}>All time</option>
       <option value="today" {% if selected_period == 'today' %}selected{% endif %}>Today</option>
       <option value="week"  {% if selected_period == 'week'  %}selected{% endif %}>Last 7 days</option>
@@ -21,7 +22,8 @@
       <option value="year"  {% if selected_period == 'year'  %}selected{% endif %}>Last year</option>
     </select>
 
-    <select name="category" class="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded px-3 py-1.5 text-sm">
+    <select name="category" onchange="this.form.submit()"
+            class="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded px-3 py-1.5 text-sm">
       <option value="" {% if not selected_category %}selected{% endif %}>All categories</option>
       {% for cat in all_categories %}
       <option value="{{ cat }}" {% if selected_category == cat %}selected{% endif %}>{{ cat }}</option>
@@ -29,7 +31,8 @@
     </select>
 
     {% if all_projects %}
-    <select name="project" class="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded px-3 py-1.5 text-sm">
+    <select name="project" onchange="this.form.submit()"
+            class="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded px-3 py-1.5 text-sm">
       <option value="" {% if not selected_project %}selected{% endif %}>All projects</option>
       {% for p in all_projects %}
       <option value="{{ p }}" {% if selected_project == p %}selected{% endif %}>{{ p }}</option>
@@ -38,7 +41,8 @@
     {% endif %}
 
     {% if all_repositories %}
-    <select name="repository" class="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded px-3 py-1.5 text-sm">
+    <select name="repository" onchange="this.form.submit()"
+            class="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded px-3 py-1.5 text-sm">
       <option value="" {% if not selected_repository %}selected{% endif %}>All repositories</option>
       {% for r in all_repositories %}
       <option value="{{ r }}" {% if selected_repository == r %}selected{% endif %}>{{ r }}</option>
@@ -47,65 +51,80 @@
     {% endif %}
   </div>
 
-  <!-- Row 2: branch + commit freetext with autocomplete -->
-  {% if all_branches or all_commits %}
-  <div class="flex flex-wrap gap-3">
-    {% if all_branches %}
-    <div class="relative">
-      <input
-        type="text"
-        name="branch"
-        value="{{ selected_branch }}"
-        placeholder="Branch…"
-        list="branch-list"
-        autocomplete="off"
-        class="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded px-3 py-1.5 text-sm w-44 focus:outline-none focus:border-indigo-500"
-      />
-      <datalist id="branch-list">
-        {% for b in all_branches %}
-        <option value="{{ b }}">
-        {% endfor %}
-      </datalist>
-    </div>
-    {% endif %}
-
-    {% if all_commits %}
-    <div class="relative">
-      <input
-        type="text"
-        name="commit"
-        value="{{ selected_commit }}"
-        placeholder="Commit hash…"
-        list="commit-list"
-        autocomplete="off"
-        class="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded px-3 py-1.5 text-sm w-52 font-mono focus:outline-none focus:border-indigo-500"
-      />
-      <datalist id="commit-list">
-        {% for c in all_commits %}
-        <option value="{{ c[:7] }}">
-        {% endfor %}
-      </datalist>
-    </div>
-    {% endif %}
-  </div>
-  {% endif %}
-
-  <!-- Row 3: starred toggle -->
+  <!-- Row 2: starred toggle (auto-submit on change) -->
   <div class="flex items-center gap-3">
     <label class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300 cursor-pointer select-none">
       <input type="checkbox" name="starred" value="1" {% if selected_starred %}checked{% endif %}
+             onchange="this.form.submit()"
              class="accent-yellow-400 w-4 h-4" />
-      <span>⭐ Starred only</span>
+      <span>★ Starred only</span>
     </label>
   </div>
 
-  <!-- Actions -->
-  <div class="flex gap-3 items-center">
-    <button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white rounded px-4 py-1.5 text-sm transition">Filter</button>
-    {% if any_filter %}
-    <a href="/lessons" class="text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-white text-sm transition">Clear</a>
-    {% endif %}
+  <!-- Advanced filters (branch + commit) — collapsible -->
+  {% if all_branches or all_commits %}
+  <details class="mt-1" {% if selected_branch or selected_commit %}open{% endif %}>
+    <summary class="text-xs text-gray-400 dark:text-gray-500 cursor-pointer select-none hover:text-gray-600 dark:hover:text-gray-300 transition w-fit">
+      Advanced filters…
+    </summary>
+    <div class="flex flex-wrap gap-3 mt-2 items-center">
+      {% if all_branches %}
+      <div class="relative">
+        <input
+          type="text"
+          name="branch"
+          value="{{ selected_branch }}"
+          placeholder="Branch…"
+          list="branch-list"
+          autocomplete="off"
+          class="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded px-3 py-1.5 text-sm w-44 focus:outline-none focus:border-indigo-500"
+        />
+        <datalist id="branch-list">
+          {% for b in all_branches %}
+          <option value="{{ b }}">
+          {% endfor %}
+        </datalist>
+      </div>
+      {% endif %}
+
+      {% if all_commits %}
+      <div class="relative">
+        <input
+          type="text"
+          name="commit"
+          value="{{ selected_commit }}"
+          placeholder="Commit hash…"
+          list="commit-list"
+          autocomplete="off"
+          class="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded px-3 py-1.5 text-sm w-52 font-mono focus:outline-none focus:border-indigo-500"
+        />
+        <datalist id="commit-list">
+          {% for c in all_commits %}
+          <option value="{{ c[:7] }}">
+          {% endfor %}
+        </datalist>
+      </div>
+      {% endif %}
+
+      <button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white rounded px-4 py-1.5 text-sm transition">Search</button>
+      {% if selected_branch or selected_commit %}
+      <a href="/lessons{% if selected_period != 'all' or selected_category or selected_project or selected_repository or selected_starred %}?period={{ selected_period }}{% if selected_category %}&category={{ selected_category }}{% endif %}{% if selected_project %}&project={{ selected_project }}{% endif %}{% if selected_repository %}&repository={{ selected_repository }}{% endif %}{% if selected_starred %}&starred=1{% endif %}{% endif %}"
+         class="text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-white text-sm transition">Clear</a>
+      {% endif %}
+    </div>
+  </details>
+  {% endif %}
+
+  {% if any_filter and not (selected_branch or selected_commit) %}
+  <div>
+    <a href="/lessons" class="text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-white text-sm transition">Clear all filters</a>
   </div>
+  {% elif any_filter %}
+  <div>
+    <a href="/lessons" class="text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-white text-sm transition">Clear all filters</a>
+  </div>
+  {% endif %}
+
 </form>
 
 <!-- Lessons table -->
@@ -114,12 +133,12 @@
   <table class="w-full text-sm border-collapse">
     <thead>
       <tr class="text-left text-gray-400 dark:text-gray-500 border-b border-gray-200 dark:border-gray-800">
-        <th class="pb-2 pr-2"></th>
-        <th class="pb-2 pr-4">Date</th>
-        <th class="pb-2 pr-4">Topic</th>
-        <th class="pb-2 pr-4">Title</th>
-        <th class="pb-2 pr-4">Level</th>
-        <th class="pb-2">Categories</th>
+        <th class="pb-2 pr-2 w-6"></th>
+        <th class="pb-2 pr-4 whitespace-nowrap">Date</th>
+        <th class="pb-2 pr-4 hidden sm:table-cell">Topic</th>
+        <th class="pb-2 pr-4 min-w-[12rem]">Title</th>
+        <th class="pb-2 pr-4 whitespace-nowrap">Level</th>
+        <th class="pb-2 hidden md:table-cell">Categories</th>
       </tr>
     </thead>
     <tbody>
@@ -132,18 +151,18 @@
           <form method="post" action="/lessons/{{ lesson.id }}/star">
             <input type="hidden" name="next" value="/lessons{% if request.url.query %}?{{ request.url.query }}{% endif %}" />
             <button type="submit" title="{% if lesson.starred %}Unstar{% else %}Star{% endif %}"
-                    class="text-lg leading-none transition {% if lesson.starred %}text-yellow-400 hover:text-yellow-300{% else %}text-gray-300 dark:text-gray-600 hover:text-yellow-400{% endif %}">
-              {% if lesson.starred %}⭐{% else %}☆{% endif %}
+                    class="w-6 text-center text-base leading-none transition {% if lesson.starred %}text-yellow-400 hover:text-yellow-300{% else %}text-gray-300 dark:text-gray-600 hover:text-yellow-400{% endif %}">
+              {% if lesson.starred %}★{% else %}☆{% endif %}
             </button>
           </form>
         </td>
         <td class="py-2 pr-4 text-gray-400 dark:text-gray-500 whitespace-nowrap">{{ lesson.timestamp[:10] }}</td>
-        <td class="py-2 pr-4 text-cyan-600 dark:text-cyan-400">{{ lesson.topic_id }}</td>
-        <td class="py-2 pr-4">
+        <td class="py-2 pr-4 text-cyan-600 dark:text-cyan-400 hidden sm:table-cell">{{ lesson.topic_id }}</td>
+        <td class="py-2 pr-4 min-w-[12rem]">
           <a href="/lessons/{{ lesson.id }}" class="hover:text-indigo-600 dark:hover:text-indigo-400 transition">{{ lesson.title }}</a>
         </td>
         <td class="py-2 pr-4 {{ level_class }}">{{ lesson.level }}</td>
-        <td class="py-2">
+        <td class="py-2 hidden md:table-cell">
           {% for cat in lesson.categories %}
           <span class="inline-block bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 text-xs rounded px-2 py-0.5 mr-1">{{ cat }}</span>
           {% endfor %}
