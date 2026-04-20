@@ -8,7 +8,7 @@
 </div>
 
 <!-- Filters -->
-{% set any_filter = selected_period != 'all' or selected_category or selected_project or selected_repository or selected_branch or selected_commit or selected_starred or selected_search %}
+{% set any_filter = selected_period != 'all' or selected_category or selected_project or selected_repository or selected_branch or selected_commit or selected_starred or selected_search or selected_feedback %}
 <form method="get" action="/lessons" class="mb-6">
 
   <!-- Single filter row: all selects + starred + advanced toggle + clear all -->
@@ -49,6 +49,14 @@
       {% endfor %}
     </select>
     {% endif %}
+
+    <select name="feedback" onchange="this.form.submit()"
+            class="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded px-3 py-1.5 text-sm">
+      <option value=""      {% if not selected_feedback %}selected{% endif %}>All feedback</option>
+      <option value="know"  {% if selected_feedback == 'know' %}selected{% endif %}>✓ Known</option>
+      <option value="dont_know" {% if selected_feedback == 'dont_know' %}selected{% endif %}>✗ Don't know</option>
+      <option value="none"  {% if selected_feedback == 'none' %}selected{% endif %}>— No response</option>
+    </select>
 
     <div class="flex items-center gap-1">
       <input type="text" name="search" value="{{ selected_search }}"

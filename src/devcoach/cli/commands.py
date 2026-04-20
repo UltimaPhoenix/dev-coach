@@ -50,6 +50,7 @@ def cmd_profile(_args: argparse.Namespace) -> None:
 def cmd_lessons(args: argparse.Namespace) -> None:
     conn = _get_conn()
     starred_filter = True if getattr(args, "starred", False) else None
+    feedback_filter = getattr(args, "feedback", None) or None
     lessons = db.get_lessons(
         conn,
         period=args.period if args.period != "all" else None,
@@ -59,6 +60,7 @@ def cmd_lessons(args: argparse.Namespace) -> None:
         branch=args.branch or None,
         commit=args.commit or None,
         starred=starred_filter,
+        feedback=feedback_filter,
     )
     conn.close()
 
@@ -249,6 +251,8 @@ def _build_parser() -> argparse.ArgumentParser:
     p_lessons.add_argument("--branch", default=None, help="Filter by branch name (fuzzy)")
     p_lessons.add_argument("--commit", default=None, help="Filter by commit hash prefix (fuzzy)")
     p_lessons.add_argument("--starred", action="store_true", default=False, help="Show only starred lessons")
+    p_lessons.add_argument("--feedback", choices=["know", "dont_know", "none"], default=None,
+                           help="Filter by feedback: know, dont_know, none (no response)")
 
     p_lesson = sub.add_parser("lesson", help="Show a single lesson in detail")
     p_lesson.add_argument("id", help="Lesson ID")

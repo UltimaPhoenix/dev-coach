@@ -184,6 +184,7 @@ def get_lessons(
     commit: Optional[str] = None,
     starred: Optional[bool] = None,
     search: Optional[str] = None,
+    feedback: Optional[str] = None,
 ) -> list[Lesson]:
     """Return lessons filtered by period, category, git metadata, starred flag, and/or search text.
 
@@ -230,6 +231,12 @@ def get_lessons(
         conditions.append("(title LIKE ? OR topic_id LIKE ? OR summary LIKE ?)")
         like = f"%{search}%"
         params.extend([like, like, like])
+
+    if feedback == "none":
+        conditions.append("feedback IS NULL")
+    elif feedback is not None:
+        conditions.append("feedback = ?")
+        params.append(feedback)
 
     where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
     rows = conn.execute(

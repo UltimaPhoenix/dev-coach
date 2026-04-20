@@ -330,7 +330,8 @@ class TestFeedbackEndpoint:
         # Clear feedback button should be gone
         assert "Clear feedback" not in html
 
-    def test_feedback_buttons_rendered_on_detail(self, client):
+    def test_feedback_rendered_on_detail(self, client):
+        # lesson-sqlite-upsert-patterns-001 has feedback="know" → shows badge, not buttons
         html = client.get("/lessons/lesson-sqlite-upsert-patterns-001").text
-        assert "I know this" in html
-        assert "I don't know this" in html
+        assert "I know this" in html  # badge text
+        assert "Clear" in html        # clear link shown alongside badge

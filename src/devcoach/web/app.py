@@ -102,6 +102,7 @@ async def lessons_page(
     commit: Optional[str] = None,
     starred: Optional[str] = None,
     search: Optional[str] = None,
+    feedback: Optional[str] = None,
 ) -> HTMLResponse:
     conn = _get_conn()
     starred_filter = True if starred == "1" else None
@@ -115,6 +116,7 @@ async def lessons_page(
         commit=commit or None,
         starred=starred_filter,
         search=search or None,
+        feedback=feedback or None,
     )
     all_categories = db.get_all_categories(conn)
     all_projects = db.get_distinct_column(conn, "project")
@@ -140,6 +142,7 @@ async def lessons_page(
             "selected_commit": commit or "",
             "selected_starred": starred == "1",
             "selected_search": search or "",
+            "selected_feedback": feedback or "",
         },
     )
 
