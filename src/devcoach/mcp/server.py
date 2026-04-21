@@ -5,7 +5,6 @@ from __future__ import annotations
 import importlib.resources
 import json
 import shutil
-import sqlite3
 import subprocess
 import sys
 from datetime import datetime, timedelta, timezone
@@ -14,7 +13,6 @@ from typing import Literal, Optional
 from fastmcp import FastMCP
 
 from devcoach.core import coach, db
-from devcoach.core.db import get_initialized_connection
 from devcoach.core.models import Lesson, Profile, RateLimitResult
 
 # ── FastMCP app ────────────────────────────────────────────────────────────
@@ -63,9 +61,8 @@ def log_lesson(
         folder=folder,
     )
     try:
-        conn = get_initialized_connection()
-        db.insert_lesson(conn, lesson)
-        conn.close()
+        with db.connection() as conn:
+            db.insert_lesson(conn, lesson)
         return "ok"
     except Exception as exc:
         return f"error: {exc}"
@@ -75,10 +72,8 @@ def log_lesson(
 def get_profile() -> Profile:
     """Return the user's current knowledge map (topic → confidence 0-10)."""
     try:
-        conn = get_initialized_connection()
-        profile = coach.get_profile(conn)
-        conn.close()
-        return profile
+        with db.connection() as conn:
+            return coach.get_profile(conn)
     except Exception:
         return Profile(knowledge={})
 
@@ -91,10 +86,8 @@ def update_knowledge(topic: str, delta: int) -> Profile:
     If the topic does not exist it is created with a base confidence of 5.
     """
     try:
-        conn = get_initialized_connection()
-        profile = coach.apply_knowledge_delta(conn, topic, delta)
-        conn.close()
-        return profile
+        with db.connection() as conn:
+            return coach.apply_knowledge_delta(conn, topic, delta)
     except Exception:
         return Profile(knowledge={})
 
@@ -107,10 +100,8 @@ def check_rate_limit() -> RateLimitResult:
     or allowed=False with a human-readable reason.
     """
     try:
-        conn = get_initialized_connection()
-        result = coach.check_rate_limit(conn)
-        conn.close()
-        return result
+        with db.connection() as conn:
+            return coach.check_rate_limit(conn)
     except Exception:
         return RateLimitResult(allowed=True)
 
@@ -142,23 +133,21 @@ def get_lessons(
     All filters can be combined.
     """
     try:
-        conn = get_initialized_connection()
-        lessons = db.get_lessons(
-            conn,
-            period=period,
-            category=category,
-            project=project,
-            repository=repository,
-            branch=branch,
-            commit=commit,
-            starred=starred,
-            feedback=feedback,
-            search=search,
-            date_from=date_from,
-            date_to=date_to,
-        )
-        conn.close()
-        return lessons
+        with db.connection() as conn:
+            return db.get_lessons(
+                conn,
+                period=period,
+                category=category,
+                project=project,
+                repository=repository,
+                branch=branch,
+                commit=commit,
+                starred=starred,
+                feedback=feedback,
+                search=search,
+                date_from=date_from,
+                date_to=date_to,
+            )
     except Exception:
         return []
 
@@ -167,10 +156,8 @@ def get_lessons(
 def get_lesson(lesson_id: str) -> Optional[Lesson]:
     """Return a single lesson by ID, or None if not found."""
     try:
-        conn = get_initialized_connection()
-        lesson = db.get_lesson_by_id(conn, lesson_id)
-        conn.close()
-        return lesson
+        with db.connection() as conn:
+            return db.get_lesson_by_id(conn, lesson_id)
     except Exception:
         return None
 
@@ -182,15 +169,14 @@ def get_stats() -> dict:
     Returns counts, rate-limit state, and the 5 weakest / 5 strongest topics.
     """
     try:
-        conn = get_initialized_connection()
-        now = datetime.now(timezone.utc)
-        total = len(db.get_lessons(conn))
-        today_cutoff = (now - timedelta(hours=24)).isoformat()
-        week_cutoff = (now - timedelta(days=7)).isoformat()
-        lessons_today = db.count_lessons_since(conn, today_cutoff)
-        lessons_week = db.count_lessons_since(conn, week_cutoff)
-        knowledge = db.get_all_knowledge(conn)
-        conn.close()
+        with db.connection() as conn:
+            now = datetime.now(timezone.utc)
+            total = len(db.get_lessons(conn))
+            today_cutoff = (now - timedelta(hours=24)).isoformat()
+            week_cutoff = (now - timedelta(days=7)).isoformat()
+            lessons_today = db.count_lessons_since(conn, today_cutoff)
+            lessons_week = db.count_lessons_since(conn, week_cutoff)
+            knowledge = db.get_all_knowledge(conn)
 
         sorted_k = sorted(knowledge.items(), key=lambda x: x[1])
         weakest = [{"topic": t, "confidence": c} for t, c in sorted_k[:5]]
@@ -214,9 +200,8 @@ def star_lesson(lesson_id: str) -> str:
     Returns 'starred' or 'unstarred' to indicate the new state.
     """
     try:
-        conn = get_initialized_connection()
-        new_state = db.toggle_star(conn, lesson_id)
-        conn.close()
+        with db.connection() as conn:
+            new_state = db.toggle_star(conn, lesson_id)
         return "starred" if new_state else "unstarred"
     except Exception as exc:
         return f"error: {exc}"
@@ -230,11 +215,10 @@ def submit_feedback(lesson_id: str, feedback: str) -> Profile:
     Automatically adjusts the topic's confidence score by ±1 and returns the updated Profile.
     """
     try:
-        conn = get_initialized_connection()
         feedback_value = None if feedback == "clear" else feedback
-        coach.record_feedback(conn, lesson_id, feedback_value)
-        knowledge = db.get_all_knowledge(conn)
-        conn.close()
+        with db.connection() as conn:
+            coach.record_feedback(conn, lesson_id, feedback_value)
+            knowledge = db.get_all_knowledge(conn)
         return Profile(knowledge=knowledge)
     except Exception:
         return Profile(knowledge={})
@@ -247,10 +231,8 @@ def get_taught_topics() -> list[str]:
     Use this before selecting a new lesson topic to avoid repetition.
     """
     try:
-        conn = get_initialized_connection()
-        topics = coach.list_taught_topics(conn)
-        conn.close()
-        return topics
+        with db.connection() as conn:
+            return coach.list_taught_topics(conn)
     except Exception:
         return []
 
@@ -275,27 +257,24 @@ def open_ui(port: int = 7860) -> str:
 @mcp.resource("devcoach://profile")
 def profile_resource() -> str:
     """Current knowledge map — topic → confidence (0-10)."""
-    conn = get_initialized_connection()
-    knowledge = db.get_all_knowledge(conn)
-    conn.close()
+    with db.connection() as conn:
+        knowledge = db.get_all_knowledge(conn)
     return json.dumps(knowledge, indent=2)
 
 
 @mcp.resource("devcoach://settings")
 def settings_resource() -> str:
     """Current coaching settings (rate limits)."""
-    conn = get_initialized_connection()
-    settings = db.get_settings(conn)
-    conn.close()
+    with db.connection() as conn:
+        settings = db.get_settings(conn)
     return json.dumps(settings.model_dump(), indent=2)
 
 
 @mcp.resource("devcoach://lessons/recent")
 def recent_lessons_resource() -> str:
     """Last 10 lessons from the current week."""
-    conn = get_initialized_connection()
-    lessons = db.get_lessons(conn, period="week")
-    conn.close()
+    with db.connection() as conn:
+        lessons = db.get_lessons(conn, period="week")
     return json.dumps(
         [l.model_dump() for l in lessons[:10]],
         indent=2,

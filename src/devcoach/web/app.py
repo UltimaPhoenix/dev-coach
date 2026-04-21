@@ -12,7 +12,6 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from devcoach.core import coach, db
-from devcoach.core.db import get_initialized_connection
 
 app = FastAPI(title="devcoach", docs_url=None, redoc_url=None)
 
@@ -25,9 +24,8 @@ app.mount("/static", StaticFiles(directory=str(_HERE / "static")), name="static"
 
 @app.get("/", response_class=HTMLResponse)
 async def profile_page(request: Request) -> HTMLResponse:
-    conn = get_initialized_connection()
-    knowledge = db.get_all_knowledge(conn)
-    conn.close()
+    with db.connection() as conn:
+        knowledge = db.get_all_knowledge(conn)
 
     categorised: dict[str, list[tuple[str, int]]] = {}
     seen: set[str] = set()
@@ -54,17 +52,15 @@ async def profile_page(request: Request) -> HTMLResponse:
 async def adjust_knowledge(
     request: Request, topic: str, delta: int = Form(...)
 ) -> RedirectResponse:
-    conn = get_initialized_connection()
-    coach.apply_knowledge_delta(conn, topic, delta)
-    conn.close()
+    with db.connection() as conn:
+        coach.apply_knowledge_delta(conn, topic, delta)
     return RedirectResponse(url="/", status_code=303)
 
 
 @app.get("/lessons/export")
 async def export_lessons_route() -> Response:
-    conn = get_initialized_connection()
-    records = db.export_lessons(conn)
-    conn.close()
+    with db.connection() as conn:
+        records = db.export_lessons(conn)
     payload = json.dumps(records, indent=2, ensure_ascii=False)
     return Response(
         content=payload,
@@ -77,9 +73,8 @@ async def export_lessons_route() -> Response:
 async def import_lessons_route(file: UploadFile = File(...)) -> RedirectResponse:
     content = await file.read()
     records = json.loads(content)
-    conn = get_initialized_connection()
-    count = db.import_lessons(conn, records)
-    conn.close()
+    with db.connection() as conn:
+        count = db.import_lessons(conn, records)
     return RedirectResponse(url=f"/settings?imported={count}", status_code=303)
 
 
@@ -98,30 +93,29 @@ async def lessons_page(
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
 ) -> HTMLResponse:
-    conn = get_initialized_connection()
     starred_filter = True if starred == "1" else None
-    # Custom date range takes precedence over period presets
     effective_period = None if (date_from or date_to) else (period or None)
-    lessons = db.get_lessons(
-        conn,
-        period=effective_period,
-        category=category or None,
-        project=project or None,
-        repository=repository or None,
-        branch=branch or None,
-        commit=commit or None,
-        starred=starred_filter,
-        search=search or None,
-        feedback=feedback or None,
-        date_from=date_from or None,
-        date_to=date_to or None,
-    )
-    all_categories = db.get_all_categories(conn)
-    all_projects = db.get_distinct_column(conn, "project")
-    all_repositories = db.get_distinct_column(conn, "repository")
-    all_branches = db.get_distinct_column(conn, "branch")
-    all_commits = db.get_distinct_column(conn, "commit_hash")
-    conn.close()
+    with db.connection() as conn:
+        lessons = db.get_lessons(
+            conn,
+            period=effective_period,
+            category=category or None,
+            project=project or None,
+            repository=repository or None,
+            branch=branch or None,
+            commit=commit or None,
+            starred=starred_filter,
+            search=search or None,
+            feedback=feedback or None,
+            date_from=date_from or None,
+            date_to=date_to or None,
+        )
+        all_categories = db.get_all_categories(conn)
+        all_projects = db.get_distinct_column(conn, "project")
+        all_repositories = db.get_distinct_column(conn, "repository")
+        all_branches = db.get_distinct_column(conn, "branch")
+        all_commits = db.get_distinct_column(conn, "commit_hash")
+
     return templates.TemplateResponse(
         request,
         "lessons.html",
@@ -151,9 +145,8 @@ async def lessons_page(
 async def star_lesson(
     lesson_id: str, next: str = Form(default="/lessons")
 ) -> RedirectResponse:
-    conn = get_initialized_connection()
-    db.toggle_star(conn, lesson_id)
-    conn.close()
+    with db.connection() as conn:
+        db.toggle_star(conn, lesson_id)
     return RedirectResponse(url=next, status_code=303)
 
 
@@ -163,18 +156,16 @@ async def submit_feedback(
     feedback: str = Form(...),
     next: str = Form(default="/lessons"),
 ) -> RedirectResponse:
-    conn = get_initialized_connection()
     feedback_value = None if feedback in ("", "clear") else feedback
-    coach.record_feedback(conn, lesson_id, feedback_value)
-    conn.close()
+    with db.connection() as conn:
+        coach.record_feedback(conn, lesson_id, feedback_value)
     return RedirectResponse(url=next, status_code=303)
 
 
 @app.get("/lessons/{lesson_id}", response_class=HTMLResponse)
 async def lesson_detail_page(request: Request, lesson_id: str) -> HTMLResponse:
-    conn = get_initialized_connection()
-    lesson = db.get_lesson_by_id(conn, lesson_id)
-    conn.close()
+    with db.connection() as conn:
+        lesson = db.get_lesson_by_id(conn, lesson_id)
     if lesson is None:
         return HTMLResponse("<h1>Lesson not found</h1>", status_code=404)
     return templates.TemplateResponse(
@@ -186,9 +177,8 @@ async def lesson_detail_page(request: Request, lesson_id: str) -> HTMLResponse:
 
 @app.get("/settings", response_class=HTMLResponse)
 async def settings_page(request: Request) -> HTMLResponse:
-    conn = get_initialized_connection()
-    settings = db.get_settings(conn)
-    conn.close()
+    with db.connection() as conn:
+        settings = db.get_settings(conn)
     return templates.TemplateResponse(
         request,
         "settings.html",
@@ -205,19 +195,17 @@ async def update_settings(
     max_per_day: int = Form(...),
     min_gap_minutes: int = Form(...),
 ) -> RedirectResponse:
-    conn = get_initialized_connection()
-    db.set_setting(conn, "max_per_day", str(max_per_day))
-    db.set_setting(conn, "min_gap_minutes", str(min_gap_minutes))
-    conn.close()
+    with db.connection() as conn:
+        db.set_setting(conn, "max_per_day", str(max_per_day))
+        db.set_setting(conn, "min_gap_minutes", str(min_gap_minutes))
     return RedirectResponse(url="/settings", status_code=303)
 
 
 @app.get("/settings/export")
 async def export_settings_route() -> Response:
     """Export full backup as zip: settings.json + lessons.json + knowledge.json."""
-    conn = get_initialized_connection()
-    data = db.create_backup_zip(conn)
-    conn.close()
+    with db.connection() as conn:
+        data = db.create_backup_zip(conn)
     return Response(
         content=data,
         media_type="application/zip",
@@ -229,7 +217,6 @@ async def export_settings_route() -> Response:
 async def import_settings_route(file: UploadFile = File(...)) -> RedirectResponse:
     """Restore from a backup zip. Restores settings, knowledge map, and imports lessons."""
     content = await file.read()
-    conn = get_initialized_connection()
-    result = db.restore_backup_zip(conn, content)
-    conn.close()
+    with db.connection() as conn:
+        result = db.restore_backup_zip(conn, content)
     return RedirectResponse(url=f"/settings?imported={result['lessons']}", status_code=303)

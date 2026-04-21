@@ -6,9 +6,10 @@ import io
 import json
 import sqlite3
 import zipfile
+from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Optional
+from typing import Generator, Optional
 
 from devcoach.core.models import Lesson, Settings
 
@@ -82,6 +83,16 @@ def get_initialized_connection() -> sqlite3.Connection:
     conn = get_connection()
     init_schema(conn)
     return conn
+
+
+@contextmanager
+def connection() -> Generator[sqlite3.Connection, None, None]:
+    """Context manager that opens an initialized connection and guarantees close."""
+    conn = get_initialized_connection()
+    try:
+        yield conn
+    finally:
+        conn.close()
 
 
 # ── Schema init ────────────────────────────────────────────────────────────

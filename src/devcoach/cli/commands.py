@@ -11,7 +11,6 @@ from rich.table import Table
 from rich import box
 
 from devcoach.core import coach, db
-from devcoach.core.db import get_initialized_connection
 
 console = Console()
 
@@ -26,9 +25,8 @@ def _confidence_bar(confidence: int) -> str:
 # ── Subcommand handlers ────────────────────────────────────────────────────
 
 def cmd_profile(_args: argparse.Namespace) -> None:
-    conn = get_initialized_connection()
-    knowledge = db.get_all_knowledge(conn)
-    conn.close()
+    with db.connection() as conn:
+        knowledge = db.get_all_knowledge(conn)
 
     table = Table(title="Knowledge Map", box=box.ROUNDED, show_lines=False)
     table.add_column("Topic", style="cyan", no_wrap=True)
@@ -44,25 +42,25 @@ def cmd_profile(_args: argparse.Namespace) -> None:
 
 
 def cmd_lessons(args: argparse.Namespace) -> None:
-    conn = get_initialized_connection()
     starred_filter = True if getattr(args, "starred", False) else None
     feedback_filter = getattr(args, "feedback", None) or None
     date_from = getattr(args, "date_from", None) or None
     date_to = getattr(args, "date_to", None) or None
-    lessons = db.get_lessons(
-        conn,
-        period=args.period if args.period != "all" else None,
-        category=args.category or None,
-        project=args.project or None,
-        repository=args.repository or None,
-        branch=args.branch or None,
-        commit=args.commit or None,
-        starred=starred_filter,
-        feedback=feedback_filter,
-        date_from=date_from,
-        date_to=date_to,
-    )
-    conn.close()
+
+    with db.connection() as conn:
+        lessons = db.get_lessons(
+            conn,
+            period=args.period if args.period != "all" else None,
+            category=args.category or None,
+            project=args.project or None,
+            repository=args.repository or None,
+            branch=args.branch or None,
+            commit=args.commit or None,
+            starred=starred_filter,
+            feedback=feedback_filter,
+            date_from=date_from,
+            date_to=date_to,
+        )
 
     if not lessons:
         console.print("[dim]No lessons found.[/dim]")
@@ -71,7 +69,7 @@ def cmd_lessons(args: argparse.Namespace) -> None:
     has_meta = any(l.project or l.branch or l.commit_hash for l in lessons)
 
     table = Table(title="Lessons", box=box.ROUNDED, show_lines=False)
-    table.add_column("", no_wrap=True, width=2)  # star column
+    table.add_column("", no_wrap=True, width=2)
     table.add_column("Date", no_wrap=True)
     table.add_column("Topic", style="cyan")
     table.add_column("Title")
@@ -105,14 +103,12 @@ def cmd_lessons(args: argparse.Namespace) -> None:
 
 
 def cmd_star(args: argparse.Namespace) -> None:
-    conn = get_initialized_connection()
-    lesson = db.get_lesson_by_id(conn, args.id)
-    if lesson is None:
-        console.print(f"[red]Lesson '{args.id}' not found.[/red]")
-        conn.close()
-        sys.exit(1)
-    new_state = db.toggle_star(conn, args.id)
-    conn.close()
+    with db.connection() as conn:
+        lesson = db.get_lesson_by_id(conn, args.id)
+        if lesson is None:
+            console.print(f"[red]Lesson '{args.id}' not found.[/red]")
+            sys.exit(1)
+        new_state = db.toggle_star(conn, args.id)
     state_label = "[yellow]★ starred[/yellow]" if new_state else "[dim]☆ unstarred[/dim]"
     console.print(f"Lesson [cyan]{args.id}[/cyan] → {state_label}")
 
@@ -123,23 +119,21 @@ def cmd_feedback(args: argparse.Namespace) -> None:
         console.print(f"[red]Invalid feedback '{args.feedback}'. Use: know | dont_know | clear[/red]")
         sys.exit(1)
 
-    conn = get_initialized_connection()
     feedback_value = None if args.feedback == "clear" else args.feedback
-    topic_id = coach.record_feedback(conn, args.id, feedback_value)
-    if topic_id is None:
-        console.print(f"[red]Lesson '{args.id}' not found.[/red]")
-        conn.close()
-        sys.exit(1)
+    with db.connection() as conn:
+        topic_id = coach.record_feedback(conn, args.id, feedback_value)
+        if topic_id is None:
+            console.print(f"[red]Lesson '{args.id}' not found.[/red]")
+            sys.exit(1)
+        knowledge = db.get_all_knowledge(conn)
 
     if feedback_value in ("know", "dont_know"):
-        knowledge = db.get_all_knowledge(conn)
         new_conf = knowledge.get(topic_id, 5)
         old_conf = new_conf + (-1 if feedback_value == "know" else 1)
         conf_label = f"[cyan]{topic_id}[/cyan] confidence: {old_conf} → [bold]{new_conf}[/bold]"
     else:
         conf_label = "feedback cleared"
 
-    conn.close()
     icon = {"know": "[green]✓ I know this[/green]", "dont_know": "[red]✗ I don't know this[/red]"}.get(
         feedback_value or "", "[dim]cleared[/dim]"
     )
@@ -147,9 +141,8 @@ def cmd_feedback(args: argparse.Namespace) -> None:
 
 
 def cmd_lesson(args: argparse.Namespace) -> None:
-    conn = get_initialized_connection()
-    lesson = db.get_lesson_by_id(conn, args.id)
-    conn.close()
+    with db.connection() as conn:
+        lesson = db.get_lesson_by_id(conn, args.id)
 
     if lesson is None:
         console.print(f"[red]Lesson '{args.id}' not found.[/red]")
@@ -190,9 +183,8 @@ def cmd_lesson(args: argparse.Namespace) -> None:
 
 
 def cmd_settings(_args: argparse.Namespace) -> None:
-    conn = get_initialized_connection()
-    settings = db.get_settings(conn)
-    conn.close()
+    with db.connection() as conn:
+        settings = db.get_settings(conn)
 
     gap_h, gap_m = divmod(settings.min_gap_minutes, 60)
     gap_label = f"{gap_h}h {gap_m}m" if gap_h else f"{gap_m}m"
@@ -200,10 +192,8 @@ def cmd_settings(_args: argparse.Namespace) -> None:
     table = Table(title="Settings", box=box.ROUNDED)
     table.add_column("Key", style="cyan")
     table.add_column("Value", justify="right")
-
     table.add_row("max_per_day", str(settings.max_per_day))
     table.add_row("min_gap_minutes", f"{settings.min_gap_minutes} ({gap_label})")
-
     console.print(table)
 
 
@@ -213,23 +203,20 @@ def cmd_set(args: argparse.Namespace) -> None:
         console.print(f"[red]Unknown key '{args.key}'. Valid keys: {', '.join(sorted(valid_keys))}[/red]")
         sys.exit(1)
 
-    conn = get_initialized_connection()
-    db.set_setting(conn, args.key, args.value)
-    conn.close()
+    with db.connection() as conn:
+        db.set_setting(conn, args.key, args.value)
     console.print(f"[green]Set {args.key} = {args.value}[/green]")
 
 
 def cmd_backup(args: argparse.Namespace) -> None:
     """Export settings + knowledge map + lessons as a zip file."""
-    conn = get_initialized_connection()
-    lessons_count = len(db.export_lessons(conn))
-    knowledge_count = len(db.get_all_knowledge(conn))
-    data = db.create_backup_zip(conn)
-    conn.close()
+    with db.connection() as conn:
+        lessons_count = len(db.export_lessons(conn))
+        knowledge_count = len(db.get_all_knowledge(conn))
+        data = db.create_backup_zip(conn)
 
     out_path = Path(args.output)
     out_path.write_bytes(data)
-
     console.print(f"[green]Backup saved:[/green] {out_path}  "
                   f"([cyan]{lessons_count}[/cyan] lessons, "
                   f"[cyan]{knowledge_count}[/cyan] topics)")
@@ -242,9 +229,8 @@ def cmd_restore(args: argparse.Namespace) -> None:
         console.print(f"[red]File not found: {in_path}[/red]")
         sys.exit(1)
 
-    conn = get_initialized_connection()
-    result = db.restore_backup_zip(conn, in_path.read_bytes())
-    conn.close()
+    with db.connection() as conn:
+        result = db.restore_backup_zip(conn, in_path.read_bytes())
 
     if result["settings"]:
         console.print("[green]✓[/green] Settings restored")
