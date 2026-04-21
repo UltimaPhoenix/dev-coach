@@ -77,6 +77,13 @@ def get_connection() -> sqlite3.Connection:
     return conn
 
 
+def get_initialized_connection() -> sqlite3.Connection:
+    """Open a connection, run schema init, and return it ready to use."""
+    conn = get_connection()
+    init_schema(conn)
+    return conn
+
+
 # ── Schema init ────────────────────────────────────────────────────────────
 
 def init_schema(conn: sqlite3.Connection) -> None:
@@ -187,6 +194,8 @@ def get_lessons(
     starred: Optional[bool] = None,
     search: Optional[str] = None,
     feedback: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
 ) -> list[Lesson]:
     """Return lessons filtered by period, category, git metadata, starred flag, and/or search text.
 
@@ -196,14 +205,23 @@ def get_lessons(
     commit: fuzzy match on commit_hash
     starred: True for starred only, False for unstarred only, None for all
     search: fuzzy match across title, topic_id, and summary
+    date_from / date_to: ISO date strings (YYYY-MM-DD); take precedence over period when set
     """
     conditions: list[str] = []
     params: list[object] = []
 
-    cutoff = _period_to_cutoff(period)
-    if cutoff is not None:
-        conditions.append("timestamp >= ?")
-        params.append(cutoff)
+    if date_from is not None or date_to is not None:
+        if date_from is not None:
+            conditions.append("timestamp >= ?")
+            params.append(date_from)
+        if date_to is not None:
+            conditions.append("timestamp <= ?")
+            params.append(date_to + "T23:59:59")
+    else:
+        cutoff = _period_to_cutoff(period)
+        if cutoff is not None:
+            conditions.append("timestamp >= ?")
+            params.append(cutoff)
 
     if category is not None:
         conditions.append("categories LIKE ?")

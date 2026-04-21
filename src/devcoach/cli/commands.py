@@ -3,28 +3,20 @@
 from __future__ import annotations
 
 import argparse
-import io
-import json
 import sys
-import zipfile
 from pathlib import Path
 
 from rich.console import Console
 from rich.table import Table
 from rich import box
 
-from devcoach.core import db
+from devcoach.core import coach, db
+from devcoach.core.db import get_initialized_connection
 
 console = Console()
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────
-
-def _get_conn():  # type: ignore[no-untyped-def]
-    conn = db.get_connection()
-    db.init_schema(conn)
-    return conn
-
 
 def _confidence_bar(confidence: int) -> str:
     filled = round(confidence * 10 / 10)
@@ -34,7 +26,7 @@ def _confidence_bar(confidence: int) -> str:
 # ── Subcommand handlers ────────────────────────────────────────────────────
 
 def cmd_profile(_args: argparse.Namespace) -> None:
-    conn = _get_conn()
+    conn = get_initialized_connection()
     knowledge = db.get_all_knowledge(conn)
     conn.close()
 
@@ -52,9 +44,11 @@ def cmd_profile(_args: argparse.Namespace) -> None:
 
 
 def cmd_lessons(args: argparse.Namespace) -> None:
-    conn = _get_conn()
+    conn = get_initialized_connection()
     starred_filter = True if getattr(args, "starred", False) else None
     feedback_filter = getattr(args, "feedback", None) or None
+    date_from = getattr(args, "date_from", None) or None
+    date_to = getattr(args, "date_to", None) or None
     lessons = db.get_lessons(
         conn,
         period=args.period if args.period != "all" else None,
@@ -65,6 +59,8 @@ def cmd_lessons(args: argparse.Namespace) -> None:
         commit=args.commit or None,
         starred=starred_filter,
         feedback=feedback_filter,
+        date_from=date_from,
+        date_to=date_to,
     )
     conn.close()
 
@@ -109,7 +105,7 @@ def cmd_lessons(args: argparse.Namespace) -> None:
 
 
 def cmd_star(args: argparse.Namespace) -> None:
-    conn = _get_conn()
+    conn = get_initialized_connection()
     lesson = db.get_lesson_by_id(conn, args.id)
     if lesson is None:
         console.print(f"[red]Lesson '{args.id}' not found.[/red]")
@@ -127,9 +123,9 @@ def cmd_feedback(args: argparse.Namespace) -> None:
         console.print(f"[red]Invalid feedback '{args.feedback}'. Use: know | dont_know | clear[/red]")
         sys.exit(1)
 
-    conn = _get_conn()
+    conn = get_initialized_connection()
     feedback_value = None if args.feedback == "clear" else args.feedback
-    topic_id = db.set_feedback(conn, args.id, feedback_value)
+    topic_id = coach.record_feedback(conn, args.id, feedback_value)
     if topic_id is None:
         console.print(f"[red]Lesson '{args.id}' not found.[/red]")
         conn.close()
@@ -137,11 +133,9 @@ def cmd_feedback(args: argparse.Namespace) -> None:
 
     if feedback_value in ("know", "dont_know"):
         knowledge = db.get_all_knowledge(conn)
-        current = knowledge.get(topic_id, 5)
-        delta = 1 if feedback_value == "know" else -1
-        db.upsert_knowledge(conn, topic_id, current + delta)
-        new_conf = max(0, min(10, current + delta))
-        conf_label = f"[cyan]{topic_id}[/cyan] confidence: {current} → [bold]{new_conf}[/bold]"
+        new_conf = knowledge.get(topic_id, 5)
+        old_conf = new_conf + (-1 if feedback_value == "know" else 1)
+        conf_label = f"[cyan]{topic_id}[/cyan] confidence: {old_conf} → [bold]{new_conf}[/bold]"
     else:
         conf_label = "feedback cleared"
 
@@ -153,7 +147,7 @@ def cmd_feedback(args: argparse.Namespace) -> None:
 
 
 def cmd_lesson(args: argparse.Namespace) -> None:
-    conn = _get_conn()
+    conn = get_initialized_connection()
     lesson = db.get_lesson_by_id(conn, args.id)
     conn.close()
 
@@ -196,7 +190,7 @@ def cmd_lesson(args: argparse.Namespace) -> None:
 
 
 def cmd_settings(_args: argparse.Namespace) -> None:
-    conn = _get_conn()
+    conn = get_initialized_connection()
     settings = db.get_settings(conn)
     conn.close()
 
@@ -219,7 +213,7 @@ def cmd_set(args: argparse.Namespace) -> None:
         console.print(f"[red]Unknown key '{args.key}'. Valid keys: {', '.join(sorted(valid_keys))}[/red]")
         sys.exit(1)
 
-    conn = _get_conn()
+    conn = get_initialized_connection()
     db.set_setting(conn, args.key, args.value)
     conn.close()
     console.print(f"[green]Set {args.key} = {args.value}[/green]")
@@ -227,24 +221,18 @@ def cmd_set(args: argparse.Namespace) -> None:
 
 def cmd_backup(args: argparse.Namespace) -> None:
     """Export settings + knowledge map + lessons as a zip file."""
-    conn = _get_conn()
-    settings = db.get_settings(conn)
-    lessons = db.export_lessons(conn)
-    knowledge = db.get_all_knowledge(conn)
+    conn = get_initialized_connection()
+    lessons_count = len(db.export_lessons(conn))
+    knowledge_count = len(db.get_all_knowledge(conn))
+    data = db.create_backup_zip(conn)
     conn.close()
 
-    out_path = Path(args.output) if args.output else Path("devcoach-backup.zip")
-
-    buf = io.BytesIO()
-    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
-        zf.writestr("settings.json", json.dumps(settings.model_dump(), indent=2))
-        zf.writestr("lessons.json", json.dumps(lessons, indent=2, ensure_ascii=False))
-        zf.writestr("knowledge.json", json.dumps(knowledge, indent=2))
-    out_path.write_bytes(buf.getvalue())
+    out_path = Path(args.output)
+    out_path.write_bytes(data)
 
     console.print(f"[green]Backup saved:[/green] {out_path}  "
-                  f"([cyan]{len(lessons)}[/cyan] lessons, "
-                  f"[cyan]{len(knowledge)}[/cyan] topics)")
+                  f"([cyan]{lessons_count}[/cyan] lessons, "
+                  f"[cyan]{knowledge_count}[/cyan] topics)")
 
 
 def cmd_restore(args: argparse.Namespace) -> None:
@@ -254,32 +242,15 @@ def cmd_restore(args: argparse.Namespace) -> None:
         console.print(f"[red]File not found: {in_path}[/red]")
         sys.exit(1)
 
-    conn = _get_conn()
-    count = 0
-
-    with zipfile.ZipFile(in_path) as zf:
-        names = zf.namelist()
-
-        if "settings.json" in names:
-            s = json.loads(zf.read("settings.json"))
-            if "max_per_day" in s:
-                db.set_setting(conn, "max_per_day", str(s["max_per_day"]))
-            if "min_gap_minutes" in s:
-                db.set_setting(conn, "min_gap_minutes", str(s["min_gap_minutes"]))
-            console.print("[green]✓[/green] Settings restored")
-
-        if "knowledge.json" in names:
-            knowledge = json.loads(zf.read("knowledge.json"))
-            for topic, confidence in knowledge.items():
-                db.upsert_knowledge(conn, topic, confidence)
-            console.print(f"[green]✓[/green] Knowledge map restored ([cyan]{len(knowledge)}[/cyan] topics)")
-
-        if "lessons.json" in names:
-            lessons_data = json.loads(zf.read("lessons.json"))
-            count = db.import_lessons(conn, lessons_data)
-            console.print(f"[green]✓[/green] Lessons: [cyan]{count}[/cyan] new imported (duplicates skipped)")
-
+    conn = get_initialized_connection()
+    result = db.restore_backup_zip(conn, in_path.read_bytes())
     conn.close()
+
+    if result["settings"]:
+        console.print("[green]✓[/green] Settings restored")
+    if result["topics"]:
+        console.print(f"[green]✓[/green] Knowledge map restored ([cyan]{result['topics']}[/cyan] topics)")
+    console.print(f"[green]✓[/green] Lessons: [cyan]{result['lessons']}[/cyan] new imported (duplicates skipped)")
 
 
 def cmd_ui(args: argparse.Namespace) -> None:
@@ -317,6 +288,10 @@ def _build_parser() -> argparse.ArgumentParser:
     p_lessons.add_argument("--starred", action="store_true", default=False, help="Show only starred lessons")
     p_lessons.add_argument("--feedback", choices=["know", "dont_know", "none"], default=None,
                            help="Filter by feedback: know, dont_know, none (no response)")
+    p_lessons.add_argument("--date-from", dest="date_from", default=None,
+                           metavar="YYYY-MM-DD", help="Show lessons on or after this date")
+    p_lessons.add_argument("--date-to", dest="date_to", default=None,
+                           metavar="YYYY-MM-DD", help="Show lessons on or before this date")
 
     p_lesson = sub.add_parser("lesson", help="Show a single lesson in detail")
     p_lesson.add_argument("id", help="Lesson ID")
@@ -335,7 +310,8 @@ def _build_parser() -> argparse.ArgumentParser:
     p_set.add_argument("value", help="New value")
 
     p_backup = sub.add_parser("backup", help="Export a full backup (settings + knowledge + lessons) as zip")
-    p_backup.add_argument("output", nargs="?", default="devcoach-backup.zip", help="Output zip file path (default: devcoach-backup.zip)")
+    p_backup.add_argument("output", nargs="?", default="devcoach-backup.zip",
+                          help="Output zip file path (default: devcoach-backup.zip)")
 
     p_restore = sub.add_parser("restore", help="Restore from a backup zip file")
     p_restore.add_argument("input", help="Path to backup zip file")

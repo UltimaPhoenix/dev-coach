@@ -3,15 +3,18 @@
 from __future__ import annotations
 
 import importlib.resources
+import json
 import shutil
 import sqlite3
 import subprocess
 import sys
+from datetime import datetime, timedelta, timezone
 from typing import Literal, Optional
 
 from fastmcp import FastMCP
 
 from devcoach.core import coach, db
+from devcoach.core.db import get_initialized_connection
 from devcoach.core.models import Lesson, Profile, RateLimitResult
 
 # ── FastMCP app ────────────────────────────────────────────────────────────
@@ -23,14 +26,6 @@ mcp = FastMCP(
         "Use the devcoach_instructions prompt for full coaching behaviour guidelines."
     ),
 )
-
-
-# ── Connection factory ─────────────────────────────────────────────────────
-
-def _get_conn() -> sqlite3.Connection:
-    conn = db.get_connection()
-    db.init_schema(conn)
-    return conn
 
 
 # ── MCP Tools ─────────────────────────────────────────────────────────────
@@ -68,7 +63,7 @@ def log_lesson(
         folder=folder,
     )
     try:
-        conn = _get_conn()
+        conn = get_initialized_connection()
         db.insert_lesson(conn, lesson)
         conn.close()
         return "ok"
@@ -80,7 +75,7 @@ def log_lesson(
 def get_profile() -> Profile:
     """Return the user's current knowledge map (topic → confidence 0-10)."""
     try:
-        conn = _get_conn()
+        conn = get_initialized_connection()
         profile = coach.get_profile(conn)
         conn.close()
         return profile
@@ -96,7 +91,7 @@ def update_knowledge(topic: str, delta: int) -> Profile:
     If the topic does not exist it is created with a base confidence of 5.
     """
     try:
-        conn = _get_conn()
+        conn = get_initialized_connection()
         profile = coach.apply_knowledge_delta(conn, topic, delta)
         conn.close()
         return profile
@@ -112,7 +107,7 @@ def check_rate_limit() -> RateLimitResult:
     or allowed=False with a human-readable reason.
     """
     try:
-        conn = _get_conn()
+        conn = get_initialized_connection()
         result = coach.check_rate_limit(conn)
         conn.close()
         return result
@@ -124,22 +119,92 @@ def check_rate_limit() -> RateLimitResult:
 def get_lessons(
     period: Optional[Literal["today", "week", "month", "year", "all"]] = None,
     category: Optional[str] = None,
+    project: Optional[str] = None,
+    repository: Optional[str] = None,
+    branch: Optional[str] = None,
+    commit: Optional[str] = None,
     starred: Optional[bool] = None,
+    feedback: Optional[Literal["know", "dont_know", "none"]] = None,
+    search: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
 ) -> list[Lesson]:
     """Query the coaching lesson history.
 
     period: today | week | month | year | all (default: all)
     category: filter by a specific category tag (e.g. "python", "docker")
+    project / repository / branch: fuzzy match on git metadata
+    commit: fuzzy match on commit hash
     starred: True to return only starred (favourite) lessons
+    feedback: "know" | "dont_know" | "none" (no response given)
+    search: full-text search across title, topic_id, and summary
+    date_from / date_to: ISO date strings (YYYY-MM-DD); override period when set
     All filters can be combined.
     """
     try:
-        conn = _get_conn()
-        lessons = db.get_lessons(conn, period=period, category=category, starred=starred)
+        conn = get_initialized_connection()
+        lessons = db.get_lessons(
+            conn,
+            period=period,
+            category=category,
+            project=project,
+            repository=repository,
+            branch=branch,
+            commit=commit,
+            starred=starred,
+            feedback=feedback,
+            search=search,
+            date_from=date_from,
+            date_to=date_to,
+        )
         conn.close()
         return lessons
     except Exception:
         return []
+
+
+@mcp.tool
+def get_lesson(lesson_id: str) -> Optional[Lesson]:
+    """Return a single lesson by ID, or None if not found."""
+    try:
+        conn = get_initialized_connection()
+        lesson = db.get_lesson_by_id(conn, lesson_id)
+        conn.close()
+        return lesson
+    except Exception:
+        return None
+
+
+@mcp.tool
+def get_stats() -> dict:
+    """Return aggregate coaching statistics for a quick overview.
+
+    Returns counts, rate-limit state, and the 5 weakest / 5 strongest topics.
+    """
+    try:
+        conn = get_initialized_connection()
+        now = datetime.now(timezone.utc)
+        total = len(db.get_lessons(conn))
+        today_cutoff = (now - timedelta(hours=24)).isoformat()
+        week_cutoff = (now - timedelta(days=7)).isoformat()
+        lessons_today = db.count_lessons_since(conn, today_cutoff)
+        lessons_week = db.count_lessons_since(conn, week_cutoff)
+        knowledge = db.get_all_knowledge(conn)
+        conn.close()
+
+        sorted_k = sorted(knowledge.items(), key=lambda x: x[1])
+        weakest = [{"topic": t, "confidence": c} for t, c in sorted_k[:5]]
+        strongest = [{"topic": t, "confidence": c} for t, c in sorted_k[-5:][::-1]]
+
+        return {
+            "total_lessons": total,
+            "lessons_today": lessons_today,
+            "lessons_this_week": lessons_week,
+            "weakest_topics": weakest,
+            "strongest_topics": strongest,
+        }
+    except Exception as exc:
+        return {"error": str(exc)}
 
 
 @mcp.tool
@@ -149,7 +214,7 @@ def star_lesson(lesson_id: str) -> str:
     Returns 'starred' or 'unstarred' to indicate the new state.
     """
     try:
-        conn = _get_conn()
+        conn = get_initialized_connection()
         new_state = db.toggle_star(conn, lesson_id)
         conn.close()
         return "starred" if new_state else "unstarred"
@@ -165,14 +230,9 @@ def submit_feedback(lesson_id: str, feedback: str) -> Profile:
     Automatically adjusts the topic's confidence score by ±1 and returns the updated Profile.
     """
     try:
-        conn = _get_conn()
+        conn = get_initialized_connection()
         feedback_value = None if feedback == "clear" else feedback
-        topic_id = db.set_feedback(conn, lesson_id, feedback_value)
-        if topic_id and feedback_value in ("know", "dont_know"):
-            knowledge = db.get_all_knowledge(conn)
-            current = knowledge.get(topic_id, 5)
-            delta = 1 if feedback_value == "know" else -1
-            db.upsert_knowledge(conn, topic_id, current + delta)
+        coach.record_feedback(conn, lesson_id, feedback_value)
         knowledge = db.get_all_knowledge(conn)
         conn.close()
         return Profile(knowledge=knowledge)
@@ -187,7 +247,7 @@ def get_taught_topics() -> list[str]:
     Use this before selecting a new lesson topic to avoid repetition.
     """
     try:
-        conn = _get_conn()
+        conn = get_initialized_connection()
         topics = coach.list_taught_topics(conn)
         conn.close()
         return topics
@@ -210,6 +270,39 @@ def open_ui(port: int = 7860) -> str:
     return f"devcoach UI starting at http://localhost:{port}"
 
 
+# ── MCP Resources ──────────────────────────────────────────────────────────
+
+@mcp.resource("devcoach://profile")
+def profile_resource() -> str:
+    """Current knowledge map — topic → confidence (0-10)."""
+    conn = get_initialized_connection()
+    knowledge = db.get_all_knowledge(conn)
+    conn.close()
+    return json.dumps(knowledge, indent=2)
+
+
+@mcp.resource("devcoach://settings")
+def settings_resource() -> str:
+    """Current coaching settings (rate limits)."""
+    conn = get_initialized_connection()
+    settings = db.get_settings(conn)
+    conn.close()
+    return json.dumps(settings.model_dump(), indent=2)
+
+
+@mcp.resource("devcoach://lessons/recent")
+def recent_lessons_resource() -> str:
+    """Last 10 lessons from the current week."""
+    conn = get_initialized_connection()
+    lessons = db.get_lessons(conn, period="week")
+    conn.close()
+    return json.dumps(
+        [l.model_dump() for l in lessons[:10]],
+        indent=2,
+        ensure_ascii=False,
+    )
+
+
 # ── MCP Prompt ────────────────────────────────────────────────────────────
 
 @mcp.prompt
@@ -229,7 +322,10 @@ def devcoach_instructions() -> str:
 
 def main() -> None:
     """Start devcoach: CLI subcommand if given, else stdio MCP server."""
-    cli_commands = {"profile", "lessons", "lesson", "star", "feedback", "settings", "set", "ui"}
+    cli_commands = {
+        "profile", "lessons", "lesson", "star", "feedback",
+        "settings", "set", "backup", "restore", "ui",
+    }
     if len(sys.argv) > 1 and sys.argv[1] in cli_commands:
         from devcoach.cli.commands import run_cli
         run_cli()

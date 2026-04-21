@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import sqlite3
 from datetime import datetime, timedelta, timezone
+from typing import Optional
 
 from devcoach.core.db import (
     count_lessons_since,
@@ -11,6 +12,7 @@ from devcoach.core.db import (
     get_last_lesson_timestamp,
     get_settings,
     get_taught_topic_ids,
+    set_feedback,
     upsert_knowledge,
 )
 from devcoach.core.models import Profile, RateLimitResult
@@ -83,6 +85,21 @@ def apply_knowledge_delta(
         return get_profile(conn)
     except Exception:
         return get_profile(conn)
+
+
+def record_feedback(
+    conn: sqlite3.Connection, lesson_id: str, feedback_value: Optional[str]
+) -> Optional[str]:
+    """Record feedback for a lesson and auto-adjust knowledge confidence by ±1.
+
+    feedback_value: "know" | "dont_know" | None (to clear).
+    Returns the topic_id of the updated lesson, or None if lesson not found.
+    """
+    topic_id = set_feedback(conn, lesson_id, feedback_value)
+    if topic_id and feedback_value in ("know", "dont_know"):
+        delta = 1 if feedback_value == "know" else -1
+        apply_knowledge_delta(conn, topic_id, delta)
+    return topic_id
 
 
 def list_taught_topics(conn: sqlite3.Connection) -> list[str]:

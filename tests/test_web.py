@@ -233,9 +233,10 @@ class TestLessonsStarredFilter:
         assert 'name="starred"' in html
         assert 'value="1"' in html
 
-    def test_starred_checkbox_checked_when_active(self, client):
+    def test_starred_pill_highlighted_when_active(self, client):
+        # Starred is now a pill button; when active it carries bg-yellow-400
         html = client.get("/lessons?starred=1").text
-        assert "checked" in html
+        assert "bg-yellow-400" in html
 
     def test_star_icon_shown_in_table(self, client):
         html = client.get("/lessons").text

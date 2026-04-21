@@ -2,130 +2,238 @@
 {% block title %}Lessons — devcoach{% endblock %}
 
 {% block content %}
-<div class="flex items-center justify-between mb-6">
+<div class="flex items-center justify-between mb-5">
   <h1 class="text-2xl font-bold text-indigo-600 dark:text-indigo-400">Lessons</h1>
   <span class="text-sm text-gray-400 dark:text-gray-500">{{ lessons | length }} lesson{{ 's' if lessons | length != 1 }}</span>
 </div>
 
-<!-- Filters -->
-{% set any_filter = selected_period != 'all' or selected_category or selected_project or selected_repository or selected_branch or selected_commit or selected_starred or selected_search or selected_feedback %}
-<form method="get" action="/lessons" class="mb-6">
+{# ── detect any active filter ── #}
+{% set custom_date = selected_date_from or selected_date_to %}
+{% set any_filter = (selected_period != 'all' and not custom_date) or custom_date or selected_category or selected_project or selected_repository or selected_branch or selected_commit or selected_starred or selected_search or selected_feedback %}
 
-  <!-- Single filter row: all selects + starred + advanced toggle + clear all -->
-  <div class="flex flex-wrap items-center gap-3">
-    <select name="period" onchange="this.form.submit()"
-            class="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded px-3 py-1.5 text-sm">
-      <option value="all"   {% if selected_period == 'all'   %}selected{% endif %}>All time</option>
-      <option value="today" {% if selected_period == 'today' %}selected{% endif %}>Today</option>
-      <option value="week"  {% if selected_period == 'week'  %}selected{% endif %}>Last 7 days</option>
-      <option value="month" {% if selected_period == 'month' %}selected{% endif %}>Last 30 days</option>
-      <option value="year"  {% if selected_period == 'year'  %}selected{% endif %}>Last year</option>
-    </select>
+<form method="get" action="/lessons" id="filter-form" class="mb-6 space-y-3">
 
-    <select name="category" onchange="this.form.submit()"
-            class="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded px-3 py-1.5 text-sm">
-      <option value="" {% if not selected_category %}selected{% endif %}>All categories</option>
-      {% for cat in all_categories %}
-      <option value="{{ cat }}" {% if selected_category == cat %}selected{% endif %}>{{ cat }}</option>
-      {% endfor %}
-    </select>
-
-    {% if all_projects %}
-    <select name="project" onchange="this.form.submit()"
-            class="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded px-3 py-1.5 text-sm">
-      <option value="" {% if not selected_project %}selected{% endif %}>All projects</option>
-      {% for p in all_projects %}
-      <option value="{{ p }}" {% if selected_project == p %}selected{% endif %}>{{ p }}</option>
-      {% endfor %}
-    </select>
-    {% endif %}
-
-    {% if all_repositories %}
-    <select name="repository" onchange="this.form.submit()"
-            class="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded px-3 py-1.5 text-sm">
-      <option value="" {% if not selected_repository %}selected{% endif %}>All repositories</option>
-      {% for r in all_repositories %}
-      <option value="{{ r }}" {% if selected_repository == r %}selected{% endif %}>{{ r }}</option>
-      {% endfor %}
-    </select>
-    {% endif %}
-
-    <select name="feedback" onchange="this.form.submit()"
-            class="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded px-3 py-1.5 text-sm">
-      <option value=""      {% if not selected_feedback %}selected{% endif %}>All feedback</option>
-      <option value="know"  {% if selected_feedback == 'know' %}selected{% endif %}>✓ Known</option>
-      <option value="dont_know" {% if selected_feedback == 'dont_know' %}selected{% endif %}>✗ Don't know</option>
-      <option value="none"  {% if selected_feedback == 'none' %}selected{% endif %}>— No response</option>
-    </select>
-
-    <div class="flex items-center gap-1">
-      <input type="text" name="search" value="{{ selected_search }}"
-             placeholder="Search…"
-             class="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded px-3 py-1.5 text-sm w-40 focus:outline-none focus:border-indigo-500" />
-      <button type="submit" class="text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-white transition px-1">🔍</button>
-    </div>
-
-    <label class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300 cursor-pointer select-none">
-      <input type="checkbox" name="starred" value="1" {% if selected_starred %}checked{% endif %}
-             onchange="this.form.submit()"
-             class="accent-yellow-400 w-4 h-4" />
-      <span>★ Starred</span>
-    </label>
-
-    {% if all_branches or all_commits %}
-    <button type="button" onclick="toggleAdv(this)"
-            class="text-xs select-none transition {% if selected_branch or selected_commit %}text-indigo-500 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300{% else %}text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300{% endif %}">
-      Advanced…
-    </button>
-    {% endif %}
-
-    {% if any_filter %}
-    <a href="/lessons" class="ml-auto text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-white text-sm transition">Clear all</a>
+  {# ── Zone 1: Search bar ── #}
+  <div class="relative">
+    <span class="absolute inset-y-0 left-3 flex items-center text-gray-400 dark:text-gray-500 pointer-events-none">🔍</span>
+    <input type="text" name="search" id="search-input" value="{{ selected_search }}"
+           placeholder="Search lessons…"
+           autocomplete="off"
+           class="w-full pl-9 pr-4 py-2.5 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition" />
+    {% if selected_search %}
+    <a href="/lessons{% if request.url.query %}?{{ request.url.query | replace('search=' ~ selected_search, '') | replace('&&','&') | trim('&') }}{% endif %}"
+       class="absolute inset-y-0 right-3 flex items-center text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition text-lg leading-none">×</a>
     {% endif %}
   </div>
 
-  <!-- Advanced panel: appears below the filter row, does not affect the row above -->
-  {% if all_branches or all_commits %}
-  <div id="adv-panel" class="{% if not (selected_branch or selected_commit) %}hidden{% endif %} flex flex-wrap gap-3 items-center mt-3">
-    {% if all_branches %}
-    <input
-      type="text"
-      name="branch"
-      value="{{ selected_branch }}"
-      placeholder="Branch…"
-      list="branch-list"
-      autocomplete="off"
-      class="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded px-3 py-1.5 text-sm w-44 focus:outline-none focus:border-indigo-500"
-    />
-    <datalist id="branch-list">
-      {% for b in all_branches %}
-      <option value="{{ b }}">
+  {# ── Zone 2: Primary filter pills ── #}
+  <div class="space-y-2">
+
+    {# Period pills #}
+    <div class="flex flex-wrap items-center gap-1.5">
+      <span class="text-xs text-gray-400 dark:text-gray-500 mr-1 shrink-0">Period</span>
+      {% for val, label in [('all','All time'),('today','Today'),('week','7 days'),('month','30 days'),('year','1 year')] %}
+      <button type="submit" name="period" value="{{ val }}"
+              class="px-3 py-1 rounded-full text-xs font-medium transition
+                     {% if selected_period == val and not custom_date %}
+                       bg-indigo-600 text-white shadow-sm
+                     {% else %}
+                       bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700
+                     {% endif %}">
+        {{ label }}
+      </button>
       {% endfor %}
-    </datalist>
+      <button type="button" id="custom-toggle"
+              onclick="toggleCustomDate()"
+              class="px-3 py-1 rounded-full text-xs font-medium transition
+                     {% if custom_date %}
+                       bg-indigo-600 text-white shadow-sm
+                     {% else %}
+                       bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700
+                     {% endif %}">
+        Custom range
+      </button>
+
+      {# Custom date range (inline, shown when custom is active) #}
+      <div id="custom-date-panel" class="{% if not custom_date %}hidden{% endif %} flex items-center gap-2 ml-1">
+        <input type="date" name="date_from" value="{{ selected_date_from }}"
+               class="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+        <span class="text-xs text-gray-400">to</span>
+        <input type="date" name="date_to" value="{{ selected_date_to }}"
+               class="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+        <button type="submit"
+                class="px-3 py-1 rounded-full text-xs font-medium bg-indigo-600 text-white hover:bg-indigo-500 transition">
+          Apply
+        </button>
+      </div>
+    </div>
+
+    {# Feedback pills #}
+    <div class="flex flex-wrap items-center gap-1.5">
+      <span class="text-xs text-gray-400 dark:text-gray-500 mr-1 shrink-0">Feedback</span>
+      {% for val, label in [('','All'),('know','✓ Known'),('dont_know','✗ Don\'t know'),('none','— No response')] %}
+      <button type="submit" name="feedback" value="{{ val }}"
+              class="px-3 py-1 rounded-full text-xs font-medium transition
+                     {% if selected_feedback == val %}
+                       bg-indigo-600 text-white shadow-sm
+                     {% else %}
+                       bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700
+                     {% endif %}">
+        {{ label }}
+      </button>
+      {% endfor %}
+
+      {# Starred toggle pill #}
+      <button type="submit" name="starred" value="{% if selected_starred %}{% else %}1{% endif %}"
+              class="ml-2 px-3 py-1 rounded-full text-xs font-medium transition
+                     {% if selected_starred %}
+                       bg-yellow-400 text-yellow-900 shadow-sm
+                     {% else %}
+                       bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-yellow-50 dark:hover:bg-yellow-900/20 hover:text-yellow-600
+                     {% endif %}">
+        ★ Starred
+      </button>
+    </div>
+
+  </div>
+
+  {# ── Zone 3: Secondary filters (dropdowns) ── #}
+  {% if all_categories or all_projects or all_repositories or all_branches or all_commits %}
+  <details {% if selected_category or selected_project or selected_repository or selected_branch or selected_commit %}open{% endif %}
+           class="group">
+    <summary class="cursor-pointer list-none flex items-center gap-1.5 text-xs text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition select-none w-fit">
+      <span class="group-open:rotate-90 transition-transform inline-block">▶</span>
+      More filters
+      {% if selected_category or selected_project or selected_repository or selected_branch or selected_commit %}
+      <span class="ml-1 px-1.5 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 text-xs font-medium">active</span>
+      {% endif %}
+    </summary>
+    <div class="mt-2 flex flex-wrap gap-2 pl-4">
+      {% if all_categories %}
+      <select name="category" onchange="this.form.submit()"
+              class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        <option value="" {% if not selected_category %}selected{% endif %}>All categories</option>
+        {% for cat in all_categories %}
+        <option value="{{ cat }}" {% if selected_category == cat %}selected{% endif %}>{{ cat }}</option>
+        {% endfor %}
+      </select>
+      {% endif %}
+
+      {% if all_projects %}
+      <select name="project" onchange="this.form.submit()"
+              class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        <option value="" {% if not selected_project %}selected{% endif %}>All projects</option>
+        {% for p in all_projects %}
+        <option value="{{ p }}" {% if selected_project == p %}selected{% endif %}>{{ p }}</option>
+        {% endfor %}
+      </select>
+      {% endif %}
+
+      {% if all_repositories %}
+      <select name="repository" onchange="this.form.submit()"
+              class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        <option value="" {% if not selected_repository %}selected{% endif %}>All repositories</option>
+        {% for r in all_repositories %}
+        <option value="{{ r }}" {% if selected_repository == r %}selected{% endif %}>{{ r }}</option>
+        {% endfor %}
+      </select>
+      {% endif %}
+
+      {% if all_branches %}
+      <input type="text" name="branch" value="{{ selected_branch }}"
+             placeholder="Branch…" list="branch-list" autocomplete="off"
+             class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded-lg px-3 py-1.5 text-xs w-36 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+      <datalist id="branch-list">
+        {% for b in all_branches %}<option value="{{ b }}">{% endfor %}
+      </datalist>
+      {% endif %}
+
+      {% if all_commits %}
+      <input type="text" name="commit" value="{{ selected_commit }}"
+             placeholder="Commit…" list="commit-list" autocomplete="off"
+             class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded-lg px-3 py-1.5 text-xs w-28 font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+      <datalist id="commit-list">
+        {% for c in all_commits %}<option value="{{ c[:7] }}">{% endfor %}
+      </datalist>
+      {% endif %}
+
+      {% if selected_branch or selected_commit %}
+      <button type="submit" class="px-3 py-1.5 rounded-lg text-xs bg-indigo-600 hover:bg-indigo-500 text-white transition">Search</button>
+      {% endif %}
+    </div>
+  </details>
+  {% endif %}
+
+  {# ── Active filter chips ── #}
+  {% if any_filter %}
+  <div class="flex flex-wrap items-center gap-1.5 pt-1">
+    {% if custom_date %}
+      {% set chip_label = '' %}
+      {% if selected_date_from and selected_date_to %}{% set chip_label = selected_date_from ~ ' → ' ~ selected_date_to %}
+      {% elif selected_date_from %}{% set chip_label = 'from ' ~ selected_date_from %}
+      {% else %}{% set chip_label = 'until ' ~ selected_date_to %}{% endif %}
+      <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+        📅 {{ chip_label }}
+        <a href="?period={{ selected_period }}&category={{ selected_category }}&project={{ selected_project }}&repository={{ selected_repository }}&branch={{ selected_branch }}&commit={{ selected_commit }}&feedback={{ selected_feedback }}&search={{ selected_search }}{% if selected_starred %}&starred=1{% endif %}" class="ml-0.5 hover:text-indigo-900 dark:hover:text-indigo-100">×</a>
+      </span>
+    {% elif selected_period != 'all' %}
+      {% set period_labels = {'today': 'Today', 'week': '7 days', 'month': '30 days', 'year': '1 year'} %}
+      <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+        🕐 {{ period_labels.get(selected_period, selected_period) }}
+        <a href="?period=all&category={{ selected_category }}&project={{ selected_project }}&repository={{ selected_repository }}&branch={{ selected_branch }}&commit={{ selected_commit }}&feedback={{ selected_feedback }}&search={{ selected_search }}{% if selected_starred %}&starred=1{% endif %}" class="ml-0.5 hover:text-indigo-900 dark:hover:text-indigo-100">×</a>
+      </span>
+    {% endif %}
+    {% if selected_feedback %}
+      {% set fb_labels = {'know': '✓ Known', 'dont_know': '✗ Don\'t know', 'none': '— No response'} %}
+      <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+        {{ fb_labels.get(selected_feedback, selected_feedback) }}
+        <a href="?period={{ selected_period }}&category={{ selected_category }}&project={{ selected_project }}&repository={{ selected_repository }}&branch={{ selected_branch }}&commit={{ selected_commit }}&search={{ selected_search }}&date_from={{ selected_date_from }}&date_to={{ selected_date_to }}{% if selected_starred %}&starred=1{% endif %}" class="ml-0.5 hover:text-indigo-900 dark:hover:text-indigo-100">×</a>
+      </span>
+    {% endif %}
+    {% if selected_starred %}
+      <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 border border-yellow-200 dark:border-yellow-800">
+        ★ Starred
+        <a href="?period={{ selected_period }}&category={{ selected_category }}&project={{ selected_project }}&repository={{ selected_repository }}&branch={{ selected_branch }}&commit={{ selected_commit }}&feedback={{ selected_feedback }}&search={{ selected_search }}&date_from={{ selected_date_from }}&date_to={{ selected_date_to }}" class="ml-0.5 hover:text-yellow-900 dark:hover:text-yellow-100">×</a>
+      </span>
+    {% endif %}
+    {% if selected_search %}
+      <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+        🔍 "{{ selected_search }}"
+        <a href="?period={{ selected_period }}&category={{ selected_category }}&project={{ selected_project }}&repository={{ selected_repository }}&branch={{ selected_branch }}&commit={{ selected_commit }}&feedback={{ selected_feedback }}{% if selected_starred %}&starred=1{% endif %}&date_from={{ selected_date_from }}&date_to={{ selected_date_to }}" class="ml-0.5 hover:text-indigo-900 dark:hover:text-indigo-100">×</a>
+      </span>
+    {% endif %}
+    {% if selected_category %}
+      <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+        {{ selected_category }}
+        <a href="?period={{ selected_period }}&project={{ selected_project }}&repository={{ selected_repository }}&branch={{ selected_branch }}&commit={{ selected_commit }}&feedback={{ selected_feedback }}&search={{ selected_search }}{% if selected_starred %}&starred=1{% endif %}&date_from={{ selected_date_from }}&date_to={{ selected_date_to }}" class="ml-0.5 hover:text-indigo-900 dark:hover:text-indigo-100">×</a>
+      </span>
+    {% endif %}
+    {% if selected_project %}
+      <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+        📁 {{ selected_project }}
+        <a href="?period={{ selected_period }}&category={{ selected_category }}&repository={{ selected_repository }}&branch={{ selected_branch }}&commit={{ selected_commit }}&feedback={{ selected_feedback }}&search={{ selected_search }}{% if selected_starred %}&starred=1{% endif %}&date_from={{ selected_date_from }}&date_to={{ selected_date_to }}" class="ml-0.5 hover:text-indigo-900 dark:hover:text-indigo-100">×</a>
+      </span>
+    {% endif %}
+    {% if selected_repository %}
+      <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+        ⎇ {{ selected_repository }}
+        <a href="?period={{ selected_period }}&category={{ selected_category }}&project={{ selected_project }}&branch={{ selected_branch }}&commit={{ selected_commit }}&feedback={{ selected_feedback }}&search={{ selected_search }}{% if selected_starred %}&starred=1{% endif %}&date_from={{ selected_date_from }}&date_to={{ selected_date_to }}" class="ml-0.5 hover:text-indigo-900 dark:hover:text-indigo-100">×</a>
+      </span>
+    {% endif %}
+    {% if selected_branch %}
+      <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+        ⎇ {{ selected_branch }}
+        <a href="?period={{ selected_period }}&category={{ selected_category }}&project={{ selected_project }}&repository={{ selected_repository }}&commit={{ selected_commit }}&feedback={{ selected_feedback }}&search={{ selected_search }}{% if selected_starred %}&starred=1{% endif %}&date_from={{ selected_date_from }}&date_to={{ selected_date_to }}" class="ml-0.5 hover:text-purple-900 dark:hover:text-purple-100">×</a>
+      </span>
+    {% endif %}
+    {% if selected_commit %}
+      <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-cyan-100 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-300 border border-cyan-200 dark:border-cyan-800 font-mono">
+        {{ selected_commit[:7] }}
+        <a href="?period={{ selected_period }}&category={{ selected_category }}&project={{ selected_project }}&repository={{ selected_repository }}&branch={{ selected_branch }}&feedback={{ selected_feedback }}&search={{ selected_search }}{% if selected_starred %}&starred=1{% endif %}&date_from={{ selected_date_from }}&date_to={{ selected_date_to }}" class="ml-0.5 font-sans hover:text-cyan-900 dark:hover:text-cyan-100">×</a>
+      </span>
     {% endif %}
 
-    {% if all_commits %}
-    <input
-      type="text"
-      name="commit"
-      value="{{ selected_commit }}"
-      placeholder="Commit hash…"
-      list="commit-list"
-      autocomplete="off"
-      class="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded px-3 py-1.5 text-sm w-52 font-mono focus:outline-none focus:border-indigo-500"
-    />
-    <datalist id="commit-list">
-      {% for c in all_commits %}
-      <option value="{{ c[:7] }}">
-      {% endfor %}
-    </datalist>
-    {% endif %}
-
-    <button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white rounded px-4 py-1.5 text-sm transition">Search</button>
-    {% if selected_branch or selected_commit %}
-    <a href="/lessons{% if selected_period != 'all' or selected_category or selected_project or selected_repository or selected_starred %}?period={{ selected_period }}{% if selected_category %}&category={{ selected_category }}{% endif %}{% if selected_project %}&project={{ selected_project }}{% endif %}{% if selected_repository %}&repository={{ selected_repository }}{% endif %}{% if selected_starred %}&starred=1{% endif %}{% endif %}"
-       class="text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-white text-sm transition">Clear</a>
-    {% endif %}
+    <a href="/lessons" class="ml-auto text-xs text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-white transition">Clear all</a>
   </div>
   {% endif %}
 
@@ -183,15 +291,18 @@
 
 {% block scripts %}
 <script>
-  function toggleAdv(btn) {
-    var panel = document.getElementById('adv-panel');
-    if (!panel) return;
-    var hidden = panel.classList.toggle('hidden');
-    // Highlight button when panel is open
-    btn.classList.toggle('text-indigo-500', !hidden);
-    btn.classList.toggle('dark:text-indigo-400', !hidden);
-    btn.classList.toggle('text-gray-400', hidden);
-    btn.classList.toggle('dark:text-gray-500', hidden);
+function toggleCustomDate() {
+  var panel = document.getElementById('custom-date-panel');
+  var btn   = document.getElementById('custom-toggle');
+  var show  = panel.classList.toggle('hidden');
+  // show=true means we just hid it; show=false means we just revealed it
+  if (!show) {
+    // opened — clear period buttons so custom range takes over visually
+    btn.classList.add('bg-indigo-600', 'text-white', 'shadow-sm');
+    btn.classList.remove('bg-gray-100', 'dark:bg-gray-800', 'text-gray-600', 'dark:text-gray-300');
   }
+}
+
+// If custom date panel is visible on load, keep it open (already handled by Jinja `hidden` toggle)
 </script>
 {% endblock %}
