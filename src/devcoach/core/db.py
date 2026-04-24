@@ -363,15 +363,14 @@ def export_lessons(conn: sqlite3.Connection) -> list[dict]:
     return [_row_to_lesson(row).model_dump(mode="json") for row in rows]
 
 
-def import_lessons(conn: sqlite3.Connection, records: list[dict]) -> tuple[int, int]:
-    """Insert lessons from a list of dicts, skipping duplicates by id.
+def import_lessons(conn: sqlite3.Connection, records: list[dict]) -> tuple[int, int, int]:
+    """Insert lessons from a list of dicts.
 
     Validates each record through the Lesson model (normalizes timestamps, enums, etc.).
-    Returns (inserted, invalid) where invalid is the count of records that failed validation.
-    Duplicates are silently skipped by INSERT OR IGNORE; callers derive that count as
-    len(records) - inserted - invalid.
+    Returns (inserted, duplicated, invalid).
     """
     inserted = 0
+    duplicated = 0
     invalid = 0
     for r in records:
         try:
@@ -404,9 +403,12 @@ def import_lessons(conn: sqlite3.Connection, records: list[dict]) -> tuple[int, 
                 lesson.feedback,
             ),
         )
-        inserted += cur.rowcount
+        if cur.rowcount:
+            inserted += 1
+        else:
+            duplicated += 1
     conn.commit()
-    return inserted, invalid
+    return inserted, duplicated, invalid
 
 
 def create_backup_zip(conn: sqlite3.Connection) -> bytes:
@@ -450,10 +452,10 @@ def restore_backup_zip(conn: sqlite3.Connection, data: bytes) -> dict[str, int]:
 
         if "lessons.json" in names:
             lessons_data = json.loads(zf.read("lessons.json"))
-            inserted, invalid = import_lessons(conn, lessons_data)
+            inserted, duplicated, invalid = import_lessons(conn, lessons_data)
             result["lessons"] = inserted
+            result["skipped"] = duplicated
             result["invalid"] = invalid
-            result["skipped"] = len(lessons_data) - inserted - invalid
 
     return result
 

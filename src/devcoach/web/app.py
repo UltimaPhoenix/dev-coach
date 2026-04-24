@@ -74,9 +74,8 @@ async def import_lessons_route(file: UploadFile = File(...)) -> RedirectResponse
     content = await file.read()
     records = json.loads(content)
     with db.connection() as conn:
-        inserted, invalid = db.import_lessons(conn, records)
-    skipped = len(records) - inserted - invalid
-    return RedirectResponse(url=f"/settings?imported={inserted}&skipped={skipped}&invalid={invalid}", status_code=303)
+        inserted, duplicated, invalid = db.import_lessons(conn, records)
+    return RedirectResponse(url=f"/settings?imported={inserted}&skipped={duplicated}&invalid={invalid}", status_code=303)
 
 
 _PER_PAGE = 25

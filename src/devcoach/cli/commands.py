@@ -236,7 +236,12 @@ def cmd_restore(args: argparse.Namespace) -> None:
         console.print("[green]✓[/green] Settings restored")
     if result["topics"]:
         console.print(f"[green]✓[/green] Knowledge map restored ([cyan]{result['topics']}[/cyan] topics)")
-    console.print(f"[green]✓[/green] Lessons: [cyan]{result['lessons']}[/cyan] new imported (duplicates skipped)")
+    parts = [f"[cyan]{result['lessons']}[/cyan] imported"]
+    if result["skipped"]:
+        parts.append(f"[yellow]{result['skipped']}[/yellow] duplicates skipped")
+    if result["invalid"]:
+        parts.append(f"[red]{result['invalid']}[/red] rejected (invalid)")
+    console.print(f"[green]✓[/green] Lessons: {', '.join(parts)}")
 
 
 def cmd_ui(args: argparse.Namespace) -> None:
