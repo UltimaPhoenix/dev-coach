@@ -35,7 +35,14 @@
 
   <!-- Row 2: date + topic + tags + feedback result (all inline) -->
   <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-500 dark:text-gray-400 mb-5">
-    <span>🗓 {{ lesson.timestamp[:10] }}</span>
+    <span class="relative group/date cursor-default">
+      🗓 <span data-ts="{{ lesson.timestamp }}">{{ lesson.timestamp[:10] }}</span>
+      <span class="absolute z-10 bottom-full left-0 mb-1 px-2 py-1 rounded bg-gray-800 dark:bg-gray-700
+                   text-white text-xs whitespace-nowrap pointer-events-none
+                   opacity-0 group-hover/date:opacity-100 transition-opacity duration-150">
+        {{ lesson.timestamp[:16].replace('T', ' ') }}
+      </span>
+    </span>
     <span>🏷 <span class="text-cyan-600 dark:text-cyan-400">{{ lesson.topic_id }}</span></span>
     {% for cat in lesson.categories %}
     <a href="/lessons?category={{ cat }}"
@@ -188,6 +195,25 @@
 <script src="/static/vendor/highlight.min.js"></script>
 <script src="/static/vendor/marked.min.js"></script>
 <script>
+  // Relative date labels
+  (function () {
+    var rtf = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
+    function relativeTime(iso) {
+      var date = new Date(iso);
+      var diffMs = Date.now() - date;
+      var diffDays = Math.floor(diffMs / 86400000);
+      if (diffDays === 0)  return 'today';
+      if (diffDays === 1)  return 'yesterday';
+      if (diffDays < 7)   return rtf.format(-diffDays, 'day');
+      if (diffDays < 30)  return rtf.format(-Math.floor(diffDays / 7), 'week');
+      if (diffDays < 365) return rtf.format(-Math.floor(diffDays / 30), 'month');
+      return rtf.format(-Math.floor(diffDays / 365), 'year');
+    }
+    document.querySelectorAll('[data-ts]').forEach(function (el) {
+      el.textContent = relativeTime(el.dataset.ts);
+    });
+  })();
+
   // Set correct hljs theme immediately (base.html updateHljsTheme targets #hljs-theme)
   updateHljsTheme();
 
