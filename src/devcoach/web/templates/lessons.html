@@ -27,7 +27,7 @@
 
 {# ── helpers ── #}
 {% set custom_date = selected_date_from or selected_date_to %}
-{% set any_filter = (selected_period != 'all' and not custom_date) or custom_date or selected_category or selected_project or selected_repository or selected_branch or selected_commit or selected_starred or selected_search or selected_feedback %}
+{% set any_filter = (selected_period != 'all' and not custom_date) or custom_date or selected_category or selected_level or selected_project or selected_repository or selected_branch or selected_commit or selected_starred or selected_search or selected_feedback %}
 
 {# period label shown on the button #}
 {% if custom_date %}
@@ -55,21 +55,30 @@
   <input type="hidden" name="feedback"   id="h-feedback"  value="{{ selected_feedback }}">
   <input type="hidden" name="starred"    id="h-starred"   value="{{ '1' if selected_starred else '' }}">
   <input type="hidden" name="category"   value="{{ selected_category }}">
+  <input type="hidden" name="level"      id="h-level" value="{{ selected_level }}">
   <input type="hidden" name="project"    value="{{ selected_project }}">
   <input type="hidden" name="repository" value="{{ selected_repository }}">
   <input type="hidden" name="branch"     value="{{ selected_branch }}">
   <input type="hidden" name="commit"     value="{{ selected_commit }}">
 
   {# ── Search bar ── #}
-  <div class="relative mb-4">
-    <span class="absolute inset-y-0 left-3.5 flex items-center text-gray-400 pointer-events-none text-sm">🔍</span>
-    <input type="text" name="search" value="{{ selected_search }}"
-           placeholder="Search lessons…" autocomplete="off"
-           class="w-full pl-9 pr-10 py-3 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-100 placeholder-gray-400 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
-    {% if selected_search %}
-    <button type="submit" name="search" value=""
-            class="absolute inset-y-0 right-3 flex items-center text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 text-xl leading-none">×</button>
-    {% endif %}
+  <div class="flex items-center gap-3 mb-4">
+    <div class="relative flex-1">
+      <span class="absolute inset-y-0 left-3.5 flex items-center text-gray-400 pointer-events-none text-sm">🔍</span>
+      <input type="text" name="search" value="{{ selected_search }}"
+             placeholder="Search lessons…" autocomplete="off"
+             class="w-full pl-9 pr-10 py-3 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-100 placeholder-gray-400 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
+      {% if selected_search %}
+      <button type="submit" name="search" value=""
+              class="absolute inset-y-0 right-3 flex items-center text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 text-xl leading-none">×</button>
+      {% endif %}
+    </div>
+    <p class="text-sm text-gray-400 dark:text-gray-500 whitespace-nowrap shrink-0">
+      {% if total == 0 %}No lessons
+      {% elif total_pages == 1 %}{{ total }} lesson{{ 's' if total != 1 }}
+      {% else %}{{ (page - 1) * per_page + 1 }}–{{ [page * per_page, total] | min }} of {{ total }}
+      {% endif %}
+    </p>
   </div>
 
   {# ── Filter bar ── #}
@@ -162,6 +171,36 @@
                          text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800
                        {% endif %}">
           {{ lbl }}{% if selected_feedback == val %}<span class="text-indigo-500 ml-auto">✓</span>{% endif %}
+        </button>
+        {% endfor %}
+      </div>
+    </div>
+
+    {# Level dropdown #}
+    {% set _lc = {'junior':'🟢','mid':'🟡','senior':'🔴'} %}
+    <div class="relative" x-data="{ open: false }" @click.outside="open = false" @keydown.escape="open = false">
+      <button type="button" @click="open = !open"
+              class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition
+                     {% if selected_level %}
+                       bg-indigo-600 text-white border-indigo-600
+                     {% else %}
+                       bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-indigo-400
+                     {% endif %}">
+        {{ (_lc[selected_level] ~ ' ' ~ selected_level) if selected_level else 'Level' }}
+        <svg class="w-3 h-3 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/></svg>
+      </button>
+      <div x-show="open" x-transition:enter="transition ease-out duration-100" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
+           class="absolute left-0 top-full mt-1 z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg w-40 p-1 overflow-hidden" style="display:none">
+        {% for val, lbl in [('','All levels'),('junior','🟢 Junior'),('mid','🟡 Mid'),('senior','🔴 Senior')] %}
+        <button type="button"
+                onclick="document.getElementById('h-level').value='{{ val }}'; document.getElementById('filter-form').submit()"
+                class="w-full text-left px-3 py-2 rounded-lg text-sm transition flex items-center justify-between
+                       {% if selected_level == val %}
+                         bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 font-medium
+                       {% else %}
+                         text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800
+                       {% endif %}">
+          {{ lbl }}{% if selected_level == val %}<span class="text-indigo-500 ml-auto">✓</span>{% endif %}
         </button>
         {% endfor %}
       </div>
@@ -280,7 +319,7 @@
     </span>
     {% endmacro %}
 
-    {% set base = '?period=' ~ selected_period ~ '&category=' ~ selected_category ~ '&project=' ~ selected_project ~ '&repository=' ~ selected_repository ~ '&branch=' ~ selected_branch ~ '&commit=' ~ selected_commit ~ '&feedback=' ~ selected_feedback ~ '&search=' ~ selected_search ~ '&date_from=' ~ selected_date_from ~ '&date_to=' ~ selected_date_to ~ ('&starred=1' if selected_starred else '') ~ '&sort=' ~ selected_sort ~ '&order=' ~ selected_order %}
+    {% set base = '?period=' ~ selected_period ~ '&category=' ~ selected_category ~ '&level=' ~ selected_level ~ '&project=' ~ selected_project ~ '&repository=' ~ selected_repository ~ '&branch=' ~ selected_branch ~ '&commit=' ~ selected_commit ~ '&feedback=' ~ selected_feedback ~ '&search=' ~ selected_search ~ '&date_from=' ~ selected_date_from ~ '&date_to=' ~ selected_date_to ~ ('&starred=1' if selected_starred else '') ~ '&sort=' ~ selected_sort ~ '&order=' ~ selected_order %}
 
     {% if custom_date %}{{ chip('📅 ' ~ period_label, base | replace('&date_from=' ~ selected_date_from, '&date_from=') | replace('&date_to=' ~ selected_date_to, '&date_to=')) }}{% endif %}
     {% if selected_period != 'all' and not custom_date %}{{ chip('🕐 ' ~ period_label, base | replace('period=' ~ selected_period, 'period=all')) }}{% endif %}
@@ -288,6 +327,7 @@
     {% if selected_starred %}<span class="inline-flex items-center gap-1 pl-2.5 pr-1 py-0.5 rounded-full text-xs bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300 border border-yellow-200 dark:border-yellow-800">★ Starred<a href="{{ base | replace('&starred=1','') }}" class="ml-0.5 w-4 h-4 flex items-center justify-center rounded-full hover:bg-yellow-200 dark:hover:bg-yellow-700 transition">×</a></span>{% endif %}
     {% if selected_search %}{{ chip('🔍 "' ~ selected_search ~ '"', base | replace('&search=' ~ selected_search, '&search=')) }}{% endif %}
     {% if selected_category %}{{ chip(selected_category, base | replace('&category=' ~ selected_category, '&category=')) }}{% endif %}
+    {% if selected_level %}{{ chip(_lc.get(selected_level, '') ~ ' ' ~ selected_level, base | replace('&level=' ~ selected_level, '&level=')) }}{% endif %}
     {% if selected_project %}{{ chip('📁 ' ~ selected_project, base | replace('&project=' ~ selected_project, '&project=')) }}{% endif %}
     {% if selected_repository %}{{ chip('⎇ ' ~ selected_repository, base | replace('&repository=' ~ selected_repository, '&repository=')) }}{% endif %}
     {% if selected_branch %}{{ chip('⎇ ' ~ selected_branch, base | replace('&branch=' ~ selected_branch, '&branch=')) }}{% endif %}
@@ -297,23 +337,13 @@
 
 </form>
 
-{# ── Header row: count + page info ── #}
-<div class="flex items-center justify-between mb-3">
-  <p class="text-sm text-gray-500 dark:text-gray-400">
-    {% if total == 0 %}No lessons found
-    {% elif total_pages == 1 %}{{ total }} lesson{{ 's' if total != 1 }}
-    {% else %}{{ (page - 1) * per_page + 1 }}–{{ [page * per_page, total] | min }} of {{ total }} lessons
-    {% endif %}
-  </p>
-</div>
-
 {# ── Table ── #}
 {% if lessons %}
 <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm overflow-hidden">
   <table class="w-full text-sm">
     <thead>
       {# qs without sort/order/page so sort links preserve all filters #}
-      {% set sort_base = '?period=' ~ selected_period ~ '&date_from=' ~ selected_date_from ~ '&date_to=' ~ selected_date_to ~ '&category=' ~ selected_category ~ '&project=' ~ selected_project ~ '&repository=' ~ selected_repository ~ '&branch=' ~ selected_branch ~ '&commit=' ~ selected_commit ~ '&feedback=' ~ selected_feedback ~ '&search=' ~ selected_search ~ ('&starred=1' if selected_starred else '') %}
+      {% set sort_base = '?period=' ~ selected_period ~ '&date_from=' ~ selected_date_from ~ '&date_to=' ~ selected_date_to ~ '&category=' ~ selected_category ~ '&level=' ~ selected_level ~ '&project=' ~ selected_project ~ '&repository=' ~ selected_repository ~ '&branch=' ~ selected_branch ~ '&commit=' ~ selected_commit ~ '&feedback=' ~ selected_feedback ~ '&search=' ~ selected_search ~ ('&starred=1' if selected_starred else '') %}
       {% macro sort_th(label, col, extra_class='') %}
         {% set active = (selected_sort == col) %}
         {% set next_order = 'asc' if (active and selected_order == 'desc') else 'desc' %}
@@ -344,10 +374,11 @@
       {% set lc = {'junior':'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20',
                    'mid':'text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20',
                    'senior':'text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/20'} %}
-      <tr class="hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors group">
+      <tr class="hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors group cursor-pointer"
+          onclick="window.location='/lessons/{{ lesson.id }}'">
 
         {# Star #}
-        <td class="px-3 py-3">
+        <td class="px-3 py-3" onclick="event.stopPropagation()">
           <form method="post" action="/lessons/{{ lesson.id }}/star">
             <input type="hidden" name="next" value="/lessons{% if request.url.query %}?{{ request.url.query }}{% endif %}" />
             <button type="submit" title="{% if lesson.starred %}Unstar{% else %}Star{% endif %}"
@@ -383,23 +414,25 @@
         </td>
 
         {# Level badge #}
-        <td class="px-3 py-3">
-          <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium {{ lc.get(lesson.level, '') }}">
+        <td class="px-3 py-3" onclick="event.stopPropagation()">
+          <a href="{{ sort_base }}&level={{ lesson.level }}&sort={{ selected_sort }}&order={{ selected_order }}"
+             class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium {{ lc.get(lesson.level, '') }} hover:ring-2 hover:ring-current hover:ring-offset-1 transition-shadow">
             {{ lesson.level }}
-          </span>
+          </a>
         </td>
 
         {# Categories #}
-        <td class="px-3 py-3 hidden lg:table-cell">
+        <td class="px-3 py-3 hidden lg:table-cell" onclick="event.stopPropagation()">
           <div class="flex flex-wrap gap-1">
             {% for cat in lesson.categories %}
-            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400">{{ cat }}</span>
+            <a href="{{ sort_base }}&category={{ cat }}&sort={{ selected_sort }}&order={{ selected_order }}"
+               class="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors">{{ cat }}</a>
             {% endfor %}
           </div>
         </td>
 
         {# Feedback #}
-        <td class="px-3 py-3 hidden xl:table-cell">
+        <td class="px-3 py-3 hidden xl:table-cell" onclick="event.stopPropagation()">
           {% if lesson.feedback == 'know' %}
           <span class="text-xs text-emerald-600 dark:text-emerald-400 font-medium">✓ Known</span>
           {% elif lesson.feedback == 'dont_know' %}
@@ -414,7 +447,7 @@
 
 {# ── Pagination ── #}
 {% if total_pages > 1 %}
-{% set qs_base = '?period=' ~ selected_period ~ '&category=' ~ selected_category ~ '&project=' ~ selected_project ~ '&repository=' ~ selected_repository ~ '&branch=' ~ selected_branch ~ '&commit=' ~ selected_commit ~ '&feedback=' ~ selected_feedback ~ '&search=' ~ selected_search ~ '&date_from=' ~ selected_date_from ~ '&date_to=' ~ selected_date_to ~ ('&starred=1' if selected_starred else '') ~ '&sort=' ~ selected_sort ~ '&order=' ~ selected_order %}
+{% set qs_base = '?period=' ~ selected_period ~ '&category=' ~ selected_category ~ '&level=' ~ selected_level ~ '&project=' ~ selected_project ~ '&repository=' ~ selected_repository ~ '&branch=' ~ selected_branch ~ '&commit=' ~ selected_commit ~ '&feedback=' ~ selected_feedback ~ '&search=' ~ selected_search ~ '&date_from=' ~ selected_date_from ~ '&date_to=' ~ selected_date_to ~ ('&starred=1' if selected_starred else '') ~ '&sort=' ~ selected_sort ~ '&order=' ~ selected_order %}
 <div class="flex items-center justify-between mt-4">
   <p class="text-xs text-gray-400 dark:text-gray-500">Page {{ page }} of {{ total_pages }}</p>
   <div class="flex items-center gap-1">

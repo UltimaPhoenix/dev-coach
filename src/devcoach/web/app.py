@@ -86,6 +86,7 @@ async def lessons_page(
     request: Request,
     period: Optional[str] = None,
     category: Optional[str] = None,
+    level: Optional[str] = None,
     project: Optional[str] = None,
     repository: Optional[str] = None,
     branch: Optional[str] = None,
@@ -101,9 +102,11 @@ async def lessons_page(
 ) -> HTMLResponse:
     starred_filter = True if starred == "1" else None
     effective_period = None if (date_from or date_to) else (period or None)
+    valid_levels = {"junior", "mid", "senior"}
     filter_kwargs = dict(
         period=effective_period,
         category=category or None,
+        level=level if level in valid_levels else None,
         project=project or None,
         repository=repository or None,
         branch=branch or None,
@@ -146,6 +149,7 @@ async def lessons_page(
             "all_commits": all_commits,
             "selected_period": period or "all",
             "selected_category": category or "",
+            "selected_level": level if level in valid_levels else "",
             "selected_project": project or "",
             "selected_repository": repository or "",
             "selected_branch": branch or "",
@@ -243,4 +247,4 @@ async def import_settings_route(file: UploadFile = File(...)) -> RedirectRespons
     content = await file.read()
     with db.connection() as conn:
         result = db.restore_backup_zip(conn, content)
-    return RedirectResponse(url=f"/settings?imported={result['lessons']}", status_code=303)
+    return RedirectResponse(url=f"/settings?imported={result['lessons']}&skipped={result['skipped']}", status_code=303)

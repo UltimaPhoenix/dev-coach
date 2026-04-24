@@ -157,7 +157,7 @@ def _migrate(conn: sqlite3.Connection) -> None:
 
 
 def _seed_defaults(conn: sqlite3.Connection) -> None:
-    """Seed knowledge and settings tables on first run. Idempotent."""
+    """Seed knowledge and settings tables on the first run. Idempotent."""
     row = conn.execute("SELECT COUNT(*) FROM knowledge").fetchone()
     if row[0] == 0:
         now = datetime.now(timezone.utc).isoformat()
@@ -210,6 +210,7 @@ def insert_lesson(conn: sqlite3.Connection, lesson: Lesson) -> None:
 def _lesson_where(
     period: Optional[str] = None,
     category: Optional[str] = None,
+    level: Optional[str] = None,
     project: Optional[str] = None,
     repository: Optional[str] = None,
     branch: Optional[str] = None,
@@ -240,6 +241,9 @@ def _lesson_where(
     if category is not None:
         conditions.append("categories LIKE ?")
         params.append(f'%"{category}"%')
+    if level is not None:
+        conditions.append("level = ?")
+        params.append(level)
     if project is not None:
         conditions.append("project LIKE ?")
         params.append(f"%{project}%")
@@ -286,6 +290,7 @@ def get_lessons(
     conn: sqlite3.Connection,
     period: Optional[str] = None,
     category: Optional[str] = None,
+    level: Optional[str] = None,
     project: Optional[str] = None,
     repository: Optional[str] = None,
     branch: Optional[str] = None,
@@ -300,10 +305,11 @@ def get_lessons(
     page: Optional[int] = None,
     per_page: int = 25,
 ) -> list[Lesson]:
-    """Return lessons filtered by period, category, git metadata, starred flag, and/or search text.
+    """Return lessons filtered by period, category, level, git metadata, starred flag, and/or search text.
 
     period: today | week | month | year | all | None (same as all)
     category: exact tag match inside the JSON categories array
+    level: junior | mid | senior
     project, repository, branch: fuzzy match on metadata columns
     commit: fuzzy match on commit_hash
     starred: True for starred only, False for unstarred only, None for all
@@ -312,7 +318,7 @@ def get_lessons(
     page / per_page: if page is given, apply LIMIT/OFFSET pagination
     """
     where, params = _lesson_where(
-        period=period, category=category, project=project,
+        period=period, category=category, level=level, project=project,
         repository=repository, branch=branch, commit=commit,
         starred=starred, search=search, feedback=feedback,
         date_from=date_from, date_to=date_to,
@@ -354,7 +360,7 @@ def set_feedback(
 def export_lessons(conn: sqlite3.Connection) -> list[dict]:
     """Return all lessons as a list of plain dicts, suitable for JSON serialisation."""
     rows = conn.execute("SELECT * FROM lessons ORDER BY timestamp DESC").fetchall()
-    return [dict(row) for row in rows]
+    return [_row_to_lesson(row).model_dump(mode="json") for row in rows]
 
 
 def import_lessons(conn: sqlite3.Connection, records: list[dict]) -> int:
@@ -416,10 +422,10 @@ def create_backup_zip(conn: sqlite3.Connection) -> bytes:
 def restore_backup_zip(conn: sqlite3.Connection, data: bytes) -> dict[str, int]:
     """Restore from a backup zip.
 
-    Returns a dict with counts: {"settings": 1, "topics": N, "lessons": N}.
+    Returns a dict with counts: {"settings": 1, "topics": N, "lessons": N, "skipped": N}.
     Settings are overwritten; knowledge entries are upserted; duplicate lessons are skipped.
     """
-    result: dict[str, int] = {"settings": 0, "topics": 0, "lessons": 0}
+    result: dict[str, int] = {"settings": 0, "topics": 0, "lessons": 0, "skipped": 0}
 
     with zipfile.ZipFile(io.BytesIO(data)) as zf:
         names = zf.namelist()
@@ -441,6 +447,7 @@ def restore_backup_zip(conn: sqlite3.Connection, data: bytes) -> dict[str, int]:
         if "lessons.json" in names:
             lessons_data = json.loads(zf.read("lessons.json"))
             result["lessons"] = import_lessons(conn, lessons_data)
+            result["skipped"] = len(lessons_data) - result["lessons"]
 
     return result
 

@@ -30,7 +30,8 @@
       </button>
     </form>
     <h1 class="text-lg font-bold text-gray-900 dark:text-white flex-1 min-w-0">{{ lesson.title }}</h1>
-    <span class="text-xs font-semibold px-2 py-0.5 rounded-full border {{ level_class }} shrink-0">{{ lesson.level }}</span>
+    <a href="/lessons?level={{ lesson.level }}"
+       class="text-xs font-semibold px-2 py-0.5 rounded-full border {{ level_class }} shrink-0 hover:ring-2 hover:ring-current hover:ring-offset-1 transition-shadow">{{ lesson.level }}</a>
   </div>
 
   <!-- Row 2: date + topic + tags + feedback result (all inline) -->
