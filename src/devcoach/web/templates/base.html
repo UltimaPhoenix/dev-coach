@@ -15,12 +15,13 @@
     })();
   </script>
 
-  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="/static/vendor/tailwind.js"></script>
   <!-- Config must come immediately after the CDN so it's set before DOMContentLoaded -->
   <script>
     tailwind.config = { darkMode: 'class' }
   </script>
-  <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+  <script src="/static/vendor/htmx.min.js"></script>
+  <script src="/static/vendor/alpinejs.min.js" defer></script>
   <link rel="stylesheet" href="/static/style.css" />
   {% block head %}{% endblock %}
 </head>
@@ -58,8 +59,8 @@
       var link = document.getElementById('hljs-theme');
       if (!link) return;
       link.href = isDark()
-        ? 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/atom-one-dark.min.css'
-        : 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/atom-one-light.min.css';
+        ? '/static/vendor/hljs-dark.min.css'
+        : '/static/vendor/hljs-light.min.css';
     }
 
     function toggleTheme() {

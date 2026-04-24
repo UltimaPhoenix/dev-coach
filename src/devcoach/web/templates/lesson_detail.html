@@ -2,7 +2,7 @@
 {% block title %}{{ lesson.title }} — devcoach{% endblock %}
 
 {% block head %}
-<link id="hljs-theme" rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/atom-one-dark.min.css" />
+<link id="hljs-theme" rel="stylesheet" href="/static/vendor/hljs-dark.min.css" />
 {% endblock %}
 
 {% block content %}
@@ -121,8 +121,8 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/highlight.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/marked@4/marked.min.js"></script>
+<script src="/static/vendor/highlight.min.js"></script>
+<script src="/static/vendor/marked.min.js"></script>
 <script>
   // Set correct hljs theme immediately (base.html updateHljsTheme targets #hljs-theme)
   updateHljsTheme();
