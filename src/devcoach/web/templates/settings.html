@@ -10,86 +10,127 @@
 </div>
 {% endif %}
 
-<div class="max-w-sm space-y-4">
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
   <!-- Coaching settings -->
-  <form method="post" action="/settings">
-    <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-6 space-y-5">
-      <p class="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">Coaching</p>
+  <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-6">
+    <p class="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500 mb-5">Coaching</p>
 
-      <div>
-        <label class="block text-sm text-gray-600 dark:text-gray-400 mb-1">Max lessons per day</label>
-        <input
-          type="number" name="max_per_day" min="1" max="20"
-          value="{{ settings.max_per_day }}"
-          class="w-full bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white rounded px-3 py-2 text-sm focus:outline-none focus:border-indigo-500"
-        />
-        <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">How many lessons can be delivered in a 24-hour window.</p>
-      </div>
+    <form method="post" action="/settings" class="space-y-4">
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm text-gray-600 dark:text-gray-400 mb-1">Max lessons per day</label>
+          <input
+            type="number" name="max_per_day" min="1" max="20"
+            value="{{ settings.max_per_day }}"
+            class="w-full bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white rounded px-3 py-2 text-sm focus:outline-none focus:border-indigo-500"
+          />
+          <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">Lessons in a 24h window.</p>
+        </div>
 
-      <div>
-        <label class="block text-sm text-gray-600 dark:text-gray-400 mb-1">Minimum gap between lessons</label>
-        <select name="min_gap_minutes"
-                class="w-full bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white rounded px-3 py-2 text-sm focus:outline-none focus:border-indigo-500">
-          {% set gap = settings.min_gap_minutes %}
-          <option value="0"    {% if gap == 0    %}selected{% endif %}>No cooldown</option>
-          <option value="15"   {% if gap == 15   %}selected{% endif %}>15 minutes</option>
-          <option value="30"   {% if gap == 30   %}selected{% endif %}>30 minutes</option>
-          <option value="60"   {% if gap == 60   %}selected{% endif %}>1 hour</option>
-          <option value="90"   {% if gap == 90   %}selected{% endif %}>1 hour 30 min</option>
-          <option value="120"  {% if gap == 120  %}selected{% endif %}>2 hours</option>
-          <option value="180"  {% if gap == 180  %}selected{% endif %}>3 hours</option>
-          <option value="240"  {% if gap == 240  %}selected{% endif %}>4 hours</option>
-          <option value="360"  {% if gap == 360  %}selected{% endif %}>6 hours</option>
-          <option value="480"  {% if gap == 480  %}selected{% endif %}>8 hours</option>
-          <option value="720"  {% if gap == 720  %}selected{% endif %}>12 hours</option>
-          <option value="1440" {% if gap == 1440 %}selected{% endif %}>24 hours</option>
-        </select>
-        <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">Minimum gap between consecutive lessons.</p>
+        <div>
+          <label class="block text-sm text-gray-600 dark:text-gray-400 mb-1">Minimum gap between lessons</label>
+          <select name="min_gap_minutes"
+                  class="w-full bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white rounded px-3 py-2 text-sm focus:outline-none focus:border-indigo-500">
+            {% set gap = settings.min_gap_minutes %}
+            <option value="0"    {% if gap == 0    %}selected{% endif %}>No cooldown</option>
+            <option value="15"   {% if gap == 15   %}selected{% endif %}>15 minutes</option>
+            <option value="30"   {% if gap == 30   %}selected{% endif %}>30 minutes</option>
+            <option value="60"   {% if gap == 60   %}selected{% endif %}>1 hour</option>
+            <option value="90"   {% if gap == 90   %}selected{% endif %}>1 hour 30 min</option>
+            <option value="120"  {% if gap == 120  %}selected{% endif %}>2 hours</option>
+            <option value="180"  {% if gap == 180  %}selected{% endif %}>3 hours</option>
+            <option value="240"  {% if gap == 240  %}selected{% endif %}>4 hours</option>
+            <option value="360"  {% if gap == 360  %}selected{% endif %}>6 hours</option>
+            <option value="480"  {% if gap == 480  %}selected{% endif %}>8 hours</option>
+            <option value="720"  {% if gap == 720  %}selected{% endif %}>12 hours</option>
+            <option value="1440" {% if gap == 1440 %}selected{% endif %}>24 hours</option>
+          </select>
+          <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">Minimum gap between lessons.</p>
+        </div>
       </div>
 
       <button type="submit"
-              class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded px-4 py-2 text-sm transition">
+              class="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded px-4 py-2 text-sm transition">
         Save settings
       </button>
-    </div>
-  </form>
+    </form>
+  </div>
 
   <!-- Backup & Restore -->
-  <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-6 space-y-4">
-    <p class="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">Backup &amp; Restore</p>
+  <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-6">
+    <p class="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500 mb-5">Backup &amp; Restore</p>
 
-    <!-- Export full backup -->
-    <div>
-      <p class="text-sm text-gray-600 dark:text-gray-400 mb-2">Export a full backup (settings + all lessons).</p>
-      <a href="/settings/export"
-         class="block w-full text-center bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 font-medium rounded px-4 py-2 text-sm transition">
-        Download backup
-      </a>
-    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
 
-    <!-- Import / restore -->
-    <div class="border-t border-gray-100 dark:border-gray-800 pt-4">
-      <p class="text-sm text-gray-600 dark:text-gray-400 mb-2">Restore from a backup file. Settings are overwritten; duplicate lessons are skipped.</p>
-      <form method="post" action="/settings/import" enctype="multipart/form-data" class="space-y-2">
-        <input type="file" name="file" accept=".json"
-               class="w-full text-sm text-gray-600 dark:text-gray-300 file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:text-sm file:bg-indigo-50 dark:file:bg-indigo-900/30 file:text-indigo-700 dark:file:text-indigo-300 file:cursor-pointer" />
-        <button type="submit"
-                class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded px-4 py-2 text-sm transition">
-          Restore backup
-        </button>
-      </form>
-    </div>
+      <!-- Export full backup -->
+      <div class="flex flex-col gap-1">
+        <p class="text-sm font-medium text-gray-700 dark:text-gray-200">Full backup</p>
+        <p class="text-xs text-gray-400 dark:text-gray-500">Settings + knowledge map + lessons as a zip file.</p>
+        <a href="/settings/export"
+           class="mt-auto inline-flex items-center justify-center gap-1.5 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 font-medium rounded px-4 py-2 text-sm transition">
+          ↓ Download backup
+        </a>
+      </div>
 
-    <!-- Export lessons only -->
-    <div class="border-t border-gray-100 dark:border-gray-800 pt-4">
-      <p class="text-sm text-gray-600 dark:text-gray-400 mb-2">Export lessons only (no settings).</p>
-      <a href="/lessons/export"
-         class="block w-full text-center bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 font-medium rounded px-4 py-2 text-sm transition">
-        Download lessons
-      </a>
+      <!-- Restore from backup -->
+      <div class="flex flex-col gap-1">
+        <p class="text-sm font-medium text-gray-700 dark:text-gray-200">Restore backup</p>
+        <p class="text-xs text-gray-400 dark:text-gray-500">Overwrites settings &amp; knowledge; duplicate lessons are skipped.</p>
+        <form id="form-restore" method="post" action="/settings/import" enctype="multipart/form-data" class="mt-auto flex flex-col gap-2">
+          <input id="file-restore" type="file" name="file" accept=".zip,.json" class="hidden" onchange="updateLabel('file-restore','label-restore','restore-submit')" />
+          <label id="label-restore" for="file-restore"
+                 class="cursor-pointer inline-flex items-center justify-center gap-1.5 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 font-medium rounded px-4 py-2 text-sm transition truncate">
+            Choose file…
+          </label>
+          <button id="restore-submit" type="submit" disabled
+                  class="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-medium rounded px-4 py-2 text-sm transition">
+            Restore
+          </button>
+        </form>
+      </div>
+
+      <!-- Export lessons only -->
+      <div class="flex flex-col gap-1">
+        <p class="text-sm font-medium text-gray-700 dark:text-gray-200">Lessons only</p>
+        <p class="text-xs text-gray-400 dark:text-gray-500">Export just the lesson log as JSON (no settings).</p>
+        <a href="/lessons/export"
+           class="mt-auto inline-flex items-center justify-center gap-1.5 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 font-medium rounded px-4 py-2 text-sm transition">
+          ↓ Download lessons
+        </a>
+      </div>
+
+      <!-- Import lessons only -->
+      <div class="flex flex-col gap-1">
+        <p class="text-sm font-medium text-gray-700 dark:text-gray-200">Import lessons</p>
+        <p class="text-xs text-gray-400 dark:text-gray-500">Merge a lessons JSON file; duplicates are skipped.</p>
+        <form id="form-import" method="post" action="/lessons/import" enctype="multipart/form-data" class="mt-auto flex flex-col gap-2">
+          <input id="file-import" type="file" name="file" accept=".json" class="hidden" onchange="updateLabel('file-import','label-import','import-submit')" />
+          <label id="label-import" for="file-import"
+                 class="cursor-pointer inline-flex items-center justify-center gap-1.5 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 font-medium rounded px-4 py-2 text-sm transition truncate">
+            Choose file…
+          </label>
+          <button id="import-submit" type="submit" disabled
+                  class="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-medium rounded px-4 py-2 text-sm transition">
+            Import
+          </button>
+        </form>
+      </div>
+
     </div>
   </div>
 
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function updateLabel(inputId, labelId, submitId) {
+  var input = document.getElementById(inputId);
+  var label = document.getElementById(labelId);
+  var btn   = document.getElementById(submitId);
+  label.textContent = input.files.length ? input.files[0].name : 'Choose file…';
+  btn.disabled = !input.files.length;
+}
+</script>
 {% endblock %}
