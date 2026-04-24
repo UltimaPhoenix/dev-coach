@@ -101,19 +101,22 @@ def init_schema(conn: sqlite3.Connection) -> None:
     """Create tables, indexes, and seed defaults if needed. Idempotent."""
     conn.executescript("""
         CREATE TABLE IF NOT EXISTS lessons (
-            id           TEXT PRIMARY KEY,
-            timestamp    TEXT NOT NULL,
-            topic_id     TEXT NOT NULL,
-            categories   TEXT NOT NULL,
-            title        TEXT NOT NULL,
-            level        TEXT NOT NULL,
-            summary      TEXT NOT NULL,
-            task_context TEXT,
-            project      TEXT,
-            repository   TEXT,
-            branch       TEXT,
-            commit_hash  TEXT,
-            folder       TEXT
+            id                  TEXT PRIMARY KEY,
+            timestamp           TEXT NOT NULL,
+            topic_id            TEXT NOT NULL,
+            categories          TEXT NOT NULL,
+            title               TEXT NOT NULL,
+            level               TEXT NOT NULL,
+            summary             TEXT NOT NULL,
+            task_context        TEXT,
+            project             TEXT,
+            repository          TEXT,
+            branch              TEXT,
+            commit_hash         TEXT,
+            folder              TEXT,
+            feedback            TEXT,
+            repository_platform TEXT,
+            starred             INTEGER NOT NULL DEFAULT 0
         );
 
         CREATE TABLE IF NOT EXISTS knowledge (
