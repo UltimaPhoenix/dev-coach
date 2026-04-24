@@ -122,14 +122,42 @@ log_lesson({
   id: "random-id",
   timestamp: "ISO8601",
   topic_id: "snake_case_identifier",
-  category: "python|node|docker|architecture|security|...",
+  categories: ["python", "architecture", ...],
   title: "Lesson title",
   level: "junior|mid|senior",
   summary: "1 line — what was taught",
-  task_context: "brief description of the task that triggered it"
+  task_context: "brief description of the task that triggered it",
+
+  // Git context — always try to populate these when working in a repo:
+  project: "project or repo name",
+  repository: "org/repo",           // for remote; absolute path for local
+  branch: "current git branch",
+  commit_hash: "full commit SHA",
+  folder: "/absolute/path/to/cwd",
+  repository_platform: "github",    // see detection logic below
 })
 
 update_knowledge("topic_id", +1)   // or -1 if user showed a gap
+```
+
+### Detecting `repository_platform` and `repository`
+
+Run `git remote get-url origin` before calling `log_lesson`:
+
+```
+If remote exists and domain matches:
+  github.com    → platform = "github",    repository = "org/repo"
+  gitlab.com    → platform = "gitlab",    repository = "org/repo"
+  bitbucket.org → platform = "bitbucket", repository = "org/repo"
+  other host    → platform = "local",     repository = absolute cwd path
+
+If no remote (pure local repo):
+  platform = "local", repository = absolute cwd path
+
+SSH URL normalisation:
+  git@github.com:org/repo.git  →  repository = "org/repo"
+HTTPS normalisation:
+  https://github.com/org/repo.git  →  repository = "org/repo"  (strip .git)
 ```
 
 ---

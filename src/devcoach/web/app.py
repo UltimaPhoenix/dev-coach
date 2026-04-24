@@ -95,6 +95,8 @@ async def lessons_page(
     feedback: Optional[str] = None,
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
+    sort: Optional[str] = None,
+    order: Optional[str] = None,
     page: int = 1,
 ) -> HTMLResponse:
     starred_filter = True if starred == "1" else None
@@ -112,10 +114,16 @@ async def lessons_page(
         date_from=date_from or None,
         date_to=date_to or None,
     )
+    selected_sort = sort or "timestamp"
+    selected_order = order if order in ("asc", "desc") else "desc"
     page = max(1, page)
     with db.connection() as conn:
         total = db.count_filtered_lessons(conn, **filter_kwargs)
-        lessons = db.get_lessons(conn, **filter_kwargs, page=page, per_page=_PER_PAGE)
+        lessons = db.get_lessons(
+            conn, **filter_kwargs,
+            sort=selected_sort, order=selected_order,
+            page=page, per_page=_PER_PAGE,
+        )
         all_categories = db.get_all_categories(conn)
         all_projects = db.get_distinct_column(conn, "project")
         all_repositories = db.get_distinct_column(conn, "repository")
@@ -147,6 +155,8 @@ async def lessons_page(
             "selected_feedback": feedback or "",
             "selected_date_from": date_from or "",
             "selected_date_to": date_to or "",
+            "selected_sort": selected_sort,
+            "selected_order": selected_order,
             "page": page,
             "per_page": _PER_PAGE,
             "total": total,

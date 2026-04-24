@@ -23,6 +23,7 @@ class Lesson(BaseModel):
     branch: Optional[str] = None
     commit_hash: Optional[str] = None
     folder: Optional[str] = None
+    repository_platform: Optional[str] = None  # "github" | "gitlab" | "bitbucket" | "local" | None
     starred: bool = False
     feedback: Optional[str] = None  # "know" | "dont_know" | None
 

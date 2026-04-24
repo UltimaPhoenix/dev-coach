@@ -70,23 +70,87 @@
   <!-- Git / project metadata -->
   {% set has_meta = lesson.project or lesson.repository or lesson.branch or lesson.commit_hash or lesson.folder %}
   {% if has_meta %}
+
+  {# Compute repo and commit URLs from platform key #}
+  {% set _domains = {"github": "github.com", "gitlab": "gitlab.com", "bitbucket": "bitbucket.org"} %}
+  {% set _is_local = (lesson.repository_platform == "local") %}
+  {% if _is_local and lesson.repository %}
+    {% set repo_url = "vscode://file/" ~ lesson.repository %}
+  {% elif lesson.repository_platform in _domains and lesson.repository %}
+    {% set repo_url = "https://" ~ _domains[lesson.repository_platform] ~ "/" ~ lesson.repository %}
+  {% else %}
+    {% set repo_url = None %}
+  {% endif %}
+  {% if repo_url and lesson.commit_hash and not _is_local %}
+    {% if lesson.repository_platform == "gitlab" %}
+      {% set commit_url = repo_url ~ "/-/commit/" ~ lesson.commit_hash %}
+    {% elif lesson.repository_platform == "bitbucket" %}
+      {% set commit_url = repo_url ~ "/commits/" ~ lesson.commit_hash %}
+    {% else %}
+      {% set commit_url = repo_url ~ "/commit/" ~ lesson.commit_hash %}
+    {% endif %}
+  {% else %}
+    {% set commit_url = None %}
+  {% endif %}
+
   <div class="mt-4 pt-4 border-t border-gray-100 dark:border-gray-800">
-    <div class="flex flex-wrap gap-x-5 gap-y-1 text-xs text-gray-400 dark:text-gray-500 font-mono">
+    <div class="flex flex-wrap gap-x-5 gap-y-1.5 text-xs text-gray-400 dark:text-gray-500 font-mono">
+
       {% if lesson.project %}
-      <span><span class="text-gray-400 dark:text-gray-600">project</span> <span class="text-gray-600 dark:text-gray-300">{{ lesson.project }}</span></span>
+      <span>
+        <span class="text-gray-400 dark:text-gray-600">project</span>
+        {% if repo_url %}
+        <a href="{{ repo_url }}" {% if not _is_local %}target="_blank" rel="noopener"{% endif %}
+           class="text-gray-600 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 transition">{{ lesson.project }}</a>
+        {% else %}
+        <span class="text-gray-600 dark:text-gray-300">{{ lesson.project }}</span>
+        {% endif %}
+      </span>
       {% endif %}
+
       {% if lesson.repository %}
-      <span><span class="text-gray-400 dark:text-gray-600">repo</span> <span class="text-gray-600 dark:text-gray-300">{{ lesson.repository }}</span></span>
+      <span class="inline-flex items-center gap-1">
+        <span class="text-gray-400 dark:text-gray-600">repo</span>
+        {% if lesson.repository_platform in ("github", "gitlab", "bitbucket") %}
+        <img src="/static/vendor/icons/{{ lesson.repository_platform }}.svg"
+             class="w-3 h-3 dark:invert opacity-60 shrink-0" alt="" />
+        {% endif %}
+        {% if repo_url %}
+        <a href="{{ repo_url }}" {% if not _is_local %}target="_blank" rel="noopener"{% endif %}
+           class="text-gray-600 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 transition">{{ lesson.repository }}</a>
+        {% else %}
+        <span class="text-gray-600 dark:text-gray-300">{{ lesson.repository }}</span>
+        {% endif %}
+      </span>
       {% endif %}
+
       {% if lesson.branch %}
       <span><span class="text-gray-400 dark:text-gray-600">branch</span> <span class="text-indigo-600 dark:text-indigo-400">{{ lesson.branch }}</span></span>
       {% endif %}
+
       {% if lesson.commit_hash %}
-      <span><span class="text-gray-400 dark:text-gray-600">commit</span> <span class="text-cyan-600 dark:text-cyan-400">{{ lesson.commit_hash[:7] }}</span></span>
+      <span>
+        <span class="text-gray-400 dark:text-gray-600">commit</span>
+        {% if commit_url %}
+        <a href="{{ commit_url }}" target="_blank" rel="noopener"
+           class="text-cyan-600 dark:text-cyan-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition">{{ lesson.commit_hash[:7] }}</a>
+        {% else %}
+        <span class="text-cyan-600 dark:text-cyan-400">{{ lesson.commit_hash[:7] }}</span>
+        {% endif %}
+      </span>
       {% endif %}
+
       {% if lesson.folder %}
-      <span><span class="text-gray-400 dark:text-gray-600">folder</span> <span class="text-gray-600 dark:text-gray-300">{{ lesson.folder }}</span></span>
+      <span class="inline-flex items-center gap-1">
+        <span class="text-gray-400 dark:text-gray-600">folder</span>
+        <a href="vscode://file/{{ lesson.folder }}"
+           class="inline-flex items-center gap-1 text-gray-600 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 transition">
+          <img src="/static/vendor/icons/vscode.svg" class="w-3 h-3 dark:invert opacity-60 shrink-0" alt="" />
+          {{ lesson.folder }}
+        </a>
+      </span>
       {% endif %}
+
     </div>
   </div>
   {% endif %}

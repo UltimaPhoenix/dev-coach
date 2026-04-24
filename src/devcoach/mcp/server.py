@@ -43,6 +43,7 @@ def log_lesson(
     branch: Optional[str] = None,
     commit_hash: Optional[str] = None,
     folder: Optional[str] = None,
+    repository_platform: Optional[str] = None,
 ) -> str:
     """Save a delivered lesson to the coaching log. Returns 'ok' on success."""
     lesson = Lesson(
@@ -59,6 +60,7 @@ def log_lesson(
         branch=branch,
         commit_hash=commit_hash,
         folder=folder,
+        repository_platform=repository_platform,
     )
     try:
         with db.connection() as conn:

@@ -280,7 +280,7 @@
     </span>
     {% endmacro %}
 
-    {% set base = '?period=' ~ selected_period ~ '&category=' ~ selected_category ~ '&project=' ~ selected_project ~ '&repository=' ~ selected_repository ~ '&branch=' ~ selected_branch ~ '&commit=' ~ selected_commit ~ '&feedback=' ~ selected_feedback ~ '&search=' ~ selected_search ~ '&date_from=' ~ selected_date_from ~ '&date_to=' ~ selected_date_to ~ ('&starred=1' if selected_starred else '') %}
+    {% set base = '?period=' ~ selected_period ~ '&category=' ~ selected_category ~ '&project=' ~ selected_project ~ '&repository=' ~ selected_repository ~ '&branch=' ~ selected_branch ~ '&commit=' ~ selected_commit ~ '&feedback=' ~ selected_feedback ~ '&search=' ~ selected_search ~ '&date_from=' ~ selected_date_from ~ '&date_to=' ~ selected_date_to ~ ('&starred=1' if selected_starred else '') ~ '&sort=' ~ selected_sort ~ '&order=' ~ selected_order %}
 
     {% if custom_date %}{{ chip('📅 ' ~ period_label, base | replace('&date_from=' ~ selected_date_from, '&date_from=') | replace('&date_to=' ~ selected_date_to, '&date_to=')) }}{% endif %}
     {% if selected_period != 'all' and not custom_date %}{{ chip('🕐 ' ~ period_label, base | replace('period=' ~ selected_period, 'period=all')) }}{% endif %}
@@ -312,14 +312,31 @@
 <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm overflow-hidden">
   <table class="w-full text-sm">
     <thead>
+      {# qs without sort/order/page so sort links preserve all filters #}
+      {% set sort_base = '?period=' ~ selected_period ~ '&date_from=' ~ selected_date_from ~ '&date_to=' ~ selected_date_to ~ '&category=' ~ selected_category ~ '&project=' ~ selected_project ~ '&repository=' ~ selected_repository ~ '&branch=' ~ selected_branch ~ '&commit=' ~ selected_commit ~ '&feedback=' ~ selected_feedback ~ '&search=' ~ selected_search ~ ('&starred=1' if selected_starred else '') %}
+      {% macro sort_th(label, col, extra_class='') %}
+        {% set active = (selected_sort == col) %}
+        {% set next_order = 'asc' if (active and selected_order == 'desc') else 'desc' %}
+        <th class="px-3 py-3 whitespace-nowrap {{ extra_class }}">
+          <a href="{{ sort_base }}&sort={{ col }}&order={{ next_order }}"
+             class="inline-flex items-center gap-1 hover:text-gray-700 dark:hover:text-gray-200 transition group/sort">
+            {{ label }}
+            {% if active %}
+              <span class="text-indigo-400">{{ '↑' if selected_order == 'asc' else '↓' }}</span>
+            {% else %}
+              <span class="text-gray-200 dark:text-gray-700 group-hover/sort:text-gray-400 dark:group-hover/sort:text-gray-500 transition">↕</span>
+            {% endif %}
+          </a>
+        </th>
+      {% endmacro %}
       <tr class="bg-gray-50 dark:bg-gray-800/60 border-b border-gray-200 dark:border-gray-800 text-left text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">
         <th class="w-8 px-3 py-3"></th>
-        <th class="px-3 py-3 whitespace-nowrap">Date</th>
-        <th class="px-3 py-3 hidden sm:table-cell">Topic</th>
+        {{ sort_th('Date', 'timestamp') }}
+        {{ sort_th('Topic', 'topic_id', 'hidden sm:table-cell') }}
         <th class="px-3 py-3">Title</th>
-        <th class="px-3 py-3">Level</th>
+        {{ sort_th('Level', 'level') }}
         <th class="px-3 py-3 hidden lg:table-cell">Categories</th>
-        <th class="px-3 py-3 hidden xl:table-cell">Feedback</th>
+        {{ sort_th('Feedback', 'feedback', 'hidden xl:table-cell') }}
       </tr>
     </thead>
     <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
@@ -334,16 +351,22 @@
           <form method="post" action="/lessons/{{ lesson.id }}/star">
             <input type="hidden" name="next" value="/lessons{% if request.url.query %}?{{ request.url.query }}{% endif %}" />
             <button type="submit" title="{% if lesson.starred %}Unstar{% else %}Star{% endif %}"
-                    class="w-5 text-center leading-none transition
-                           {% if lesson.starred %}text-yellow-400 hover:text-yellow-300{% else %}text-gray-200 dark:text-gray-700 group-hover:text-gray-300 dark:group-hover:text-gray-600 hover:text-yellow-400{% endif %}">
+                    class="w-6 text-lg text-center leading-none transition
+                           {% if lesson.starred %}text-yellow-400 hover:text-yellow-300{% else %}text-gray-300 dark:text-gray-600 hover:text-yellow-400{% endif %}">
               {% if lesson.starred %}★{% else %}☆{% endif %}
             </button>
           </form>
         </td>
 
-        {# Date #}
-        <td class="px-3 py-3 text-gray-400 dark:text-gray-500 whitespace-nowrap tabular-nums">
-          {{ lesson.timestamp[:10] }}
+        {# Date — relative label + exact tooltip on hover #}
+        <td class="px-3 py-3 whitespace-nowrap tabular-nums relative group/date">
+          <span class="text-gray-400 dark:text-gray-500 cursor-default"
+                data-ts="{{ lesson.timestamp }}">{{ lesson.timestamp[:10] }}</span>
+          <div class="absolute z-10 bottom-full left-0 mb-1 px-2 py-1 rounded bg-gray-800 dark:bg-gray-700
+                      text-white text-xs whitespace-nowrap pointer-events-none
+                      opacity-0 group-hover/date:opacity-100 transition-opacity duration-150">
+            {{ lesson.timestamp[:16].replace('T', ' ') }}
+          </div>
         </td>
 
         {# Topic #}
@@ -391,7 +414,7 @@
 
 {# ── Pagination ── #}
 {% if total_pages > 1 %}
-{% set qs_base = '?period=' ~ selected_period ~ '&category=' ~ selected_category ~ '&project=' ~ selected_project ~ '&repository=' ~ selected_repository ~ '&branch=' ~ selected_branch ~ '&commit=' ~ selected_commit ~ '&feedback=' ~ selected_feedback ~ '&search=' ~ selected_search ~ '&date_from=' ~ selected_date_from ~ '&date_to=' ~ selected_date_to ~ ('&starred=1' if selected_starred else '') %}
+{% set qs_base = '?period=' ~ selected_period ~ '&category=' ~ selected_category ~ '&project=' ~ selected_project ~ '&repository=' ~ selected_repository ~ '&branch=' ~ selected_branch ~ '&commit=' ~ selected_commit ~ '&feedback=' ~ selected_feedback ~ '&search=' ~ selected_search ~ '&date_from=' ~ selected_date_from ~ '&date_to=' ~ selected_date_to ~ ('&starred=1' if selected_starred else '') ~ '&sort=' ~ selected_sort ~ '&order=' ~ selected_order %}
 <div class="flex items-center justify-between mt-4">
   <p class="text-xs text-gray-400 dark:text-gray-500">Page {{ page }} of {{ total_pages }}</p>
   <div class="flex items-center gap-1">
@@ -444,6 +467,25 @@
 {% block scripts %}
 <script src="/static/vendor/flatpickr.min.js"></script>
 <script>
+// Relative date labels on [data-ts] spans
+(function () {
+  var rtf = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
+  function relativeTime(iso) {
+    var date = new Date(iso);
+    var diffMs = Date.now() - date;
+    var diffDays = Math.floor(diffMs / 86400000);
+    if (diffDays === 0)  return 'today';
+    if (diffDays === 1)  return 'yesterday';
+    if (diffDays < 7)   return rtf.format(-diffDays, 'day');
+    if (diffDays < 30)  return rtf.format(-Math.floor(diffDays / 7), 'week');
+    if (diffDays < 365) return rtf.format(-Math.floor(diffDays / 30), 'month');
+    return rtf.format(-Math.floor(diffDays / 365), 'year');
+  }
+  document.querySelectorAll('[data-ts]').forEach(function (el) {
+    el.textContent = relativeTime(el.dataset.ts);
+  });
+})();
+
 function periodPicker() {
   return {
     open: false,

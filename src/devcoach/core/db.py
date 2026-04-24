@@ -135,7 +135,7 @@ def init_schema(conn: sqlite3.Connection) -> None:
 def _migrate(conn: sqlite3.Connection) -> None:
     """Add new columns to existing tables. Safe to run on every startup."""
     existing = {row[1] for row in conn.execute("PRAGMA table_info(lessons)").fetchall()}
-    text_columns = ["project", "repository", "branch", "commit_hash", "folder", "feedback"]
+    text_columns = ["project", "repository", "branch", "commit_hash", "folder", "feedback", "repository_platform"]
     for col in text_columns:
         if col not in existing:
             conn.execute(f"ALTER TABLE lessons ADD COLUMN {col} TEXT")
@@ -171,8 +171,8 @@ def insert_lesson(conn: sqlite3.Connection, lesson: Lesson) -> None:
         """INSERT OR REPLACE INTO lessons
            (id, timestamp, topic_id, categories, title, level, summary,
             task_context, project, repository, branch, commit_hash, folder,
-            starred, feedback)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            repository_platform, starred, feedback)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (
             lesson.id,
             lesson.timestamp,
@@ -187,6 +187,7 @@ def insert_lesson(conn: sqlite3.Connection, lesson: Lesson) -> None:
             lesson.branch,
             lesson.commit_hash,
             lesson.folder,
+            lesson.repository_platform,
             1 if lesson.starred else 0,
             lesson.feedback,
         ),
@@ -266,6 +267,9 @@ def count_filtered_lessons(
     return int(row[0])
 
 
+_SORT_COLUMNS = frozenset({"timestamp", "level", "topic_id", "title", "feedback"})
+
+
 def get_lessons(
     conn: sqlite3.Connection,
     period: Optional[str] = None,
@@ -279,6 +283,8 @@ def get_lessons(
     feedback: Optional[str] = None,
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
+    sort: str = "timestamp",
+    order: str = "desc",
     page: Optional[int] = None,
     per_page: int = 25,
 ) -> list[Lesson]:
@@ -299,7 +305,9 @@ def get_lessons(
         starred=starred, search=search, feedback=feedback,
         date_from=date_from, date_to=date_to,
     )
-    query = f"SELECT * FROM lessons {where} ORDER BY timestamp DESC"
+    col = sort if sort in _SORT_COLUMNS else "timestamp"
+    direction = "ASC" if order.lower() == "asc" else "DESC"
+    query = f"SELECT * FROM lessons {where} ORDER BY {col} {direction}"
     if page is not None:
         query += " LIMIT ? OFFSET ?"
         params = list(params) + [per_page, (page - 1) * per_page]
@@ -348,10 +356,10 @@ def import_lessons(conn: sqlite3.Connection, records: list[dict]) -> int:
             """INSERT OR IGNORE INTO lessons
                (id, timestamp, topic_id, categories, title, level, summary,
                 task_context, project, repository, branch, commit_hash, folder,
-                starred, feedback)
+                repository_platform, starred, feedback)
                VALUES (:id, :timestamp, :topic_id, :categories, :title, :level, :summary,
                        :task_context, :project, :repository, :branch, :commit_hash, :folder,
-                       :starred, :feedback)""",
+                       :repository_platform, :starred, :feedback)""",
             {
                 "id": r.get("id"),
                 "timestamp": r.get("timestamp"),
@@ -366,6 +374,7 @@ def import_lessons(conn: sqlite3.Connection, records: list[dict]) -> int:
                 "branch": r.get("branch"),
                 "commit_hash": r.get("commit_hash"),
                 "folder": r.get("folder"),
+                "repository_platform": r.get("repository_platform"),
                 "starred": r.get("starred", 0),
                 "feedback": r.get("feedback"),
             },
@@ -560,6 +569,7 @@ def _row_to_lesson(row: sqlite3.Row) -> Lesson:
         branch=row["branch"],
         commit_hash=row["commit_hash"],
         folder=row["folder"],
+        repository_platform=row["repository_platform"],
         starred=bool(row["starred"]) if row["starred"] is not None else False,
         feedback=row["feedback"],
     )
