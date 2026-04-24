@@ -228,10 +228,11 @@ class TestLessonsStarredFilter:
         html = client.get("/lessons").text
         assert "3 lessons" in html
 
-    def test_starred_checkbox_rendered(self, client):
+    def test_starred_toggle_rendered(self, client):
+        # Starred is now a hidden input toggled by a pill button
         html = client.get("/lessons").text
         assert 'name="starred"' in html
-        assert 'value="1"' in html
+        assert 'id="h-starred"' in html
 
     def test_starred_pill_highlighted_when_active(self, client):
         # Starred is now a pill button; when active it carries bg-yellow-400

@@ -78,6 +78,9 @@ async def import_lessons_route(file: UploadFile = File(...)) -> RedirectResponse
     return RedirectResponse(url=f"/settings?imported={count}", status_code=303)
 
 
+_PER_PAGE = 25
+
+
 @app.get("/lessons", response_class=HTMLResponse)
 async def lessons_page(
     request: Request,
@@ -92,29 +95,36 @@ async def lessons_page(
     feedback: Optional[str] = None,
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
+    page: int = 1,
 ) -> HTMLResponse:
     starred_filter = True if starred == "1" else None
     effective_period = None if (date_from or date_to) else (period or None)
+    filter_kwargs = dict(
+        period=effective_period,
+        category=category or None,
+        project=project or None,
+        repository=repository or None,
+        branch=branch or None,
+        commit=commit or None,
+        starred=starred_filter,
+        search=search or None,
+        feedback=feedback or None,
+        date_from=date_from or None,
+        date_to=date_to or None,
+    )
+    page = max(1, page)
     with db.connection() as conn:
-        lessons = db.get_lessons(
-            conn,
-            period=effective_period,
-            category=category or None,
-            project=project or None,
-            repository=repository or None,
-            branch=branch or None,
-            commit=commit or None,
-            starred=starred_filter,
-            search=search or None,
-            feedback=feedback or None,
-            date_from=date_from or None,
-            date_to=date_to or None,
-        )
+        total = db.count_filtered_lessons(conn, **filter_kwargs)
+        lessons = db.get_lessons(conn, **filter_kwargs, page=page, per_page=_PER_PAGE)
         all_categories = db.get_all_categories(conn)
         all_projects = db.get_distinct_column(conn, "project")
         all_repositories = db.get_distinct_column(conn, "repository")
         all_branches = db.get_distinct_column(conn, "branch")
         all_commits = db.get_distinct_column(conn, "commit_hash")
+
+    import math
+    total_pages = max(1, math.ceil(total / _PER_PAGE))
+    page = min(page, total_pages)
 
     return templates.TemplateResponse(
         request,
@@ -137,6 +147,10 @@ async def lessons_page(
             "selected_feedback": feedback or "",
             "selected_date_from": date_from or "",
             "selected_date_to": date_to or "",
+            "page": page,
+            "per_page": _PER_PAGE,
+            "total": total,
+            "total_pages": total_pages,
         },
     )
 

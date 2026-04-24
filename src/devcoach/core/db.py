@@ -194,8 +194,7 @@ def insert_lesson(conn: sqlite3.Connection, lesson: Lesson) -> None:
     conn.commit()
 
 
-def get_lessons(
-    conn: sqlite3.Connection,
+def _lesson_where(
     period: Optional[str] = None,
     category: Optional[str] = None,
     project: Optional[str] = None,
@@ -207,17 +206,8 @@ def get_lessons(
     feedback: Optional[str] = None,
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
-) -> list[Lesson]:
-    """Return lessons filtered by period, category, git metadata, starred flag, and/or search text.
-
-    period: today | week | month | year | all | None (same as all)
-    category: exact tag match inside the JSON categories array
-    project, repository, branch: fuzzy match on metadata columns
-    commit: fuzzy match on commit_hash
-    starred: True for starred only, False for unstarred only, None for all
-    search: fuzzy match across title, topic_id, and summary
-    date_from / date_to: ISO date strings (YYYY-MM-DD); take precedence over period when set
-    """
+) -> tuple[str, list[object]]:
+    """Build the WHERE clause and params list for lesson queries."""
     conditions: list[str] = []
     params: list[object] = []
 
@@ -237,32 +227,25 @@ def get_lessons(
     if category is not None:
         conditions.append("categories LIKE ?")
         params.append(f'%"{category}"%')
-
     if project is not None:
         conditions.append("project LIKE ?")
         params.append(f"%{project}%")
-
     if repository is not None:
         conditions.append("repository LIKE ?")
         params.append(f"%{repository}%")
-
     if branch is not None:
         conditions.append("branch LIKE ?")
         params.append(f"%{branch}%")
-
     if commit is not None:
         conditions.append("commit_hash LIKE ?")
         params.append(f"%{commit}%")
-
     if starred is not None:
         conditions.append("starred = ?")
         params.append(1 if starred else 0)
-
     if search is not None:
         conditions.append("(title LIKE ? OR topic_id LIKE ? OR summary LIKE ?)")
         like = f"%{search}%"
         params.extend([like, like, like])
-
     if feedback == "none":
         conditions.append("feedback IS NULL")
     elif feedback is not None:
@@ -270,10 +253,57 @@ def get_lessons(
         params.append(feedback)
 
     where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
-    rows = conn.execute(
-        f"SELECT * FROM lessons {where} ORDER BY timestamp DESC",
-        params,
-    ).fetchall()
+    return where, params
+
+
+def count_filtered_lessons(
+    conn: sqlite3.Connection,
+    **kwargs: object,
+) -> int:
+    """Return the total number of lessons matching the given filters."""
+    where, params = _lesson_where(**kwargs)  # type: ignore[arg-type]
+    row = conn.execute(f"SELECT COUNT(*) FROM lessons {where}", params).fetchone()
+    return int(row[0])
+
+
+def get_lessons(
+    conn: sqlite3.Connection,
+    period: Optional[str] = None,
+    category: Optional[str] = None,
+    project: Optional[str] = None,
+    repository: Optional[str] = None,
+    branch: Optional[str] = None,
+    commit: Optional[str] = None,
+    starred: Optional[bool] = None,
+    search: Optional[str] = None,
+    feedback: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    page: Optional[int] = None,
+    per_page: int = 25,
+) -> list[Lesson]:
+    """Return lessons filtered by period, category, git metadata, starred flag, and/or search text.
+
+    period: today | week | month | year | all | None (same as all)
+    category: exact tag match inside the JSON categories array
+    project, repository, branch: fuzzy match on metadata columns
+    commit: fuzzy match on commit_hash
+    starred: True for starred only, False for unstarred only, None for all
+    search: fuzzy match across title, topic_id, and summary
+    date_from / date_to: ISO date strings (YYYY-MM-DD); take precedence over period when set
+    page / per_page: if page is given, apply LIMIT/OFFSET pagination
+    """
+    where, params = _lesson_where(
+        period=period, category=category, project=project,
+        repository=repository, branch=branch, commit=commit,
+        starred=starred, search=search, feedback=feedback,
+        date_from=date_from, date_to=date_to,
+    )
+    query = f"SELECT * FROM lessons {where} ORDER BY timestamp DESC"
+    if page is not None:
+        query += " LIMIT ? OFFSET ?"
+        params = list(params) + [per_page, (page - 1) * per_page]
+    rows = conn.execute(query, params).fetchall()
     return [_row_to_lesson(row) for row in rows]
 
 
