@@ -74,8 +74,9 @@ async def import_lessons_route(file: UploadFile = File(...)) -> RedirectResponse
     content = await file.read()
     records = json.loads(content)
     with db.connection() as conn:
-        count = db.import_lessons(conn, records)
-    return RedirectResponse(url=f"/settings?imported={count}", status_code=303)
+        inserted, invalid = db.import_lessons(conn, records)
+    skipped = len(records) - inserted - invalid
+    return RedirectResponse(url=f"/settings?imported={inserted}&skipped={skipped}&invalid={invalid}", status_code=303)
 
 
 _PER_PAGE = 25
@@ -247,4 +248,4 @@ async def import_settings_route(file: UploadFile = File(...)) -> RedirectRespons
     content = await file.read()
     with db.connection() as conn:
         result = db.restore_backup_zip(conn, content)
-    return RedirectResponse(url=f"/settings?imported={result['lessons']}&skipped={result['skipped']}", status_code=303)
+    return RedirectResponse(url=f"/settings?imported={result['lessons']}&skipped={result['skipped']}&invalid={result['invalid']}", status_code=303)

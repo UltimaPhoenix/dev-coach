@@ -363,18 +363,22 @@ def export_lessons(conn: sqlite3.Connection) -> list[dict]:
     return [_row_to_lesson(row).model_dump(mode="json") for row in rows]
 
 
-def import_lessons(conn: sqlite3.Connection, records: list[dict]) -> int:
+def import_lessons(conn: sqlite3.Connection, records: list[dict]) -> tuple[int, int]:
     """Insert lessons from a list of dicts, skipping duplicates by id.
 
     Validates each record through the Lesson model (normalizes timestamps, enums, etc.).
-    Returns the number of newly inserted rows.
+    Returns (inserted, invalid) where invalid is the count of records that failed validation.
+    Duplicates are silently skipped by INSERT OR IGNORE; callers derive that count as
+    len(records) - inserted - invalid.
     """
     inserted = 0
+    invalid = 0
     for r in records:
         try:
             lesson = Lesson(**r)
         except Exception:
-            continue  # skip records that fail validation
+            invalid += 1
+            continue
         cur = conn.execute(
             """INSERT OR IGNORE INTO lessons
                (id, timestamp, topic_id, categories, title, level, summary,
@@ -402,7 +406,7 @@ def import_lessons(conn: sqlite3.Connection, records: list[dict]) -> int:
         )
         inserted += cur.rowcount
     conn.commit()
-    return inserted
+    return inserted, invalid
 
 
 def create_backup_zip(conn: sqlite3.Connection) -> bytes:
@@ -422,10 +426,10 @@ def create_backup_zip(conn: sqlite3.Connection) -> bytes:
 def restore_backup_zip(conn: sqlite3.Connection, data: bytes) -> dict[str, int]:
     """Restore from a backup zip.
 
-    Returns a dict with counts: {"settings": 1, "topics": N, "lessons": N, "skipped": N}.
+    Returns a dict with counts: {"settings": 1, "topics": N, "lessons": N, "skipped": N, "invalid": N}.
     Settings are overwritten; knowledge entries are upserted; duplicate lessons are skipped.
     """
-    result: dict[str, int] = {"settings": 0, "topics": 0, "lessons": 0, "skipped": 0}
+    result: dict[str, int] = {"settings": 0, "topics": 0, "lessons": 0, "skipped": 0, "invalid": 0}
 
     with zipfile.ZipFile(io.BytesIO(data)) as zf:
         names = zf.namelist()
@@ -446,8 +450,10 @@ def restore_backup_zip(conn: sqlite3.Connection, data: bytes) -> dict[str, int]:
 
         if "lessons.json" in names:
             lessons_data = json.loads(zf.read("lessons.json"))
-            result["lessons"] = import_lessons(conn, lessons_data)
-            result["skipped"] = len(lessons_data) - result["lessons"]
+            inserted, invalid = import_lessons(conn, lessons_data)
+            result["lessons"] = inserted
+            result["invalid"] = invalid
+            result["skipped"] = len(lessons_data) - inserted - invalid
 
     return result
 
