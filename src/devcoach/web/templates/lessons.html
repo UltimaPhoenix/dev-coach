@@ -361,11 +361,11 @@
         {# Date — relative label + exact tooltip on hover #}
         <td class="px-3 py-3 whitespace-nowrap tabular-nums relative group/date">
           <span class="text-gray-400 dark:text-gray-500 cursor-default"
-                data-ts="{{ lesson.timestamp }}">{{ lesson.timestamp[:10] }}</span>
+                data-ts="{{ lesson.timestamp_iso }}">{{ lesson.timestamp_iso[:10] }}</span>
           <div class="absolute z-10 bottom-full left-0 mb-1 px-2 py-1 rounded bg-gray-800 dark:bg-gray-700
                       text-white text-xs whitespace-nowrap pointer-events-none
                       opacity-0 group-hover/date:opacity-100 transition-opacity duration-150">
-            {{ lesson.timestamp[:16].replace('T', ' ') }}
+            {{ lesson.timestamp_iso[:16].replace('T', ' ') }}
           </div>
         </td>
 

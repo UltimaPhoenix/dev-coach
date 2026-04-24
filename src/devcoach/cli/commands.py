@@ -85,7 +85,7 @@ def cmd_lessons(args: argparse.Namespace) -> None:
         feedback_icon = " [green]✓[/green]" if lesson.feedback == "know" else (" [red]✗[/red]" if lesson.feedback == "dont_know" else "")
         row = [
             "[yellow]★[/yellow]" if lesson.starred else "[dim]·[/dim]",
-            lesson.timestamp[:10],
+            lesson.timestamp_iso[:10],
             lesson.topic_id,
             lesson.title + feedback_icon,
             f"[{level_color}]{lesson.level}[/{level_color}]",
@@ -152,7 +152,7 @@ def cmd_lesson(args: argparse.Namespace) -> None:
 
     console.rule(f"[bold]{lesson.title}[/bold]")
     console.print(f"[dim]ID:[/dim]         {lesson.id}")
-    console.print(f"[dim]Date:[/dim]        {lesson.timestamp[:19].replace('T', ' ')}")
+    console.print(f"[dim]Date:[/dim]        {lesson.timestamp_iso[:19].replace('T', ' ')}")
     console.print(f"[dim]Topic:[/dim]       {lesson.topic_id}")
     console.print(f"[dim]Categories:[/dim]  {', '.join(lesson.categories)}")
     console.print(f"[dim]Level:[/dim]       [{level_color}]{lesson.level}[/{level_color}]")

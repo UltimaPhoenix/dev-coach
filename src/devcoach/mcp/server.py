@@ -13,7 +13,7 @@ from typing import Literal, Optional
 from fastmcp import FastMCP
 
 from devcoach.core import coach, db
-from devcoach.core.models import Lesson, Profile, RateLimitResult
+from devcoach.core.models import Lesson, Level, Profile, RateLimitResult, RepositoryPlatform
 
 # ── FastMCP app ────────────────────────────────────────────────────────────
 
@@ -35,7 +35,7 @@ def log_lesson(
     topic_id: str,
     categories: list[str],
     title: str,
-    level: Literal["junior", "mid", "senior"],
+    level: Level,
     summary: str,
     task_context: Optional[str] = None,
     project: Optional[str] = None,
@@ -43,7 +43,7 @@ def log_lesson(
     branch: Optional[str] = None,
     commit_hash: Optional[str] = None,
     folder: Optional[str] = None,
-    repository_platform: Optional[str] = None,
+    repository_platform: Optional[RepositoryPlatform] = None,
 ) -> str:
     """Save a delivered lesson to the coaching log. Returns 'ok' on success."""
     lesson = Lesson(

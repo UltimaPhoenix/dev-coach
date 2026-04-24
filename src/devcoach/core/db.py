@@ -165,17 +165,6 @@ def _seed_defaults(conn: sqlite3.Connection) -> None:
 
 # ── Lessons ────────────────────────────────────────────────────────────────
 
-def _normalize_ts(ts: str) -> str:
-    """Normalize an ISO timestamp to UTC with a trailing Z."""
-    try:
-        dt = datetime.fromisoformat(ts)
-        if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
-        return dt.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
-    except ValueError:
-        return ts
-
-
 def insert_lesson(conn: sqlite3.Connection, lesson: Lesson) -> None:
     """Insert or replace a lesson record."""
     conn.execute(
@@ -186,7 +175,7 @@ def insert_lesson(conn: sqlite3.Connection, lesson: Lesson) -> None:
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (
             lesson.id,
-            _normalize_ts(lesson.timestamp),
+            lesson.timestamp_iso,
             lesson.topic_id,
             json.dumps(lesson.categories),
             lesson.title,
@@ -359,36 +348,39 @@ def export_lessons(conn: sqlite3.Connection) -> list[dict]:
 def import_lessons(conn: sqlite3.Connection, records: list[dict]) -> int:
     """Insert lessons from a list of dicts, skipping duplicates by id.
 
+    Validates each record through the Lesson model (normalizes timestamps, enums, etc.).
     Returns the number of newly inserted rows.
     """
     inserted = 0
     for r in records:
+        try:
+            lesson = Lesson(**r)
+        except Exception:
+            continue  # skip records that fail validation
         cur = conn.execute(
             """INSERT OR IGNORE INTO lessons
                (id, timestamp, topic_id, categories, title, level, summary,
                 task_context, project, repository, branch, commit_hash, folder,
                 repository_platform, starred, feedback)
-               VALUES (:id, :timestamp, :topic_id, :categories, :title, :level, :summary,
-                       :task_context, :project, :repository, :branch, :commit_hash, :folder,
-                       :repository_platform, :starred, :feedback)""",
-            {
-                "id": r.get("id"),
-                "timestamp": r.get("timestamp"),
-                "topic_id": r.get("topic_id"),
-                "categories": r.get("categories"),
-                "title": r.get("title"),
-                "level": r.get("level"),
-                "summary": r.get("summary"),
-                "task_context": r.get("task_context"),
-                "project": r.get("project"),
-                "repository": r.get("repository"),
-                "branch": r.get("branch"),
-                "commit_hash": r.get("commit_hash"),
-                "folder": r.get("folder"),
-                "repository_platform": r.get("repository_platform"),
-                "starred": r.get("starred", 0),
-                "feedback": r.get("feedback"),
-            },
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                lesson.id,
+                lesson.timestamp_iso,
+                lesson.topic_id,
+                json.dumps(lesson.categories) if isinstance(lesson.categories, list) else lesson.categories,
+                lesson.title,
+                lesson.level,
+                lesson.summary,
+                lesson.task_context,
+                lesson.project,
+                lesson.repository,
+                lesson.branch,
+                lesson.commit_hash,
+                lesson.folder,
+                lesson.repository_platform,
+                1 if lesson.starred else 0,
+                lesson.feedback,
+            ),
         )
         inserted += cur.rowcount
     conn.commit()

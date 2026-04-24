@@ -36,11 +36,11 @@
   <!-- Row 2: date + topic + tags + feedback result (all inline) -->
   <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-500 dark:text-gray-400 mb-5">
     <span class="relative group/date cursor-default">
-      🗓 <span data-ts="{{ lesson.timestamp }}">{{ lesson.timestamp[:10] }}</span>
+      🗓 <span data-ts="{{ lesson.timestamp_iso }}">{{ lesson.timestamp_iso[:10] }}</span>
       <span class="absolute z-10 bottom-full left-0 mb-1 px-2 py-1 rounded bg-gray-800 dark:bg-gray-700
                    text-white text-xs whitespace-nowrap pointer-events-none
                    opacity-0 group-hover/date:opacity-100 transition-opacity duration-150">
-        {{ lesson.timestamp[:16].replace('T', ' ') }}
+        {{ lesson.timestamp_iso[:16].replace('T', ' ') }}
       </span>
     </span>
     <span>🏷 <span class="text-cyan-600 dark:text-cyan-400">{{ lesson.topic_id }}</span></span>
