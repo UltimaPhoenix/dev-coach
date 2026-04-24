@@ -98,7 +98,7 @@ def connection() -> Generator[sqlite3.Connection, None, None]:
 # ── Schema init ────────────────────────────────────────────────────────────
 
 def init_schema(conn: sqlite3.Connection) -> None:
-    """Create tables and seed defaults if needed. Idempotent."""
+    """Create tables, indexes, and seed defaults if needed. Idempotent."""
     conn.executescript("""
         CREATE TABLE IF NOT EXISTS lessons (
             id           TEXT PRIMARY KEY,
@@ -126,6 +126,7 @@ def init_schema(conn: sqlite3.Connection) -> None:
             key   TEXT PRIMARY KEY,
             value TEXT NOT NULL
         );
+
     """)
     conn.commit()
     _migrate(conn)
@@ -133,7 +134,7 @@ def init_schema(conn: sqlite3.Connection) -> None:
 
 
 def _migrate(conn: sqlite3.Connection) -> None:
-    """Add new columns to existing tables. Safe to run on every startup."""
+    """Add new columns and indexes to existing tables. Safe to run on every startup."""
     existing = {row[1] for row in conn.execute("PRAGMA table_info(lessons)").fetchall()}
     text_columns = ["project", "repository", "branch", "commit_hash", "folder", "feedback", "repository_platform"]
     for col in text_columns:
@@ -141,6 +142,27 @@ def _migrate(conn: sqlite3.Connection) -> None:
             conn.execute(f"ALTER TABLE lessons ADD COLUMN {col} TEXT")
     if "starred" not in existing:
         conn.execute("ALTER TABLE lessons ADD COLUMN starred INTEGER NOT NULL DEFAULT 0")
+
+    # Indexes — created after all columns exist so they can reference migrated columns.
+    # CREATE INDEX IF NOT EXISTS is idempotent; safe to run on every startup.
+    conn.executescript("""
+        -- Period/date-range filters, rate-limit count, get_last_lesson_timestamp,
+        -- and the default ORDER BY timestamp DESC all benefit from this index.
+        CREATE INDEX IF NOT EXISTS idx_lessons_timestamp
+            ON lessons (timestamp);
+
+        -- Starred filter combined with timestamp sort (common listing pattern).
+        CREATE INDEX IF NOT EXISTS idx_lessons_starred_ts
+            ON lessons (starred, timestamp);
+
+        -- Feedback equality filter (feedback = ? / IS NULL) and ORDER BY feedback.
+        CREATE INDEX IF NOT EXISTS idx_lessons_feedback
+            ON lessons (feedback);
+
+        -- get_taught_topics uses SELECT DISTINCT topic_id; also covers ORDER BY topic_id.
+        CREATE INDEX IF NOT EXISTS idx_lessons_topic_id
+            ON lessons (topic_id);
+    """)
     conn.commit()
 
 
