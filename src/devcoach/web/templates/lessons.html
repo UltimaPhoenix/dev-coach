@@ -471,9 +471,11 @@
 (function () {
   var rtf = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
   function relativeTime(iso) {
+    if (!iso.endsWith('Z') && !/[+-]\d{2}:\d{2}$/.test(iso)) iso += 'Z';
     var date = new Date(iso);
     var diffMs = Date.now() - date;
     var diffDays = Math.floor(diffMs / 86400000);
+    if (diffMs < 0)      return 'just now';
     if (diffDays === 0)  return 'today';
     if (diffDays === 1)  return 'yesterday';
     if (diffDays < 7)   return rtf.format(-diffDays, 'day');
