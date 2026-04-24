@@ -165,6 +165,17 @@ def _seed_defaults(conn: sqlite3.Connection) -> None:
 
 # ── Lessons ────────────────────────────────────────────────────────────────
 
+def _normalize_ts(ts: str) -> str:
+    """Normalize an ISO timestamp to UTC with a trailing Z."""
+    try:
+        dt = datetime.fromisoformat(ts)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+    except ValueError:
+        return ts
+
+
 def insert_lesson(conn: sqlite3.Connection, lesson: Lesson) -> None:
     """Insert or replace a lesson record."""
     conn.execute(
@@ -175,7 +186,7 @@ def insert_lesson(conn: sqlite3.Connection, lesson: Lesson) -> None:
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (
             lesson.id,
-            lesson.timestamp,
+            _normalize_ts(lesson.timestamp),
             lesson.topic_id,
             json.dumps(lesson.categories),
             lesson.title,
