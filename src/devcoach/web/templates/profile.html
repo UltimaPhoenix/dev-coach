@@ -12,14 +12,24 @@
 
   <div class="flex items-center gap-2">
 
-    {# Edit / Done toggle #}
-    <button type="button" @click="toggle()"
-            :class="editMode
-              ? 'bg-indigo-600 text-white border-indigo-600 hover:bg-indigo-500'
-              : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-indigo-400'"
-            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition">
-      <span x-text="editMode ? '✓ Done' : '✎ Edit'">✎ Edit</span>
-    </button>
+    {# Add group — edit mode only #}
+    <div x-show="editMode" style="display:none" x-data="{ open: false }" class="relative">
+      <button type="button" @click="open = !open"
+              class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition
+                     bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-indigo-400">
+        + Add group
+      </button>
+      <div x-show="open" @click.outside="open = false"
+           class="absolute right-0 top-full mt-1 z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg p-3 w-56"
+           style="display:none">
+        <form method="post" action="/groups" class="flex gap-2">
+          <input type="text" name="group_name" placeholder="Group name…" required
+                 class="flex-1 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          <button type="submit"
+                  class="px-3 py-1.5 rounded-lg text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-500 transition">Add</button>
+        </form>
+      </div>
+    </div>
 
     {# Add topic — edit mode only #}
     <div x-show="editMode" style="display:none" x-data="{ open: false }" class="relative">
@@ -60,24 +70,14 @@
       </div>
     </div>
 
-    {# Add group — edit mode only #}
-    <div x-show="editMode" style="display:none" x-data="{ open: false }" class="relative">
-      <button type="button" @click="open = !open"
-              class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition
-                     bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-indigo-400">
-        + Add group
-      </button>
-      <div x-show="open" @click.outside="open = false"
-           class="absolute right-0 top-full mt-1 z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg p-3 w-56"
-           style="display:none">
-        <form method="post" action="/groups" class="flex gap-2">
-          <input type="text" name="group_name" placeholder="Group name…" required
-                 class="flex-1 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-          <button type="submit"
-                  class="px-3 py-1.5 rounded-lg text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-500 transition">Add</button>
-        </form>
-      </div>
-    </div>
+    {# Edit / Done toggle #}
+    <button type="button" @click="toggle()"
+            :class="editMode
+              ? 'bg-indigo-600 text-white border-indigo-600 hover:bg-indigo-500'
+              : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-indigo-400'"
+            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition">
+      <span x-text="editMode ? '✓ Done' : '✎ Edit'">✎ Edit</span>
+    </button>
 
   </div>
 </div>
