@@ -1,0 +1,73 @@
+name: Release
+
+# Manually trigger a release from the Actions tab.
+# Choose a bump type (patch / minor / major) or supply an exact version.
+# The workflow will:
+#   1. Bump the version in pyproject.toml
+#   2. Commit "chore: bump version to X.Y.Z"
+#   3. Tag vX.Y.Z and push branch + tag
+#   4. The existing CI workflow picks up the tag and handles build / PyPI / GitHub Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Version bump type"
+        required: false
+        default: patch
+        type: choice
+        options: [patch, minor, major]
+      version:
+        description: "Exact version (overrides bump, e.g. 1.0.0)"
+        required: false
+        default: ""
+
+jobs:
+  release:
+    name: Bump version and tag
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # need full history to compute next version
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+
+      - name: Configure git
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Compute next version
+        id: ver
+        run: |
+          if [ -n "${{ inputs.version }}" ]; then
+            NEXT="${{ inputs.version }}"
+          else
+            CURRENT=$(grep '^version' pyproject.toml | head -1 | sed 's/.*"\(.*\)"/\1/')
+            IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
+            case "${{ inputs.bump }}" in
+              major) NEXT="$((MAJOR+1)).0.0" ;;
+              minor) NEXT="${MAJOR}.$((MINOR+1)).0" ;;
+              patch) NEXT="${MAJOR}.${MINOR}.$((PATCH+1))" ;;
+            esac
+          fi
+          echo "version=$NEXT" >> "$GITHUB_OUTPUT"
+          echo "tag=v$NEXT"    >> "$GITHUB_OUTPUT"
+
+      - name: Bump version in pyproject.toml
+        run: |
+          sed -i 's/^version = ".*"/version = "${{ steps.ver.outputs.version }}"/' pyproject.toml
+
+      - name: Commit and tag
+        run: |
+          git add pyproject.toml
+          git commit -m "chore: bump version to ${{ steps.ver.outputs.version }}"
+          git tag "${{ steps.ver.outputs.tag }}"
+          git push origin HEAD:main
+          git push origin "${{ steps.ver.outputs.tag }}"
