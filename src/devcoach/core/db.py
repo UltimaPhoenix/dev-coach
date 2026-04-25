@@ -11,7 +11,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Generator, Optional
 
-from devcoach.core.models import Lesson, Settings
+from devcoach.core.models import KnowledgeEntry, KnowledgeGroup, Lesson, Settings
 
 # ── Constants ──────────────────────────────────────────────────────────────
 
@@ -499,6 +499,30 @@ def get_all_knowledge(conn: sqlite3.Connection) -> dict[str, int]:
     """Return the full knowledge map as {topic: confidence}."""
     rows = conn.execute("SELECT topic, confidence FROM knowledge").fetchall()
     return {row[0]: row[1] for row in rows}
+
+
+def get_knowledge_entries(conn: sqlite3.Connection) -> list[KnowledgeEntry]:
+    """Return every knowledge topic as a typed list, ordered by topic name."""
+    rows = conn.execute(
+        "SELECT topic, confidence FROM knowledge ORDER BY topic"
+    ).fetchall()
+    return [KnowledgeEntry(topic=row[0], confidence=row[1]) for row in rows]
+
+
+def get_knowledge_group_list(conn: sqlite3.Connection) -> list[KnowledgeGroup]:
+    """Return all named groups (including empty ones) as a typed list."""
+    names = [
+        row[0]
+        for row in conn.execute(
+            "SELECT group_name FROM knowledge_group_names ORDER BY group_name"
+        ).fetchall()
+    ]
+    assignments: dict[str, list[str]] = {}
+    for row in conn.execute(
+        "SELECT group_name, topic FROM knowledge_groups ORDER BY group_name, topic"
+    ).fetchall():
+        assignments.setdefault(row[0], []).append(row[1])
+    return [KnowledgeGroup(name=n, topics=assignments.get(n, [])) for n in names]
 
 
 def upsert_knowledge(

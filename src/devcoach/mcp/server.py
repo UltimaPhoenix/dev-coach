@@ -220,10 +220,9 @@ def submit_feedback(lesson_id: str, feedback: str) -> Profile:
         feedback_value = None if feedback == "clear" else feedback
         with db.connection() as conn:
             coach.record_feedback(conn, lesson_id, feedback_value)
-            knowledge = db.get_all_knowledge(conn)
-        return Profile(knowledge=knowledge)
+            return coach.get_profile(conn)
     except Exception:
-        return Profile(knowledge={})
+        return Profile(knowledge=[], groups=[])
 
 
 @mcp.tool
@@ -240,10 +239,9 @@ def add_topic(topic: str, confidence: int = 5, group: Optional[str] = None) -> P
             db.upsert_knowledge(conn, topic, confidence)
             if group and group != "Other":
                 db.assign_topic_to_group(conn, topic, group)
-            knowledge = db.get_all_knowledge(conn)
-        return Profile(knowledge=knowledge)
-    except Exception as exc:
-        return Profile(knowledge={})
+            return coach.get_profile(conn)
+    except Exception:
+        return Profile(knowledge=[], groups=[])
 
 
 @mcp.tool
@@ -255,10 +253,9 @@ def remove_topic(topic: str) -> Profile:
     try:
         with db.connection() as conn:
             db.delete_knowledge(conn, topic)
-            knowledge = db.get_all_knowledge(conn)
-        return Profile(knowledge=knowledge)
-    except Exception as exc:
-        return Profile(knowledge={})
+            return coach.get_profile(conn)
+    except Exception:
+        return Profile(knowledge=[], groups=[])
 
 
 @mcp.tool
@@ -293,10 +290,9 @@ def open_ui(port: int = 7860) -> str:
 
 @mcp.resource("devcoach://profile")
 def profile_resource() -> str:
-    """Current knowledge map — topic → confidence (0-10)."""
+    """Current knowledge map — topics, confidence scores, and groups."""
     with db.connection() as conn:
-        knowledge = db.get_all_knowledge(conn)
-    return json.dumps(knowledge, indent=2)
+        return coach.get_profile(conn).model_dump_json(indent=2)
 
 
 @mcp.resource("devcoach://settings")

@@ -26,14 +26,9 @@ def _confidence_bar(confidence: int) -> str:
 
 def cmd_profile(_args: argparse.Namespace) -> None:
     with db.connection() as conn:
-        knowledge = db.get_all_knowledge(conn)
-        groups = db.get_knowledge_groups(conn)
+        profile = coach.get_profile(conn)
 
-    # Build topic → group lookup
-    topic_group: dict[str, str] = {}
-    for group_name, topics in groups.items():
-        for t in topics:
-            topic_group[t] = group_name
+    topic_group = {t: g.name for g in profile.groups for t in g.topics}
 
     table = Table(title="Knowledge Map", box=box.ROUNDED, show_lines=False)
     table.add_column("Topic", style="cyan", no_wrap=True)
@@ -41,11 +36,11 @@ def cmd_profile(_args: argparse.Namespace) -> None:
     table.add_column("Confidence", justify="right")
     table.add_column("Bar", no_wrap=True)
 
-    for topic, confidence in sorted(knowledge.items(), key=lambda x: -x[1]):
-        bar = _confidence_bar(confidence)
-        color = "green" if confidence >= 7 else "yellow" if confidence >= 4 else "red"
-        group = topic_group.get(topic, "Other")
-        table.add_row(topic, group, f"[{color}]{confidence}/10[/{color}]", f"[{color}]{bar}[/{color}]")
+    for entry in sorted(profile.knowledge, key=lambda e: -e.confidence):
+        bar = _confidence_bar(entry.confidence)
+        color = "green" if entry.confidence >= 7 else "yellow" if entry.confidence >= 4 else "red"
+        group = topic_group.get(entry.topic, "Other")
+        table.add_row(entry.topic, group, f"[{color}]{entry.confidence}/10[/{color}]", f"[{color}]{bar}[/{color}]")
 
     console.print(table)
 
@@ -134,10 +129,12 @@ def cmd_feedback(args: argparse.Namespace) -> None:
         if topic_id is None:
             console.print(f"[red]Lesson '{args.id}' not found.[/red]")
             sys.exit(1)
-        knowledge = db.get_all_knowledge(conn)
+        row = conn.execute(
+            "SELECT confidence FROM knowledge WHERE topic = ?", (topic_id,)
+        ).fetchone()
+        new_conf = row[0] if row else 5
 
     if feedback_value in ("know", "dont_know"):
-        new_conf = knowledge.get(topic_id, 5)
         old_conf = new_conf + (-1 if feedback_value == "know" else 1)
         conf_label = f"[cyan]{topic_id}[/cyan] confidence: {old_conf} → [bold]{new_conf}[/bold]"
     else:
@@ -260,8 +257,10 @@ def cmd_group_remove(args: argparse.Namespace) -> None:
 
 def cmd_group_assign(args: argparse.Namespace) -> None:
     with db.connection() as conn:
-        knowledge = db.get_all_knowledge(conn)
-        if args.topic not in knowledge:
+        row = conn.execute(
+            "SELECT topic FROM knowledge WHERE topic = ?", (args.topic,)
+        ).fetchone()
+        if row is None:
             console.print(f"[red]Topic '{args.topic}' not in knowledge map. Add it first.[/red]")
             sys.exit(1)
         if args.group == "Other":
@@ -276,7 +275,7 @@ def cmd_backup(args: argparse.Namespace) -> None:
     """Export settings + knowledge map + lessons as a zip file."""
     with db.connection() as conn:
         lessons_count = len(db.export_lessons(conn))
-        knowledge_count = len(db.get_all_knowledge(conn))
+        knowledge_count = conn.execute("SELECT COUNT(*) FROM knowledge").fetchone()[0]
         data = db.create_backup_zip(conn)
 
     out_path = Path(args.output)

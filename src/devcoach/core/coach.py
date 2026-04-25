@@ -8,7 +8,8 @@ from typing import Optional
 
 from devcoach.core.db import (
     count_lessons_since,
-    get_all_knowledge,
+    get_knowledge_entries,
+    get_knowledge_group_list,
     get_last_lesson_timestamp,
     get_settings,
     get_taught_topic_ids,
@@ -66,9 +67,12 @@ def check_rate_limit(conn: sqlite3.Connection) -> RateLimitResult:
 def get_profile(conn: sqlite3.Connection) -> Profile:
     """Load and return the current user profile."""
     try:
-        return Profile(knowledge=get_all_knowledge(conn))
+        return Profile(
+            knowledge=get_knowledge_entries(conn),
+            groups=get_knowledge_group_list(conn),
+        )
     except Exception:
-        return Profile(knowledge={})
+        return Profile(knowledge=[], groups=[])
 
 
 def apply_knowledge_delta(
@@ -79,8 +83,10 @@ def apply_knowledge_delta(
     If the topic does not exist it is created with a base confidence of 5.
     """
     try:
-        knowledge = get_all_knowledge(conn)
-        current = knowledge.get(topic, 5)
+        row = conn.execute(
+            "SELECT confidence FROM knowledge WHERE topic = ?", (topic,)
+        ).fetchone()
+        current = row[0] if row else 5
         upsert_knowledge(conn, topic, current + delta)
         return get_profile(conn)
     except Exception:

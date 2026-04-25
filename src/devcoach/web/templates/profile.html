@@ -65,7 +65,9 @@
   </div>
 
   <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-x-8 gap-y-0">
-    {% for topic, confidence in topics %}
+    {% for entry in topics %}
+    {% set topic = entry.topic %}
+    {% set confidence = entry.confidence %}
     {% set pct = (confidence / 10 * 100) | int %}
     {% if confidence >= 7 %}
       {% set color = "bg-green-500" %}

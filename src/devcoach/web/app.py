@@ -12,6 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from devcoach.core import coach, db
+from devcoach.core.models import KnowledgeEntry
 
 app = FastAPI(title="devcoach", docs_url=None, redoc_url=None)
 
@@ -25,25 +26,15 @@ app.mount("/static", StaticFiles(directory=str(_HERE / "static")), name="static"
 @app.get("/", response_class=HTMLResponse)
 async def profile_page(request: Request) -> HTMLResponse:
     with db.connection() as conn:
-        knowledge = db.get_all_knowledge(conn)
-        groups = db.get_knowledge_groups(conn)
+        profile = coach.get_profile(conn)
 
-    categorised: dict[str, list[tuple[str, int]]] = {}
-    seen: set[str] = set()
-    for group_name, topics in groups.items():
-        entries = [(t, knowledge[t]) for t in topics if t in knowledge]
-        categorised[group_name] = entries
-        seen.update(t for t, _ in entries)
-    other = sorted(
-        [(t, c) for t, c in knowledge.items() if t not in seen],
-        key=lambda x: -x[1],
-    )
-    if other:
-        categorised["Other"] = other
+    topic_group = {t: g.name for g in profile.groups for t in g.topics}
+    categorised: dict[str, list[KnowledgeEntry]] = {g.name: [] for g in profile.groups}
+    for entry in profile.knowledge:
+        key = topic_group.get(entry.topic, "Other")
+        categorised.setdefault(key, []).append(entry)
 
-    all_groups = list(groups.keys())
-    if "Other" not in all_groups:
-        all_groups.append("Other")
+    all_groups = [g.name for g in profile.groups]
 
     return templates.TemplateResponse(
         request,

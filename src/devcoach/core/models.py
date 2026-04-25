@@ -61,10 +61,25 @@ class Lesson(BaseModel):
         return self.timestamp.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-class Profile(BaseModel):
-    """The user's full knowledge map."""
+class KnowledgeEntry(BaseModel):
+    """A single topic in the knowledge map."""
 
-    knowledge: dict[str, int]  # topic -> confidence (0-10)
+    topic: str
+    confidence: int  # 0-10
+
+
+class KnowledgeGroup(BaseModel):
+    """A named group containing a list of topic IDs."""
+
+    name: str
+    topics: list[str]
+
+
+class Profile(BaseModel):
+    """The user's full knowledge map with group definitions."""
+
+    knowledge: list[KnowledgeEntry]
+    groups: list[KnowledgeGroup]
 
 
 class Settings(BaseModel):
@@ -82,7 +97,7 @@ class KnowledgeUpdate(BaseModel):
 
 
 class RateLimitResult(BaseModel):
-    """Result from check_rate_limit tool."""
+    """Result from the check_rate_limit tool."""
 
     allowed: bool
     reason: Optional[str] = None
