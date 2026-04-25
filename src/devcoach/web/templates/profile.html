@@ -2,38 +2,56 @@
 {% block title %}Profile — devcoach{% endblock %}
 
 {% block content %}
+<div x-data="{
+  editMode: JSON.parse(localStorage.getItem('km-edit-mode') || 'false'),
+  toggle() { this.editMode = !this.editMode; localStorage.setItem('km-edit-mode', this.editMode); }
+}">
+
 <div class="flex items-center justify-between mb-6">
   <h1 class="text-2xl font-bold text-indigo-600 dark:text-indigo-400">Knowledge Map</h1>
 
-  {# Add group button #}
-  <div x-data="{ open: false }" class="relative">
-    <button type="button" @click="open = !open"
-            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition
-                   bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-indigo-400">
-      + Add group
+  <div class="flex items-center gap-2">
+
+    {# Edit / Done toggle #}
+    <button type="button" @click="toggle()"
+            :class="editMode
+              ? 'bg-indigo-600 text-white border-indigo-600 hover:bg-indigo-500'
+              : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-indigo-400'"
+            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition">
+      <span x-text="editMode ? '✓ Done' : '✎ Edit'">✎ Edit</span>
     </button>
-    <div x-show="open" @click.outside="open = false"
-         class="absolute right-0 top-full mt-1 z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg p-3 w-56"
-         style="display:none">
-      <form method="post" action="/groups" class="flex gap-2">
-        <input type="text" name="group_name" placeholder="Group name…" required
-               class="flex-1 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-        <button type="submit"
-                class="px-3 py-1.5 rounded-lg text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-500 transition">Add</button>
-      </form>
+
+    {# Add group — edit mode only #}
+    <div x-show="editMode" style="display:none" x-data="{ open: false }" class="relative">
+      <button type="button" @click="open = !open"
+              class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition
+                     bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-indigo-400">
+        + Add group
+      </button>
+      <div x-show="open" @click.outside="open = false"
+           class="absolute right-0 top-full mt-1 z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg p-3 w-56"
+           style="display:none">
+        <form method="post" action="/groups" class="flex gap-2">
+          <input type="text" name="group_name" placeholder="Group name…" required
+                 class="flex-1 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          <button type="submit"
+                  class="px-3 py-1.5 rounded-lg text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-500 transition">Add</button>
+        </form>
+      </div>
     </div>
+
   </div>
 </div>
 
 {% for category, topics in categorised.items() %}
-<section class="mb-6" x-data="{ editing: false }">
+<section class="mb-6">
   <div class="flex items-center gap-2 mb-2 border-b border-gray-200 dark:border-gray-800 pb-1">
     <h2 class="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500 flex-1">
       {{ category }}
     </h2>
 
-    {# Add topic to this group #}
-    <div x-data="{ open: false }" class="relative">
+    {# Add topic to this group — edit mode only #}
+    <div x-show="editMode" style="display:none" x-data="{ open: false }" class="relative">
       <button type="button" @click="open = !open"
               class="text-xs text-gray-300 dark:text-gray-600 hover:text-indigo-500 dark:hover:text-indigo-400 transition px-1">+ topic</button>
       <div x-show="open" @click.outside="open = false"
@@ -54,10 +72,11 @@
       </div>
     </div>
 
-    {# Delete group (not "Other") #}
+    {# Delete group — edit mode only #}
     {% if category != 'Other' %}
-    <form method="post" action="/groups/{{ category | urlencode }}/delete"
-          onsubmit="return confirm('Remove group "{{ category }}"? Topics will move to Other.')">
+    <form x-show="editMode" style="display:none"
+          method="post" action="/groups/{{ category | urlencode }}/delete"
+          onsubmit="return confirm('Remove group &quot;{{ category }}&quot;? Topics will move to Other.')">
       <button type="submit"
               class="text-xs text-gray-300 dark:text-gray-600 hover:text-red-500 dark:hover:text-red-400 transition px-1" title="Delete group">✕</button>
     </form>
@@ -81,12 +100,25 @@
     {% endif %}
 
     <div class="flex items-center gap-2 py-1.5 border-b border-gray-100 dark:border-gray-800/50 group/row">
-      <span class="text-sm text-gray-700 dark:text-gray-200 flex-1 min-w-0 truncate" title="{{ topic }}">{{ topic }}</span>
+
+      {# View mode: topic is a link to lessons filtered by this topic #}
+      <a x-show="!editMode"
+         href="/lessons?search={{ topic }}"
+         class="text-sm text-gray-700 dark:text-gray-200 flex-1 min-w-0 truncate hover:text-indigo-600 dark:hover:text-indigo-400 hover:underline transition"
+         title="{{ topic }}">{{ topic }}</a>
+
+      {# Edit mode: plain text #}
+      <span x-show="editMode" style="display:none"
+            class="text-sm text-gray-700 dark:text-gray-200 flex-1 min-w-0 truncate"
+            title="{{ topic }}">{{ topic }}</span>
+
       <div class="w-20 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden shrink-0">
         <div class="{{ color }} h-full rounded-full transition-all" style="width: {{ pct }}%"></div>
       </div>
       <span class="text-xs font-bold {{ text_color }} w-5 text-right shrink-0">{{ confidence }}</span>
-      <div class="flex gap-0.5 shrink-0">
+
+      {# Confidence ±1 — edit mode only #}
+      <div x-show="editMode" style="display:none" class="flex gap-0.5 shrink-0">
         <form method="post" action="/knowledge/{{ topic }}">
           <input type="hidden" name="delta" value="-1" />
           <button class="text-xs text-gray-300 dark:text-gray-600 hover:text-red-500 dark:hover:text-red-400 transition w-5 text-center">−</button>
@@ -97,8 +129,8 @@
         </form>
       </div>
 
-      {# Move to group dropdown #}
-      <div x-data="{ open: false }" class="relative shrink-0">
+      {# Move to group — edit mode only, revealed on hover #}
+      <div x-show="editMode" style="display:none" x-data="{ open: false }" class="relative shrink-0">
         <button type="button" @click="open = !open"
                 class="text-xs text-gray-200 dark:text-gray-700 hover:text-indigo-500 dark:hover:text-indigo-400 transition w-4 text-center opacity-0 group-hover/row:opacity-100" title="Move to group">⇄</button>
         <div x-show="open" @click.outside="open = false"
@@ -116,21 +148,23 @@
         </div>
       </div>
 
-      {# Delete topic #}
-      <form method="post" action="/knowledge/{{ topic }}/delete"
+      {# Delete topic — edit mode only, revealed on hover #}
+      <form x-show="editMode" style="display:none"
+            method="post" action="/knowledge/{{ topic }}/delete"
             onsubmit="return confirm('Remove {{ topic }} from your knowledge map?')"
             class="shrink-0">
         <button type="submit"
                 class="text-xs text-gray-200 dark:text-gray-700 hover:text-red-500 dark:hover:text-red-400 transition w-4 text-center opacity-0 group-hover/row:opacity-100" title="Remove topic">×</button>
       </form>
+
     </div>
     {% endfor %}
   </div>
 </section>
 {% endfor %}
 
-{# Global add topic form (for Other / no specific group) #}
-<div class="mt-4 pt-4 border-t border-gray-200 dark:border-gray-800">
+{# Global add topic form — edit mode only #}
+<div x-show="editMode" style="display:none" class="mt-4 pt-4 border-t border-gray-200 dark:border-gray-800">
   <div x-data="{ open: false }">
     <button type="button" @click="open = !open"
             class="text-sm text-gray-400 dark:text-gray-500 hover:text-indigo-500 dark:hover:text-indigo-400 transition">
@@ -163,5 +197,7 @@
       </form>
     </div>
   </div>
+</div>
+
 </div>
 {% endblock %}
