@@ -213,7 +213,8 @@ def _lesson_where(
             params.append(date_from)
         if date_to is not None:
             conditions.append("timestamp <= ?")
-            params.append(date_to + "T23:59:59")
+            # If no time component supplied, treat date_to as end-of-day
+            params.append(date_to if ("T" in date_to or " " in date_to) else date_to + "T23:59:59")
     else:
         cutoff = _period_to_cutoff(period)
         if cutoff is not None:
@@ -296,7 +297,8 @@ def get_lessons(
     commit: fuzzy match on commit_hash
     starred: True for starred only, False for unstarred only, None for all
     search: fuzzy match across title, topic_id, and summary
-    date_from / date_to: ISO date strings (YYYY-MM-DD); take precedence over period when set
+    date_from / date_to: ISO date or datetime strings (YYYY-MM-DD or YYYY-MM-DDTHH:MM[:SS]);
+        take precedence over period when set; date_to with date-only defaults to end-of-day
     page / per_page: if page is given, apply LIMIT/OFFSET pagination
     """
     where, params = _lesson_where(

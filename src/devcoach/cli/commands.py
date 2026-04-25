@@ -384,9 +384,11 @@ def _build_parser() -> argparse.ArgumentParser:
     p_lessons.add_argument("--level", choices=["junior", "mid", "senior"], default=None,
                            help="Filter by difficulty level")
     p_lessons.add_argument("--date-from", dest="date_from", default=None,
-                           metavar="YYYY-MM-DD", help="Show lessons on or after this date")
+                           metavar="YYYY-MM-DD[THH:MM]",
+                           help="Show lessons on or after this date/time (e.g. 2026-04-25 or 2026-04-25T14:30)")
     p_lessons.add_argument("--date-to", dest="date_to", default=None,
-                           metavar="YYYY-MM-DD", help="Show lessons on or before this date")
+                           metavar="YYYY-MM-DD[THH:MM]",
+                           help="Show lessons on or before this date/time; defaults to end-of-day if no time given")
     p_lessons.add_argument("--sort", default="timestamp",
                            choices=["timestamp", "level", "topic_id", "title", "feedback"],
                            help="Sort column (default: timestamp)")

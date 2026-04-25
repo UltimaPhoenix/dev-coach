@@ -132,7 +132,9 @@ def get_lessons(
     starred: True to return only starred (favourite) lessons
     feedback: "know" | "dont_know" | "none" (no response given)
     search: full-text search across title, topic_id, and summary
-    date_from / date_to: ISO date strings (YYYY-MM-DD); override period when set
+    date_from / date_to: ISO date/datetime strings; override period when set.
+      Date-only (YYYY-MM-DD) or with time (YYYY-MM-DDTHH:MM or YYYY-MM-DDTHH:MM:SS).
+      date_to with date-only is treated as end-of-day (23:59:59).
     All filters can be combined.
     """
     try:
