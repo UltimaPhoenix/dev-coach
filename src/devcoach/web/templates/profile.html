@@ -187,22 +187,23 @@
 
       </div>
 
+      {# − button — edit mode only #}
+      <form x-show="editMode" style="display:none" method="post" action="/knowledge/{{ topic }}" class="shrink-0 flex items-center">
+        <input type="hidden" name="delta" value="-1" />
+        <button class="text-xs text-gray-300 dark:text-gray-600 hover:text-red-500 dark:hover:text-red-400 transition w-5 text-center leading-none">−</button>
+      </form>
+
       <div class="w-20 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden shrink-0">
         <div class="{{ color }} h-full rounded-full transition-all" style="width: {{ pct }}%"></div>
       </div>
-      <span class="text-xs font-bold {{ text_color }} w-5 text-right shrink-0">{{ confidence }}</span>
 
-      {# Confidence ±1 — edit mode only #}
-      <div x-show="editMode" style="display:none" class="flex gap-0.5 shrink-0">
-        <form method="post" action="/knowledge/{{ topic }}">
-          <input type="hidden" name="delta" value="-1" />
-          <button class="text-xs text-gray-300 dark:text-gray-600 hover:text-red-500 dark:hover:text-red-400 transition w-5 text-center">−</button>
-        </form>
-        <form method="post" action="/knowledge/{{ topic }}">
-          <input type="hidden" name="delta" value="1" />
-          <button class="text-xs text-gray-300 dark:text-gray-600 hover:text-green-600 dark:hover:text-green-400 transition w-5 text-center">+</button>
-        </form>
-      </div>
+      {# + button — edit mode only #}
+      <form x-show="editMode" style="display:none" method="post" action="/knowledge/{{ topic }}" class="shrink-0 flex items-center">
+        <input type="hidden" name="delta" value="1" />
+        <button class="text-xs text-gray-300 dark:text-gray-600 hover:text-green-600 dark:hover:text-green-400 transition w-5 text-center leading-none">+</button>
+      </form>
+
+      <span class="text-xs font-bold {{ text_color }} w-5 text-right shrink-0">{{ confidence }}</span>
 
     </div>
     {% endfor %}
