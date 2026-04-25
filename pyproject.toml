@@ -68,3 +68,10 @@ ignore = ["E501"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.coverage.run]
+source = ["src/devcoach"]
+omit = ["tests/*"]
+
+[tool.coverage.report]
+omit = ["tests/*"]
