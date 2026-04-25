@@ -1,6 +1,6 @@
 [project]
 name = "devcoach"
-version = "0.3.1"
+version = "0.3.2"
 description = "A local MCP server that acts as a progressive technical coach for Claude Code and Claude Desktop"
 readme = "README.md"
 requires-python = ">=3.11"
