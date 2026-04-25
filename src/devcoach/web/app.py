@@ -16,6 +16,21 @@ from devcoach.core.models import KnowledgeEntry
 app = FastAPI(title="devcoach", docs_url=None, redoc_url=None)
 
 _HERE = Path(__file__).parent
+
+
+def _safe_redirect(url: str, default: str = "/lessons") -> str:
+    """Return url only if it is a safe relative path; otherwise return default.
+
+    Prevents open-redirect attacks where a form-supplied ``next`` parameter
+    could point to an external site (e.g. ``next=https://evil.com``).
+    A valid relative path starts with ``/`` but not ``//`` (which browsers
+    treat as protocol-relative, i.e. an external URL).
+    """
+    if url.startswith("/") and not url.startswith("//"):
+        return url
+    return default
+
+
 templates = Jinja2Templates(directory=str(_HERE / "templates"))
 app.mount("/static", StaticFiles(directory=str(_HERE / "static")), name="static")
 
@@ -124,7 +139,12 @@ async def export_lessons_route() -> Response:
 @app.post("/lessons/import")
 async def import_lessons_route(file: UploadFile = File(...)) -> RedirectResponse:
     content = await file.read()
-    records = json.loads(content)
+    try:
+        records = json.loads(content)
+    except (json.JSONDecodeError, ValueError):
+        return RedirectResponse(url="/settings?imported=0&skipped=0&invalid=1", status_code=303)
+    if not isinstance(records, list):
+        return RedirectResponse(url="/settings?imported=0&skipped=0&invalid=1", status_code=303)
     with db.connection() as conn:
         inserted, duplicated, invalid = db.import_lessons(conn, records)
     return RedirectResponse(
@@ -231,7 +251,7 @@ async def lessons_page(
 async def star_lesson(lesson_id: str, next: str = Form(default="/lessons")) -> RedirectResponse:
     with db.connection() as conn:
         db.toggle_star(conn, lesson_id)
-    return RedirectResponse(url=next, status_code=303)
+    return RedirectResponse(url=_safe_redirect(next), status_code=303)
 
 
 @app.post("/lessons/{lesson_id}/feedback")
@@ -243,7 +263,7 @@ async def submit_feedback(
     feedback_value = None if feedback in ("", "clear") else feedback
     with db.connection() as conn:
         coach.record_feedback(conn, lesson_id, feedback_value)
-    return RedirectResponse(url=next, status_code=303)
+    return RedirectResponse(url=_safe_redirect(next), status_code=303)
 
 
 @app.get("/lessons/{lesson_id}", response_class=HTMLResponse)

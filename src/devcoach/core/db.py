@@ -287,6 +287,9 @@ def count_filtered_lessons(
 
 
 _SORT_COLUMNS = frozenset({"timestamp", "level", "topic_id", "title", "feedback"})
+_METADATA_COLUMNS = frozenset(
+    {"project", "repository", "branch", "commit_hash", "repository_platform"}
+)
 
 
 def get_lessons(
@@ -518,8 +521,10 @@ def restore_backup_zip(conn: sqlite3.Connection, data: bytes) -> dict[str, int]:
 
 def get_distinct_column(conn: sqlite3.Connection, column: str) -> list[str]:
     """Return sorted distinct non-null values for a metadata column."""
+    if column not in _METADATA_COLUMNS:
+        raise ValueError(f"Column not allowed: {column!r}")
     rows = conn.execute(
-        f"SELECT DISTINCT {column} FROM lessons WHERE {column} IS NOT NULL ORDER BY {column}"
+        f"SELECT DISTINCT {column} FROM lessons WHERE {column} IS NOT NULL ORDER BY {column}"  # noqa: S608
     ).fetchall()
     return [row[0] for row in rows]
 
@@ -715,8 +720,12 @@ def get_usage_defaults(conn: sqlite3.Connection) -> dict[str, str | None]:
     """
     result: dict[str, str | None] = {}
     for col in ("project", "repository", "branch", "repository_platform"):
+        # col is from a hardcoded tuple above — allowlist-check is a belt-and-suspenders guard
+        if col not in _METADATA_COLUMNS:
+            result[col] = None
+            continue
         row = conn.execute(
-            f"SELECT {col}, COUNT(*) c FROM lessons "
+            f"SELECT {col}, COUNT(*) c FROM lessons "  # noqa: S608
             f"WHERE {col} IS NOT NULL GROUP BY {col} ORDER BY c DESC LIMIT 1"
         ).fetchone()
         result[col] = row[0] if row else None
