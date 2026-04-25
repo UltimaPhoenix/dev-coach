@@ -32,9 +32,8 @@ async def profile_page(request: Request) -> HTMLResponse:
     seen: set[str] = set()
     for group_name, topics in groups.items():
         entries = [(t, knowledge[t]) for t in topics if t in knowledge]
-        if entries:
-            categorised[group_name] = entries
-            seen.update(t for t, _ in entries)
+        categorised[group_name] = entries
+        seen.update(t for t, _ in entries)
     other = sorted(
         [(t, c) for t, c in knowledge.items() if t not in seen],
         key=lambda x: -x[1],
