@@ -92,11 +92,11 @@
         {{ category }}
       </h2>
       {% if category != 'Other' %}
-      <form x-show="editMode" style="display:none" class="self-start shrink-0"
+      <form x-show="editMode" style="display:none"
             method="post" action="/groups/{{ category | urlencode }}/delete"
             onsubmit="return confirm('Remove group &quot;{{ category }}&quot;? Topics will move to Other.')">
         <button type="submit"
-                class="text-[10px] leading-none text-gray-300 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 transition opacity-0 group-hover/section:opacity-100" title="Delete group">×</button>
+                class="text-xs text-gray-300 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 transition w-4 text-center opacity-0 group-hover/section:opacity-100" title="Delete group">×</button>
       </form>
       {% endif %}
     </div>
@@ -177,11 +177,12 @@
               title="{{ topic }}">{{ topic }}</span>
 
         {# Delete topic — edit mode only, revealed on hover, snug after topic text #}
-        <form x-show="editMode" style="display:none" class="self-start shrink-0"
+        <form x-show="editMode" style="display:none"
               method="post" action="/knowledge/{{ topic }}/delete"
-              onsubmit="return confirm('Remove {{ topic }} from your knowledge map?')">
+              onsubmit="return confirm('Remove {{ topic }} from your knowledge map?')"
+              class="shrink-0">
           <button type="submit"
-                  class="text-[10px] leading-none text-gray-300 dark:text-gray-600 hover:text-red-500 dark:hover:text-red-400 transition opacity-0 group-hover/row:opacity-100" title="Remove topic">×</button>
+                  class="text-xs text-gray-200 dark:text-gray-700 hover:text-red-500 dark:hover:text-red-400 transition w-4 text-center opacity-0 group-hover/row:opacity-100" title="Remove topic">×</button>
         </form>
 
       </div>
