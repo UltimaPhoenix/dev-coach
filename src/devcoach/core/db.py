@@ -36,37 +36,6 @@ DEFAULT_SETTINGS: dict[str, str] = {
 
 # Ordered category → topic list mapping for the knowledge map UI.
 # Topics not listed here land in "Other".
-KNOWLEDGE_CATEGORIES: dict[str, list[str]] = {
-    "Engineering Fundamentals": [
-        "general_engineering", "software_architecture",
-        "design_patterns", "debugging_mindset",
-    ],
-    "Languages": [
-        "python", "javascript", "typescript",
-    ],
-    "Backend": [
-        "node_js", "fastapi", "django",
-    ],
-    "Frontend": [
-        "react", "html_css",
-    ],
-    "Infrastructure & DevOps": [
-        "docker", "docker_compose", "traefik", "coolify", "ci_cd", "linux_cli",
-    ],
-    "Databases": [
-        "postgresql", "redis",
-    ],
-    "Networking & Security": [
-        "networking", "security",
-    ],
-    "Quality": [
-        "testing", "performance_optimization",
-    ],
-    "Version Control": [
-        "git",
-    ],
-}
-
 
 # ── Connection ─────────────────────────────────────────────────────────────
 
@@ -183,22 +152,6 @@ def _seed_defaults(conn: sqlite3.Connection) -> None:
         conn.execute(
             "INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)",
             (key, value),
-        )
-
-    # Seed knowledge_group_names and knowledge_groups from KNOWLEDGE_CATEGORIES if empty.
-    row = conn.execute("SELECT COUNT(*) FROM knowledge_group_names").fetchone()
-    if row[0] == 0:
-        conn.executemany(
-            "INSERT OR IGNORE INTO knowledge_group_names (group_name) VALUES (?)",
-            [(group,) for group in KNOWLEDGE_CATEGORIES],
-        )
-        conn.executemany(
-            "INSERT OR IGNORE INTO knowledge_groups (group_name, topic) VALUES (?, ?)",
-            [
-                (group, topic)
-                for group, topics in KNOWLEDGE_CATEGORIES.items()
-                for topic in topics
-            ],
         )
 
     conn.commit()

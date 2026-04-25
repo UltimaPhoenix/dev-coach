@@ -27,16 +27,25 @@ def _confidence_bar(confidence: int) -> str:
 def cmd_profile(_args: argparse.Namespace) -> None:
     with db.connection() as conn:
         knowledge = db.get_all_knowledge(conn)
+        groups = db.get_knowledge_groups(conn)
+
+    # Build topic → group lookup
+    topic_group: dict[str, str] = {}
+    for group_name, topics in groups.items():
+        for t in topics:
+            topic_group[t] = group_name
 
     table = Table(title="Knowledge Map", box=box.ROUNDED, show_lines=False)
     table.add_column("Topic", style="cyan", no_wrap=True)
+    table.add_column("Group", style="dim", no_wrap=True)
     table.add_column("Confidence", justify="right")
     table.add_column("Bar", no_wrap=True)
 
     for topic, confidence in sorted(knowledge.items(), key=lambda x: -x[1]):
         bar = _confidence_bar(confidence)
         color = "green" if confidence >= 7 else "yellow" if confidence >= 4 else "red"
-        table.add_row(topic, f"[{color}]{confidence}/10[/{color}]", f"[{color}]{bar}[/{color}]")
+        group = topic_group.get(topic, "Other")
+        table.add_row(topic, group, f"[{color}]{confidence}/10[/{color}]", f"[{color}]{bar}[/{color}]")
 
     console.print(table)
 
