@@ -50,12 +50,16 @@ def cmd_lessons(args: argparse.Namespace) -> None:
     feedback_filter = getattr(args, "feedback", None) or None
     date_from = getattr(args, "date_from", None) or None
     date_to = getattr(args, "date_to", None) or None
+    level_filter = getattr(args, "level", None) or None
+    sort_col = getattr(args, "sort", "timestamp") or "timestamp"
+    sort_order = getattr(args, "order", "desc") or "desc"
 
     with db.connection() as conn:
         lessons = db.get_lessons(
             conn,
             period=args.period if args.period != "all" else None,
             category=args.category or None,
+            level=level_filter,
             project=args.project or None,
             repository=args.repository or None,
             branch=args.branch or None,
@@ -64,6 +68,8 @@ def cmd_lessons(args: argparse.Namespace) -> None:
             feedback=feedback_filter,
             date_from=date_from,
             date_to=date_to,
+            sort=sort_col,
+            order=sort_order,
         )
 
     if not lessons:
@@ -201,6 +207,39 @@ def cmd_settings(_args: argparse.Namespace) -> None:
     table.add_row("max_per_day", str(settings.max_per_day))
     table.add_row("min_gap_minutes", f"{settings.min_gap_minutes} ({gap_label})")
     console.print(table)
+
+
+def cmd_stats(_args: argparse.Namespace) -> None:
+    with db.connection() as conn:
+        stats = coach.get_stats(conn)
+        rate_limit = coach.check_rate_limit(conn)
+        settings = db.get_settings(conn)
+
+    table = Table(title="Coaching Stats", box=box.ROUNDED, show_header=False)
+    table.add_column("Metric", style="dim")
+    table.add_column("Value", justify="right")
+    table.add_row("Total lessons", str(stats.get("total_lessons", 0)))
+    table.add_row("Lessons today (24h)", f"{stats.get('lessons_today', 0)} / {settings.max_per_day}")
+    table.add_row("Lessons this week", str(stats.get("lessons_this_week", 0)))
+    rl_label = "[green]Available now[/green]" if rate_limit.allowed else f"[yellow]{rate_limit.reason}[/yellow]"
+    table.add_row("Next lesson", rl_label)
+    console.print(table)
+
+    weakest = stats.get("weakest_topics", [])
+    strongest = stats.get("strongest_topics", [])
+
+    if weakest or strongest:
+        side = Table(box=box.SIMPLE, show_header=True, padding=(0, 1))
+        side.add_column("Weakest topics", style="red", no_wrap=True)
+        side.add_column("  ")
+        side.add_column("Strongest topics", style="green", no_wrap=True)
+        for i in range(max(len(weakest), len(strongest))):
+            w = weakest[i] if i < len(weakest) else None
+            s = strongest[i] if i < len(strongest) else None
+            w_cell = f"{w['topic']} [dim]({w['confidence']})[/dim]" if w else ""
+            s_cell = f"{s['topic']} [dim]({s['confidence']})[/dim]" if s else ""
+            side.add_row(w_cell, "", s_cell)
+        console.print(side)
 
 
 def cmd_set(args: argparse.Namespace) -> None:
@@ -342,10 +381,17 @@ def _build_parser() -> argparse.ArgumentParser:
     p_lessons.add_argument("--starred", action="store_true", default=False, help="Show only starred lessons")
     p_lessons.add_argument("--feedback", choices=["know", "dont_know", "none"], default=None,
                            help="Filter by feedback: know, dont_know, none (no response)")
+    p_lessons.add_argument("--level", choices=["junior", "mid", "senior"], default=None,
+                           help="Filter by difficulty level")
     p_lessons.add_argument("--date-from", dest="date_from", default=None,
                            metavar="YYYY-MM-DD", help="Show lessons on or after this date")
     p_lessons.add_argument("--date-to", dest="date_to", default=None,
                            metavar="YYYY-MM-DD", help="Show lessons on or before this date")
+    p_lessons.add_argument("--sort", default="timestamp",
+                           choices=["timestamp", "level", "topic_id", "title", "feedback"],
+                           help="Sort column (default: timestamp)")
+    p_lessons.add_argument("--order", default="desc", choices=["asc", "desc"],
+                           help="Sort order (default: desc)")
 
     p_lesson = sub.add_parser("lesson", help="Show a single lesson in detail")
     p_lesson.add_argument("id", help="Lesson ID")
@@ -358,6 +404,7 @@ def _build_parser() -> argparse.ArgumentParser:
     p_feedback.add_argument("feedback", choices=["know", "dont_know", "clear"], help="Feedback value")
 
     sub.add_parser("settings", help="Show current settings")
+    sub.add_parser("stats", help="Show coaching statistics and rate-limit status")
 
     p_set = sub.add_parser("set", help="Update a setting")
     p_set.add_argument("key", help="Setting key (max_per_day | min_gap_minutes)")
@@ -410,6 +457,7 @@ def run_cli() -> None:
         "star": cmd_star,
         "feedback": cmd_feedback,
         "settings": cmd_settings,
+        "stats": cmd_stats,
         "set": cmd_set,
         "backup": cmd_backup,
         "restore": cmd_restore,

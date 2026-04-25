@@ -27,6 +27,9 @@ app.mount("/static", StaticFiles(directory=str(_HERE / "static")), name="static"
 async def profile_page(request: Request) -> HTMLResponse:
     with db.connection() as conn:
         profile = coach.get_profile(conn)
+        stats = coach.get_stats(conn)
+        rate_limit = coach.check_rate_limit(conn)
+        settings = db.get_settings(conn)
 
     topic_group = {t: g.name for g in profile.groups for t in g.topics}
     categorised: dict[str, list[KnowledgeEntry]] = {g.name: [] for g in profile.groups}
@@ -39,7 +42,13 @@ async def profile_page(request: Request) -> HTMLResponse:
     return templates.TemplateResponse(
         request,
         "profile.html",
-        {"categorised": categorised, "all_groups": all_groups},
+        {
+            "categorised": categorised,
+            "all_groups": all_groups,
+            "stats": stats,
+            "rate_limit": rate_limit,
+            "max_per_day": settings.max_per_day,
+        },
     )
 
 

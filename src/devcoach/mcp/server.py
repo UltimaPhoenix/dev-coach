@@ -7,7 +7,6 @@ import json
 import shutil
 import subprocess
 import sys
-from datetime import datetime, timedelta, timezone
 from typing import Literal, Optional
 
 from fastmcp import FastMCP
@@ -112,6 +111,7 @@ def check_rate_limit() -> RateLimitResult:
 def get_lessons(
     period: Optional[Literal["today", "week", "month", "year", "all"]] = None,
     category: Optional[str] = None,
+    level: Optional[Literal["junior", "mid", "senior"]] = None,
     project: Optional[str] = None,
     repository: Optional[str] = None,
     branch: Optional[str] = None,
@@ -126,6 +126,7 @@ def get_lessons(
 
     period: today | week | month | year | all (default: all)
     category: filter by a specific category tag (e.g. "python", "docker")
+    level: filter by difficulty level — junior | mid | senior
     project / repository / branch: fuzzy match on git metadata
     commit: fuzzy match on commit hash
     starred: True to return only starred (favourite) lessons
@@ -140,6 +141,7 @@ def get_lessons(
                 conn,
                 period=period,
                 category=category,
+                level=level,
                 project=project,
                 repository=repository,
                 branch=branch,
@@ -172,25 +174,7 @@ def get_stats() -> dict:
     """
     try:
         with db.connection() as conn:
-            now = datetime.now(timezone.utc)
-            total = len(db.get_lessons(conn))
-            today_cutoff = (now - timedelta(hours=24)).isoformat()
-            week_cutoff = (now - timedelta(days=7)).isoformat()
-            lessons_today = db.count_lessons_since(conn, today_cutoff)
-            lessons_week = db.count_lessons_since(conn, week_cutoff)
-            knowledge = db.get_all_knowledge(conn)
-
-        sorted_k = sorted(knowledge.items(), key=lambda x: x[1])
-        weakest = [{"topic": t, "confidence": c} for t, c in sorted_k[:5]]
-        strongest = [{"topic": t, "confidence": c} for t, c in sorted_k[-5:][::-1]]
-
-        return {
-            "total_lessons": total,
-            "lessons_today": lessons_today,
-            "lessons_this_week": lessons_week,
-            "weakest_topics": weakest,
-            "strongest_topics": strongest,
-        }
+            return coach.get_stats(conn)
     except Exception as exc:
         return {"error": str(exc)}
 
@@ -256,6 +240,57 @@ def remove_topic(topic: str) -> Profile:
             return coach.get_profile(conn)
     except Exception:
         return Profile(knowledge=[], groups=[])
+
+
+@mcp.tool
+def add_group(name: str) -> Profile:
+    """Create a new (initially empty) knowledge group.
+
+    name: group name, e.g. 'Machine Learning'
+    Note: add_topic(group=name) also auto-creates the group when assigning a topic.
+    Returns the updated Profile.
+    """
+    try:
+        name = name.strip()
+        with db.connection() as conn:
+            db.add_group(conn, name)
+            return coach.get_profile(conn)
+    except Exception:
+        return Profile(knowledge=[], groups=[])
+
+
+@mcp.tool
+def remove_group(name: str) -> Profile:
+    """Delete a knowledge group. Topics in the group move to Other.
+
+    Returns the updated Profile.
+    """
+    try:
+        with db.connection() as conn:
+            db.delete_group(conn, name)
+            return coach.get_profile(conn)
+    except Exception:
+        return Profile(knowledge=[], groups=[])
+
+
+@mcp.tool
+def update_settings(key: str, value: str) -> dict:
+    """Update a coaching setting.
+
+    key: 'max_per_day' or 'min_gap_minutes'
+    value: new value as a string (e.g. '3' or '120')
+    Returns the updated settings dict.
+    """
+    try:
+        valid_keys = {"max_per_day", "min_gap_minutes"}
+        if key not in valid_keys:
+            return {"error": f"Unknown key '{key}'. Valid keys: {', '.join(sorted(valid_keys))}"}
+        with db.connection() as conn:
+            db.set_setting(conn, key, value)
+            s = db.get_settings(conn)
+        return {"max_per_day": s.max_per_day, "min_gap_minutes": s.min_gap_minutes}
+    except Exception as exc:
+        return {"error": str(exc)}
 
 
 @mcp.tool
@@ -336,7 +371,9 @@ def main() -> None:
     """Start devcoach: CLI subcommand if given, else stdio MCP server."""
     cli_commands = {
         "profile", "lessons", "lesson", "star", "feedback",
-        "settings", "set", "backup", "restore", "ui",
+        "settings", "set", "stats", "backup", "restore", "ui",
+        "knowledge-add", "knowledge-remove",
+        "group-add", "group-remove", "group-assign",
     }
     if len(sys.argv) > 1 and sys.argv[1] in cli_commands:
         from devcoach.cli.commands import run_cli

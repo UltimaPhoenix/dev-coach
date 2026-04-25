@@ -7,7 +7,9 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from devcoach.core.db import (
+    count_filtered_lessons,
     count_lessons_since,
+    get_all_knowledge,
     get_knowledge_entries,
     get_knowledge_group_list,
     get_last_lesson_timestamp,
@@ -106,6 +108,34 @@ def record_feedback(
         delta = 1 if feedback_value == "know" else -1
         apply_knowledge_delta(conn, topic_id, delta)
     return topic_id
+
+
+def get_stats(conn: sqlite3.Connection) -> dict:
+    """Return aggregate coaching statistics.
+
+    Returns total_lessons, lessons_today (last 24h), lessons_this_week (last 7d),
+    weakest_topics (up to 5), and strongest_topics (up to 5).
+    """
+    try:
+        now = datetime.now(timezone.utc)
+        total = count_filtered_lessons(conn)
+        today_cutoff = (now - timedelta(hours=24)).isoformat()
+        week_cutoff = (now - timedelta(days=7)).isoformat()
+        lessons_today = count_lessons_since(conn, today_cutoff)
+        lessons_week = count_lessons_since(conn, week_cutoff)
+        knowledge = get_all_knowledge(conn)
+        sorted_k = sorted(knowledge.items(), key=lambda x: x[1])
+        weakest = [{"topic": t, "confidence": c} for t, c in sorted_k[:5]]
+        strongest = [{"topic": t, "confidence": c} for t, c in sorted_k[-5:][::-1]]
+        return {
+            "total_lessons": total,
+            "lessons_today": lessons_today,
+            "lessons_this_week": lessons_week,
+            "weakest_topics": weakest,
+            "strongest_topics": strongest,
+        }
+    except Exception as exc:
+        return {"error": str(exc)}
 
 
 def list_taught_topics(conn: sqlite3.Connection) -> list[str]:
