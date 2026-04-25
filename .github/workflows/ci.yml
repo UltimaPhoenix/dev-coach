@@ -1,22 +1,95 @@
 name: CI
 
+# Covers three scenarios:
+#
+#  1. Push to main / pull request  →  lint + test + build
+#  2. Tag push (v*)                →  lint + test + build + publish + GitHub Release
+#  3. workflow_dispatch (Release)  →  bump version → tag → lint + test + build + publish + GitHub Release
+#
+# The bump job only runs on workflow_dispatch. Lint/test/build always run.
+# Publish and GitHub Release run whenever a tag is present.
+
 on:
   push:
     branches: [main]
     tags: ["v*"]
   pull_request:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Version bump type"
+        required: false
+        default: patch
+        type: choice
+        options: [patch, minor, major]
+      version:
+        description: "Exact version (overrides bump, e.g. 1.0.0)"
+        required: false
+        default: ""
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  # ── Bump ────────────────────────────────────────────────────────────────
+  # Only runs on workflow_dispatch. Bumps pyproject.toml, commits, tags, pushes.
+  bump:
+    name: Bump version and tag
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      version: ${{ steps.ver.outputs.version }}
+      tag:     ${{ steps.ver.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Configure git
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Compute next version
+        id: ver
+        run: |
+          if [ -n "${{ inputs.version }}" ]; then
+            NEXT="${{ inputs.version }}"
+          else
+            CURRENT=$(grep '^version' pyproject.toml | head -1 | sed 's/.*"\(.*\)"/\1/')
+            IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
+            case "${{ inputs.bump }}" in
+              major) NEXT="$((MAJOR+1)).0.0" ;;
+              minor) NEXT="${MAJOR}.$((MINOR+1)).0" ;;
+              patch) NEXT="${MAJOR}.${MINOR}.$((PATCH+1))" ;;
+            esac
+          fi
+          echo "version=$NEXT" >> "$GITHUB_OUTPUT"
+          echo "tag=v$NEXT"    >> "$GITHUB_OUTPUT"
+
+      - name: Bump version in pyproject.toml
+        run: sed -i 's/^version = ".*"/version = "${{ steps.ver.outputs.version }}"/' pyproject.toml
+
+      - name: Commit and tag
+        run: |
+          git add pyproject.toml
+          git commit -m "chore: bump version to ${{ steps.ver.outputs.version }}"
+          git tag "${{ steps.ver.outputs.tag }}"
+          git push --atomic origin main "${{ steps.ver.outputs.tag }}"
+
   # ── Lint ────────────────────────────────────────────────────────────────
   lint:
     name: Lint (ruff)
+    needs: [bump]
+    if: always() && (needs.bump.result == 'success' || needs.bump.result == 'skipped')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.bump.outputs.tag || github.ref }}
       - uses: astral-sh/setup-uv@v7
         with:
           python-version: "3.12"
@@ -27,6 +100,8 @@ jobs:
   # ── Tests ───────────────────────────────────────────────────────────────
   test:
     name: Test (Python ${{ matrix.python-version }})
+    needs: [bump]
+    if: always() && (needs.bump.result == 'success' || needs.bump.result == 'skipped')
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -34,6 +109,8 @@ jobs:
         python-version: ["3.11", "3.12", "3.13"]
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.bump.outputs.tag || github.ref }}
       - uses: astral-sh/setup-uv@v7
         with:
           python-version: ${{ matrix.python-version }}
@@ -43,10 +120,13 @@ jobs:
   # ── Build ───────────────────────────────────────────────────────────────
   build:
     name: Build distribution
-    needs: [lint, test]
+    needs: [bump, lint, test]
+    if: always() && (needs.bump.result == 'success' || needs.bump.result == 'skipped') && needs.lint.result == 'success' && needs.test.result == 'success'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.bump.outputs.tag || github.ref }}
       - uses: astral-sh/setup-uv@v7
         with:
           python-version: "3.12"
@@ -58,53 +138,48 @@ jobs:
           retention-days: 7
 
   # ── Publish ─────────────────────────────────────────────────────────────
-  # Runs only on v* tags (e.g. v0.2.0). Uses PyPI Trusted Publishing (OIDC)
-  # — no API tokens stored in repository secrets.
+  # Runs when a tag is present: either created by the bump job (workflow_dispatch)
+  # or pushed directly (git push origin v1.2.3).
+  # Uses PyPI Trusted Publishing (OIDC) — no API tokens needed.
   #
-  # One-time setup required on PyPI:
-  #   1. Go to https://pypi.org/manage/account/publishing/
-  #   2. Add a new publisher:
-  #        PyPI project name : devcoach
-  #        Owner             : UltimaPhoenix
-  #        Repository name   : dev-coach
-  #        Workflow filename  : ci.yml
-  #        Environment name  : pypi
+  # One-time setup on PyPI: project=devcoach, owner=UltimaPhoenix,
+  #   repo=dev-coach, workflow=ci.yml, environment=pypi
   publish:
     name: Publish to PyPI
-    if: startsWith(github.ref, 'refs/tags/v')
-    needs: build
+    needs: [bump, build]
+    if: always() && needs.build.result == 'success' && (needs.bump.result == 'success' || startsWith(github.ref, 'refs/tags/v'))
     runs-on: ubuntu-latest
     environment:
       name: pypi
       url: https://pypi.org/p/devcoach
     permissions:
-      id-token: write   # required for OIDC trusted publishing
+      id-token: write
     steps:
       - uses: actions/download-artifact@v8
         with:
           name: dist
           path: dist/
-      - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
+      - uses: pypa/gh-action-pypi-publish@release/v1
 
   # ── GitHub Release ──────────────────────────────────────────────────────
-  # Creates a GitHub Release with the built distribution attached.
-  release:
+  github-release:
     name: Create GitHub Release
-    if: startsWith(github.ref, 'refs/tags/v')
-    needs: publish
+    needs: [bump, publish]
+    if: always() && needs.publish.result == 'success' && (needs.bump.result == 'success' || startsWith(github.ref, 'refs/tags/v'))
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.bump.outputs.tag || github.ref }}
       - uses: actions/download-artifact@v8
         with:
           name: dist
           path: dist/
-      - name: Create release
-        uses: softprops/action-gh-release@v3
+      - uses: softprops/action-gh-release@v3
         with:
+          tag_name: ${{ needs.bump.outputs.tag || github.ref_name }}
           files: dist/*
           generate_release_notes: true
           fail_on_unmatched_files: true
