@@ -159,27 +159,27 @@
         </div>
       </div>
 
-      {# Topic name + delete button grouped so × stays tight against the text #}
-      <div class="flex items-center gap-1 flex-1 min-w-0">
+      {# Topic name — flex-1 cell; delete × overlays it on hover #}
+      <div class="relative flex-1 min-w-0">
 
         {# View mode: topic is a link to lessons filtered by this topic #}
         <a x-show="!editMode"
            href="/lessons?search={{ topic }}"
-           class="text-sm text-gray-700 dark:text-gray-200 min-w-0 truncate hover:text-indigo-600 dark:hover:text-indigo-400 hover:underline transition"
+           class="text-sm text-gray-700 dark:text-gray-200 block truncate hover:text-indigo-600 dark:hover:text-indigo-400 hover:underline transition"
            title="{{ topic }}">{{ topic }}</a>
 
-        {# Edit mode: plain text #}
+        {# Edit mode: plain text, right-padded to leave room for the × overlay #}
         <span x-show="editMode" style="display:none"
-              class="text-sm text-gray-700 dark:text-gray-200 min-w-0 truncate"
+              class="text-sm text-gray-700 dark:text-gray-200 block truncate pr-4"
               title="{{ topic }}">{{ topic }}</span>
 
-        {# Delete topic — edit mode only, revealed on hover, snug after topic text #}
+        {# Delete topic — absolute overlay, revealed on hover, right edge of name cell #}
         <form x-show="editMode" style="display:none"
               method="post" action="/knowledge/{{ topic }}/delete"
               onsubmit="return confirm('Remove {{ topic }} from your knowledge map?')"
-              class="shrink-0">
+              class="absolute inset-y-0 right-0 flex items-center">
           <button type="submit"
-                  class="text-xs text-gray-200 dark:text-gray-700 hover:text-red-500 dark:hover:text-red-400 transition w-4 text-center opacity-0 group-hover/row:opacity-100" title="Remove topic">×</button>
+                  class="text-xs text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 transition w-4 text-center opacity-0 group-hover/row:opacity-100" title="Remove topic">×</button>
         </form>
 
       </div>
