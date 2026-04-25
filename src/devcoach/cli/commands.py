@@ -208,6 +208,61 @@ def cmd_set(args: argparse.Namespace) -> None:
     console.print(f"[green]Set {args.key} = {args.value}[/green]")
 
 
+def cmd_knowledge_add(args: argparse.Namespace) -> None:
+    topic = args.topic.strip()
+    if not topic:
+        console.print("[red]Topic name must not be empty.[/red]")
+        sys.exit(1)
+    with db.connection() as conn:
+        db.upsert_knowledge(conn, topic, args.confidence)
+        if args.group and args.group != "Other":
+            db.assign_topic_to_group(conn, topic, args.group)
+    group_label = f" → [cyan]{args.group}[/cyan]" if args.group and args.group != "Other" else ""
+    console.print(f"[green]Added[/green] [bold]{topic}[/bold] (confidence [cyan]{args.confidence}[/cyan]){group_label}")
+
+
+def cmd_knowledge_remove(args: argparse.Namespace) -> None:
+    with db.connection() as conn:
+        removed = db.delete_knowledge(conn, args.topic)
+    if removed:
+        console.print(f"[green]Removed[/green] [bold]{args.topic}[/bold] from knowledge map")
+    else:
+        console.print(f"[yellow]Topic '{args.topic}' not found.[/yellow]")
+
+
+def cmd_group_add(args: argparse.Namespace) -> None:
+    group_name = args.name.strip()
+    if not group_name or group_name == "Other":
+        console.print("[red]Invalid group name.[/red]")
+        sys.exit(1)
+    with db.connection() as conn:
+        db.add_group(conn, group_name)
+    console.print(f"[green]Group '[cyan]{group_name}[/cyan]' ready.[/green] Assign topics with: devcoach group-assign <topic> \"{group_name}\"")
+
+
+def cmd_group_remove(args: argparse.Namespace) -> None:
+    with db.connection() as conn:
+        count = db.delete_group(conn, args.name)
+    if count:
+        console.print(f"[green]Removed group '[cyan]{args.name}[/cyan]'[/green] ({count} topic assignment(s) cleared)")
+    else:
+        console.print(f"[yellow]Group '{args.name}' not found or already empty.[/yellow]")
+
+
+def cmd_group_assign(args: argparse.Namespace) -> None:
+    with db.connection() as conn:
+        knowledge = db.get_all_knowledge(conn)
+        if args.topic not in knowledge:
+            console.print(f"[red]Topic '{args.topic}' not in knowledge map. Add it first.[/red]")
+            sys.exit(1)
+        if args.group == "Other":
+            db.unassign_topic_from_group(conn, args.topic)
+            console.print(f"[green]Moved[/green] [bold]{args.topic}[/bold] → Other (ungrouped)")
+        else:
+            db.assign_topic_to_group(conn, args.topic, args.group)
+            console.print(f"[green]Moved[/green] [bold]{args.topic}[/bold] → [cyan]{args.group}[/cyan]")
+
+
 def cmd_backup(args: argparse.Namespace) -> None:
     """Export settings + knowledge map + lessons as a zip file."""
     with db.connection() as conn:
@@ -307,6 +362,26 @@ def _build_parser() -> argparse.ArgumentParser:
     p_restore = sub.add_parser("restore", help="Restore from a backup zip file")
     p_restore.add_argument("input", help="Path to backup zip file")
 
+    p_kadd = sub.add_parser("knowledge-add", help="Add or update a topic in the knowledge map")
+    p_kadd.add_argument("topic", help="Topic ID (e.g. rust_lifetimes)")
+    p_kadd.add_argument("--confidence", type=int, default=5, metavar="N",
+                        help="Initial confidence 0-10 (default: 5)")
+    p_kadd.add_argument("--group", default=None, metavar="GROUP",
+                        help="Assign to a named group (optional)")
+
+    p_kremove = sub.add_parser("knowledge-remove", help="Remove a topic from the knowledge map")
+    p_kremove.add_argument("topic", help="Topic ID to remove")
+
+    p_gadd = sub.add_parser("group-add", help="Register a new knowledge group")
+    p_gadd.add_argument("name", help="Group name (e.g. 'Machine Learning')")
+
+    p_gremove = sub.add_parser("group-remove", help="Delete a knowledge group (topics move to Other)")
+    p_gremove.add_argument("name", help="Group name to delete")
+
+    p_gassign = sub.add_parser("group-assign", help="Move a topic to a group")
+    p_gassign.add_argument("topic", help="Topic ID")
+    p_gassign.add_argument("group", help="Group name (use 'Other' to ungroup)")
+
     p_ui = sub.add_parser("ui", help="Launch the web dashboard")
     p_ui.add_argument("--port", type=int, default=7860, help="Port (default: 7860)")
 
@@ -330,6 +405,11 @@ def run_cli() -> None:
         "set": cmd_set,
         "backup": cmd_backup,
         "restore": cmd_restore,
+        "knowledge-add": cmd_knowledge_add,
+        "knowledge-remove": cmd_knowledge_remove,
+        "group-add": cmd_group_add,
+        "group-remove": cmd_group_remove,
+        "group-assign": cmd_group_assign,
         "ui": cmd_ui,
     }
 

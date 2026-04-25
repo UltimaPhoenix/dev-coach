@@ -130,6 +130,14 @@ def init_schema(conn: sqlite3.Connection) -> None:
             value TEXT NOT NULL
         );
 
+        -- Maps topics to named groups for the knowledge map display.
+        -- Topics not present here appear under "Other".
+        CREATE TABLE IF NOT EXISTS knowledge_groups (
+            group_name TEXT NOT NULL,
+            topic      TEXT NOT NULL,
+            PRIMARY KEY (group_name, topic)
+        );
+
         -- Period/date-range filters, rate-limit count, get_last_lesson_timestamp,
         -- and the default ORDER BY timestamp DESC all benefit from this index.
         CREATE INDEX IF NOT EXISTS idx_lessons_timestamp
@@ -170,6 +178,18 @@ def _seed_defaults(conn: sqlite3.Connection) -> None:
         conn.execute(
             "INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)",
             (key, value),
+        )
+
+    # Seed knowledge_groups from KNOWLEDGE_CATEGORIES if the table is empty.
+    row = conn.execute("SELECT COUNT(*) FROM knowledge_groups").fetchone()
+    if row[0] == 0:
+        conn.executemany(
+            "INSERT OR IGNORE INTO knowledge_groups (group_name, topic) VALUES (?, ?)",
+            [
+                (group, topic)
+                for group, topics in KNOWLEDGE_CATEGORIES.items()
+                for topic in topics
+            ],
         )
 
     conn.commit()
@@ -531,6 +551,67 @@ def upsert_knowledge(
                                             updated_at = excluded.updated_at""",
         (topic, clamped, now),
     )
+    conn.commit()
+
+
+def delete_knowledge(conn: sqlite3.Connection, topic: str) -> bool:
+    """Remove a topic from the knowledge map and all groups. Returns True if it existed."""
+    cur = conn.execute("DELETE FROM knowledge WHERE topic = ?", (topic,))
+    conn.execute("DELETE FROM knowledge_groups WHERE topic = ?", (topic,))
+    conn.commit()
+    return cur.rowcount > 0
+
+
+# ── Knowledge groups ───────────────────────────────────────────────────────
+
+def get_knowledge_groups(conn: sqlite3.Connection) -> dict[str, list[str]]:
+    """Return the DB-backed group map as {group_name: [topic, ...]} (insertion order)."""
+    rows = conn.execute(
+        "SELECT group_name, topic FROM knowledge_groups ORDER BY group_name, topic"
+    ).fetchall()
+    groups: dict[str, list[str]] = {}
+    for row in rows:
+        groups.setdefault(row[0], []).append(row[1])
+    return groups
+
+
+def add_group(conn: sqlite3.Connection, group_name: str) -> None:
+    """Register a new group name (no-op if a topic is already in it).
+
+    Groups with no topics are not stored; callers should immediately assign a topic.
+    This helper is a placeholder that verifies the name is non-empty.
+    """
+    if not group_name.strip():
+        raise ValueError("Group name must not be empty")
+
+
+def delete_group(conn: sqlite3.Connection, group_name: str) -> int:
+    """Remove a group entirely. Topics in it become ungrouped (appear under Other).
+
+    Returns the number of topic assignments removed.
+    """
+    cur = conn.execute(
+        "DELETE FROM knowledge_groups WHERE group_name = ?", (group_name,)
+    )
+    conn.commit()
+    return cur.rowcount
+
+
+def assign_topic_to_group(
+    conn: sqlite3.Connection, topic: str, group_name: str
+) -> None:
+    """Assign a topic to a group, replacing any previous group assignment."""
+    conn.execute("DELETE FROM knowledge_groups WHERE topic = ?", (topic,))
+    conn.execute(
+        "INSERT OR IGNORE INTO knowledge_groups (group_name, topic) VALUES (?, ?)",
+        (group_name, topic),
+    )
+    conn.commit()
+
+
+def unassign_topic_from_group(conn: sqlite3.Connection, topic: str) -> None:
+    """Remove a topic from its group (it will appear under Other)."""
+    conn.execute("DELETE FROM knowledge_groups WHERE topic = ?", (topic,))
     conn.commit()
 
 

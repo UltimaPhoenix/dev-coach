@@ -26,13 +26,14 @@ app.mount("/static", StaticFiles(directory=str(_HERE / "static")), name="static"
 async def profile_page(request: Request) -> HTMLResponse:
     with db.connection() as conn:
         knowledge = db.get_all_knowledge(conn)
+        groups = db.get_knowledge_groups(conn)
 
     categorised: dict[str, list[tuple[str, int]]] = {}
     seen: set[str] = set()
-    for category, topics in db.KNOWLEDGE_CATEGORIES.items():
+    for group_name, topics in groups.items():
         entries = [(t, knowledge[t]) for t in topics if t in knowledge]
         if entries:
-            categorised[category] = entries
+            categorised[group_name] = entries
             seen.update(t for t, _ in entries)
     other = sorted(
         [(t, c) for t, c in knowledge.items() if t not in seen],
@@ -41,11 +42,63 @@ async def profile_page(request: Request) -> HTMLResponse:
     if other:
         categorised["Other"] = other
 
+    all_groups = list(groups.keys())
+    if "Other" not in all_groups:
+        all_groups.append("Other")
+
     return templates.TemplateResponse(
         request,
         "profile.html",
-        {"categorised": categorised},
+        {"categorised": categorised, "all_groups": all_groups},
     )
+
+
+@app.post("/knowledge", response_class=HTMLResponse)
+async def add_knowledge(
+    topic: str = Form(...),
+    confidence: int = Form(5),
+    group: str = Form(""),
+) -> RedirectResponse:
+    topic = topic.strip()
+    if topic:
+        with db.connection() as conn:
+            db.upsert_knowledge(conn, topic, confidence)
+            if group.strip() and group.strip() != "Other":
+                db.assign_topic_to_group(conn, topic, group.strip())
+    return RedirectResponse(url="/", status_code=303)
+
+
+@app.post("/knowledge/{topic}/delete", response_class=HTMLResponse)
+async def delete_knowledge(topic: str) -> RedirectResponse:
+    with db.connection() as conn:
+        db.delete_knowledge(conn, topic)
+    return RedirectResponse(url="/", status_code=303)
+
+
+@app.post("/knowledge/{topic}/group", response_class=HTMLResponse)
+async def set_topic_group(topic: str, group: str = Form(...)) -> RedirectResponse:
+    with db.connection() as conn:
+        if group.strip() and group.strip() != "Other":
+            db.assign_topic_to_group(conn, topic, group.strip())
+        else:
+            db.unassign_topic_from_group(conn, topic)
+    return RedirectResponse(url="/", status_code=303)
+
+
+@app.post("/groups", response_class=HTMLResponse)
+async def add_group(group_name: str = Form(...)) -> RedirectResponse:
+    group_name = group_name.strip()
+    if group_name and group_name != "Other":
+        with db.connection() as conn:
+            db.add_group(conn, group_name)
+    return RedirectResponse(url="/", status_code=303)
+
+
+@app.post("/groups/{group_name}/delete", response_class=HTMLResponse)
+async def delete_group(group_name: str) -> RedirectResponse:
+    with db.connection() as conn:
+        db.delete_group(conn, group_name)
+    return RedirectResponse(url="/", status_code=303)
 
 
 @app.post("/knowledge/{topic}", response_class=HTMLResponse)

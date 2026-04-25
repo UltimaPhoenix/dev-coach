@@ -2,13 +2,68 @@
 {% block title %}Profile — devcoach{% endblock %}
 
 {% block content %}
-<h1 class="text-2xl font-bold mb-6 text-indigo-600 dark:text-indigo-400">Knowledge Map</h1>
+<div class="flex items-center justify-between mb-6">
+  <h1 class="text-2xl font-bold text-indigo-600 dark:text-indigo-400">Knowledge Map</h1>
+
+  {# Add group button #}
+  <div x-data="{ open: false }" class="relative">
+    <button type="button" @click="open = !open"
+            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition
+                   bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-indigo-400">
+      + Add group
+    </button>
+    <div x-show="open" @click.outside="open = false"
+         class="absolute right-0 top-full mt-1 z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg p-3 w-56"
+         style="display:none">
+      <form method="post" action="/groups" class="flex gap-2">
+        <input type="text" name="group_name" placeholder="Group name…" required
+               class="flex-1 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+        <button type="submit"
+                class="px-3 py-1.5 rounded-lg text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-500 transition">Add</button>
+      </form>
+    </div>
+  </div>
+</div>
 
 {% for category, topics in categorised.items() %}
-<section class="mb-6">
-  <h2 class="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-2 border-b border-gray-200 dark:border-gray-800 pb-1">
-    {{ category }}
-  </h2>
+<section class="mb-6" x-data="{ editing: false }">
+  <div class="flex items-center gap-2 mb-2 border-b border-gray-200 dark:border-gray-800 pb-1">
+    <h2 class="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500 flex-1">
+      {{ category }}
+    </h2>
+
+    {# Add topic to this group #}
+    <div x-data="{ open: false }" class="relative">
+      <button type="button" @click="open = !open"
+              class="text-xs text-gray-300 dark:text-gray-600 hover:text-indigo-500 dark:hover:text-indigo-400 transition px-1">+ topic</button>
+      <div x-show="open" @click.outside="open = false"
+           class="absolute right-0 top-full mt-1 z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg p-3 w-64"
+           style="display:none">
+        <form method="post" action="/knowledge" class="space-y-2">
+          <input type="hidden" name="group" value="{{ category if category != 'Other' else '' }}" />
+          <input type="text" name="topic" placeholder="topic_id (e.g. rust_lifetimes)" required
+                 class="w-full text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          <div class="flex items-center gap-2">
+            <label class="text-xs text-gray-400 dark:text-gray-500 shrink-0">Confidence</label>
+            <input type="number" name="confidence" value="5" min="0" max="10"
+                   class="w-16 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2 py-1 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            <button type="submit"
+                    class="flex-1 px-3 py-1.5 rounded-lg text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-500 transition">Add</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    {# Delete group (not "Other") #}
+    {% if category != 'Other' %}
+    <form method="post" action="/groups/{{ category | urlencode }}/delete"
+          onsubmit="return confirm('Remove group "{{ category }}"? Topics will move to Other.')">
+      <button type="submit"
+              class="text-xs text-gray-300 dark:text-gray-600 hover:text-red-500 dark:hover:text-red-400 transition px-1" title="Delete group">✕</button>
+    </form>
+    {% endif %}
+  </div>
+
   <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-x-8 gap-y-0">
     {% for topic, confidence in topics %}
     {% set pct = (confidence / 10 * 100) | int %}
@@ -23,7 +78,7 @@
       {% set text_color = "text-red-600 dark:text-red-400" %}
     {% endif %}
 
-    <div class="flex items-center gap-2 py-1.5 border-b border-gray-100 dark:border-gray-800/50">
+    <div class="flex items-center gap-2 py-1.5 border-b border-gray-100 dark:border-gray-800/50 group/row">
       <span class="text-sm text-gray-700 dark:text-gray-200 flex-1 min-w-0 truncate" title="{{ topic }}">{{ topic }}</span>
       <div class="w-20 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden shrink-0">
         <div class="{{ color }} h-full rounded-full transition-all" style="width: {{ pct }}%"></div>
@@ -39,9 +94,72 @@
           <button class="text-xs text-gray-300 dark:text-gray-600 hover:text-green-600 dark:hover:text-green-400 transition w-5 text-center">+</button>
         </form>
       </div>
+
+      {# Move to group dropdown #}
+      <div x-data="{ open: false }" class="relative shrink-0">
+        <button type="button" @click="open = !open"
+                class="text-xs text-gray-200 dark:text-gray-700 hover:text-indigo-500 dark:hover:text-indigo-400 transition w-4 text-center opacity-0 group-hover/row:opacity-100" title="Move to group">⇄</button>
+        <div x-show="open" @click.outside="open = false"
+             class="absolute right-0 top-full mt-1 z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg p-1 w-40"
+             style="display:none">
+          <form method="post" action="/knowledge/{{ topic }}/group">
+            <select name="group" onchange="this.form.submit()"
+                    class="w-full text-xs bg-transparent text-gray-700 dark:text-gray-200 px-2 py-1 focus:outline-none">
+              <option value="Other" {% if category == 'Other' %}selected{% endif %}>Other (ungrouped)</option>
+              {% for g in all_groups if g != 'Other' %}
+              <option value="{{ g }}" {% if g == category %}selected{% endif %}>{{ g }}</option>
+              {% endfor %}
+            </select>
+          </form>
+        </div>
+      </div>
+
+      {# Delete topic #}
+      <form method="post" action="/knowledge/{{ topic }}/delete"
+            onsubmit="return confirm('Remove {{ topic }} from your knowledge map?')"
+            class="shrink-0">
+        <button type="submit"
+                class="text-xs text-gray-200 dark:text-gray-700 hover:text-red-500 dark:hover:text-red-400 transition w-4 text-center opacity-0 group-hover/row:opacity-100" title="Remove topic">×</button>
+      </form>
     </div>
     {% endfor %}
   </div>
 </section>
 {% endfor %}
+
+{# Global add topic form (for Other / no specific group) #}
+<div class="mt-4 pt-4 border-t border-gray-200 dark:border-gray-800">
+  <div x-data="{ open: false }">
+    <button type="button" @click="open = !open"
+            class="text-sm text-gray-400 dark:text-gray-500 hover:text-indigo-500 dark:hover:text-indigo-400 transition">
+      + Add topic to knowledge map
+    </button>
+    <div x-show="open" class="mt-3 max-w-sm" style="display:none">
+      <form method="post" action="/knowledge" class="flex flex-wrap items-end gap-2">
+        <div class="flex-1 min-w-32">
+          <label class="block text-xs text-gray-400 dark:text-gray-500 mb-1">Topic ID</label>
+          <input type="text" name="topic" placeholder="e.g. rust_lifetimes" required
+                 class="w-full text-sm bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+        </div>
+        <div class="w-20">
+          <label class="block text-xs text-gray-400 dark:text-gray-500 mb-1">Confidence</label>
+          <input type="number" name="confidence" value="5" min="0" max="10"
+                 class="w-full text-sm bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+        </div>
+        <div class="w-40">
+          <label class="block text-xs text-gray-400 dark:text-gray-500 mb-1">Group</label>
+          <select name="group"
+                  class="w-full text-sm bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            <option value="">Other (ungrouped)</option>
+            {% for g in all_groups if g != 'Other' %}
+            <option value="{{ g }}">{{ g }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <button type="submit"
+                class="px-4 py-1.5 rounded-lg text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-500 transition">Add</button>
+      </form>
+    </div>
+  </div>
+</div>
 {% endblock %}

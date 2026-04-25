@@ -227,6 +227,41 @@ def submit_feedback(lesson_id: str, feedback: str) -> Profile:
 
 
 @mcp.tool
+def add_topic(topic: str, confidence: int = 5, group: Optional[str] = None) -> Profile:
+    """Add a new topic to the knowledge map, or update confidence if it already exists.
+
+    topic: topic identifier, e.g. 'rust_lifetimes'
+    confidence: initial confidence score 0-10 (default 5)
+    group: optional group name; topic appears under 'Other' if omitted
+    Returns the updated Profile.
+    """
+    try:
+        with db.connection() as conn:
+            db.upsert_knowledge(conn, topic, confidence)
+            if group and group != "Other":
+                db.assign_topic_to_group(conn, topic, group)
+            knowledge = db.get_all_knowledge(conn)
+        return Profile(knowledge=knowledge)
+    except Exception as exc:
+        return Profile(knowledge={})
+
+
+@mcp.tool
+def remove_topic(topic: str) -> Profile:
+    """Remove a topic from the knowledge map entirely.
+
+    Returns the updated Profile.
+    """
+    try:
+        with db.connection() as conn:
+            db.delete_knowledge(conn, topic)
+            knowledge = db.get_all_knowledge(conn)
+        return Profile(knowledge=knowledge)
+    except Exception as exc:
+        return Profile(knowledge={})
+
+
+@mcp.tool
 def get_taught_topics() -> list[str]:
     """Return all topic_ids that have already been taught.
 
