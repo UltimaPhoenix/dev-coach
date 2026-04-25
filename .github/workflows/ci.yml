@@ -3,7 +3,9 @@ name: CI
 run-name: >-
   ${{ github.event_name == 'workflow_dispatch'
     && format('CI — New release ({0})', inputs.version != '' && inputs.version || inputs.bump)
-    || 'CI' }}
+    || (startsWith(github.ref, 'refs/tags/v')
+    && format('CI — New release ({0})', github.ref_name)
+    || 'CI') }}
 
 # Covers three scenarios:
 #
