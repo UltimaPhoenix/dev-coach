@@ -5,7 +5,9 @@ run-name: >-
     && format('CI — New release ({0})', inputs.version != '' && inputs.version || inputs.bump)
     || (startsWith(github.ref, 'refs/tags/v')
     && format('CI — New release ({0})', github.ref_name)
-    || format('CI — {0}', github.event.head_commit.message || github.event.pull_request.title)) }}
+    || (github.event_name == 'pull_request'
+    && format('PR — {0}', github.event.pull_request.title)
+    || format('CI — {0}', github.event.head_commit.message))) }}
 
 # Covers three scenarios:
 #
