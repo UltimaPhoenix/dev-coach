@@ -144,7 +144,7 @@
     <div class="flex items-center gap-2 py-1.5 border-b border-gray-100 dark:border-gray-800/50 group/row">
 
       {# Move to group — edit mode only, revealed on hover, before topic name #}
-      <div x-show="editMode" style="display:none" x-data="{ open: false }" class="relative shrink-0">
+      <div x-show="editMode" style="display:none" x-data="{ open: false }" class="relative shrink-0 flex items-center">
         <button type="button" @click="open = !open"
                 class="text-xs text-gray-200 dark:text-gray-700 hover:text-indigo-500 dark:hover:text-indigo-400 transition w-4 text-center opacity-0 group-hover/row:opacity-100" title="Move to group">⇄</button>
         <div x-show="open" @click.outside="open = false"
@@ -180,7 +180,7 @@
         <form x-show="editMode" style="display:none"
               method="post" action="/knowledge/{{ topic }}/delete"
               onsubmit="return confirm('Remove {{ topic }} from your knowledge map?')"
-              class="shrink-0">
+              class="shrink-0 flex items-center">
           <button type="submit"
                   class="text-xs text-gray-200 dark:text-gray-700 hover:text-red-500 dark:hover:text-red-400 transition w-4 text-center opacity-0 group-hover/row:opacity-100" title="Remove topic">×</button>
         </form>
