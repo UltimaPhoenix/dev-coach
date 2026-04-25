@@ -1,5 +1,10 @@
 name: CI
 
+run-name: >-
+  ${{ github.event_name == 'workflow_dispatch'
+    && format('CI — New release ({0})', inputs.version != '' && inputs.version || inputs.bump)
+    || 'CI' }}
+
 # Covers three scenarios:
 #
 #  1. Push to main / pull request  →  lint + test + build
