@@ -250,10 +250,8 @@ npx @modelcontextprotocol/inspector devcoach
 
 ## Development conventions
 
-- Follow **Uncle Bob's Clean Code** principles: meaningful names, small focused functions (one level of abstraction per function), no side effects in query functions, avoid comments by making code self-documenting, keep classes and modules small and cohesive
-- Follow **PEP 8** (style), **PEP 257** (docstrings), **PEP 484** (type hints), **PEP 526** (variable annotations)
-- All code is **type-annotated** — use `X | None` over `Optional[X]`, `list[X]` over `List[X]`, `dict[K, V]` over `Dict[K, V]` (PEP 585 / PEP 604)
-- Imports sorted per **PEP 8 §Imports**: stdlib → third-party → local, one section per group, no wildcard imports
+- Follow **Uncle Bob's Clean Code** principles
+- Follow **PEP** standards
 - Linting and formatting enforced by **ruff** — run `uv run ruff check src/ tests/` and `uv run ruff format src/ tests/` before committing
 - No external dependencies beyond `fastmcp` and `pydantic`
 - `db.py` exposes only pure functions — no business logic
