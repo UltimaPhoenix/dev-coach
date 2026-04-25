@@ -95,7 +95,19 @@ jobs:
     needs: [bump]
     if: always() && (needs.bump.result == 'success' || needs.bump.result == 'skipped')
     runs-on: ubuntu-latest
+    permissions:
+      actions: write
     steps:
+      - name: Set run name from commit title
+        if: github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MSG: ${{ github.event.head_commit.message }}
+        run: |
+          TITLE=$(printf '%s' "$MSG" | head -1)
+          gh api "repos/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            -X PATCH -f "name=CI — $TITLE"
+
       - uses: actions/checkout@v6
         with:
           ref: ${{ needs.bump.outputs.tag || github.ref }}
