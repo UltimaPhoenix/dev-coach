@@ -427,7 +427,7 @@ def restore_backup_zip(conn: sqlite3.Connection, data: bytes) -> dict[str, int]:
     Returns a dict with counts: {"settings": 1, "topics": N, "lessons": N, "skipped": N, "invalid": N}.
     Settings are overwritten; knowledge entries are upserted; duplicate lessons are skipped.
     """
-    result: dict[str, int] = {"settings": 0, "topics": 0, "lessons": 0, "skipped": 0, "invalid": 0}
+    result: dict[str, int] = {"settings": 0, "topics": 0, "groups": 0, "lessons": 0, "skipped": 0, "invalid": 0}
 
     with zipfile.ZipFile(io.BytesIO(data)) as zf:
         names = zf.namelist()
@@ -444,15 +444,25 @@ def restore_backup_zip(conn: sqlite3.Connection, data: bytes) -> dict[str, int]:
             knowledge = json.loads(zf.read("knowledge.json"))
             if isinstance(knowledge, dict) and "topics" in knowledge:
                 # Current format: {"groups": [...], "topics": [{topic, confidence, group}, ...]}
+                groups_added = 0
                 for g in knowledge.get("groups", []):
-                    add_group(conn, g)
+                    cur = conn.execute(
+                        "INSERT OR IGNORE INTO knowledge_group_names (group_name) VALUES (?)",
+                        (g.strip(),),
+                    )
+                    groups_added += cur.rowcount
                 for item in knowledge.get("topics", []):
                     upsert_knowledge(conn, item["topic"], item["confidence"])
                     group = item.get("group")
                     if group and group != "Other":
-                        add_group(conn, group)
+                        cur = conn.execute(
+                            "INSERT OR IGNORE INTO knowledge_group_names (group_name) VALUES (?)",
+                            (group.strip(),),
+                        )
+                        groups_added += cur.rowcount
                         assign_topic_to_group(conn, item["topic"], group)
                 result["topics"] = len(knowledge.get("topics", []))
+                result["groups"] = groups_added
             else:
                 # Legacy format: {"topic": confidence, ...}
                 for topic, confidence in knowledge.items():

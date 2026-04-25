@@ -247,7 +247,13 @@ async def lesson_detail_page(request: Request, lesson_id: str) -> HTMLResponse:
 
 
 @app.get("/settings", response_class=HTMLResponse)
-async def settings_page(request: Request) -> HTMLResponse:
+async def settings_page(
+    request: Request,
+    imported: Optional[int] = None,
+    skipped: Optional[int] = None,
+    invalid: Optional[int] = None,
+    groups: Optional[int] = None,
+) -> HTMLResponse:
     with db.connection() as conn:
         settings = db.get_settings(conn)
     return templates.TemplateResponse(
@@ -257,6 +263,10 @@ async def settings_page(request: Request) -> HTMLResponse:
             "settings": settings,
             "gap_hours": settings.min_gap_minutes // 60,
             "gap_minutes": settings.min_gap_minutes % 60,
+            "imported": imported,
+            "skipped": skipped,
+            "invalid": invalid,
+            "groups": groups,
         },
     )
 
@@ -290,4 +300,4 @@ async def import_settings_route(file: UploadFile = File(...)) -> RedirectRespons
     content = await file.read()
     with db.connection() as conn:
         result = db.restore_backup_zip(conn, content)
-    return RedirectResponse(url=f"/settings?imported={result['lessons']}&skipped={result['skipped']}&invalid={result['invalid']}", status_code=303)
+    return RedirectResponse(url=f"/settings?imported={result['lessons']}&skipped={result['skipped']}&invalid={result['invalid']}&groups={result['groups']}", status_code=303)

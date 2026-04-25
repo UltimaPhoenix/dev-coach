@@ -4,17 +4,17 @@
 {% block content %}
 <h1 class="text-2xl font-bold mb-6 text-indigo-600 dark:text-indigo-400">Settings</h1>
 
-{% set _imported = request.query_params.get('imported') %}
-{% set _skipped  = request.query_params.get('skipped') %}
-{% set _invalid  = request.query_params.get('invalid') %}
-{% if _imported is not none and _imported != '' %}
+{% if imported is not none %}
 <div class="mb-4 px-4 py-2 rounded-lg border text-sm
-            {% if _invalid and _invalid != '0' %}
+            {% if invalid %}
               bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-700 text-yellow-800 dark:text-yellow-300
             {% else %}
               bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-700 text-green-700 dark:text-green-300
             {% endif %}">
-  {{ _imported }} lesson{{ 's' if _imported != '1' }} imported.{% if _skipped and _skipped != '0' %} {{ _skipped }} skipped (already in DB).{% endif %}{% if _invalid and _invalid != '0' %} {{ _invalid }} rejected (failed validation).{% endif %}
+  {{ imported }} lesson{{ 's' if imported != 1 }} imported.
+  {%- if skipped %} {{ skipped }} skipped (already in DB).{% endif %}
+  {%- if invalid %} {{ invalid }} rejected (failed validation).{% endif %}
+  {%- if groups is not none %} {{ groups }} group{{ 's' if groups != 1 }} added.{% endif %}
 </div>
 {% endif %}
 
