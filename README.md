@@ -1,7 +1,7 @@
 # devcoach
 
-[![PyPI](https://img.shields.io/pypi/v/devcoach)](https://pypi.org/project/devcoach/)
-[![Python](https://img.shields.io/pypi/pyversions/devcoach)](https://pypi.org/project/devcoach/)
+[![PyPI](https://img.shields.io/github/v/release/UltimaPhoenix/dev-coach?label=PyPI)](https://pypi.org/project/devcoach/)
+[![Python](https://img.shields.io/badge/python-3.11%2B-blue)](https://pypi.org/project/devcoach/)
 [![CI](https://github.com/UltimaPhoenix/dev-coach/actions/workflows/ci.yml/badge.svg)](https://github.com/UltimaPhoenix/dev-coach/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
 
