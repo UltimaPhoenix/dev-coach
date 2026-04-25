@@ -7,7 +7,7 @@ run-name: >-
     && format('CI — New release ({0})', github.ref_name)
     || (github.event_name == 'pull_request'
     && format('CI - PR {0}', github.event.pull_request.title)
-    || format('CI — {0}', github.event.head_commit.message))) }}
+    || format('CI — {0}', split(github.event.head_commit.message, '\n')[0])) }}
 
 # Covers three scenarios:
 #
