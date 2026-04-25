@@ -250,7 +250,10 @@ npx @modelcontextprotocol/inspector devcoach
 
 ## Development conventions
 
-- All code is **type-annotated** (mypy-compatible)
+- Follow **PEP 8** (style), **PEP 257** (docstrings), **PEP 484** (type hints), **PEP 526** (variable annotations)
+- All code is **type-annotated** — use `X | None` over `Optional[X]`, `list[X]` over `List[X]`, `dict[K, V]` over `Dict[K, V]` (PEP 585 / PEP 604)
+- Imports sorted per **PEP 8 §Imports**: stdlib → third-party → local, one section per group, no wildcard imports
+- Linting and formatting enforced by **ruff** — run `uv run ruff check src/ tests/` and `uv run ruff format src/ tests/` before committing
 - No external dependencies beyond `fastmcp` and `pydantic`
 - `db.py` exposes only pure functions — no business logic
 - `coach.py` never imports from `server.py` (one-way dependency)
