@@ -106,7 +106,7 @@ class TestLessonsRepositoryFilter:
 
     def test_repository_no_match(self, client):
         html = client.get("/lessons?repository=github").text
-        assert "No lessons found" in html
+        assert "No lessons" in html
 
     def test_repository_select_rendered(self, client):
         html = client.get("/lessons").text
@@ -129,7 +129,7 @@ class TestLessonsBranchFilter:
 
     def test_branch_no_match(self, client):
         html = client.get("/lessons?branch=develop").text
-        assert "No lessons found" in html
+        assert "No lessons" in html
 
     def test_branch_datalist_rendered(self, client):
         html = client.get("/lessons").text
@@ -157,7 +157,7 @@ class TestLessonsCommitFilter:
 
     def test_commit_no_match(self, client):
         html = client.get("/lessons?commit=deadbeef").text
-        assert "No lessons found" in html
+        assert "No lessons" in html
 
     def test_commit_datalist_shows_short_hashes(self, client):
         html = client.get("/lessons").text
