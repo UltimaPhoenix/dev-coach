@@ -387,6 +387,168 @@ def cmd_install(args: argparse.Namespace) -> None:
         console.print("\n[dim]Restart Claude Code / Claude Desktop to pick up the new server.[/dim]")
 
 
+def cmd_setup(_args: argparse.Namespace) -> None:
+    """Interactive wizard: import backup OR auto/manual stack setup + group assignment."""
+    import os
+    from devcoach.core.detect import detect_stack
+    from devcoach.core.git import detect_git_context
+
+    def _prompt(msg: str, default: str = "") -> str:
+        suffix = f" [{default}]" if default else ""
+        try:
+            val = input(f"{msg}{suffix}: ").strip()
+        except (EOFError, KeyboardInterrupt):
+            console.print("\n[dim]Setup cancelled.[/dim]")
+            sys.exit(0)
+        return val if val else default
+
+    def _prompt_int(msg: str, default: int, lo: int, hi: int) -> int:
+        while True:
+            raw = _prompt(msg, str(default))
+            try:
+                v = int(raw)
+                if lo <= v <= hi:
+                    return v
+                console.print(f"[red]Must be {lo}–{hi}.[/red]")
+            except ValueError:
+                console.print("[red]Please enter a number.[/red]")
+
+    console.rule("[bold cyan]devcoach setup[/bold cyan]")
+
+    # ── Step 1: import? ───────────────────────────────────────────────────
+    console.print("\n[bold]Step 1[/bold] — Restore from backup")
+    backup_path = _prompt("Path to existing backup zip (Enter to skip)", "")
+    if backup_path:
+        p = Path(backup_path)
+        if not p.exists():
+            console.print(f"[red]File not found: {p}[/red]")
+            sys.exit(1)
+        with db.connection() as conn:
+            result = db.restore_backup_zip(conn, p.read_bytes())
+            db.set_setting(conn, "onboarding_completed", "1")
+        console.print(f"[green]✓[/green] Restored: {result['topics']} topics, {result['lessons']} lessons")
+        console.print("[green]Setup complete![/green]")
+        return
+
+    # ── Step 2: auto or manual ────────────────────────────────────────────
+    console.print("\n[bold]Step 2[/bold] — Build your knowledge profile")
+    mode = _prompt("Mode: [a]utomatic (detect from files) / [m]anual (type your stack)", "a").lower()
+
+    topics: dict[str, int] = {}
+
+    if mode.startswith("a"):
+        git_ctx = detect_git_context()
+        cwd = git_ctx.get("folder") or os.getcwd()
+        detected = detect_stack(cwd)
+
+        if detected:
+            console.print(f"\n[dim]Detected from [cyan]{cwd}[/cyan]:[/dim]")
+            table = Table(box=box.SIMPLE, show_header=True, padding=(0, 1))
+            table.add_column("Topic", style="cyan", no_wrap=True)
+            table.add_column("Confidence", justify="right")
+            console.print(table)
+
+            for topic, default_conf in sorted(detected.items()):
+                raw = _prompt(
+                    f"  [cyan]{topic}[/cyan] (Enter=keep, 0-10=override, s=skip)",
+                    str(default_conf),
+                )
+                if raw.lower() == "s":
+                    continue
+                try:
+                    topics[topic] = max(0, min(10, int(raw)))
+                except ValueError:
+                    topics[topic] = default_conf
+        else:
+            console.print("[dim]No technology files detected in current directory.[/dim]")
+
+        console.print("\n[dim]Add any additional topics:[/dim]")
+        extra = _prompt("Comma-separated topic names (or Enter to skip)", "")
+        if extra:
+            for t in [x.strip() for x in extra.split(",") if x.strip()]:
+                conf = _prompt_int(f"  Confidence for [cyan]{t}[/cyan]", 5, 0, 10)
+                topics[t] = conf
+
+    else:
+        # Manual
+        console.print(
+            "\n[dim]Enter topics one by one. Format: topic_id confidence "
+            "(e.g. [cyan]python 7[/cyan]). Blank line when done.[/dim]"
+        )
+        while True:
+            entry = _prompt("Topic (Enter when done)", "").strip()
+            if not entry:
+                break
+            parts = entry.split()
+            t = parts[0]
+            try:
+                c = max(0, min(10, int(parts[1]))) if len(parts) > 1 else 5
+            except ValueError:
+                c = 5
+            topics[t] = c
+            console.print(f"  [green]+[/green] [cyan]{t}[/cyan] → {c}")
+
+    if not topics:
+        console.print("[yellow]No topics selected — profile will be empty.[/yellow]")
+
+    # ── Step 3: group assignment ──────────────────────────────────────────
+    groups: dict[str, list[str]] = {}
+    if topics:
+        console.print("\n[bold]Step 3[/bold] — Organise into groups")
+        do_groups = _prompt("Would you like to organise topics into groups? [y/N]", "n").lower()
+        if do_groups.startswith("y"):
+            existing_groups: list[str] = []
+            for t in sorted(topics):
+                suggestion = ", ".join(existing_groups) if existing_groups else "(none yet)"
+                g = _prompt(
+                    f"  Group for [cyan]{t}[/cyan]  existing: [dim]{suggestion}[/dim]  (Enter=Other)",
+                    "",
+                )
+                if g and g != "Other":
+                    groups.setdefault(g, []).append(t)
+                    if g not in existing_groups:
+                        existing_groups.append(g)
+
+    # ── Step 4: settings ─────────────────────────────────────────────────
+    console.print("\n[bold]Step 4[/bold] — Rate-limit settings")
+    max_per_day = _prompt_int("Max lessons per day", 2, 1, 20)
+    min_gap = _prompt_int("Min gap between lessons (minutes)", 240, 0, 1440)
+
+    # ── Finish ────────────────────────────────────────────────────────────
+    with db.connection() as conn:
+        conn.execute("DELETE FROM knowledge")
+        conn.execute("DELETE FROM knowledge_groups")
+        conn.execute("DELETE FROM knowledge_group_names")
+        conn.commit()
+        for topic, confidence in topics.items():
+            db.upsert_knowledge(conn, topic, confidence)
+        for group_name, group_topics in groups.items():
+            for t in group_topics:
+                db.assign_topic_to_group(conn, t, group_name)
+        db.set_setting(conn, "max_per_day", str(max_per_day))
+        db.set_setting(conn, "min_gap_minutes", str(min_gap))
+        db.set_setting(conn, "onboarding_completed", "1")
+        profile = coach.get_profile(conn)
+
+    topic_group = {t: g.name for g in profile.groups for t in g.topics}
+    final_table = Table(title="Knowledge Profile", box=box.ROUNDED, show_lines=False)
+    final_table.add_column("Topic", style="cyan", no_wrap=True)
+    final_table.add_column("Group", style="dim")
+    final_table.add_column("Confidence", justify="right")
+    final_table.add_column("Bar", no_wrap=True)
+    for entry in sorted(profile.knowledge, key=lambda e: -e.confidence):
+        bar = _confidence_bar(entry.confidence)
+        color = "green" if entry.confidence >= 7 else "yellow" if entry.confidence >= 4 else "red"
+        group_name = topic_group.get(entry.topic, "Other")
+        final_table.add_row(
+            entry.topic, group_name,
+            f"[{color}]{entry.confidence}/10[/{color}]",
+            f"[{color}]{bar}[/{color}]",
+        )
+    console.print(final_table)
+    console.print(f"\n[green]Setup complete![/green] {len(topics)} topics saved.")
+
+
 def cmd_ui(args: argparse.Namespace) -> None:
     import uvicorn
     from devcoach.web.app import app
@@ -494,6 +656,11 @@ def _build_parser() -> argparse.ArgumentParser:
     p_ui = sub.add_parser("ui", help="Launch the web dashboard")
     p_ui.add_argument("--port", type=int, default=7860, help="Port (default: 7860)")
 
+    sub.add_parser(
+        "setup",
+        help="Interactive first-run wizard: import backup or build knowledge profile",
+    )
+
     return parser
 
 
@@ -522,6 +689,7 @@ def run_cli() -> None:
         "group-assign": cmd_group_assign,
         "install": cmd_install,
         "ui": cmd_ui,
+        "setup": cmd_setup,
     }
 
     if args.command is None:

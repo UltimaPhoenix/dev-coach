@@ -32,6 +32,7 @@ DEFAULT_PROFILE: dict[str, int] = {
 DEFAULT_SETTINGS: dict[str, str] = {
     "max_per_day": "2",
     "min_gap_minutes": "240",  # replaces min_hours_between
+    "onboarding_completed": "0",
 }
 
 # Ordered category → topic list mapping for the knowledge map UI.
@@ -677,6 +678,32 @@ def set_setting(conn: sqlite3.Connection, key: str, value: str) -> None:
         (key, value),
     )
     conn.commit()
+
+
+def is_onboarding_complete(conn: sqlite3.Connection) -> bool:
+    """Return True if the user has completed the onboarding setup flow."""
+    row = conn.execute(
+        "SELECT value FROM settings WHERE key = 'onboarding_completed'"
+    ).fetchone()
+    return row is not None and row[0] == "1"
+
+
+def get_usage_defaults(conn: sqlite3.Connection) -> dict[str, str | None]:
+    """Return the most-used value for each git metadata column across all lessons.
+
+    Used as a fallback when a field is not supplied to log_lesson and cannot
+    be detected from the current workspace.
+    Returns {column: value_or_None} for project, repository, branch,
+    repository_platform.
+    """
+    result: dict[str, str | None] = {}
+    for col in ("project", "repository", "branch", "repository_platform"):
+        row = conn.execute(
+            f"SELECT {col}, COUNT(*) c FROM lessons "
+            f"WHERE {col} IS NOT NULL GROUP BY {col} ORDER BY c DESC LIMIT 1"
+        ).fetchone()
+        result[col] = row[0] if row else None
+    return result
 
 
 # ── Private helpers ────────────────────────────────────────────────────────

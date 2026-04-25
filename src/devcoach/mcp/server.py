@@ -1,4 +1,4 @@
-"""FastMCP server for devcoach — tools, prompt, and entry point."""
+"""FastMCP server for devcoach — tools, resources, prompt, and entry point."""
 
 from __future__ import annotations
 
@@ -7,11 +7,14 @@ import json
 import shutil
 import subprocess
 import sys
+from pathlib import Path
 from typing import Literal, Optional
 
-from fastmcp import FastMCP
+from fastmcp import Context, FastMCP
 
 from devcoach.core import coach, db
+from devcoach.core.detect import detect_stack
+from devcoach.core.git import detect_git_context
 from devcoach.core.models import Lesson, Level, Profile, RateLimitResult, RepositoryPlatform
 
 # ── FastMCP app ────────────────────────────────────────────────────────────
@@ -28,7 +31,8 @@ mcp = FastMCP(
 # ── MCP Tools ─────────────────────────────────────────────────────────────
 
 @mcp.tool
-def log_lesson(
+async def log_lesson(
+    ctx: Context,
     id: str,
     timestamp: str,
     topic_id: str,
@@ -44,7 +48,39 @@ def log_lesson(
     folder: Optional[str] = None,
     repository_platform: Optional[RepositoryPlatform] = None,
 ) -> str:
-    """Save a delivered lesson to the coaching log. Returns 'ok' on success."""
+    """Save a delivered lesson to the coaching log.
+
+    Git metadata fields (project, repository, branch, commit_hash, folder,
+    repository_platform) are auto-detected from the current workspace when
+    not provided. Detection order: caller value → git auto-detect → usage
+    default from past lessons → None.
+
+    Returns 'ok' on success.
+    """
+    git_ctx = detect_git_context()
+    try:
+        with db.connection() as conn:
+            usage = db.get_usage_defaults(conn)
+    except Exception:
+        usage = {}
+
+    resolved_project = project or git_ctx["project"] or usage.get("project")
+    resolved_repository = repository or git_ctx["repository"] or usage.get("repository")
+    resolved_branch = branch or git_ctx["branch"] or usage.get("branch")
+    resolved_commit = commit_hash or git_ctx["commit_hash"]
+    resolved_folder = folder or git_ctx["folder"]
+    resolved_platform = repository_platform or git_ctx["repository_platform"] or usage.get("repository_platform")
+
+    auto_filled = {
+        k: v for k, v in {
+            "project": resolved_project if not project else None,
+            "branch": resolved_branch if not branch else None,
+            "commit_hash": resolved_commit if not commit_hash else None,
+        }.items() if v is not None
+    }
+    if auto_filled:
+        await ctx.info(f"log_lesson: auto-filled git context {auto_filled}")
+
     lesson = Lesson(
         id=id,
         timestamp=timestamp,
@@ -54,12 +90,12 @@ def log_lesson(
         level=level,
         summary=summary,
         task_context=task_context,
-        project=project,
-        repository=repository,
-        branch=branch,
-        commit_hash=commit_hash,
-        folder=folder,
-        repository_platform=repository_platform,
+        project=resolved_project,
+        repository=resolved_repository,
+        branch=resolved_branch,
+        commit_hash=resolved_commit,
+        folder=resolved_folder,
+        repository_platform=resolved_platform,
     )
     try:
         with db.connection() as conn:
@@ -67,23 +103,6 @@ def log_lesson(
         return "ok"
     except Exception as exc:
         return f"error: {exc}"
-
-
-@mcp.tool
-def get_profile() -> Profile:
-    """Return the user's full knowledge map.
-
-    Returns a Profile with two fields:
-    - knowledge: list of {topic, confidence} entries (confidence 0-10)
-    - groups: list of {name, topics[]} defining named categories
-
-    Use this to understand what the user already knows before choosing a lesson topic.
-    """
-    try:
-        with db.connection() as conn:
-            return coach.get_profile(conn)
-    except Exception:
-        return Profile(knowledge=[], groups=[])
 
 
 @mcp.tool
@@ -98,20 +117,6 @@ def update_knowledge(topic: str, delta: int) -> Profile:
             return coach.apply_knowledge_delta(conn, topic, delta)
     except Exception:
         return Profile(knowledge=[], groups=[])
-
-
-@mcp.tool
-def check_rate_limit() -> RateLimitResult:
-    """Check whether a new coaching lesson can be delivered right now.
-
-    Returns allowed=True if the daily cap and minimum interval allow it,
-    or allowed=False with a human-readable reason.
-    """
-    try:
-        with db.connection() as conn:
-            return coach.check_rate_limit(conn)
-    except Exception as exc:
-        return RateLimitResult(allowed=False, reason=f"Rate limit check unavailable: {exc}")
 
 
 @mcp.tool
@@ -163,29 +168,6 @@ def get_lessons(
             )
     except Exception:
         return []
-
-
-@mcp.tool
-def get_lesson(lesson_id: str) -> Optional[Lesson]:
-    """Return a single lesson by ID, or None if not found."""
-    try:
-        with db.connection() as conn:
-            return db.get_lesson_by_id(conn, lesson_id)
-    except Exception:
-        return None
-
-
-@mcp.tool
-def get_stats() -> dict:
-    """Return aggregate coaching statistics for a quick overview.
-
-    Returns counts, rate-limit state, and the 5 weakest / 5 strongest topics.
-    """
-    try:
-        with db.connection() as conn:
-            return coach.get_stats(conn)
-    except Exception as exc:
-        return {"error": str(exc)}
 
 
 @mcp.tool
@@ -314,19 +296,6 @@ def update_settings(key: str, value: str) -> dict:
 
 
 @mcp.tool
-def get_taught_topics() -> list[str]:
-    """Return all topic_ids that have already been taught.
-
-    Use this before selecting a new lesson topic to avoid repetition.
-    """
-    try:
-        with db.connection() as conn:
-            return coach.list_taught_topics(conn)
-    except Exception:
-        return []
-
-
-@mcp.tool
 def open_ui(port: int = 7860) -> str:
     """Launch the devcoach web dashboard in the background.
 
@@ -342,6 +311,49 @@ def open_ui(port: int = 7860) -> str:
     )
     subprocess.Popen(cmd)
     return f"devcoach UI starting at http://localhost:{port}"
+
+
+@mcp.tool
+async def complete_onboarding(
+    ctx: Context,
+    topics: dict[str, int],
+    groups: Optional[dict[str, list[str]]] = None,
+) -> Profile:
+    """Save the user's initial knowledge profile and mark onboarding complete.
+
+    topics: {topic_id: confidence_0_to_10} — all topics the user confirmed.
+    groups: {group_name: [topic_id, ...]} — optional grouping structure.
+      Topics not listed in any group are placed in 'Other'.
+      Groups are dynamically defined by the onboarding conversation — there
+      is no predefined catalogue. Suggest logical groupings based on what
+      the user selected (e.g. Languages, Backend, DevOps, Version Control)
+      and confirm with the user before calling this tool.
+
+    Wipes any default-seeded profile, saves selections, marks onboarding done.
+    Returns the updated Profile.
+    """
+    try:
+        with db.connection() as conn:
+            conn.execute("DELETE FROM knowledge")
+            conn.execute("DELETE FROM knowledge_groups")
+            conn.execute("DELETE FROM knowledge_group_names")
+            conn.commit()
+            for topic, confidence in topics.items():
+                db.upsert_knowledge(conn, topic, max(0, min(10, confidence)))
+            if groups:
+                for group_name, group_topics in groups.items():
+                    for t in group_topics:
+                        if t in topics:
+                            db.assign_topic_to_group(conn, t, group_name)
+            db.set_setting(conn, "onboarding_completed", "1")
+            profile = coach.get_profile(conn)
+        await ctx.info(
+            f"Onboarding complete — {len(topics)} topics, "
+            f"{len(groups or {})} groups"
+        )
+        return profile
+    except Exception:
+        return Profile(knowledge=[], groups=[])
 
 
 # ── MCP Resources ──────────────────────────────────────────────────────────
@@ -382,6 +394,103 @@ def recent_lessons_resource() -> str:
         return json.dumps({"error": str(exc)})
 
 
+@mcp.resource("devcoach://stats")
+def stats_resource() -> str:
+    """Aggregate coaching statistics: lesson counts, rate-limit state, weakest/strongest topics."""
+    try:
+        with db.connection() as conn:
+            return json.dumps(coach.get_stats(conn), indent=2)
+    except Exception as exc:
+        return json.dumps({"error": str(exc)})
+
+
+@mcp.resource("devcoach://taught-topics")
+def taught_topics_resource() -> str:
+    """All topic_ids that have already been taught.
+
+    Read this before selecting a new lesson topic to avoid repetition.
+    """
+    try:
+        with db.connection() as conn:
+            return json.dumps(coach.list_taught_topics(conn))
+    except Exception as exc:
+        return json.dumps({"error": str(exc)})
+
+
+@mcp.resource("devcoach://rate-limit")
+def rate_limit_resource() -> str:
+    """Current rate-limit status.
+
+    Returns {allowed, reason} — check this before delivering a lesson.
+    """
+    try:
+        with db.connection() as conn:
+            result = coach.check_rate_limit(conn)
+        return result.model_dump_json(indent=2)
+    except Exception as exc:
+        return json.dumps({"allowed": False, "reason": f"Rate limit check unavailable: {exc}"})
+
+
+@mcp.resource("devcoach://context")
+def context_resource() -> str:
+    """Current workspace git context and most-used lesson metadata defaults.
+
+    git: auto-detected from cwd (branch, commit, repository, platform, folder).
+    usage_defaults: most-frequently used values from past lessons — used as
+      fallback when git detection finds nothing.
+    """
+    try:
+        git = detect_git_context()
+        with db.connection() as conn:
+            usage = db.get_usage_defaults(conn)
+        return json.dumps({"git": git, "usage_defaults": usage}, indent=2)
+    except Exception as exc:
+        return json.dumps({"error": str(exc)})
+
+
+@mcp.resource("devcoach://onboarding")
+def onboarding_resource() -> str:
+    """Onboarding status and auto-detected stack for first-run setup.
+
+    needs_onboarding: true if the user has not yet completed the setup flow.
+    detected_stack: {topic_id: confidence} inferred from project files in cwd.
+      These are suggestions only — the user confirms or adjusts them during
+      the onboarding conversation before complete_onboarding is called.
+    context_ready: true if a git branch was successfully detected in cwd.
+    """
+    try:
+        with db.connection() as conn:
+            done = db.is_onboarding_complete(conn)
+        git = detect_git_context()
+        detected = detect_stack(git["folder"] or str(Path.cwd()))
+        return json.dumps(
+            {
+                "needs_onboarding": not done,
+                "detected_stack": detected,
+                "context_ready": git["branch"] is not None,
+            },
+            indent=2,
+        )
+    except Exception as exc:
+        return json.dumps({"error": str(exc)})
+
+
+@mcp.resource("devcoach://lessons/{lesson_id}")
+def lesson_resource(lesson_id: str) -> str:
+    """A single lesson by ID.
+
+    Returns the full lesson JSON, or {"error": "..."} if not found.
+    """
+    try:
+        with db.connection() as conn:
+            lesson = db.get_lesson_by_id(conn, lesson_id)
+        if lesson is None:
+            return json.dumps({"error": f"Lesson '{lesson_id}' not found"})
+        return lesson.model_dump_json(indent=2)
+    except Exception as exc:
+        return json.dumps({"error": str(exc)})
+
+
 # ── MCP Prompt ────────────────────────────────────────────────────────────
 
 @mcp.prompt
@@ -406,7 +515,7 @@ def main() -> None:
         "settings", "set", "stats", "backup", "restore", "ui",
         "knowledge-add", "knowledge-remove",
         "group-add", "group-remove", "group-assign",
-        "install",
+        "install", "setup",
     }
     if len(sys.argv) > 1 and sys.argv[1] in cli_commands:
         from devcoach.cli.commands import run_cli

@@ -19,6 +19,94 @@ by teaching one thing at a time, at the right moment, based on what they actuall
 
 ---
 
+## Session startup
+
+At the start of every devcoach session, read the resource `devcoach://onboarding`.
+
+If `needs_onboarding` is **true**, run the onboarding flow **before anything else**:
+
+### Step 1 — Offer to restore from backup
+Ask once: *"Do you have an existing devcoach backup to restore? If yes, provide the
+file path — otherwise I'll help you build your profile from scratch."*
+
+If a path is provided: call `restore` (CLI) with the file. When complete, call
+`complete_onboarding(topics={}, groups={})` with empty maps to mark setup as done
+(the restored profile is already in the DB). Skip the remaining steps.
+
+### Step 2 — Choose setup mode
+Ask: *"Would you like me to detect your tech stack automatically from this project,
+or set it up manually through a conversation?"*
+
+**Automatic mode:**
+- Read `detected_stack` from `devcoach://onboarding` and present those topics in a
+  clear list with their suggested confidence scores.
+- For each, ask the user to confirm or adjust: *"Looks right? Or enter 1–10."*
+- After the list, ask: *"Anything else I missed? List any tools, languages,
+  frameworks, or practices you work with regularly."* — add each with a confidence.
+
+**Manual mode:**
+- Have a free-form conversation: *"Tell me about the technologies you work with
+  day-to-day. For each one I'll ask how confident you are:
+  1–3 = still learning · 4–6 = comfortable · 7–9 = strong · 10 = expert."*
+- Probe across domains: programming languages, frameworks, databases, infrastructure,
+  version control practices (git, branching strategies, CI/CD pipelines), testing,
+  architecture patterns, etc. Keep probing until the user says they're done.
+
+### Step 3 — Propose groups and save
+Once the full topic list is agreed:
+- **Suggest logical groups** based on what was collected. Examples:
+  Languages, Backend, Frontend, Databases, DevOps, Version Control, Testing.
+  These names emerge from the conversation — there is no fixed list.
+- Show the proposed grouping: *"Here's how I'd organise these — does this look
+  right? Any changes?"*
+- When confirmed, call `complete_onboarding(topics={...}, groups={...})`.
+- Confirm setup is complete and continue normally.
+
+**Rule:** Never ask about groups during topic collection. Propose them only in
+Step 3 after all topics are known.
+
+---
+
+Before delivering a lesson, always read:
+- `devcoach://rate-limit` — check `allowed` before proceeding
+- `devcoach://taught-topics` — never repeat a topic already taught
+- `devcoach://profile` — use confidence scores to pick lesson depth
+
+---
+
+## Lesson levels
+
+Levels are calibrated to **professional practice**, not tutorial difficulty.
+The bar is deliberately higher than most online learning content.
+
+**junior** — A working developer with 1–3 years of production experience.
+They write code daily but haven't yet encountered certain patterns or failure modes.
+Lessons introduce *correct professional practice*: how a feature should be used,
+pitfalls that hurt real systems, and why naive approaches fall short.
+NOT: "what is a for loop" — that is documentation, not coaching.
+
+**mid** — A competent developer who ships features independently.
+They know the basics but need to deepen their model of *how things work* and
+*when to use what*. Lessons cover trade-offs, non-obvious behaviour, performance
+implications, and patterns that separate solid code from mediocre code.
+NOT: "how to use Docker" — at this level Docker lessons cover multi-stage builds,
+layer caching trade-offs, or security hardening.
+
+**senior** — An experienced developer who makes system-level decisions.
+Lessons operate at the level of architecture, reliability, and long-term
+maintainability. Topics include subtle correctness issues, design trade-offs
+with real costs, patterns that only emerge at scale, and when *not* to apply
+a technology. Lessons challenge assumptions rather than teach features.
+NOT: anything that could be found with a 5-minute Google search.
+
+**When in doubt, raise the bar.** A lesson that feels "too advanced" plants
+vocabulary the user will recognise when they encounter it later. Mediocre lessons
+waste the rate limit.
+
+---
+
+---
+
 ## 1. When to activate
 
 Evaluate whether to append a lesson **after every technical response** that involves:
@@ -37,11 +125,11 @@ writing, non-technical conversation.
 
 ## 2. Rate limit
 
-Before delivering a lesson, check the MCP server via `check_rate_limit`:
+Before delivering a lesson, read the resource `devcoach://rate-limit`:
 
 ```
-Lessons today: if >= MAX_PER_DAY → skip (default: 2)
-Last lesson: if < MIN_HOURS_AGO hours ago → skip (default: 4 hours)
+allowed: false → skip entirely
+allowed: true  → proceed
 ```
 
 If the rate limit is reached, **say nothing** — do not comment that you skipped,
@@ -60,8 +148,8 @@ Identify all technical concepts present in the output:
 - Applied or missing best practices
 
 ### 3b. Estimate the user's knowledge level on the topic
-Use the profile from `get_profile` as a baseline, then adjust with signals from
-the conversation:
+Use the profile from `devcoach://profile` as a baseline, then adjust with signals
+from the conversation:
 
 | Signal | Effect |
 |---|---|
@@ -86,7 +174,7 @@ Priority:
 4. **Deep-dive** on something already touched but not yet mastered (confidence 4–6)
 
 **Never teach:**
-- Topics already in the log (compare by `topic_id` via `get_taught_topics`)
+- Topics already in the log (compare by `topic_id` via `devcoach://taught-topics`)
 - Topics with confidence >= 8 (user already knows)
 - Things unrelated to the current task (no random off-context lessons)
 
@@ -128,37 +216,24 @@ log_lesson({
   summary: "1 line — what was taught",
   task_context: "brief description of the task that triggered it",
 
-  // Git context — always try to populate these when working in a repo:
-  project: "project or repo name",
-  repository: "org/repo",           // for remote; absolute path for local
-  branch: "current git branch",
-  commit_hash: "full commit SHA",
-  folder: "/absolute/path/to/cwd",
-  repository_platform: "github",    // see detection logic below
+  // Git context is optional — the server auto-detects it from the workspace.
+  // Only provide these if you have them from context (e.g. a recent commit);
+  // omitting them is fine and will not reduce lesson quality.
+  project: "project or repo name",         // optional
+  repository: "org/repo",                  // optional
+  branch: "current git branch",            // optional
+  commit_hash: "full commit SHA",          // optional
+  folder: "/absolute/path/to/cwd",         // optional
+  repository_platform: "github",           // optional
 })
 
 update_knowledge("topic_id", +1)   // or -1 if user showed a gap
 ```
 
-### Detecting `repository_platform` and `repository`
-
-Run `git remote get-url origin` before calling `log_lesson`:
-
-```
-If remote exists and domain matches:
-  github.com    → platform = "github",    repository = "org/repo"
-  gitlab.com    → platform = "gitlab",    repository = "org/repo"
-  bitbucket.org → platform = "bitbucket", repository = "org/repo"
-  other host    → platform = "local",     repository = absolute cwd path
-
-If no remote (pure local repo):
-  platform = "local", repository = absolute cwd path
-
-SSH URL normalisation:
-  git@github.com:org/repo.git  →  repository = "org/repo"
-HTTPS normalisation:
-  https://github.com/org/repo.git  →  repository = "org/repo"  (strip .git)
-```
+Git metadata fields are **auto-detected server-side** from the current working
+directory using `git rev-parse`, `git remote get-url`, etc. Detection order:
+caller value → git auto-detect → most-used value from past lessons → None.
+Do not run git commands manually to populate these fields.
 
 ---
 
@@ -188,7 +263,7 @@ The skill updates them dynamically over time via `update_knowledge`.
 When the user asks about their learning journey, use the MCP tools to answer:
 
 - **"What did I learn today/this week/this month?"** → `get_lessons(period=...)`
-- **"How good am I at X?"** → `get_profile()` → show confidence + inferred trend
+- **"How good am I at X?"** → `devcoach://profile` → show confidence + inferred trend
 - **"Show me my profile"** → summarise the knowledge map with strong/weak areas
 - **"Coaching log"** → `get_lessons(period="all")`
 
