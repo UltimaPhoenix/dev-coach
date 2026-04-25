@@ -1,0 +1,40 @@
+version: 2
+
+updates:
+  # Python dependencies (uv / pyproject.toml)
+  - package-ecosystem: uv
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: "Europe/Rome"
+    groups:
+      # Group all non-breaking updates together to minimise PR noise.
+      # Breaking updates (major bumps) are kept separate per package.
+      non-breaking:
+        update-types:
+          - minor
+          - patch
+    open-pull-requests-limit: 10
+    commit-message:
+      prefix: "deps"
+    labels:
+      - dependencies
+
+  # GitHub Actions
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: "Europe/Rome"
+    groups:
+      github-actions:
+        patterns: ["*"]
+    commit-message:
+      prefix: "ci"
+    labels:
+      - dependencies
+      - ci
