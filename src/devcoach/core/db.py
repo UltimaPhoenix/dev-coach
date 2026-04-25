@@ -397,13 +397,27 @@ def create_backup_zip(conn: sqlite3.Connection) -> bytes:
     """Return a zip archive (bytes) containing settings.json, lessons.json, knowledge.json."""
     settings = get_settings(conn)
     lessons = export_lessons(conn)
-    knowledge = get_all_knowledge(conn)
+
+    entries = get_knowledge_entries(conn)
+    groups = get_knowledge_group_list(conn)
+    topic_group: dict[str, str] = {t: g.name for g in groups for t in g.topics}
+    knowledge_data = {
+        "groups": [g.name for g in groups],
+        "topics": [
+            {
+                "topic": e.topic,
+                "confidence": e.confidence,
+                "group": topic_group.get(e.topic),
+            }
+            for e in entries
+        ],
+    }
 
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
         zf.writestr("settings.json", json.dumps(settings.model_dump(), indent=2))
         zf.writestr("lessons.json", json.dumps(lessons, indent=2, ensure_ascii=False))
-        zf.writestr("knowledge.json", json.dumps(knowledge, indent=2))
+        zf.writestr("knowledge.json", json.dumps(knowledge_data, indent=2))
     return buf.getvalue()
 
 
@@ -428,9 +442,22 @@ def restore_backup_zip(conn: sqlite3.Connection, data: bytes) -> dict[str, int]:
 
         if "knowledge.json" in names:
             knowledge = json.loads(zf.read("knowledge.json"))
-            for topic, confidence in knowledge.items():
-                upsert_knowledge(conn, topic, confidence)
-            result["topics"] = len(knowledge)
+            if isinstance(knowledge, dict) and "topics" in knowledge:
+                # Current format: {"groups": [...], "topics": [{topic, confidence, group}, ...]}
+                for g in knowledge.get("groups", []):
+                    add_group(conn, g)
+                for item in knowledge.get("topics", []):
+                    upsert_knowledge(conn, item["topic"], item["confidence"])
+                    group = item.get("group")
+                    if group and group != "Other":
+                        add_group(conn, group)
+                        assign_topic_to_group(conn, item["topic"], group)
+                result["topics"] = len(knowledge.get("topics", []))
+            else:
+                # Legacy format: {"topic": confidence, ...}
+                for topic, confidence in knowledge.items():
+                    upsert_knowledge(conn, topic, confidence)
+                result["topics"] = len(knowledge)
 
         if "lessons.json" in names:
             lessons_data = json.loads(zf.read("lessons.json"))
