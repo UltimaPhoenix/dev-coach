@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from pathlib import Path
 
@@ -346,6 +347,46 @@ def cmd_restore(args: argparse.Namespace) -> None:
     console.print(f"[green]✓[/green] Lessons: {', '.join(parts)}")
 
 
+_CLAUDE_CODE_CONFIG = Path.home() / ".claude.json"
+_CLAUDE_DESKTOP_CONFIG = (
+    Path.home() / "Library" / "Application Support" / "Claude" / "claude_desktop_config.json"
+)
+_CLAUDE_CODE_ENTRY: dict = {
+    "type": "stdio",
+    "command": "uvx",
+    "args": ["devcoach"],
+    "env": {},
+}
+_CLAUDE_DESKTOP_ENTRY: dict = {
+    "command": "uvx",
+    "args": ["devcoach"],
+}
+
+
+def _install_to(path: Path, entry: dict, force: bool) -> str:
+    data: dict = json.loads(path.read_text()) if path.exists() else {}
+    servers: dict = data.setdefault("mcpServers", {})
+    if "devcoach" in servers and not force:
+        return f"[yellow]Already registered[/yellow] in {path} (use --force to overwrite)"
+    servers["devcoach"] = entry
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data, indent=2) + "\n")
+    return f"[green]✓[/green] Installed into {path}"
+
+
+def cmd_install(args: argparse.Namespace) -> None:
+    do_code = args.claude_code or not args.claude_desktop
+    do_desktop = args.claude_desktop or not args.claude_code
+
+    if do_code:
+        console.print(_install_to(_CLAUDE_CODE_CONFIG, _CLAUDE_CODE_ENTRY, args.force))
+    if do_desktop:
+        console.print(_install_to(_CLAUDE_DESKTOP_CONFIG, _CLAUDE_DESKTOP_ENTRY, args.force))
+
+    if do_code or do_desktop:
+        console.print("\n[dim]Restart Claude Code / Claude Desktop to pick up the new server.[/dim]")
+
+
 def cmd_ui(args: argparse.Namespace) -> None:
     import uvicorn
     from devcoach.web.app import app
@@ -439,6 +480,17 @@ def _build_parser() -> argparse.ArgumentParser:
     p_gassign.add_argument("topic", help="Topic ID")
     p_gassign.add_argument("group", help="Group name (use 'Other' to ungroup)")
 
+    p_install = sub.add_parser(
+        "install",
+        help="Register devcoach MCP server in Claude Code and/or Claude Desktop config",
+    )
+    p_install.add_argument("--claude-code", dest="claude_code", action="store_true",
+                           help="Install into Claude Code only (~/.claude.json)")
+    p_install.add_argument("--claude-desktop", dest="claude_desktop", action="store_true",
+                           help="Install into Claude Desktop only")
+    p_install.add_argument("--force", action="store_true",
+                           help="Overwrite existing devcoach entry")
+
     p_ui = sub.add_parser("ui", help="Launch the web dashboard")
     p_ui.add_argument("--port", type=int, default=7860, help="Port (default: 7860)")
 
@@ -468,6 +520,7 @@ def run_cli() -> None:
         "group-add": cmd_group_add,
         "group-remove": cmd_group_remove,
         "group-assign": cmd_group_assign,
+        "install": cmd_install,
         "ui": cmd_ui,
     }
 

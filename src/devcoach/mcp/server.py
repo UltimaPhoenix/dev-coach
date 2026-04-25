@@ -71,12 +71,19 @@ def log_lesson(
 
 @mcp.tool
 def get_profile() -> Profile:
-    """Return the user's current knowledge map (topic → confidence 0-10)."""
+    """Return the user's full knowledge map.
+
+    Returns a Profile with two fields:
+    - knowledge: list of {topic, confidence} entries (confidence 0-10)
+    - groups: list of {name, topics[]} defining named categories
+
+    Use this to understand what the user already knows before choosing a lesson topic.
+    """
     try:
         with db.connection() as conn:
             return coach.get_profile(conn)
     except Exception:
-        return Profile(knowledge={})
+        return Profile(knowledge=[], groups=[])
 
 
 @mcp.tool
@@ -90,7 +97,7 @@ def update_knowledge(topic: str, delta: int) -> Profile:
         with db.connection() as conn:
             return coach.apply_knowledge_delta(conn, topic, delta)
     except Exception:
-        return Profile(knowledge={})
+        return Profile(knowledge=[], groups=[])
 
 
 @mcp.tool
@@ -103,8 +110,8 @@ def check_rate_limit() -> RateLimitResult:
     try:
         with db.connection() as conn:
             return coach.check_rate_limit(conn)
-    except Exception:
-        return RateLimitResult(allowed=True)
+    except Exception as exc:
+        return RateLimitResult(allowed=False, reason=f"Rate limit check unavailable: {exc}")
 
 
 @mcp.tool
@@ -199,8 +206,9 @@ def star_lesson(lesson_id: str) -> str:
 def submit_feedback(lesson_id: str, feedback: str) -> Profile:
     """Record user comprehension feedback for a lesson and update knowledge confidence.
 
-    feedback: "know" (understood) | "dont_know" (needs more practice) | "clear" (remove feedback)
-    Automatically adjusts the topic's confidence score by ±1 and returns the updated Profile.
+    feedback: "know" (understood, confidence +1) | "dont_know" (needs practice, confidence -1)
+              | "clear" (remove feedback only — confidence is NOT adjusted)
+    Returns the updated Profile.
     """
     try:
         feedback_value = None if feedback == "clear" else feedback
@@ -280,15 +288,25 @@ def update_settings(key: str, value: str) -> dict:
     """Update a coaching setting.
 
     key: 'max_per_day' or 'min_gap_minutes'
-    value: new value as a string (e.g. '3' or '120')
-    Returns the updated settings dict.
+    value: new value as a string
+      - max_per_day: integer 1-20 (max lessons delivered in a 24h window)
+      - min_gap_minutes: integer 0-1440 (minimum minutes between lessons; 0 = no cooldown)
+    Returns the updated settings dict, or {"error": "..."} if validation fails.
     """
     try:
         valid_keys = {"max_per_day", "min_gap_minutes"}
         if key not in valid_keys:
             return {"error": f"Unknown key '{key}'. Valid keys: {', '.join(sorted(valid_keys))}"}
+        try:
+            int_val = int(value)
+        except ValueError:
+            return {"error": f"Value must be an integer, got '{value}'"}
+        if key == "max_per_day" and not (1 <= int_val <= 20):
+            return {"error": "max_per_day must be between 1 and 20"}
+        if key == "min_gap_minutes" and not (0 <= int_val <= 1440):
+            return {"error": "min_gap_minutes must be between 0 and 1440"}
         with db.connection() as conn:
-            db.set_setting(conn, key, value)
+            db.set_setting(conn, key, str(int_val))
             s = db.get_settings(conn)
         return {"max_per_day": s.max_per_day, "min_gap_minutes": s.min_gap_minutes}
     except Exception as exc:
@@ -313,7 +331,10 @@ def open_ui(port: int = 7860) -> str:
     """Launch the devcoach web dashboard in the background.
 
     Opens http://localhost:<port> — defaults to 7860.
+    port must be in the range 1024-65535.
     """
+    if not (1024 <= port <= 65535):
+        return f"error: port {port} is out of valid range (1024-65535)"
     cmd = (
         ["uvx", "devcoach", "ui", "--port", str(port)]
         if shutil.which("uvx")
@@ -328,28 +349,37 @@ def open_ui(port: int = 7860) -> str:
 @mcp.resource("devcoach://profile")
 def profile_resource() -> str:
     """Current knowledge map — topics, confidence scores, and groups."""
-    with db.connection() as conn:
-        return coach.get_profile(conn).model_dump_json(indent=2)
+    try:
+        with db.connection() as conn:
+            return coach.get_profile(conn).model_dump_json(indent=2)
+    except Exception as exc:
+        return json.dumps({"error": str(exc)})
 
 
 @mcp.resource("devcoach://settings")
 def settings_resource() -> str:
     """Current coaching settings (rate limits)."""
-    with db.connection() as conn:
-        settings = db.get_settings(conn)
-    return json.dumps(settings.model_dump(), indent=2)
+    try:
+        with db.connection() as conn:
+            settings = db.get_settings(conn)
+        return json.dumps(settings.model_dump(), indent=2)
+    except Exception as exc:
+        return json.dumps({"error": str(exc)})
 
 
 @mcp.resource("devcoach://lessons/recent")
 def recent_lessons_resource() -> str:
     """Last 10 lessons from the current week."""
-    with db.connection() as conn:
-        lessons = db.get_lessons(conn, period="week")
-    return json.dumps(
-        [l.model_dump() for l in lessons[:10]],
-        indent=2,
-        ensure_ascii=False,
-    )
+    try:
+        with db.connection() as conn:
+            lessons = db.get_lessons(conn, period="week")
+        return json.dumps(
+            [l.model_dump() for l in lessons[:10]],
+            indent=2,
+            ensure_ascii=False,
+        )
+    except Exception as exc:
+        return json.dumps({"error": str(exc)})
 
 
 # ── MCP Prompt ────────────────────────────────────────────────────────────
@@ -376,6 +406,7 @@ def main() -> None:
         "settings", "set", "stats", "backup", "restore", "ui",
         "knowledge-add", "knowledge-remove",
         "group-add", "group-remove", "group-assign",
+        "install",
     }
     if len(sys.argv) > 1 and sys.argv[1] in cli_commands:
         from devcoach.cli.commands import run_cli
