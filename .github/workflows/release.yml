@@ -65,5 +65,4 @@ jobs:
           git add pyproject.toml
           git commit -m "chore: bump version to ${{ steps.ver.outputs.version }}"
           git tag "${{ steps.ver.outputs.tag }}"
-          git push origin HEAD:main
-          git push origin "${{ steps.ver.outputs.tag }}"
+          git push --atomic origin main "${{ steps.ver.outputs.tag }}"
