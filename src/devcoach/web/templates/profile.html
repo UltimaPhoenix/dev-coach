@@ -159,25 +159,30 @@
         </div>
       </div>
 
-      {# View mode: topic is a link to lessons filtered by this topic #}
-      <a x-show="!editMode"
-         href="/lessons?search={{ topic }}"
-         class="text-sm text-gray-700 dark:text-gray-200 flex-1 min-w-0 truncate hover:text-indigo-600 dark:hover:text-indigo-400 hover:underline transition"
-         title="{{ topic }}">{{ topic }}</a>
+      {# Topic name + delete button grouped so × stays tight against the text #}
+      <div class="flex items-center gap-1 flex-1 min-w-0">
 
-      {# Edit mode: plain text #}
-      <span x-show="editMode" style="display:none"
-            class="text-sm text-gray-700 dark:text-gray-200 flex-1 min-w-0 truncate"
-            title="{{ topic }}">{{ topic }}</span>
+        {# View mode: topic is a link to lessons filtered by this topic #}
+        <a x-show="!editMode"
+           href="/lessons?search={{ topic }}"
+           class="text-sm text-gray-700 dark:text-gray-200 min-w-0 truncate hover:text-indigo-600 dark:hover:text-indigo-400 hover:underline transition"
+           title="{{ topic }}">{{ topic }}</a>
 
-      {# Delete topic — edit mode only, revealed on hover, right after topic name #}
-      <form x-show="editMode" style="display:none"
-            method="post" action="/knowledge/{{ topic }}/delete"
-            onsubmit="return confirm('Remove {{ topic }} from your knowledge map?')"
-            class="shrink-0">
-        <button type="submit"
-                class="text-xs text-gray-200 dark:text-gray-700 hover:text-red-500 dark:hover:text-red-400 transition w-4 text-center opacity-0 group-hover/row:opacity-100" title="Remove topic">×</button>
-      </form>
+        {# Edit mode: plain text #}
+        <span x-show="editMode" style="display:none"
+              class="text-sm text-gray-700 dark:text-gray-200 min-w-0 truncate"
+              title="{{ topic }}">{{ topic }}</span>
+
+        {# Delete topic — edit mode only, revealed on hover, snug after topic text #}
+        <form x-show="editMode" style="display:none"
+              method="post" action="/knowledge/{{ topic }}/delete"
+              onsubmit="return confirm('Remove {{ topic }} from your knowledge map?')"
+              class="shrink-0">
+          <button type="submit"
+                  class="text-xs text-gray-200 dark:text-gray-700 hover:text-red-500 dark:hover:text-red-400 transition w-4 text-center opacity-0 group-hover/row:opacity-100" title="Remove topic">×</button>
+        </form>
+
+      </div>
 
       <div class="w-20 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden shrink-0">
         <div class="{{ color }} h-full rounded-full transition-all" style="width: {{ pct }}%"></div>
