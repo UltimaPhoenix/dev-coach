@@ -1,0 +1,52 @@
+site_name: devcoach
+site_description: Progressive technical coaching, directly in Claude
+site_url: https://ultimaphoenix.github.io/dev-coach/
+repo_url: https://github.com/UltimaPhoenix/dev-coach
+repo_name: UltimaPhoenix/dev-coach
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  palette:
+    - scheme: slate
+      primary: deep purple
+      accent: purple
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+    - scheme: default
+      primary: deep purple
+      accent: purple
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - search.highlight
+    - content.code.copy
+  icon:
+    repo: fontawesome/brands/github
+
+nav:
+  - Home: index.md
+  - Getting started: getting-started.md
+  - CLI reference: cli.md
+  - MCP server: mcp-server.md
+  - Web UI: web-ui.md
+  - Configuration: configuration.md
+
+plugins:
+  - search
+
+markdown_extensions:
+  - admonition
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - tables
+  - attr_list
+  - md_in_html

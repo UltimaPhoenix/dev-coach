@@ -11,7 +11,7 @@ run-name: >-
 
 # Covers three scenarios:
 #
-#  1. Push to main / pull request  →  lint + test + build
+#  1. Push to main / pull request  →  lint + test + build + sonar + pages
 #  2. Tag push (v*)                →  lint + test + build + publish + GitHub Release
 #  3. workflow_dispatch (Release)  →  bump version → tag → lint + test + build + publish + GitHub Release
 #
@@ -124,7 +124,15 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - run: uv sync --group dev
-      - run: uv run pytest tests/ -v --tb=short
+      - name: Run tests with coverage
+        run: uv run pytest tests/ -v --tb=short --cov=src/devcoach --cov-report=xml
+      - name: Upload coverage report
+        if: matrix.python-version == '3.12'
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage
+          path: coverage.xml
+          retention-days: 1
 
   # ── Build ───────────────────────────────────────────────────────────────
   build:
@@ -145,6 +153,54 @@ jobs:
           name: dist
           path: dist/
           retention-days: 7
+
+  # ── SonarCloud ──────────────────────────────────────────────────────────
+  # Code quality analysis. Requires SONAR_TOKEN secret.
+  # One-time setup: https://sonarcloud.io → import this repository.
+  sonar:
+    name: SonarCloud analysis
+    needs: [bump, test]
+    if: always() && (needs.bump.result == 'success' || needs.bump.result == 'skipped') && needs.test.result == 'success' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.bump.outputs.tag || github.ref }}
+          fetch-depth: 0
+      - uses: actions/download-artifact@v8
+        with:
+          name: coverage
+          path: .
+      - uses: SonarSource/sonarqube-scan-action@v5
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+  # ── GitHub Pages ────────────────────────────────────────────────────────
+  # Builds MkDocs site and deploys to GitHub Pages on every push to main.
+  pages:
+    name: Deploy docs to GitHub Pages
+    needs: [bump, build]
+    if: always() && needs.build.result == 'success' && github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.12"
+      - run: uv sync --group docs
+      - run: uv run mkdocs build
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site/
+      - name: Deploy to GitHub Pages
+        id: deploy
+        uses: actions/deploy-pages@v4
 
   # ── Publish ─────────────────────────────────────────────────────────────
   # Runs when a tag is present: either created by the bump job (workflow_dispatch)

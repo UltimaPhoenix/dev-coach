@@ -3,6 +3,9 @@
 [![PyPI](https://img.shields.io/github/v/release/UltimaPhoenix/dev-coach?label=PyPI)](https://pypi.org/project/devcoach/)
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue)](https://pypi.org/project/devcoach/)
 [![CI](https://github.com/UltimaPhoenix/dev-coach/actions/workflows/ci.yml/badge.svg)](https://github.com/UltimaPhoenix/dev-coach/actions/workflows/ci.yml)
+[![Quality Gate](https://sonarcloud.io/api/project_badges/measure?project=UltimaPhoenix_dev-coach&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=UltimaPhoenix_dev-coach)
+[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=UltimaPhoenix_dev-coach&metric=coverage)](https://sonarcloud.io/summary/new_code?id=UltimaPhoenix_dev-coach)
+[![Docs](https://img.shields.io/badge/docs-GitHub%20Pages-purple)](https://ultimaphoenix.github.io/dev-coach/)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
 
 **Progressive technical coaching, directly in Claude.** After every task you complete with Claude Code or Claude Desktop, devcoach delivers a short, targeted lesson based on what you already know — no generic tutorials, no repeated topics.
@@ -19,6 +22,14 @@
 | You mark it know / don't know | Confidence scores update, shaping future lessons |
 
 Everything runs **locally**. No data leaves your machine. One SQLite file at `~/.devcoach/coaching.db`.
+
+---
+
+## Screenshots
+
+| Knowledge map | Lesson history | Settings |
+|:---:|:---:|:---:|
+| ![Knowledge map](docs/screenshots/knowledge-map.png) | ![Lessons](docs/screenshots/lessons.png) | ![Settings](docs/screenshots/settings.png) |
 
 ---
 
