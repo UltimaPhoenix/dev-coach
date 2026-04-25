@@ -124,14 +124,8 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - run: uv sync --group dev
-      - name: Run tests with coverage
-        run: uv run pytest tests/ -v --tb=short --cov=src/devcoach --cov-report=xml
-      - name: Upload coverage to Codecov
-        if: matrix.python-version == '3.12'
-        uses: codecov/codecov-action@v5
-        with:
-          files: coverage.xml
-          fail_ci_if_error: false
+      - name: Run tests
+        run: uv run pytest tests/ -v --tb=short
 
   # ── Build ───────────────────────────────────────────────────────────────
   build:
@@ -153,16 +147,31 @@ jobs:
           path: dist/
           retention-days: 7
 
-  # ── SonarCloud quality gate ─────────────────────────────────────────────
-  # Blocks PR merge if SonarCloud Automatic Analysis fails the quality gate.
-  # SonarCloud Automatic Analysis must be enabled on sonarcloud.io — no token needed.
-  sonar-quality-gate:
-    name: SonarCloud quality gate
+  # ── SonarCloud scan + quality gate ─────────────────────────────────────
+  # CI-based analysis: feeds coverage.xml to SonarCloud and blocks PR merge
+  # if the quality gate fails. Requires Automatic Analysis to be DISABLED on
+  # sonarcloud.io (Administration → Analysis Method).
+  sonar:
+    name: SonarCloud scan
     needs: [bump, test]
-    if: always() && (needs.bump.result == 'success' || needs.bump.result == 'skipped') && needs.test.result == 'success' && github.event_name == 'pull_request'
+    if: always() && (needs.bump.result == 'success' || needs.bump.result == 'skipped') && needs.test.result == 'success'
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.bump.outputs.tag || github.ref }}
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.12"
+      - run: uv sync --group dev
+      - name: Run tests with coverage
+        run: uv run pytest tests/ -v --tb=short --cov=src/devcoach --cov-report=xml
+      - uses: sonarsource/sonarqube-scan-action@v5
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
       - uses: sonarsource/sonarqube-quality-gate-action@v1
+        if: github.event_name == 'pull_request'
         timeout-minutes: 5
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
