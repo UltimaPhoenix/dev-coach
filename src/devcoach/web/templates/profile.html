@@ -140,6 +140,25 @@
 
     <div class="flex items-center gap-2 py-1.5 border-b border-gray-100 dark:border-gray-800/50 group/row">
 
+      {# Move to group — edit mode only, revealed on hover, before topic name #}
+      <div x-show="editMode" style="display:none" x-data="{ open: false }" class="relative shrink-0">
+        <button type="button" @click="open = !open"
+                class="text-xs text-gray-200 dark:text-gray-700 hover:text-indigo-500 dark:hover:text-indigo-400 transition w-4 text-center opacity-0 group-hover/row:opacity-100" title="Move to group">⇄</button>
+        <div x-show="open" @click.outside="open = false"
+             class="absolute left-0 top-full mt-1 z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg p-1 w-40"
+             style="display:none">
+          <form method="post" action="/knowledge/{{ topic }}/group">
+            <select name="group" onchange="this.form.submit()"
+                    class="w-full text-xs bg-transparent text-gray-700 dark:text-gray-200 px-2 py-1 focus:outline-none">
+              <option value="Other" {% if category == 'Other' %}selected{% endif %}>Other (ungrouped)</option>
+              {% for g in all_groups if g != 'Other' %}
+              <option value="{{ g }}" {% if g == category %}selected{% endif %}>{{ g }}</option>
+              {% endfor %}
+            </select>
+          </form>
+        </div>
+      </div>
+
       {# View mode: topic is a link to lessons filtered by this topic #}
       <a x-show="!editMode"
          href="/lessons?search={{ topic }}"
@@ -150,6 +169,15 @@
       <span x-show="editMode" style="display:none"
             class="text-sm text-gray-700 dark:text-gray-200 flex-1 min-w-0 truncate"
             title="{{ topic }}">{{ topic }}</span>
+
+      {# Delete topic — edit mode only, revealed on hover, right after topic name #}
+      <form x-show="editMode" style="display:none"
+            method="post" action="/knowledge/{{ topic }}/delete"
+            onsubmit="return confirm('Remove {{ topic }} from your knowledge map?')"
+            class="shrink-0">
+        <button type="submit"
+                class="text-xs text-gray-200 dark:text-gray-700 hover:text-red-500 dark:hover:text-red-400 transition w-4 text-center opacity-0 group-hover/row:opacity-100" title="Remove topic">×</button>
+      </form>
 
       <div class="w-20 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden shrink-0">
         <div class="{{ color }} h-full rounded-full transition-all" style="width: {{ pct }}%"></div>
@@ -167,34 +195,6 @@
           <button class="text-xs text-gray-300 dark:text-gray-600 hover:text-green-600 dark:hover:text-green-400 transition w-5 text-center">+</button>
         </form>
       </div>
-
-      {# Move to group — edit mode only, revealed on hover #}
-      <div x-show="editMode" style="display:none" x-data="{ open: false }" class="relative shrink-0">
-        <button type="button" @click="open = !open"
-                class="text-xs text-gray-200 dark:text-gray-700 hover:text-indigo-500 dark:hover:text-indigo-400 transition w-4 text-center opacity-0 group-hover/row:opacity-100" title="Move to group">⇄</button>
-        <div x-show="open" @click.outside="open = false"
-             class="absolute right-0 top-full mt-1 z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg p-1 w-40"
-             style="display:none">
-          <form method="post" action="/knowledge/{{ topic }}/group">
-            <select name="group" onchange="this.form.submit()"
-                    class="w-full text-xs bg-transparent text-gray-700 dark:text-gray-200 px-2 py-1 focus:outline-none">
-              <option value="Other" {% if category == 'Other' %}selected{% endif %}>Other (ungrouped)</option>
-              {% for g in all_groups if g != 'Other' %}
-              <option value="{{ g }}" {% if g == category %}selected{% endif %}>{{ g }}</option>
-              {% endfor %}
-            </select>
-          </form>
-        </div>
-      </div>
-
-      {# Delete topic — edit mode only, revealed on hover #}
-      <form x-show="editMode" style="display:none"
-            method="post" action="/knowledge/{{ topic }}/delete"
-            onsubmit="return confirm('Remove {{ topic }} from your knowledge map?')"
-            class="shrink-0">
-        <button type="submit"
-                class="text-xs text-gray-200 dark:text-gray-700 hover:text-red-500 dark:hover:text-red-400 transition w-4 text-center opacity-0 group-hover/row:opacity-100" title="Remove topic">×</button>
-      </form>
 
     </div>
     {% endfor %}
