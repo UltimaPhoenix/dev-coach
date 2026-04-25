@@ -126,13 +126,12 @@ jobs:
       - run: uv sync --group dev
       - name: Run tests with coverage
         run: uv run pytest tests/ -v --tb=short --cov=src/devcoach --cov-report=xml
-      - name: Upload coverage report
+      - name: Upload coverage to Codecov
         if: matrix.python-version == '3.12'
-        uses: actions/upload-artifact@v7
+        uses: codecov/codecov-action@v5
         with:
-          name: coverage
-          path: coverage.xml
-          retention-days: 1
+          files: coverage.xml
+          fail_ci_if_error: false
 
   # ── Build ───────────────────────────────────────────────────────────────
   build:
@@ -154,24 +153,17 @@ jobs:
           path: dist/
           retention-days: 7
 
-  # ── SonarCloud ──────────────────────────────────────────────────────────
-  # Code quality analysis. Requires SONAR_TOKEN secret.
-  # One-time setup: https://sonarcloud.io → import this repository.
-  sonar:
-    name: SonarCloud analysis
+  # ── SonarCloud quality gate ─────────────────────────────────────────────
+  # Blocks PR merge if SonarCloud Automatic Analysis fails the quality gate.
+  # SonarCloud Automatic Analysis must be enabled on sonarcloud.io — no token needed.
+  sonar-quality-gate:
+    name: SonarCloud quality gate
     needs: [bump, test]
-    if: always() && (needs.bump.result == 'success' || needs.bump.result == 'skipped') && needs.test.result == 'success' && github.event_name != 'pull_request'
+    if: always() && (needs.bump.result == 'success' || needs.bump.result == 'skipped') && needs.test.result == 'success' && github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-        with:
-          ref: ${{ needs.bump.outputs.tag || github.ref }}
-          fetch-depth: 0
-      - uses: actions/download-artifact@v8
-        with:
-          name: coverage
-          path: .
-      - uses: SonarSource/sonarqube-scan-action@v5
+      - uses: sonarsource/sonarqube-quality-gate-action@v1
+        timeout-minutes: 5
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
