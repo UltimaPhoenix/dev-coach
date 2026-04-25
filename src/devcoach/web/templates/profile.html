@@ -83,11 +83,23 @@
 </div>
 
 {% for category, topics in categorised.items() %}
-<section class="mb-6">
+<section class="mb-6 group/section">
   <div class="flex items-center gap-2 mb-2 border-b border-gray-200 dark:border-gray-800 pb-1">
-    <h2 class="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500 flex-1">
-      {{ category }}
-    </h2>
+
+    {# Group name + delete × — grouped so × sits right after the name on hover #}
+    <div class="flex items-center gap-1 flex-1 min-w-0">
+      <h2 class="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500 shrink-0">
+        {{ category }}
+      </h2>
+      {% if category != 'Other' %}
+      <form x-show="editMode" style="display:none"
+            method="post" action="/groups/{{ category | urlencode }}/delete"
+            onsubmit="return confirm('Remove group &quot;{{ category }}&quot;? Topics will move to Other.')">
+        <button type="submit"
+                class="text-xs text-gray-300 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 transition w-4 text-center opacity-0 group-hover/section:opacity-100" title="Delete group">×</button>
+      </form>
+      {% endif %}
+    </div>
 
     {# Add topic to this group — edit mode only #}
     <div x-show="editMode" style="display:none" x-data="{ open: false }" class="relative">
@@ -111,15 +123,6 @@
       </div>
     </div>
 
-    {# Delete group — edit mode only #}
-    {% if category != 'Other' %}
-    <form x-show="editMode" style="display:none"
-          method="post" action="/groups/{{ category | urlencode }}/delete"
-          onsubmit="return confirm('Remove group &quot;{{ category }}&quot;? Topics will move to Other.')">
-      <button type="submit"
-              class="text-xs text-gray-300 dark:text-gray-600 hover:text-red-500 dark:hover:text-red-400 transition px-1" title="Delete group">✕</button>
-    </form>
-    {% endif %}
   </div>
 
   <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-x-8 gap-y-0">
