@@ -7,9 +7,9 @@ import json
 import sys
 from pathlib import Path
 
+from rich import box
 from rich.console import Console
 from rich.table import Table
-from rich import box
 
 from devcoach.core import coach, db
 
@@ -18,12 +18,14 @@ console = Console()
 
 # ── Helpers ────────────────────────────────────────────────────────────────
 
+
 def _confidence_bar(confidence: int) -> str:
     filled = round(confidence * 10 / 10)
     return "█" * filled + "░" * (10 - filled)
 
 
 # ── Subcommand handlers ────────────────────────────────────────────────────
+
 
 def cmd_profile(_args: argparse.Namespace) -> None:
     with db.connection() as conn:
@@ -41,7 +43,12 @@ def cmd_profile(_args: argparse.Namespace) -> None:
         bar = _confidence_bar(entry.confidence)
         color = "green" if entry.confidence >= 7 else "yellow" if entry.confidence >= 4 else "red"
         group = topic_group.get(entry.topic, "Other")
-        table.add_row(entry.topic, group, f"[{color}]{entry.confidence}/10[/{color}]", f"[{color}]{bar}[/{color}]")
+        table.add_row(
+            entry.topic,
+            group,
+            f"[{color}]{entry.confidence}/10[/{color}]",
+            f"[{color}]{bar}[/{color}]",
+        )
 
     console.print(table)
 
@@ -77,7 +84,7 @@ def cmd_lessons(args: argparse.Namespace) -> None:
         console.print("[dim]No lessons found.[/dim]")
         return
 
-    has_meta = any(l.project or l.branch or l.commit_hash for l in lessons)
+    has_meta = any(lesson.project or lesson.branch or lesson.commit_hash for lesson in lessons)
 
     table = Table(title="Lessons", box=box.ROUNDED, show_lines=False)
     table.add_column("", no_wrap=True, width=2)
@@ -92,8 +99,14 @@ def cmd_lessons(args: argparse.Namespace) -> None:
         table.add_column("Commit", style="cyan", no_wrap=True)
 
     for lesson in lessons:
-        level_color = {"junior": "green", "mid": "yellow", "senior": "red"}.get(lesson.level, "white")
-        feedback_icon = " [green]✓[/green]" if lesson.feedback == "know" else (" [red]✗[/red]" if lesson.feedback == "dont_know" else "")
+        level_color = {"junior": "green", "mid": "yellow", "senior": "red"}.get(
+            lesson.level, "white"
+        )
+        feedback_icon = (
+            " [green]✓[/green]"
+            if lesson.feedback == "know"
+            else (" [red]✗[/red]" if lesson.feedback == "dont_know" else "")
+        )
         row = [
             "[yellow]★[/yellow]" if lesson.starred else "[dim]·[/dim]",
             lesson.timestamp_iso[:10],
@@ -127,7 +140,9 @@ def cmd_star(args: argparse.Namespace) -> None:
 def cmd_feedback(args: argparse.Namespace) -> None:
     valid = {"know", "dont_know", "clear"}
     if args.feedback not in valid:
-        console.print(f"[red]Invalid feedback '{args.feedback}'. Use: know | dont_know | clear[/red]")
+        console.print(
+            f"[red]Invalid feedback '{args.feedback}'. Use: know | dont_know | clear[/red]"
+        )
         sys.exit(1)
 
     feedback_value = None if args.feedback == "clear" else args.feedback
@@ -147,9 +162,10 @@ def cmd_feedback(args: argparse.Namespace) -> None:
     else:
         conf_label = "feedback cleared"
 
-    icon = {"know": "[green]✓ I know this[/green]", "dont_know": "[red]✗ I don't know this[/red]"}.get(
-        feedback_value or "", "[dim]cleared[/dim]"
-    )
+    icon = {
+        "know": "[green]✓ I know this[/green]",
+        "dont_know": "[red]✗ I don't know this[/red]",
+    }.get(feedback_value or "", "[dim]cleared[/dim]")
     console.print(f"Lesson [cyan]{args.id}[/cyan] → {icon}  ({conf_label})")
 
 
@@ -171,8 +187,10 @@ def cmd_lesson(args: argparse.Namespace) -> None:
     console.print(f"[dim]Level:[/dim]       [{level_color}]{lesson.level}[/{level_color}]")
     star_label = "[yellow]★ starred[/yellow]" if lesson.starred else "[dim]☆ not starred[/dim]"
     feedback_label = (
-        "[green]✓ I know this[/green]" if lesson.feedback == "know"
-        else "[red]✗ I don't know this[/red]" if lesson.feedback == "dont_know"
+        "[green]✓ I know this[/green]"
+        if lesson.feedback == "know"
+        else "[red]✗ I don't know this[/red]"
+        if lesson.feedback == "dont_know"
         else "[dim]no feedback[/dim]"
     )
     console.print(f"[dim]Star:[/dim]        {star_label}   [dim]Feedback:[/dim] {feedback_label}")
@@ -220,9 +238,15 @@ def cmd_stats(_args: argparse.Namespace) -> None:
     table.add_column("Metric", style="dim")
     table.add_column("Value", justify="right")
     table.add_row("Total lessons", str(stats.get("total_lessons", 0)))
-    table.add_row("Lessons today (24h)", f"{stats.get('lessons_today', 0)} / {settings.max_per_day}")
+    table.add_row(
+        "Lessons today (24h)", f"{stats.get('lessons_today', 0)} / {settings.max_per_day}"
+    )
     table.add_row("Lessons this week", str(stats.get("lessons_this_week", 0)))
-    rl_label = "[green]Available now[/green]" if rate_limit.allowed else f"[yellow]{rate_limit.reason}[/yellow]"
+    rl_label = (
+        "[green]Available now[/green]"
+        if rate_limit.allowed
+        else f"[yellow]{rate_limit.reason}[/yellow]"
+    )
     table.add_row("Next lesson", rl_label)
     console.print(table)
 
@@ -246,7 +270,9 @@ def cmd_stats(_args: argparse.Namespace) -> None:
 def cmd_set(args: argparse.Namespace) -> None:
     valid_keys = {"max_per_day", "min_gap_minutes"}
     if args.key not in valid_keys:
-        console.print(f"[red]Unknown key '{args.key}'. Valid keys: {', '.join(sorted(valid_keys))}[/red]")
+        console.print(
+            f"[red]Unknown key '{args.key}'. Valid keys: {', '.join(sorted(valid_keys))}[/red]"
+        )
         sys.exit(1)
 
     with db.connection() as conn:
@@ -264,7 +290,9 @@ def cmd_knowledge_add(args: argparse.Namespace) -> None:
         if args.group and args.group != "Other":
             db.assign_topic_to_group(conn, topic, args.group)
     group_label = f" → [cyan]{args.group}[/cyan]" if args.group and args.group != "Other" else ""
-    console.print(f"[green]Added[/green] [bold]{topic}[/bold] (confidence [cyan]{args.confidence}[/cyan]){group_label}")
+    console.print(
+        f"[green]Added[/green] [bold]{topic}[/bold] (confidence [cyan]{args.confidence}[/cyan]){group_label}"
+    )
 
 
 def cmd_knowledge_remove(args: argparse.Namespace) -> None:
@@ -283,23 +311,25 @@ def cmd_group_add(args: argparse.Namespace) -> None:
         sys.exit(1)
     with db.connection() as conn:
         db.add_group(conn, group_name)
-    console.print(f"[green]Group '[cyan]{group_name}[/cyan]' ready.[/green] Assign topics with: devcoach group-assign <topic> \"{group_name}\"")
+    console.print(
+        f"[green]Group '[cyan]{group_name}[/cyan]' ready.[/green] Assign topics with: devcoach group-assign <topic> \"{group_name}\""
+    )
 
 
 def cmd_group_remove(args: argparse.Namespace) -> None:
     with db.connection() as conn:
         count = db.delete_group(conn, args.name)
     if count:
-        console.print(f"[green]Removed group '[cyan]{args.name}[/cyan]'[/green] ({count} topic assignment(s) cleared)")
+        console.print(
+            f"[green]Removed group '[cyan]{args.name}[/cyan]'[/green] ({count} topic assignment(s) cleared)"
+        )
     else:
         console.print(f"[yellow]Group '{args.name}' not found or already empty.[/yellow]")
 
 
 def cmd_group_assign(args: argparse.Namespace) -> None:
     with db.connection() as conn:
-        row = conn.execute(
-            "SELECT topic FROM knowledge WHERE topic = ?", (args.topic,)
-        ).fetchone()
+        row = conn.execute("SELECT topic FROM knowledge WHERE topic = ?", (args.topic,)).fetchone()
         if row is None:
             console.print(f"[red]Topic '{args.topic}' not in knowledge map. Add it first.[/red]")
             sys.exit(1)
@@ -308,7 +338,9 @@ def cmd_group_assign(args: argparse.Namespace) -> None:
             console.print(f"[green]Moved[/green] [bold]{args.topic}[/bold] → Other (ungrouped)")
         else:
             db.assign_topic_to_group(conn, args.topic, args.group)
-            console.print(f"[green]Moved[/green] [bold]{args.topic}[/bold] → [cyan]{args.group}[/cyan]")
+            console.print(
+                f"[green]Moved[/green] [bold]{args.topic}[/bold] → [cyan]{args.group}[/cyan]"
+            )
 
 
 def cmd_backup(args: argparse.Namespace) -> None:
@@ -320,9 +352,11 @@ def cmd_backup(args: argparse.Namespace) -> None:
 
     out_path = Path(args.output)
     out_path.write_bytes(data)
-    console.print(f"[green]Backup saved:[/green] {out_path}  "
-                  f"([cyan]{lessons_count}[/cyan] lessons, "
-                  f"[cyan]{knowledge_count}[/cyan] topics)")
+    console.print(
+        f"[green]Backup saved:[/green] {out_path}  "
+        f"([cyan]{lessons_count}[/cyan] lessons, "
+        f"[cyan]{knowledge_count}[/cyan] topics)"
+    )
 
 
 def cmd_restore(args: argparse.Namespace) -> None:
@@ -338,7 +372,9 @@ def cmd_restore(args: argparse.Namespace) -> None:
     if result["settings"]:
         console.print("[green]✓[/green] Settings restored")
     if result["topics"]:
-        console.print(f"[green]✓[/green] Knowledge map restored ([cyan]{result['topics']}[/cyan] topics)")
+        console.print(
+            f"[green]✓[/green] Knowledge map restored ([cyan]{result['topics']}[/cyan] topics)"
+        )
     parts = [f"[cyan]{result['lessons']}[/cyan] imported"]
     if result["skipped"]:
         parts.append(f"[yellow]{result['skipped']}[/yellow] duplicates skipped")
@@ -384,12 +420,15 @@ def cmd_install(args: argparse.Namespace) -> None:
         console.print(_install_to(_CLAUDE_DESKTOP_CONFIG, _CLAUDE_DESKTOP_ENTRY, args.force))
 
     if do_code or do_desktop:
-        console.print("\n[dim]Restart Claude Code / Claude Desktop to pick up the new server.[/dim]")
+        console.print(
+            "\n[dim]Restart Claude Code / Claude Desktop to pick up the new server.[/dim]"
+        )
 
 
 def cmd_setup(_args: argparse.Namespace) -> None:
     """Interactive wizard: import backup OR auto/manual stack setup + group assignment."""
     import os
+
     from devcoach.core.detect import detect_stack
     from devcoach.core.git import detect_git_context
 
@@ -426,13 +465,17 @@ def cmd_setup(_args: argparse.Namespace) -> None:
         with db.connection() as conn:
             result = db.restore_backup_zip(conn, p.read_bytes())
             db.set_setting(conn, "onboarding_completed", "1")
-        console.print(f"[green]✓[/green] Restored: {result['topics']} topics, {result['lessons']} lessons")
+        console.print(
+            f"[green]✓[/green] Restored: {result['topics']} topics, {result['lessons']} lessons"
+        )
         console.print("[green]Setup complete![/green]")
         return
 
     # ── Step 2: auto or manual ────────────────────────────────────────────
     console.print("\n[bold]Step 2[/bold] — Build your knowledge profile")
-    mode = _prompt("Mode: [a]utomatic (detect from files) / [m]anual (type your stack)", "a").lower()
+    mode = _prompt(
+        "Mode: [a]utomatic (detect from files) / [m]anual (type your stack)", "a"
+    ).lower()
 
     topics: dict[str, int] = {}
 
@@ -541,7 +584,8 @@ def cmd_setup(_args: argparse.Namespace) -> None:
         color = "green" if entry.confidence >= 7 else "yellow" if entry.confidence >= 4 else "red"
         group_name = topic_group.get(entry.topic, "Other")
         final_table.add_row(
-            entry.topic, group_name,
+            entry.topic,
+            group_name,
             f"[{color}]{entry.confidence}/10[/{color}]",
             f"[{color}]{bar}[/{color}]",
         )
@@ -551,14 +595,18 @@ def cmd_setup(_args: argparse.Namespace) -> None:
 
 def cmd_ui(args: argparse.Namespace) -> None:
     import uvicorn
+
     from devcoach.web.app import app
 
     port = args.port
-    console.print(f"[bold green]devcoach UI[/bold green] running at [link]http://localhost:{port}[/link]")
+    console.print(
+        f"[bold green]devcoach UI[/bold green] running at [link]http://localhost:{port}[/link]"
+    )
     uvicorn.run(app, host="127.0.0.1", port=port, log_level="warning")
 
 
 # ── Parser ─────────────────────────────────────────────────────────────────
+
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
@@ -581,22 +629,44 @@ def _build_parser() -> argparse.ArgumentParser:
     p_lessons.add_argument("--repository", default=None, help="Filter by repository (fuzzy)")
     p_lessons.add_argument("--branch", default=None, help="Filter by branch name (fuzzy)")
     p_lessons.add_argument("--commit", default=None, help="Filter by commit hash prefix (fuzzy)")
-    p_lessons.add_argument("--starred", action="store_true", default=False, help="Show only starred lessons")
-    p_lessons.add_argument("--feedback", choices=["know", "dont_know", "none"], default=None,
-                           help="Filter by feedback: know, dont_know, none (no response)")
-    p_lessons.add_argument("--level", choices=["junior", "mid", "senior"], default=None,
-                           help="Filter by difficulty level")
-    p_lessons.add_argument("--date-from", dest="date_from", default=None,
-                           metavar="YYYY-MM-DD[THH:MM]",
-                           help="Show lessons on or after this date/time (e.g. 2026-04-25 or 2026-04-25T14:30)")
-    p_lessons.add_argument("--date-to", dest="date_to", default=None,
-                           metavar="YYYY-MM-DD[THH:MM]",
-                           help="Show lessons on or before this date/time; defaults to end-of-day if no time given")
-    p_lessons.add_argument("--sort", default="timestamp",
-                           choices=["timestamp", "level", "topic_id", "title", "feedback"],
-                           help="Sort column (default: timestamp)")
-    p_lessons.add_argument("--order", default="desc", choices=["asc", "desc"],
-                           help="Sort order (default: desc)")
+    p_lessons.add_argument(
+        "--starred", action="store_true", default=False, help="Show only starred lessons"
+    )
+    p_lessons.add_argument(
+        "--feedback",
+        choices=["know", "dont_know", "none"],
+        default=None,
+        help="Filter by feedback: know, dont_know, none (no response)",
+    )
+    p_lessons.add_argument(
+        "--level",
+        choices=["junior", "mid", "senior"],
+        default=None,
+        help="Filter by difficulty level",
+    )
+    p_lessons.add_argument(
+        "--date-from",
+        dest="date_from",
+        default=None,
+        metavar="YYYY-MM-DD[THH:MM]",
+        help="Show lessons on or after this date/time (e.g. 2026-04-25 or 2026-04-25T14:30)",
+    )
+    p_lessons.add_argument(
+        "--date-to",
+        dest="date_to",
+        default=None,
+        metavar="YYYY-MM-DD[THH:MM]",
+        help="Show lessons on or before this date/time; defaults to end-of-day if no time given",
+    )
+    p_lessons.add_argument(
+        "--sort",
+        default="timestamp",
+        choices=["timestamp", "level", "topic_id", "title", "feedback"],
+        help="Sort column (default: timestamp)",
+    )
+    p_lessons.add_argument(
+        "--order", default="desc", choices=["asc", "desc"], help="Sort order (default: desc)"
+    )
 
     p_lesson = sub.add_parser("lesson", help="Show a single lesson in detail")
     p_lesson.add_argument("id", help="Lesson ID")
@@ -606,7 +676,9 @@ def _build_parser() -> argparse.ArgumentParser:
 
     p_feedback = sub.add_parser("feedback", help="Record know/dont_know feedback for a lesson")
     p_feedback.add_argument("id", help="Lesson ID")
-    p_feedback.add_argument("feedback", choices=["know", "dont_know", "clear"], help="Feedback value")
+    p_feedback.add_argument(
+        "feedback", choices=["know", "dont_know", "clear"], help="Feedback value"
+    )
 
     sub.add_parser("settings", help="Show current settings")
     sub.add_parser("stats", help="Show coaching statistics and rate-limit status")
@@ -615,19 +687,31 @@ def _build_parser() -> argparse.ArgumentParser:
     p_set.add_argument("key", help="Setting key (max_per_day | min_gap_minutes)")
     p_set.add_argument("value", help="New value")
 
-    p_backup = sub.add_parser("backup", help="Export a full backup (settings + knowledge + lessons) as zip")
-    p_backup.add_argument("output", nargs="?", default="devcoach-backup.zip",
-                          help="Output zip file path (default: devcoach-backup.zip)")
+    p_backup = sub.add_parser(
+        "backup", help="Export a full backup (settings + knowledge + lessons) as zip"
+    )
+    p_backup.add_argument(
+        "output",
+        nargs="?",
+        default="devcoach-backup.zip",
+        help="Output zip file path (default: devcoach-backup.zip)",
+    )
 
     p_restore = sub.add_parser("restore", help="Restore from a backup zip file")
     p_restore.add_argument("input", help="Path to backup zip file")
 
     p_kadd = sub.add_parser("knowledge-add", help="Add or update a topic in the knowledge map")
     p_kadd.add_argument("topic", help="Topic ID (e.g. rust_lifetimes)")
-    p_kadd.add_argument("--confidence", type=int, default=5, metavar="N",
-                        help="Initial confidence 0-10 (default: 5)")
-    p_kadd.add_argument("--group", default=None, metavar="GROUP",
-                        help="Assign to a named group (optional)")
+    p_kadd.add_argument(
+        "--confidence",
+        type=int,
+        default=5,
+        metavar="N",
+        help="Initial confidence 0-10 (default: 5)",
+    )
+    p_kadd.add_argument(
+        "--group", default=None, metavar="GROUP", help="Assign to a named group (optional)"
+    )
 
     p_kremove = sub.add_parser("knowledge-remove", help="Remove a topic from the knowledge map")
     p_kremove.add_argument("topic", help="Topic ID to remove")
@@ -635,7 +719,9 @@ def _build_parser() -> argparse.ArgumentParser:
     p_gadd = sub.add_parser("group-add", help="Register a new knowledge group")
     p_gadd.add_argument("name", help="Group name (e.g. 'Machine Learning')")
 
-    p_gremove = sub.add_parser("group-remove", help="Delete a knowledge group (topics move to Other)")
+    p_gremove = sub.add_parser(
+        "group-remove", help="Delete a knowledge group (topics move to Other)"
+    )
     p_gremove.add_argument("name", help="Group name to delete")
 
     p_gassign = sub.add_parser("group-assign", help="Move a topic to a group")
@@ -646,12 +732,19 @@ def _build_parser() -> argparse.ArgumentParser:
         "install",
         help="Register devcoach MCP server in Claude Code and/or Claude Desktop config",
     )
-    p_install.add_argument("--claude-code", dest="claude_code", action="store_true",
-                           help="Install into Claude Code only (~/.claude.json)")
-    p_install.add_argument("--claude-desktop", dest="claude_desktop", action="store_true",
-                           help="Install into Claude Desktop only")
-    p_install.add_argument("--force", action="store_true",
-                           help="Overwrite existing devcoach entry")
+    p_install.add_argument(
+        "--claude-code",
+        dest="claude_code",
+        action="store_true",
+        help="Install into Claude Code only (~/.claude.json)",
+    )
+    p_install.add_argument(
+        "--claude-desktop",
+        dest="claude_desktop",
+        action="store_true",
+        help="Install into Claude Desktop only",
+    )
+    p_install.add_argument("--force", action="store_true", help="Overwrite existing devcoach entry")
 
     p_ui = sub.add_parser("ui", help="Launch the web dashboard")
     p_ui.add_argument("--port", type=int, default=7860, help="Port (default: 7860)")
@@ -665,6 +758,7 @@ def _build_parser() -> argparse.ArgumentParser:
 
 
 # ── Public entry point ─────────────────────────────────────────────────────
+
 
 def run_cli() -> None:
     """Parse CLI arguments and dispatch to the appropriate subcommand."""

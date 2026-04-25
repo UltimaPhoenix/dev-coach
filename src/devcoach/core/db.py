@@ -6,10 +6,10 @@ import io
 import json
 import sqlite3
 import zipfile
+from collections.abc import Generator
 from contextlib import contextmanager
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Generator, Optional
 
 from devcoach.core.models import KnowledgeEntry, KnowledgeGroup, Lesson, Settings
 
@@ -18,15 +18,31 @@ from devcoach.core.models import KnowledgeEntry, KnowledgeGroup, Lesson, Setting
 DB_PATH = Path.home() / ".devcoach" / "coaching.db"
 
 DEFAULT_PROFILE: dict[str, int] = {
-    "general_engineering": 8, "software_architecture": 8,
-    "design_patterns": 7, "debugging_mindset": 8,
-    "node_js": 7, "javascript": 7, "typescript": 6,
-    "python": 4, "django": 3, "fastapi": 4,
-    "docker": 8, "docker_compose": 8, "traefik": 7,
-    "coolify": 7, "postgresql": 6, "redis": 6,
-    "git": 7, "ci_cd": 6, "security": 5,
-    "performance_optimization": 6, "testing": 5,
-    "linux_cli": 7, "networking": 6, "react": 5, "html_css": 5,
+    "general_engineering": 8,
+    "software_architecture": 8,
+    "design_patterns": 7,
+    "debugging_mindset": 8,
+    "node_js": 7,
+    "javascript": 7,
+    "typescript": 6,
+    "python": 4,
+    "django": 3,
+    "fastapi": 4,
+    "docker": 8,
+    "docker_compose": 8,
+    "traefik": 7,
+    "coolify": 7,
+    "postgresql": 6,
+    "redis": 6,
+    "git": 7,
+    "ci_cd": 6,
+    "security": 5,
+    "performance_optimization": 6,
+    "testing": 5,
+    "linux_cli": 7,
+    "networking": 6,
+    "react": 5,
+    "html_css": 5,
 }
 
 DEFAULT_SETTINGS: dict[str, str] = {
@@ -39,6 +55,7 @@ DEFAULT_SETTINGS: dict[str, str] = {
 # Topics not listed here land in "Other".
 
 # ── Connection ─────────────────────────────────────────────────────────────
+
 
 def get_connection() -> sqlite3.Connection:
     """Open a connection to the DB, creating the directory if needed."""
@@ -66,6 +83,7 @@ def connection() -> Generator[sqlite3.Connection, None, None]:
 
 
 # ── Schema init ────────────────────────────────────────────────────────────
+
 
 def init_schema(conn: sqlite3.Connection) -> None:
     """Create tables, indexes, and seed defaults if needed. Idempotent."""
@@ -143,7 +161,7 @@ def _seed_defaults(conn: sqlite3.Connection) -> None:
     """Seed knowledge and settings tables on the first run. Idempotent."""
     row = conn.execute("SELECT COUNT(*) FROM knowledge").fetchone()
     if row[0] == 0:
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         conn.executemany(
             "INSERT INTO knowledge (topic, confidence, updated_at) VALUES (?, ?, ?)",
             [(topic, confidence, now) for topic, confidence in DEFAULT_PROFILE.items()],
@@ -159,6 +177,7 @@ def _seed_defaults(conn: sqlite3.Connection) -> None:
 
 
 # ── Lessons ────────────────────────────────────────────────────────────────
+
 
 def insert_lesson(conn: sqlite3.Connection, lesson: Lesson) -> None:
     """Insert or replace a lesson record."""
@@ -191,18 +210,18 @@ def insert_lesson(conn: sqlite3.Connection, lesson: Lesson) -> None:
 
 
 def _lesson_where(
-    period: Optional[str] = None,
-    category: Optional[str] = None,
-    level: Optional[str] = None,
-    project: Optional[str] = None,
-    repository: Optional[str] = None,
-    branch: Optional[str] = None,
-    commit: Optional[str] = None,
-    starred: Optional[bool] = None,
-    search: Optional[str] = None,
-    feedback: Optional[str] = None,
-    date_from: Optional[str] = None,
-    date_to: Optional[str] = None,
+    period: str | None = None,
+    category: str | None = None,
+    level: str | None = None,
+    project: str | None = None,
+    repository: str | None = None,
+    branch: str | None = None,
+    commit: str | None = None,
+    starred: bool | None = None,
+    search: str | None = None,
+    feedback: str | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
 ) -> tuple[str, list[object]]:
     """Build the WHERE clause and params list for lesson queries."""
     conditions: list[str] = []
@@ -272,21 +291,21 @@ _SORT_COLUMNS = frozenset({"timestamp", "level", "topic_id", "title", "feedback"
 
 def get_lessons(
     conn: sqlite3.Connection,
-    period: Optional[str] = None,
-    category: Optional[str] = None,
-    level: Optional[str] = None,
-    project: Optional[str] = None,
-    repository: Optional[str] = None,
-    branch: Optional[str] = None,
-    commit: Optional[str] = None,
-    starred: Optional[bool] = None,
-    search: Optional[str] = None,
-    feedback: Optional[str] = None,
-    date_from: Optional[str] = None,
-    date_to: Optional[str] = None,
+    period: str | None = None,
+    category: str | None = None,
+    level: str | None = None,
+    project: str | None = None,
+    repository: str | None = None,
+    branch: str | None = None,
+    commit: str | None = None,
+    starred: bool | None = None,
+    search: str | None = None,
+    feedback: str | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
     sort: str = "timestamp",
     order: str = "desc",
-    page: Optional[int] = None,
+    page: int | None = None,
     per_page: int = 25,
 ) -> list[Lesson]:
     """Return lessons filtered by period, category, level, git metadata, starred flag, and/or search text.
@@ -303,10 +322,18 @@ def get_lessons(
     page / per_page: if page is given, apply LIMIT/OFFSET pagination
     """
     where, params = _lesson_where(
-        period=period, category=category, level=level, project=project,
-        repository=repository, branch=branch, commit=commit,
-        starred=starred, search=search, feedback=feedback,
-        date_from=date_from, date_to=date_to,
+        period=period,
+        category=category,
+        level=level,
+        project=project,
+        repository=repository,
+        branch=branch,
+        commit=commit,
+        starred=starred,
+        search=search,
+        feedback=feedback,
+        date_from=date_from,
+        date_to=date_to,
     )
     col = sort if sort in _SORT_COLUMNS else "timestamp"
     direction = "ASC" if order.lower() == "asc" else "DESC"
@@ -329,9 +356,7 @@ def toggle_star(conn: sqlite3.Connection, lesson_id: str) -> bool:
     return bool(row["starred"]) if row else False
 
 
-def set_feedback(
-    conn: sqlite3.Connection, lesson_id: str, feedback: Optional[str]
-) -> Optional[str]:
+def set_feedback(conn: sqlite3.Connection, lesson_id: str, feedback: str | None) -> str | None:
     """Set feedback ('know'/'dont_know'/None) on a lesson. Returns topic_id for knowledge update."""
     conn.execute(
         "UPDATE lessons SET feedback = ? WHERE id = ?",
@@ -373,7 +398,9 @@ def import_lessons(conn: sqlite3.Connection, records: list[dict]) -> tuple[int, 
                 lesson.id,
                 lesson.timestamp_iso,
                 lesson.topic_id,
-                json.dumps(lesson.categories) if isinstance(lesson.categories, list) else lesson.categories,
+                json.dumps(lesson.categories)
+                if isinstance(lesson.categories, list)
+                else lesson.categories,
                 lesson.title,
                 lesson.level,
                 lesson.summary,
@@ -430,7 +457,14 @@ def restore_backup_zip(conn: sqlite3.Connection, data: bytes) -> dict[str, int]:
     Returns a dict with counts: {"settings": 1, "topics": N, "lessons": N, "skipped": N, "invalid": N}.
     Settings are overwritten; knowledge entries are upserted; duplicate lessons are skipped.
     """
-    result: dict[str, int] = {"settings": 0, "topics": 0, "groups": 0, "lessons": 0, "skipped": 0, "invalid": 0}
+    result: dict[str, int] = {
+        "settings": 0,
+        "topics": 0,
+        "groups": 0,
+        "lessons": 0,
+        "skipped": 0,
+        "invalid": 0,
+    }
 
     with zipfile.ZipFile(io.BytesIO(data)) as zf:
         names = zf.namelist()
@@ -490,11 +524,9 @@ def get_distinct_column(conn: sqlite3.Connection, column: str) -> list[str]:
     return [row[0] for row in rows]
 
 
-def get_lesson_by_id(conn: sqlite3.Connection, lesson_id: str) -> Optional[Lesson]:
+def get_lesson_by_id(conn: sqlite3.Connection, lesson_id: str) -> Lesson | None:
     """Return a single lesson by id, or None if not found."""
-    row = conn.execute(
-        "SELECT * FROM lessons WHERE id = ?", (lesson_id,)
-    ).fetchone()
+    row = conn.execute("SELECT * FROM lessons WHERE id = ?", (lesson_id,)).fetchone()
     return _row_to_lesson(row) if row else None
 
 
@@ -519,21 +551,18 @@ def get_taught_topic_ids(conn: sqlite3.Connection) -> list[str]:
 
 def count_lessons_since(conn: sqlite3.Connection, since: str) -> int:
     """Count lessons delivered since a given ISO 8601 timestamp."""
-    row = conn.execute(
-        "SELECT COUNT(*) FROM lessons WHERE timestamp >= ?", (since,)
-    ).fetchone()
+    row = conn.execute("SELECT COUNT(*) FROM lessons WHERE timestamp >= ?", (since,)).fetchone()
     return row[0]
 
 
-def get_last_lesson_timestamp(conn: sqlite3.Connection) -> Optional[str]:
+def get_last_lesson_timestamp(conn: sqlite3.Connection) -> str | None:
     """Return the ISO 8601 timestamp of the most recent lesson, or None."""
-    row = conn.execute(
-        "SELECT timestamp FROM lessons ORDER BY timestamp DESC LIMIT 1"
-    ).fetchone()
+    row = conn.execute("SELECT timestamp FROM lessons ORDER BY timestamp DESC LIMIT 1").fetchone()
     return row[0] if row else None
 
 
 # ── Knowledge ──────────────────────────────────────────────────────────────
+
 
 def get_all_knowledge(conn: sqlite3.Connection) -> dict[str, int]:
     """Return the full knowledge map as {topic: confidence}."""
@@ -543,9 +572,7 @@ def get_all_knowledge(conn: sqlite3.Connection) -> dict[str, int]:
 
 def get_knowledge_entries(conn: sqlite3.Connection) -> list[KnowledgeEntry]:
     """Return every knowledge topic as a typed list, ordered by topic name."""
-    rows = conn.execute(
-        "SELECT topic, confidence FROM knowledge ORDER BY topic"
-    ).fetchall()
+    rows = conn.execute("SELECT topic, confidence FROM knowledge ORDER BY topic").fetchall()
     return [KnowledgeEntry(topic=row[0], confidence=row[1]) for row in rows]
 
 
@@ -565,12 +592,10 @@ def get_knowledge_group_list(conn: sqlite3.Connection) -> list[KnowledgeGroup]:
     return [KnowledgeGroup(name=n, topics=assignments.get(n, [])) for n in names]
 
 
-def upsert_knowledge(
-    conn: sqlite3.Connection, topic: str, confidence: int
-) -> None:
+def upsert_knowledge(conn: sqlite3.Connection, topic: str, confidence: int) -> None:
     """Insert or update a knowledge entry, clamping confidence to 0-10."""
     clamped = max(0, min(10, confidence))
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     conn.execute(
         """INSERT INTO knowledge (topic, confidence, updated_at) VALUES (?, ?, ?)
            ON CONFLICT(topic) DO UPDATE SET confidence = excluded.confidence,
@@ -589,6 +614,7 @@ def delete_knowledge(conn: sqlite3.Connection, topic: str) -> bool:
 
 
 # ── Knowledge groups ───────────────────────────────────────────────────────
+
 
 def get_knowledge_groups(conn: sqlite3.Connection) -> dict[str, list[str]]:
     """Return all named groups as {group_name: [topic, ...]} (empty groups included)."""
@@ -611,9 +637,7 @@ def add_group(conn: sqlite3.Connection, group_name: str) -> None:
     name = group_name.strip()
     if not name:
         raise ValueError("Group name must not be empty")
-    conn.execute(
-        "INSERT OR IGNORE INTO knowledge_group_names (group_name) VALUES (?)", (name,)
-    )
+    conn.execute("INSERT OR IGNORE INTO knowledge_group_names (group_name) VALUES (?)", (name,))
     conn.commit()
 
 
@@ -622,19 +646,13 @@ def delete_group(conn: sqlite3.Connection, group_name: str) -> int:
 
     Returns the number of topic assignments removed.
     """
-    cur = conn.execute(
-        "DELETE FROM knowledge_groups WHERE group_name = ?", (group_name,)
-    )
-    conn.execute(
-        "DELETE FROM knowledge_group_names WHERE group_name = ?", (group_name,)
-    )
+    cur = conn.execute("DELETE FROM knowledge_groups WHERE group_name = ?", (group_name,))
+    conn.execute("DELETE FROM knowledge_group_names WHERE group_name = ?", (group_name,))
     conn.commit()
     return cur.rowcount
 
 
-def assign_topic_to_group(
-    conn: sqlite3.Connection, topic: str, group_name: str
-) -> None:
+def assign_topic_to_group(conn: sqlite3.Connection, topic: str, group_name: str) -> None:
     """Assign a topic to a group, replacing any previous group assignment."""
     conn.execute(
         "INSERT OR IGNORE INTO knowledge_group_names (group_name) VALUES (?)", (group_name,)
@@ -654,6 +672,7 @@ def unassign_topic_from_group(conn: sqlite3.Connection, topic: str) -> None:
 
 
 # ── Settings ───────────────────────────────────────────────────────────────
+
 
 def get_settings(conn: sqlite3.Connection) -> Settings:
     """Load settings from DB, falling back to defaults. Migrates old min_hours_between."""
@@ -682,9 +701,7 @@ def set_setting(conn: sqlite3.Connection, key: str, value: str) -> None:
 
 def is_onboarding_complete(conn: sqlite3.Connection) -> bool:
     """Return True if the user has completed the onboarding setup flow."""
-    row = conn.execute(
-        "SELECT value FROM settings WHERE key = 'onboarding_completed'"
-    ).fetchone()
+    row = conn.execute("SELECT value FROM settings WHERE key = 'onboarding_completed'").fetchone()
     return row is not None and row[0] == "1"
 
 
@@ -708,9 +725,10 @@ def get_usage_defaults(conn: sqlite3.Connection) -> dict[str, str | None]:
 
 # ── Private helpers ────────────────────────────────────────────────────────
 
-def _period_to_cutoff(period: Optional[str]) -> Optional[str]:
+
+def _period_to_cutoff(period: str | None) -> str | None:
     """Convert a period string to an ISO 8601 cutoff timestamp, or None for all."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     if period == "today":
         cutoff = now.replace(hour=0, minute=0, second=0, microsecond=0)
     elif period == "week":

@@ -59,15 +59,7 @@ target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP"]
-ignore = [
-    "E501",   # line too long — handled by formatter
-    "E741",   # ambiguous variable name (l, O, I) — existing code convention
-    "F401",   # unused imports — existing code has intentional re-exports
-    "I001",   # import sort order — existing code style
-    "UP017",  # datetime.UTC alias — existing code uses timezone.utc
-    "UP035",  # typing.Generator → collections.abc — existing code style
-    "UP045",  # X | None syntax — existing code uses Optional[X]
-]
+ignore = ["E501"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

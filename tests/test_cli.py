@@ -3,21 +3,18 @@
 from __future__ import annotations
 
 import argparse
-from io import StringIO
-from unittest.mock import patch
+from datetime import date
 
 import pytest
 
-from datetime import date
-
+from devcoach.cli.commands import cmd_feedback, cmd_lesson, cmd_lessons, cmd_star
 from devcoach.core import db
-from devcoach.cli.commands import cmd_lessons, cmd_lesson, cmd_star, cmd_feedback
-from tests.conftest import TEST_LESSONS
 
 _TODAY = date.today().isoformat()
 
 
 # ── get_lessons filter tests ───────────────────────────────────────────────
+
 
 class TestGetLessonsFilters:
     def test_no_filter_returns_all(self, conn):
@@ -35,7 +32,7 @@ class TestGetLessonsFilters:
     def test_filter_by_project_exact(self, conn):
         lessons = db.get_lessons(conn, project="devcoach")
         assert len(lessons) == 2
-        assert all(l.project == "devcoach" for l in lessons)
+        assert all(lesson.project == "devcoach" for lesson in lessons)
 
     def test_filter_by_project_no_match(self, conn):
         assert db.get_lessons(conn, project="other") == []
@@ -106,11 +103,12 @@ class TestGetLessonsFilters:
 
     def test_results_ordered_newest_first(self, conn):
         lessons = db.get_lessons(conn)
-        timestamps = [l.timestamp for l in lessons]
+        timestamps = [lesson.timestamp for lesson in lessons]
         assert timestamps == sorted(timestamps, reverse=True)
 
 
 # ── get_distinct_column tests ──────────────────────────────────────────────
+
 
 class TestGetDistinctColumn:
     def test_distinct_projects(self, conn):
@@ -135,9 +133,11 @@ class TestGetDistinctColumn:
 
 # ── cmd_lessons command tests ──────────────────────────────────────────────
 
+
 def _make_lessons_args(**kwargs) -> argparse.Namespace:
-    defaults = dict(period="all", category=None, project=None,
-                    repository=None, branch=None, commit=None)
+    defaults = dict(
+        period="all", category=None, project=None, repository=None, branch=None, commit=None
+    )
     defaults.update(kwargs)
     return argparse.Namespace(**defaults)
 
@@ -148,25 +148,25 @@ class TestCmdLessons:
         cmd_lessons(_make_lessons_args())
         out = capsys.readouterr().out
         # Rich wraps/truncates columns — use unique fragments from each title
-        assert out.count(_TODAY) == 3   # 3 date rows
-        assert "PRAGMA" in out                 # pragma_introspection title
-        assert "INSERT" in out                 # upsert_patterns title
-        assert "column" in out                 # row_factory title ("by column name")
+        assert out.count(_TODAY) == 3  # 3 date rows
+        assert "PRAGMA" in out  # pragma_introspection title
+        assert "INSERT" in out  # upsert_patterns title
+        assert "column" in out  # row_factory title ("by column name")
 
     def test_filter_by_project(self, db_path, monkeypatch, capsys):
         monkeypatch.setattr(db, "DB_PATH", db_path)
         cmd_lessons(_make_lessons_args(project="devcoach"))
         out = capsys.readouterr().out
-        assert out.count(_TODAY) == 2    # 2 lessons with devcoach project
+        assert out.count(_TODAY) == 2  # 2 lessons with devcoach project
         assert "INSERT" in out
         assert "PRAGMA" in out
-        assert "column" not in out             # row_factory excluded
+        assert "column" not in out  # row_factory excluded
 
     def test_filter_by_branch(self, db_path, monkeypatch, capsys):
         monkeypatch.setattr(db, "DB_PATH", db_path)
         cmd_lessons(_make_lessons_args(branch="main"))
         out = capsys.readouterr().out
-        assert out.count(_TODAY) == 1    # only upsert lesson is on main
+        assert out.count(_TODAY) == 1  # only upsert lesson is on main
         assert "INSERT" in out
         assert "PRAGMA" not in out
 
@@ -175,7 +175,7 @@ class TestCmdLessons:
         cmd_lessons(_make_lessons_args(commit="05f2f86"))
         out = capsys.readouterr().out
         assert out.count(_TODAY) == 1
-        assert "05f2f86" in out                # commit hash appears in Commit column
+        assert "05f2f86" in out  # commit hash appears in Commit column
         assert "PRAGMA" not in out
 
     def test_no_results_prints_message(self, db_path, monkeypatch, capsys):
@@ -189,8 +189,8 @@ class TestCmdLessons:
         cmd_lessons(_make_lessons_args(project="devcoach"))
         out = capsys.readouterr().out
         # Rich truncates wide column values — assert on 7-char commit hashes (always fit)
-        assert "05f2f86" in out    # upsert lesson commit (main branch)
-        assert "f053771" in out    # pragma lesson commit (feature branch)
+        assert "05f2f86" in out  # upsert lesson commit (main branch)
+        assert "f053771" in out  # pragma lesson commit (feature branch)
 
     def test_meta_columns_hidden_when_no_metadata(self, db_path, monkeypatch, capsys):
         monkeypatch.setattr(db, "DB_PATH", db_path)
@@ -201,6 +201,7 @@ class TestCmdLessons:
 
 
 # ── cmd_lesson detail tests ────────────────────────────────────────────────
+
 
 def _make_lesson_args(lesson_id: str) -> argparse.Namespace:
     return argparse.Namespace(id=lesson_id)
@@ -243,6 +244,7 @@ class TestCmdLesson:
 
 # ── starred filter tests ───────────────────────────────────────────────────
 
+
 class TestStarredFilter:
     def test_get_lessons_starred_only(self, conn):
         lessons = db.get_lessons(conn, starred=True)
@@ -252,13 +254,18 @@ class TestStarredFilter:
     def test_get_lessons_unstarred_only(self, conn):
         lessons = db.get_lessons(conn, starred=False)
         assert len(lessons) == 2
-        assert all(not l.starred for l in lessons)
+        assert all(not lesson.starred for lesson in lessons)
 
     def test_cmd_lessons_starred_flag(self, db_path, monkeypatch, capsys):
         monkeypatch.setattr(db, "DB_PATH", db_path)
         args = argparse.Namespace(
-            period="all", category=None, project=None,
-            repository=None, branch=None, commit=None, starred=True,
+            period="all",
+            category=None,
+            project=None,
+            repository=None,
+            branch=None,
+            commit=None,
+            starred=True,
         )
         cmd_lessons(args)
         out = capsys.readouterr().out
@@ -273,6 +280,7 @@ class TestStarredFilter:
 
 
 # ── toggle_star tests ──────────────────────────────────────────────────────
+
 
 class TestToggleStar:
     def test_toggle_star_on(self, conn):
@@ -302,6 +310,7 @@ class TestToggleStar:
 
 
 # ── set_feedback / cmd_feedback tests ─────────────────────────────────────
+
 
 class TestFeedback:
     def test_set_feedback_know(self, conn):

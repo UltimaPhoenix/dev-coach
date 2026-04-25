@@ -5,10 +5,9 @@ from __future__ import annotations
 import re
 import subprocess
 from pathlib import Path
-from typing import Optional
 
 
-def _run(*args: str) -> Optional[str]:
+def _run(*args: str) -> str | None:
     """Run a git command and return stdout, or None on any error."""
     try:
         result = subprocess.run(
@@ -24,7 +23,7 @@ def _run(*args: str) -> Optional[str]:
     return None
 
 
-def _parse_remote(remote: Optional[str]) -> tuple[Optional[str], Optional[str]]:
+def _parse_remote(remote: str | None) -> tuple[str | None, str | None]:
     """Parse a git remote URL into (repository, platform).
 
     Handles:
@@ -79,7 +78,7 @@ def detect_git_context() -> dict[str, str | None]:
 
     if repository:
         # Use last path component as project name
-        project: Optional[str] = repository.rstrip("/").split("/")[-1]
+        project: str | None = repository.rstrip("/").split("/")[-1]
     else:
         # Fall back to cwd folder name
         project = Path(folder).name or None

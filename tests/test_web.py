@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import sqlite3
 from pathlib import Path
 
 import pytest
@@ -11,8 +10,8 @@ from fastapi.testclient import TestClient
 from devcoach.core import db
 from devcoach.web.app import app
 
-
 # ── Client fixture ─────────────────────────────────────────────────────────
+
 
 @pytest.fixture
 def client(db_path: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
@@ -22,6 +21,7 @@ def client(db_path: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
 
 
 # ── /lessons — no filter ───────────────────────────────────────────────────
+
 
 class TestLessonsNoFilter:
     def test_returns_200(self, client):
@@ -39,6 +39,7 @@ class TestLessonsNoFilter:
 
 
 # ── /lessons — empty-string params (the bug that caused blank results) ─────
+
 
 class TestLessonsEmptyParams:
     def test_empty_category_returns_all(self, client):
@@ -71,6 +72,7 @@ class TestLessonsEmptyParams:
 
 # ── /lessons — project filter ──────────────────────────────────────────────
 
+
 class TestLessonsProjectFilter:
     def test_project_devcoach_returns_two(self, client):
         html = client.get("/lessons?project=devcoach").text
@@ -89,6 +91,7 @@ class TestLessonsProjectFilter:
 
 
 # ── /lessons — repository filter ──────────────────────────────────────────
+
 
 class TestLessonsRepositoryFilter:
     def test_repository_exact_match(self, client):
@@ -112,6 +115,7 @@ class TestLessonsRepositoryFilter:
 
 # ── /lessons — branch filter ───────────────────────────────────────────────
 
+
 class TestLessonsBranchFilter:
     def test_branch_main(self, client):
         html = client.get("/lessons?branch=main").text
@@ -134,6 +138,7 @@ class TestLessonsBranchFilter:
 
 
 # ── /lessons — commit filter ───────────────────────────────────────────────
+
 
 class TestLessonsCommitFilter:
     def test_commit_short_hash(self, client):
@@ -165,6 +170,7 @@ class TestLessonsCommitFilter:
 
 # ── /lessons — combined filters ────────────────────────────────────────────
 
+
 class TestLessonsCombinedFilters:
     def test_project_and_branch(self, client):
         html = client.get("/lessons?project=devcoach&branch=main").text
@@ -181,6 +187,7 @@ class TestLessonsCombinedFilters:
 
 
 # ── /lessons/{id} — detail page ───────────────────────────────────────────
+
 
 class TestLessonDetail:
     def test_returns_200(self, client):
@@ -207,6 +214,7 @@ class TestLessonDetail:
 
 # ── / — profile page ──────────────────────────────────────────────────────
 
+
 class TestProfilePage:
     def test_returns_200(self, client):
         assert client.get("/").status_code == 200
@@ -217,6 +225,7 @@ class TestProfilePage:
 
 
 # ── /lessons — starred filter ──────────────────────────────────────────────
+
 
 class TestLessonsStarredFilter:
     def test_starred_only_returns_one(self, client):
@@ -245,6 +254,7 @@ class TestLessonsStarredFilter:
 
 
 # ── POST /lessons/{id}/star ────────────────────────────────────────────────
+
 
 class TestStarEndpoint:
     def test_star_redirects(self, client):
@@ -275,6 +285,7 @@ class TestStarEndpoint:
 
 # ── POST /lessons/{id}/feedback ────────────────────────────────────────────
 
+
 class TestFeedbackEndpoint:
     def test_feedback_redirects(self, client):
         r = client.post(
@@ -302,6 +313,7 @@ class TestFeedbackEndpoint:
 
     def test_feedback_know_bumps_knowledge(self, client, db_path):
         import sqlite3 as _sqlite3
+
         from devcoach.core import db as _db
 
         # Read baseline confidence for sqlite3_row_factory
@@ -336,4 +348,4 @@ class TestFeedbackEndpoint:
         # lesson-sqlite-upsert-patterns-001 has feedback="know" → shows badge, not buttons
         html = client.get("/lessons/lesson-sqlite-upsert-patterns-001").text
         assert "I know this" in html  # badge text
-        assert "Clear" in html        # clear link shown alongside badge
+        assert "Clear" in html  # clear link shown alongside badge

@@ -3,8 +3,7 @@
 from __future__ import annotations
 
 import sqlite3
-from datetime import datetime, timedelta, timezone
-from typing import Optional
+from datetime import UTC, datetime, timedelta
 
 from devcoach.core.db import (
     count_filtered_lessons,
@@ -31,7 +30,7 @@ def check_rate_limit(conn: sqlite3.Connection) -> RateLimitResult:
     """
     try:
         settings = get_settings(conn)
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         since_24h = (now - timedelta(hours=24)).isoformat()
         count = count_lessons_since(conn, since_24h)
@@ -45,7 +44,7 @@ def check_rate_limit(conn: sqlite3.Connection) -> RateLimitResult:
         if last_ts is not None:
             last_dt = datetime.fromisoformat(last_ts)
             if last_dt.tzinfo is None:
-                last_dt = last_dt.replace(tzinfo=timezone.utc)
+                last_dt = last_dt.replace(tzinfo=UTC)
             elapsed_minutes = (now - last_dt).total_seconds() / 60
             if elapsed_minutes < settings.min_gap_minutes:
                 remaining = settings.min_gap_minutes - elapsed_minutes
@@ -77,17 +76,13 @@ def get_profile(conn: sqlite3.Connection) -> Profile:
         return Profile(knowledge=[], groups=[])
 
 
-def apply_knowledge_delta(
-    conn: sqlite3.Connection, topic: str, delta: int
-) -> Profile:
+def apply_knowledge_delta(conn: sqlite3.Connection, topic: str, delta: int) -> Profile:
     """Add delta to the current confidence for a topic (clamped 0-10).
 
     If the topic does not exist it is created with a base confidence of 5.
     """
     try:
-        row = conn.execute(
-            "SELECT confidence FROM knowledge WHERE topic = ?", (topic,)
-        ).fetchone()
+        row = conn.execute("SELECT confidence FROM knowledge WHERE topic = ?", (topic,)).fetchone()
         current = row[0] if row else 5
         upsert_knowledge(conn, topic, current + delta)
         return get_profile(conn)
@@ -96,8 +91,8 @@ def apply_knowledge_delta(
 
 
 def record_feedback(
-    conn: sqlite3.Connection, lesson_id: str, feedback_value: Optional[str]
-) -> Optional[str]:
+    conn: sqlite3.Connection, lesson_id: str, feedback_value: str | None
+) -> str | None:
     """Record feedback for a lesson and auto-adjust knowledge confidence by ±1.
 
     feedback_value: "know" | "dont_know" | None (to clear).
@@ -117,7 +112,7 @@ def get_stats(conn: sqlite3.Connection) -> dict:
     weakest_topics (up to 5), and strongest_topics (up to 5).
     """
     try:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         total = count_filtered_lessons(conn)
         today_cutoff = (now - timedelta(hours=24)).isoformat()
         week_cutoff = (now - timedelta(days=7)).isoformat()

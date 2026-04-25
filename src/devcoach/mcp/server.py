@@ -8,14 +8,14 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
-from typing import Literal, Optional
+from typing import Literal
 
 from fastmcp import Context, FastMCP
 
 from devcoach.core import coach, db
 from devcoach.core.detect import detect_stack
 from devcoach.core.git import detect_git_context
-from devcoach.core.models import Lesson, Level, Profile, RateLimitResult, RepositoryPlatform
+from devcoach.core.models import Lesson, Level, Profile, RepositoryPlatform
 
 # ── FastMCP app ────────────────────────────────────────────────────────────
 
@@ -30,6 +30,7 @@ mcp = FastMCP(
 
 # ── MCP Tools ─────────────────────────────────────────────────────────────
 
+
 @mcp.tool
 async def log_lesson(
     ctx: Context,
@@ -40,13 +41,13 @@ async def log_lesson(
     title: str,
     level: Level,
     summary: str,
-    task_context: Optional[str] = None,
-    project: Optional[str] = None,
-    repository: Optional[str] = None,
-    branch: Optional[str] = None,
-    commit_hash: Optional[str] = None,
-    folder: Optional[str] = None,
-    repository_platform: Optional[RepositoryPlatform] = None,
+    task_context: str | None = None,
+    project: str | None = None,
+    repository: str | None = None,
+    branch: str | None = None,
+    commit_hash: str | None = None,
+    folder: str | None = None,
+    repository_platform: RepositoryPlatform | None = None,
 ) -> str:
     """Save a delivered lesson to the coaching log.
 
@@ -69,14 +70,18 @@ async def log_lesson(
     resolved_branch = branch or git_ctx["branch"] or usage.get("branch")
     resolved_commit = commit_hash or git_ctx["commit_hash"]
     resolved_folder = folder or git_ctx["folder"]
-    resolved_platform = repository_platform or git_ctx["repository_platform"] or usage.get("repository_platform")
+    resolved_platform = (
+        repository_platform or git_ctx["repository_platform"] or usage.get("repository_platform")
+    )
 
     auto_filled = {
-        k: v for k, v in {
+        k: v
+        for k, v in {
             "project": resolved_project if not project else None,
             "branch": resolved_branch if not branch else None,
             "commit_hash": resolved_commit if not commit_hash else None,
-        }.items() if v is not None
+        }.items()
+        if v is not None
     }
     if auto_filled:
         await ctx.info(f"log_lesson: auto-filled git context {auto_filled}")
@@ -121,18 +126,18 @@ def update_knowledge(topic: str, delta: int) -> Profile:
 
 @mcp.tool
 def get_lessons(
-    period: Optional[Literal["today", "week", "month", "year", "all"]] = None,
-    category: Optional[str] = None,
-    level: Optional[Literal["junior", "mid", "senior"]] = None,
-    project: Optional[str] = None,
-    repository: Optional[str] = None,
-    branch: Optional[str] = None,
-    commit: Optional[str] = None,
-    starred: Optional[bool] = None,
-    feedback: Optional[Literal["know", "dont_know", "none"]] = None,
-    search: Optional[str] = None,
-    date_from: Optional[str] = None,
-    date_to: Optional[str] = None,
+    period: Literal["today", "week", "month", "year", "all"] | None = None,
+    category: str | None = None,
+    level: Literal["junior", "mid", "senior"] | None = None,
+    project: str | None = None,
+    repository: str | None = None,
+    branch: str | None = None,
+    commit: str | None = None,
+    starred: bool | None = None,
+    feedback: Literal["know", "dont_know", "none"] | None = None,
+    search: str | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
 ) -> list[Lesson]:
     """Query the coaching lesson history.
 
@@ -202,7 +207,7 @@ def submit_feedback(lesson_id: str, feedback: str) -> Profile:
 
 
 @mcp.tool
-def add_topic(topic: str, confidence: int = 5, group: Optional[str] = None) -> Profile:
+def add_topic(topic: str, confidence: int = 5, group: str | None = None) -> Profile:
     """Add a new topic to the knowledge map, or update confidence if it already exists.
 
     topic: topic identifier, e.g. 'rust_lifetimes'
@@ -317,7 +322,7 @@ def open_ui(port: int = 7860) -> str:
 async def complete_onboarding(
     ctx: Context,
     topics: dict[str, int],
-    groups: Optional[dict[str, list[str]]] = None,
+    groups: dict[str, list[str]] | None = None,
 ) -> Profile:
     """Save the user's initial knowledge profile and mark onboarding complete.
 
@@ -347,16 +352,14 @@ async def complete_onboarding(
                             db.assign_topic_to_group(conn, t, group_name)
             db.set_setting(conn, "onboarding_completed", "1")
             profile = coach.get_profile(conn)
-        await ctx.info(
-            f"Onboarding complete — {len(topics)} topics, "
-            f"{len(groups or {})} groups"
-        )
+        await ctx.info(f"Onboarding complete — {len(topics)} topics, {len(groups or {})} groups")
         return profile
     except Exception:
         return Profile(knowledge=[], groups=[])
 
 
 # ── MCP Resources ──────────────────────────────────────────────────────────
+
 
 @mcp.resource("devcoach://profile")
 def profile_resource() -> str:
@@ -386,7 +389,7 @@ def recent_lessons_resource() -> str:
         with db.connection() as conn:
             lessons = db.get_lessons(conn, period="week")
         return json.dumps(
-            [l.model_dump() for l in lessons[:10]],
+            [lesson.model_dump() for lesson in lessons[:10]],
             indent=2,
             ensure_ascii=False,
         )
@@ -493,14 +496,13 @@ def lesson_resource(lesson_id: str) -> str:
 
 # ── MCP Prompt ────────────────────────────────────────────────────────────
 
+
 @mcp.prompt
 def devcoach_instructions() -> str:
     """Full coaching instructions for the devcoach skill (content of SKILL.md)."""
     try:
         return (
-            importlib.resources.files("devcoach")
-            .joinpath("SKILL.md")
-            .read_text(encoding="utf-8")
+            importlib.resources.files("devcoach").joinpath("SKILL.md").read_text(encoding="utf-8")
         )
     except Exception:
         return "devcoach: coaching instructions unavailable (SKILL.md not found in package)."
@@ -508,17 +510,32 @@ def devcoach_instructions() -> str:
 
 # ── Entry point ───────────────────────────────────────────────────────────
 
+
 def main() -> None:
     """Start devcoach: CLI subcommand if given, else stdio MCP server."""
     cli_commands = {
-        "profile", "lessons", "lesson", "star", "feedback",
-        "settings", "set", "stats", "backup", "restore", "ui",
-        "knowledge-add", "knowledge-remove",
-        "group-add", "group-remove", "group-assign",
-        "install", "setup",
+        "profile",
+        "lessons",
+        "lesson",
+        "star",
+        "feedback",
+        "settings",
+        "set",
+        "stats",
+        "backup",
+        "restore",
+        "ui",
+        "knowledge-add",
+        "knowledge-remove",
+        "group-add",
+        "group-remove",
+        "group-assign",
+        "install",
+        "setup",
     }
     if len(sys.argv) > 1 and sys.argv[1] in cli_commands:
         from devcoach.cli.commands import run_cli
+
         run_cli()
     else:
         mcp.run(transport="stdio")

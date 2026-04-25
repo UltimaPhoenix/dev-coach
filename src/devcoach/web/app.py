@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Optional
 
 from fastapi import FastAPI, File, Form, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
@@ -22,6 +21,7 @@ app.mount("/static", StaticFiles(directory=str(_HERE / "static")), name="static"
 
 
 # ── Routes ─────────────────────────────────────────────────────────────────
+
 
 @app.get("/", response_class=HTMLResponse)
 async def profile_page(request: Request) -> HTMLResponse:
@@ -127,7 +127,9 @@ async def import_lessons_route(file: UploadFile = File(...)) -> RedirectResponse
     records = json.loads(content)
     with db.connection() as conn:
         inserted, duplicated, invalid = db.import_lessons(conn, records)
-    return RedirectResponse(url=f"/settings?imported={inserted}&skipped={duplicated}&invalid={invalid}", status_code=303)
+    return RedirectResponse(
+        url=f"/settings?imported={inserted}&skipped={duplicated}&invalid={invalid}", status_code=303
+    )
 
 
 _PER_PAGE = 25
@@ -136,20 +138,20 @@ _PER_PAGE = 25
 @app.get("/lessons", response_class=HTMLResponse)
 async def lessons_page(
     request: Request,
-    period: Optional[str] = None,
-    category: Optional[str] = None,
-    level: Optional[str] = None,
-    project: Optional[str] = None,
-    repository: Optional[str] = None,
-    branch: Optional[str] = None,
-    commit: Optional[str] = None,
-    starred: Optional[str] = None,
-    search: Optional[str] = None,
-    feedback: Optional[str] = None,
-    date_from: Optional[str] = None,
-    date_to: Optional[str] = None,
-    sort: Optional[str] = None,
-    order: Optional[str] = None,
+    period: str | None = None,
+    category: str | None = None,
+    level: str | None = None,
+    project: str | None = None,
+    repository: str | None = None,
+    branch: str | None = None,
+    commit: str | None = None,
+    starred: str | None = None,
+    search: str | None = None,
+    feedback: str | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
+    sort: str | None = None,
+    order: str | None = None,
     page: int = 1,
 ) -> HTMLResponse:
     starred_filter = True if starred == "1" else None
@@ -175,9 +177,12 @@ async def lessons_page(
     with db.connection() as conn:
         total = db.count_filtered_lessons(conn, **filter_kwargs)
         lessons = db.get_lessons(
-            conn, **filter_kwargs,
-            sort=selected_sort, order=selected_order,
-            page=page, per_page=_PER_PAGE,
+            conn,
+            **filter_kwargs,
+            sort=selected_sort,
+            order=selected_order,
+            page=page,
+            per_page=_PER_PAGE,
         )
         all_categories = db.get_all_categories(conn)
         all_projects = db.get_distinct_column(conn, "project")
@@ -186,6 +191,7 @@ async def lessons_page(
         all_commits = db.get_distinct_column(conn, "commit_hash")
 
     import math
+
     total_pages = max(1, math.ceil(total / _PER_PAGE))
     page = min(page, total_pages)
 
@@ -222,9 +228,7 @@ async def lessons_page(
 
 
 @app.post("/lessons/{lesson_id}/star")
-async def star_lesson(
-    lesson_id: str, next: str = Form(default="/lessons")
-) -> RedirectResponse:
+async def star_lesson(lesson_id: str, next: str = Form(default="/lessons")) -> RedirectResponse:
     with db.connection() as conn:
         db.toggle_star(conn, lesson_id)
     return RedirectResponse(url=next, status_code=303)
@@ -258,10 +262,10 @@ async def lesson_detail_page(request: Request, lesson_id: str) -> HTMLResponse:
 @app.get("/settings", response_class=HTMLResponse)
 async def settings_page(
     request: Request,
-    imported: Optional[int] = None,
-    skipped: Optional[int] = None,
-    invalid: Optional[int] = None,
-    groups: Optional[int] = None,
+    imported: int | None = None,
+    skipped: int | None = None,
+    invalid: int | None = None,
+    groups: int | None = None,
 ) -> HTMLResponse:
     with db.connection() as conn:
         settings = db.get_settings(conn)
@@ -309,4 +313,7 @@ async def import_settings_route(file: UploadFile = File(...)) -> RedirectRespons
     content = await file.read()
     with db.connection() as conn:
         result = db.restore_backup_zip(conn, content)
-    return RedirectResponse(url=f"/settings?imported={result['lessons']}&skipped={result['skipped']}&invalid={result['invalid']}&groups={result['groups']}", status_code=303)
+    return RedirectResponse(
+        url=f"/settings?imported={result['lessons']}&skipped={result['skipped']}&invalid={result['invalid']}&groups={result['groups']}",
+        status_code=303,
+    )

@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import Literal, Optional
+from datetime import UTC, datetime
+from typing import Literal
 
 from pydantic import BaseModel, field_serializer, field_validator
 
@@ -16,6 +16,7 @@ Feedback = Literal["know", "dont_know"]
 
 # ── Models ─────────────────────────────────────────────────────────────────
 
+
 class Lesson(BaseModel):
     """A coaching lesson delivered to the user."""
 
@@ -26,27 +27,27 @@ class Lesson(BaseModel):
     title: str
     level: Level
     summary: str
-    task_context: Optional[str] = None
-    project: Optional[str] = None
-    repository: Optional[str] = None
-    branch: Optional[str] = None
-    commit_hash: Optional[str] = None
-    folder: Optional[str] = None
-    repository_platform: Optional[RepositoryPlatform] = None
+    task_context: str | None = None
+    project: str | None = None
+    repository: str | None = None
+    branch: str | None = None
+    commit_hash: str | None = None
+    folder: str | None = None
+    repository_platform: RepositoryPlatform | None = None
     starred: bool = False
-    feedback: Optional[Feedback] = None
+    feedback: Feedback | None = None
 
     @field_validator("timestamp", mode="before")
     @classmethod
     def parse_and_normalize_timestamp(cls, v: str | datetime) -> datetime:
         """Accept any ISO 8601 string or datetime; always return UTC-aware datetime."""
         if isinstance(v, datetime):
-            return v if v.tzinfo else v.replace(tzinfo=timezone.utc)
+            return v if v.tzinfo else v.replace(tzinfo=UTC)
         try:
             dt = datetime.fromisoformat(v)
             if dt.tzinfo is None:
-                dt = dt.replace(tzinfo=timezone.utc)
-            return dt.astimezone(timezone.utc)
+                dt = dt.replace(tzinfo=UTC)
+            return dt.astimezone(UTC)
         except ValueError:
             raise ValueError(f"Cannot parse timestamp {v!r} — expected ISO 8601")
 
@@ -100,4 +101,4 @@ class RateLimitResult(BaseModel):
     """Result from the check_rate_limit tool."""
 
     allowed: bool
-    reason: Optional[str] = None
+    reason: str | None = None

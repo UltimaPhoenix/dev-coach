@@ -9,7 +9,7 @@ Test data mirrors the actual DB produced during devcoach development:
 from __future__ import annotations
 
 import sqlite3
-from datetime import date, datetime, timezone
+from datetime import date
 from pathlib import Path
 
 import pytest
@@ -70,6 +70,7 @@ TEST_LESSONS: list[Lesson] = [
 
 
 # ── DB fixtures ────────────────────────────────────────────────────────────
+
 
 @pytest.fixture
 def db_path(tmp_path: Path) -> Path:
