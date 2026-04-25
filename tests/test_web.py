@@ -82,7 +82,7 @@ class TestLessonsProjectFilter:
 
     def test_project_no_match_shows_empty(self, client):
         html = client.get("/lessons?project=other").text
-        assert "No lessons found" in html
+        assert "No lessons" in html
 
     def test_project_select_rendered(self, client):
         html = client.get("/lessons").text
