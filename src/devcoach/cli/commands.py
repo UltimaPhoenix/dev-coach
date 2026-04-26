@@ -387,6 +387,8 @@ _CLAUDE_CODE_CONFIG = Path.home() / ".claude.json"
 _CLAUDE_DESKTOP_CONFIG = (
     Path.home() / "Library" / "Application Support" / "Claude" / "claude_desktop_config.json"
 )
+# Allowlist of paths _install_to is permitted to read/write.
+_ALLOWED_CONFIG_PATHS: frozenset[Path] = frozenset({_CLAUDE_CODE_CONFIG, _CLAUDE_DESKTOP_CONFIG})
 _CLAUDE_CODE_ENTRY: dict = {
     "type": "stdio",
     "command": "uvx",
@@ -400,13 +402,18 @@ _CLAUDE_DESKTOP_ENTRY: dict = {
 
 
 def _install_to(path: Path, entry: dict, force: bool) -> str:
+    # Guard: path must be one of the two known config locations — never user-supplied.
+    if path not in _ALLOWED_CONFIG_PATHS:
+        raise ValueError(f"Config path not in allowlist: {path}")
     data: dict = json.loads(path.read_text()) if path.exists() else {}
     servers: dict = data.setdefault("mcpServers", {})
     if "devcoach" in servers and not force:
         return f"[yellow]Already registered[/yellow] in {path} (use --force to overwrite)"
     servers["devcoach"] = entry
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(data, indent=2) + "\n")
+    path.write_text(
+        json.dumps(data, indent=2) + "\n"
+    )  # NOSONAR - path is allowlist-validated, not user-controlled
     return f"[green]✓[/green] Installed into {path}"
 
 
