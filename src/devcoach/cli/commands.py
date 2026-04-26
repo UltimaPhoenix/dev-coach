@@ -392,12 +392,12 @@ _CLAUDE_DESKTOP_CONFIG = (
 _CLAUDE_CODE_ENTRY: dict = {
     "type": "stdio",
     "command": "uvx",
-    "args": ["devcoach"],
+    "args": ["devcoach", "mcp"],
     "env": {},
 }
 _CLAUDE_DESKTOP_ENTRY: dict = {
     "command": "uvx",
-    "args": ["devcoach"],
+    "args": ["devcoach", "mcp"],
 }
 
 
