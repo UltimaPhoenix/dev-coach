@@ -371,47 +371,94 @@ class TestInstallTo:
 
 
 class TestCmdInstall:
-    def test_installs_both_by_default(self, capsys, tmp_path, monkeypatch):
-        code = tmp_path / "code.json"
-        desktop = tmp_path / "desktop.json"
-        monkeypatch.setattr(commands, "_CLAUDE_CODE_CONFIG", code)
-        monkeypatch.setattr(commands, "_CLAUDE_DESKTOP_CONFIG", desktop)
-        commands.cmd_install(_ns(claude_code=False, claude_desktop=False, force=False))
-        assert code.exists()
-        assert desktop.exists()
+    """Tests for cmd_install — claude CLI path is mocked out; desktop uses file fallback."""
 
-    def test_code_only(self, capsys, tmp_path, monkeypatch):
-        code = tmp_path / "code.json"
+    def _ns_install(self, **kwargs):
+        defaults = dict(claude_code=False, claude_desktop=False, global_scope=False, force=False)
+        defaults.update(kwargs)
+        return _ns(**defaults)
+
+    def test_installs_via_claude_cli_for_code(self, capsys, tmp_path, monkeypatch):
         desktop = tmp_path / "desktop.json"
-        monkeypatch.setattr(commands, "_CLAUDE_CODE_CONFIG", code)
         monkeypatch.setattr(commands, "_CLAUDE_DESKTOP_CONFIG", desktop)
-        commands.cmd_install(_ns(claude_code=True, claude_desktop=False, force=False))
-        assert code.exists()
+        monkeypatch.setattr(
+            commands, "_install_via_claude_cli", lambda scope, force: "[green]✓[/green] Registered"
+        )
+        commands.cmd_install(self._ns_install(claude_code=True))
+        out = capsys.readouterr().out
+        assert "Registered" in out
         assert not desktop.exists()
 
-    def test_desktop_only(self, capsys, tmp_path, monkeypatch):
+    def test_falls_back_to_file_when_no_claude_cli(self, capsys, tmp_path, monkeypatch):
         code = tmp_path / "code.json"
         desktop = tmp_path / "desktop.json"
-        monkeypatch.setattr(commands, "_CLAUDE_CODE_CONFIG", code)
         monkeypatch.setattr(commands, "_CLAUDE_DESKTOP_CONFIG", desktop)
-        commands.cmd_install(_ns(claude_code=False, claude_desktop=True, force=False))
-        assert not code.exists()
+        # Simulate missing `claude` binary by returning empty string
+        monkeypatch.setattr(commands, "_install_via_claude_cli", lambda scope, force: "")
+        # Also patch the fallback path used inside cmd_install
+        import devcoach.cli.commands as _cmd
+        original_path_home = Path.home
+
+        def _fake_home():
+            return tmp_path
+
+        monkeypatch.setattr(Path, "home", staticmethod(_fake_home))
+        commands.cmd_install(self._ns_install(claude_code=True))
+        assert (tmp_path / ".claude.json").exists()
+
+    def test_desktop_only_writes_file(self, capsys, tmp_path, monkeypatch):
+        desktop = tmp_path / "desktop.json"
+        monkeypatch.setattr(commands, "_CLAUDE_DESKTOP_CONFIG", desktop)
+        monkeypatch.setattr(commands, "_install_via_claude_cli", lambda scope, force: "")
+        commands.cmd_install(self._ns_install(claude_desktop=True))
+        assert desktop.exists()
+        data = json.loads(desktop.read_text())
+        assert data["mcpServers"]["devcoach"]["command"] == "uvx"
+
+    def test_both_by_default(self, capsys, tmp_path, monkeypatch):
+        desktop = tmp_path / "desktop.json"
+        monkeypatch.setattr(commands, "_CLAUDE_DESKTOP_CONFIG", desktop)
+        monkeypatch.setattr(
+            commands, "_install_via_claude_cli", lambda scope, force: "[green]✓[/green] Registered"
+        )
+        commands.cmd_install(self._ns_install())
         assert desktop.exists()
 
-    def test_prints_restart_reminder(self, capsys, tmp_path, monkeypatch):
-        monkeypatch.setattr(commands, "_CLAUDE_CODE_CONFIG", tmp_path / "code.json")
-        monkeypatch.setattr(commands, "_CLAUDE_DESKTOP_CONFIG", tmp_path / "desktop.json")
-        commands.cmd_install(_ns(claude_code=False, claude_desktop=False, force=False))
+    def test_restart_reminder_shown_for_desktop(self, capsys, tmp_path, monkeypatch):
+        desktop = tmp_path / "desktop.json"
+        monkeypatch.setattr(commands, "_CLAUDE_DESKTOP_CONFIG", desktop)
+        monkeypatch.setattr(commands, "_install_via_claude_cli", lambda scope, force: "")
+        commands.cmd_install(self._ns_install(claude_desktop=True))
         assert "Restart" in capsys.readouterr().out
 
-    def test_force_overwrites_existing(self, capsys, tmp_path, monkeypatch):
-        code = tmp_path / "code.json"
-        code.write_text(json.dumps({"mcpServers": {"devcoach": {"command": "old"}}}))
-        monkeypatch.setattr(commands, "_CLAUDE_CODE_CONFIG", code)
-        monkeypatch.setattr(commands, "_CLAUDE_DESKTOP_CONFIG", tmp_path / "desktop.json")
-        commands.cmd_install(_ns(claude_code=True, claude_desktop=False, force=True))
-        data = json.loads(code.read_text())
-        assert data["mcpServers"]["devcoach"]["command"] == "uvx"
+    def test_no_restart_reminder_when_cli_succeeds(self, capsys, tmp_path, monkeypatch):
+        desktop = tmp_path / "no_desktop.json"
+        monkeypatch.setattr(commands, "_CLAUDE_DESKTOP_CONFIG", desktop)
+        monkeypatch.setattr(
+            commands, "_install_via_claude_cli", lambda scope, force: "[green]✓[/green] Registered"
+        )
+        commands.cmd_install(self._ns_install(claude_code=True))
+        assert "Restart" not in capsys.readouterr().out
+
+    def test_force_flag_passed_to_cli(self, monkeypatch, tmp_path):
+        desktop = tmp_path / "desktop.json"
+        monkeypatch.setattr(commands, "_CLAUDE_DESKTOP_CONFIG", desktop)
+        received = {}
+        monkeypatch.setattr(
+            commands,
+            "_install_via_claude_cli",
+            lambda scope, force: received.update(force=force) or "[green]✓[/green]",
+        )
+        commands.cmd_install(self._ns_install(claude_code=True, force=True))
+        assert received["force"] is True
+
+    def test_force_overwrites_desktop_file(self, capsys, tmp_path, monkeypatch):
+        desktop = tmp_path / "desktop.json"
+        desktop.write_text(json.dumps({"mcpServers": {"devcoach": {"command": "old"}}}))
+        monkeypatch.setattr(commands, "_CLAUDE_DESKTOP_CONFIG", desktop)
+        monkeypatch.setattr(commands, "_install_via_claude_cli", lambda scope, force: "")
+        commands.cmd_install(self._ns_install(claude_desktop=True, force=True))
+        assert json.loads(desktop.read_text())["mcpServers"]["devcoach"]["command"] == "uvx"
 
 
 # ── _build_parser ──────────────────────────────────────────────────────────

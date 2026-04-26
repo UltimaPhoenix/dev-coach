@@ -407,21 +407,42 @@ def _claude_desktop_config() -> Path:
     return Path(xdg) / "Claude" / "claude_desktop_config.json"
 
 
-_CLAUDE_CODE_CONFIG = Path.home() / ".claude.json"
 _CLAUDE_DESKTOP_CONFIG = _claude_desktop_config()
-_CLAUDE_CODE_ENTRY: dict = {
-    "type": "stdio",
-    "command": "uvx",
-    "args": ["devcoach", "mcp"],
-    "env": {},
-}
 _CLAUDE_DESKTOP_ENTRY: dict = {
     "command": "uvx",
     "args": ["devcoach", "mcp"],
 }
 
 
+def _install_via_claude_cli(scope: str, force: bool) -> str:
+    """Register devcoach using the `claude mcp` CLI. Returns a status message or '' if unavailable."""
+    import shutil
+    import subprocess
+
+    if not shutil.which("claude"):
+        return ""  # caller falls back to manual install
+
+    if force:
+        subprocess.run(
+            ["claude", "mcp", "remove", "--scope", scope, "devcoach"],
+            capture_output=True,
+        )
+
+    result = subprocess.run(
+        ["claude", "mcp", "add", "--scope", scope, "devcoach", "uvx", "--", "devcoach", "mcp"],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode == 0:
+        return f"[green]✓[/green] Registered via `claude mcp add` (scope: {scope})"
+    combined = (result.stderr + result.stdout).lower()
+    if "already" in combined:
+        return "[yellow]Already registered[/yellow] in Claude Code (use --force to overwrite)"
+    return f"[red]claude mcp add failed:[/red] {(result.stderr or result.stdout).strip()}"
+
+
 def _install_to(path: Path, entry: dict, force: bool) -> str:
+    """Manually edit a JSON config file to add the devcoach MCP entry."""
     data: dict = json.loads(path.read_text()) if path.exists() else {}
     servers: dict = data.setdefault("mcpServers", {})
     if "devcoach" in servers and not force:
@@ -435,16 +456,35 @@ def _install_to(path: Path, entry: dict, force: bool) -> str:
 def cmd_install(args: argparse.Namespace) -> None:
     do_code = args.claude_code or not args.claude_desktop
     do_desktop = args.claude_desktop or not args.claude_code
+    needs_restart = False
 
     if do_code:
-        console.print(_install_to(_CLAUDE_CODE_CONFIG, _CLAUDE_CODE_ENTRY, args.force))
+        # Prefer the official `claude mcp add` CLI — no file path hunting needed.
+        msg = _install_via_claude_cli(
+            scope="global" if getattr(args, "global_scope", False) else "user",
+            force=args.force,
+        )
+        if not msg:
+            # `claude` CLI not found — fall back to direct JSON edit
+            from pathlib import Path as _P
+
+            claude_code_config = _P.home() / ".claude.json"
+            claude_code_entry: dict = {
+                "type": "stdio",
+                "command": "uvx",
+                "args": ["devcoach", "mcp"],
+                "env": {},
+            }
+            msg = _install_to(claude_code_config, claude_code_entry, args.force)
+            needs_restart = True
+        console.print(msg)
+
     if do_desktop:
         console.print(_install_to(_CLAUDE_DESKTOP_CONFIG, _CLAUDE_DESKTOP_ENTRY, args.force))
+        needs_restart = True
 
-    if do_code or do_desktop:
-        console.print(
-            "\n[dim]Restart Claude Code / Claude Desktop to pick up the new server.[/dim]"
-        )
+    if needs_restart:
+        console.print("\n[dim]Restart Claude Desktop to pick up the new server.[/dim]")
 
 
 def cmd_setup(_args: argparse.Namespace) -> None:
@@ -814,19 +854,25 @@ def _build_parser() -> argparse.ArgumentParser:
 
     p_install = sub.add_parser(
         "install",
-        help="Register devcoach MCP server in Claude Code and/or Claude Desktop config",
+        help="Register devcoach MCP server in Claude Code and/or Claude Desktop",
     )
     p_install.add_argument(
         "--claude-code",
         dest="claude_code",
         action="store_true",
-        help="Install into Claude Code only (~/.claude.json)",
+        help="Target Claude Code only (uses `claude mcp add` if available)",
     )
     p_install.add_argument(
         "--claude-desktop",
         dest="claude_desktop",
         action="store_true",
-        help="Install into Claude Desktop only",
+        help="Target Claude Desktop only (edits config file directly)",
+    )
+    p_install.add_argument(
+        "--global",
+        dest="global_scope",
+        action="store_true",
+        help="Install at global scope instead of user scope (Claude Code only)",
     )
     p_install.add_argument("--force", action="store_true", help="Overwrite existing devcoach entry")
 
