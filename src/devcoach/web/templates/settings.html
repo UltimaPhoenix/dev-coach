@@ -27,9 +27,9 @@
     <form method="post" action="/settings" class="space-y-4">
       <div class="grid grid-cols-2 gap-4">
         <div>
-          <label class="block text-sm text-gray-600 dark:text-gray-400 mb-1">Max lessons per day</label>
+          <label for="max-per-day" class="block text-sm text-gray-600 dark:text-gray-400 mb-1">Max lessons per day</label>
           <input
-            type="number" name="max_per_day" min="1" max="20"
+            id="max-per-day" type="number" name="max_per_day" min="1" max="20"
             value="{{ settings.max_per_day }}"
             class="w-full bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white rounded px-3 py-2 text-sm focus:outline-none focus:border-indigo-500"
           />
@@ -37,8 +37,8 @@
         </div>
 
         <div>
-          <label class="block text-sm text-gray-600 dark:text-gray-400 mb-1">Minimum gap between lessons</label>
-          <select name="min_gap_minutes"
+          <label for="min-gap-minutes" class="block text-sm text-gray-600 dark:text-gray-400 mb-1">Minimum gap between lessons</label>
+          <select id="min-gap-minutes" name="min_gap_minutes"
                   class="w-full bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white rounded px-3 py-2 text-sm focus:outline-none focus:border-indigo-500">
             {% set gap = settings.min_gap_minutes %}
             <option value="0"    {% if gap == 0    %}selected{% endif %}>No cooldown</option>
@@ -58,8 +58,8 @@
         </div>
       </div>
 
-      <div>
-        <label class="block text-sm text-gray-600 dark:text-gray-400 mb-1">UI theme</label>
+      <fieldset class="border-0 p-0 m-0">
+        <legend class="block text-sm text-gray-600 dark:text-gray-400 mb-1">UI theme</legend>
         <div class="flex gap-2">
           {% for value, label, icon in [("system", "System", "🌓"), ("light", "Light", "☀️"), ("dark", "Dark", "🌙")] %}
           <label class="flex-1 cursor-pointer">
@@ -78,7 +78,7 @@
           {% endfor %}
         </div>
         <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">System follows your OS preference.</p>
-      </div>
+      </fieldset>
 
       <button type="submit"
               class="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded px-4 py-2 text-sm transition">

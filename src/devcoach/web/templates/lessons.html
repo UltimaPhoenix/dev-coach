@@ -375,10 +375,13 @@
                    'mid':'text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20',
                    'senior':'text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/20'} %}
       <tr class="hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors group cursor-pointer"
-          onclick="window.location='/lessons/{{ lesson.id }}'">
+          tabindex="0"
+          onclick="window.location='/lessons/{{ lesson.id }}'"
+          onkeydown="if(event.key==='Enter')window.location='/lessons/{{ lesson.id }}'"
+          role="link">
 
         {# Star #}
-        <td class="px-3 py-3" onclick="event.stopPropagation()">
+        <td class="px-3 py-3" onclick="event.stopPropagation()" onkeydown="event.stopPropagation()">
           <form method="post" action="/lessons/{{ lesson.id }}/star">
             <input type="hidden" name="next" value="/lessons{% if request.url.query %}?{{ request.url.query }}{% endif %}" />
             <button type="submit" title="{% if lesson.starred %}Unstar{% else %}Star{% endif %}"
@@ -414,7 +417,7 @@
         </td>
 
         {# Level badge #}
-        <td class="px-3 py-3" onclick="event.stopPropagation()">
+        <td class="px-3 py-3" onclick="event.stopPropagation()" onkeydown="event.stopPropagation()">
           <a href="{{ sort_base }}&level={{ lesson.level }}&sort={{ selected_sort }}&order={{ selected_order }}"
              class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium {{ lc.get(lesson.level, '') }} hover:ring-2 hover:ring-current hover:ring-offset-1 transition-shadow">
             {{ lesson.level }}
@@ -422,7 +425,7 @@
         </td>
 
         {# Categories #}
-        <td class="px-3 py-3 hidden lg:table-cell" onclick="event.stopPropagation()">
+        <td class="px-3 py-3 hidden lg:table-cell" onclick="event.stopPropagation()" onkeydown="event.stopPropagation()">
           <div class="flex flex-wrap gap-1">
             {% for cat in lesson.categories %}
             <a href="{{ sort_base }}&category={{ cat }}&sort={{ selected_sort }}&order={{ selected_order }}"
@@ -432,7 +435,7 @@
         </td>
 
         {# Feedback #}
-        <td class="px-3 py-3 hidden xl:table-cell" onclick="event.stopPropagation()">
+        <td class="px-3 py-3 hidden xl:table-cell" onclick="event.stopPropagation()" onkeydown="event.stopPropagation()">
           {% if lesson.feedback == 'know' %}
           <span class="text-xs text-emerald-600 dark:text-emerald-400 font-medium">✓ Known</span>
           {% elif lesson.feedback == 'dont_know' %}
