@@ -1,0 +1,514 @@
+"""Tests for cli/commands.py — non-interactive subcommands not covered by test_cli.py."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import sqlite3
+import zipfile
+from pathlib import Path
+
+import pytest
+
+from devcoach.cli import commands
+from devcoach.core import db
+
+# ── Fixtures ───────────────────────────────────────────────────────────────
+
+
+@pytest.fixture(autouse=True)
+def _patch_db(db_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(db, "DB_PATH", db_path)
+
+
+def _ns(**kwargs) -> argparse.Namespace:
+    return argparse.Namespace(**kwargs)
+
+
+# ── _confidence_bar ────────────────────────────────────────────────────────
+
+
+class TestConfidenceBar:
+    def test_zero_all_empty(self):
+        assert commands._confidence_bar(0) == "░" * 10
+
+    def test_ten_all_filled(self):
+        assert commands._confidence_bar(10) == "█" * 10
+
+    def test_five_has_both(self):
+        bar = commands._confidence_bar(5)
+        assert len(bar) == 10
+        assert "█" in bar and "░" in bar
+
+
+# ── cmd_profile ────────────────────────────────────────────────────────────
+
+
+class TestCmdProfile:
+    def test_runs_without_error(self, capsys):
+        commands.cmd_profile(_ns())
+
+    def test_shows_known_topic(self, capsys):
+        commands.cmd_profile(_ns())
+        assert "python" in capsys.readouterr().out
+
+
+# ── cmd_settings ───────────────────────────────────────────────────────────
+
+
+class TestCmdSettings:
+    def test_shows_max_per_day(self, capsys):
+        commands.cmd_settings(_ns())
+        assert "max_per_day" in capsys.readouterr().out
+
+    def test_shows_min_gap_minutes(self, capsys):
+        commands.cmd_settings(_ns())
+        assert "min_gap_minutes" in capsys.readouterr().out
+
+
+# ── cmd_stats ──────────────────────────────────────────────────────────────
+
+
+class TestCmdStats:
+    def test_runs_without_error(self, capsys):
+        commands.cmd_stats(_ns())
+
+    def test_shows_total_lesson_count(self, capsys):
+        commands.cmd_stats(_ns())
+        assert "3" in capsys.readouterr().out  # 3 seeded lessons
+
+
+# ── cmd_set ────────────────────────────────────────────────────────────────
+
+
+class TestCmdSet:
+    def test_sets_max_per_day(self, capsys, db_path):
+        commands.cmd_set(_ns(key="max_per_day", value="5"))
+        c = sqlite3.connect(str(db_path))
+        c.row_factory = sqlite3.Row
+        assert db.get_settings(c).max_per_day == 5
+        c.close()
+
+    def test_sets_min_gap_minutes(self, capsys, db_path):
+        commands.cmd_set(_ns(key="min_gap_minutes", value="30"))
+        c = sqlite3.connect(str(db_path))
+        c.row_factory = sqlite3.Row
+        assert db.get_settings(c).min_gap_minutes == 30
+        c.close()
+
+    def test_prints_confirmation(self, capsys):
+        commands.cmd_set(_ns(key="max_per_day", value="3"))
+        assert "max_per_day" in capsys.readouterr().out
+
+    def test_invalid_key_exits(self, capsys):
+        with pytest.raises(SystemExit) as exc:
+            commands.cmd_set(_ns(key="nonexistent_key", value="1"))
+        assert exc.value.code == 1
+
+
+# ── cmd_backup ─────────────────────────────────────────────────────────────
+
+
+class TestCmdBackup:
+    def test_creates_zip_file(self, capsys, tmp_path):
+        out = tmp_path / "backup.zip"
+        commands.cmd_backup(_ns(output=str(out)))
+        assert out.exists()
+
+    def test_zip_is_valid(self, capsys, tmp_path):
+        out = tmp_path / "backup.zip"
+        commands.cmd_backup(_ns(output=str(out)))
+        with zipfile.ZipFile(out) as zf:
+            assert "lessons.json" in zf.namelist()
+            assert "knowledge.json" in zf.namelist()
+            assert "settings.json" in zf.namelist()
+
+    def test_zip_contains_seeded_lessons(self, capsys, tmp_path):
+        out = tmp_path / "backup.zip"
+        commands.cmd_backup(_ns(output=str(out)))
+        with zipfile.ZipFile(out) as zf:
+            lessons = json.loads(zf.read("lessons.json"))
+        assert len(lessons) == 3
+
+    def test_prints_saved_message(self, capsys, tmp_path):
+        out = tmp_path / "backup.zip"
+        commands.cmd_backup(_ns(output=str(out)))
+        assert "Backup saved" in capsys.readouterr().out
+
+
+# ── cmd_restore ────────────────────────────────────────────────────────────
+
+
+class TestCmdRestore:
+    @pytest.fixture
+    def backup_zip(self, tmp_path: Path) -> Path:
+        with db.connection() as conn:
+            data = db.create_backup_zip(conn)
+        path = tmp_path / "backup.zip"
+        path.write_bytes(data)
+        return path
+
+    def test_restores_without_error(self, capsys, backup_zip):
+        commands.cmd_restore(_ns(input=str(backup_zip)))
+
+    def test_prints_lesson_result(self, capsys, backup_zip):
+        commands.cmd_restore(_ns(input=str(backup_zip)))
+        assert "Lessons" in capsys.readouterr().out
+
+    def test_settings_restored(self, capsys, backup_zip):
+        commands.cmd_restore(_ns(input=str(backup_zip)))
+        assert "Settings" in capsys.readouterr().out
+
+    def test_missing_file_exits(self, capsys, tmp_path):
+        with pytest.raises(SystemExit) as exc:
+            commands.cmd_restore(_ns(input=str(tmp_path / "no.zip")))
+        assert exc.value.code == 1
+
+
+# ── cmd_knowledge_add ──────────────────────────────────────────────────────
+
+
+class TestCmdKnowledgeAdd:
+    def test_adds_topic(self, capsys, db_path):
+        commands.cmd_knowledge_add(_ns(topic="rust", confidence=7, group=None))
+        c = sqlite3.connect(str(db_path))
+        c.row_factory = sqlite3.Row
+        assert db.get_all_knowledge(c).get("rust") == 7
+        c.close()
+
+    def test_empty_topic_exits(self, capsys):
+        with pytest.raises(SystemExit) as exc:
+            commands.cmd_knowledge_add(_ns(topic="   ", confidence=5, group=None))
+        assert exc.value.code == 1
+
+    def test_adds_topic_with_group(self, capsys, db_path):
+        commands.cmd_knowledge_add(_ns(topic="elixir", confidence=5, group="Languages"))
+        c = sqlite3.connect(str(db_path))
+        c.row_factory = sqlite3.Row
+        groups = db.get_knowledge_groups(c)
+        c.close()
+        assert "elixir" in groups.get("Languages", [])
+
+    def test_group_other_not_assigned(self, capsys, db_path):
+        commands.cmd_knowledge_add(_ns(topic="go", confidence=6, group="Other"))
+        c = sqlite3.connect(str(db_path))
+        c.row_factory = sqlite3.Row
+        groups = db.get_knowledge_groups(c)
+        c.close()
+        # "Other" is not a real group — topic should exist but not be in any named group
+        all_group_topics = [t for ts in groups.values() for t in ts]
+        assert "go" not in all_group_topics
+
+    def test_prints_confirmation(self, capsys):
+        commands.cmd_knowledge_add(_ns(topic="haskell", confidence=3, group=None))
+        assert "haskell" in capsys.readouterr().out
+
+
+# ── cmd_knowledge_remove ───────────────────────────────────────────────────
+
+
+class TestCmdKnowledgeRemove:
+    def test_removes_existing_topic(self, capsys, db_path):
+        commands.cmd_knowledge_remove(_ns(topic="python"))
+        c = sqlite3.connect(str(db_path))
+        c.row_factory = sqlite3.Row
+        assert "python" not in db.get_all_knowledge(c)
+        c.close()
+
+    def test_prints_removed_message(self, capsys):
+        commands.cmd_knowledge_remove(_ns(topic="python"))
+        assert "python" in capsys.readouterr().out
+
+    def test_nonexistent_topic_prints_not_found(self, capsys):
+        commands.cmd_knowledge_remove(_ns(topic="nonexistent_xyz_123"))
+        out = capsys.readouterr().out
+        assert "nonexistent_xyz_123" in out
+
+
+# ── cmd_group_add ──────────────────────────────────────────────────────────
+
+
+class TestCmdGroupAdd:
+    def test_adds_group(self, capsys, db_path):
+        commands.cmd_group_add(_ns(name="DevOps"))
+        c = sqlite3.connect(str(db_path))
+        c.row_factory = sqlite3.Row
+        assert "DevOps" in db.get_knowledge_groups(c)
+        c.close()
+
+    def test_empty_name_exits(self, capsys):
+        with pytest.raises(SystemExit) as exc:
+            commands.cmd_group_add(_ns(name="   "))
+        assert exc.value.code == 1
+
+    def test_other_name_exits(self, capsys):
+        with pytest.raises(SystemExit) as exc:
+            commands.cmd_group_add(_ns(name="Other"))
+        assert exc.value.code == 1
+
+    def test_prints_group_name(self, capsys):
+        commands.cmd_group_add(_ns(name="Languages"))
+        assert "Languages" in capsys.readouterr().out
+
+
+# ── cmd_group_remove ───────────────────────────────────────────────────────
+
+
+class TestCmdGroupRemove:
+    def test_removes_existing_group(self, capsys, db_path):
+        c = sqlite3.connect(str(db_path))
+        c.row_factory = sqlite3.Row
+        db.add_group(c, "Temp")
+        c.close()
+
+        commands.cmd_group_remove(_ns(name="Temp"))
+        c = sqlite3.connect(str(db_path))
+        c.row_factory = sqlite3.Row
+        assert "Temp" not in db.get_knowledge_groups(c)
+        c.close()
+
+    def test_nonexistent_group_does_not_crash(self, capsys):
+        commands.cmd_group_remove(_ns(name="NoSuchGroup"))
+
+    def test_prints_group_name_on_success(self, capsys, db_path):
+        c = sqlite3.connect(str(db_path))
+        c.row_factory = sqlite3.Row
+        db.add_group(c, "ToRemove")
+        c.close()
+        commands.cmd_group_remove(_ns(name="ToRemove"))
+        assert "ToRemove" in capsys.readouterr().out
+
+
+# ── cmd_group_assign ───────────────────────────────────────────────────────
+
+
+class TestCmdGroupAssign:
+    def test_assigns_to_group(self, capsys, db_path):
+        commands.cmd_group_assign(_ns(topic="python", group="Languages"))
+        c = sqlite3.connect(str(db_path))
+        c.row_factory = sqlite3.Row
+        groups = db.get_knowledge_groups(c)
+        c.close()
+        assert "python" in groups.get("Languages", [])
+
+    def test_assign_other_ungroups_topic(self, capsys, db_path):
+        commands.cmd_group_assign(_ns(topic="python", group="Languages"))
+        commands.cmd_group_assign(_ns(topic="python", group="Other"))
+        c = sqlite3.connect(str(db_path))
+        c.row_factory = sqlite3.Row
+        groups = db.get_knowledge_groups(c)
+        c.close()
+        assert "python" not in groups.get("Languages", [])
+
+    def test_unknown_topic_exits(self, capsys):
+        with pytest.raises(SystemExit) as exc:
+            commands.cmd_group_assign(_ns(topic="no_such_topic_xyz", group="Backend"))
+        assert exc.value.code == 1
+
+    def test_prints_topic_and_group(self, capsys):
+        commands.cmd_group_assign(_ns(topic="python", group="Languages"))
+        out = capsys.readouterr().out
+        assert "python" in out
+        assert "Languages" in out
+
+
+# ── _install_to ────────────────────────────────────────────────────────────
+
+
+class TestInstallTo:
+    def test_creates_new_config(self, tmp_path):
+        path = tmp_path / "claude.json"
+        result = commands._install_to(path, {"command": "uvx"}, force=False)
+        assert path.exists()
+        assert "Installed" in result
+
+    def test_new_config_has_devcoach_entry(self, tmp_path):
+        path = tmp_path / "claude.json"
+        commands._install_to(path, {"command": "uvx", "args": ["devcoach"]}, force=False)
+        data = json.loads(path.read_text())
+        assert data["mcpServers"]["devcoach"]["command"] == "uvx"
+
+    def test_merges_with_existing_servers(self, tmp_path):
+        path = tmp_path / "claude.json"
+        path.write_text(json.dumps({"mcpServers": {"other-tool": {"command": "other"}}}))
+        commands._install_to(path, {"command": "uvx"}, force=False)
+        data = json.loads(path.read_text())
+        assert "other-tool" in data["mcpServers"]
+        assert "devcoach" in data["mcpServers"]
+
+    def test_already_registered_returns_message(self, tmp_path):
+        path = tmp_path / "claude.json"
+        path.write_text(json.dumps({"mcpServers": {"devcoach": {"command": "old"}}}))
+        result = commands._install_to(path, {"command": "new"}, force=False)
+        assert "Already registered" in result
+
+    def test_already_registered_not_overwritten(self, tmp_path):
+        path = tmp_path / "claude.json"
+        path.write_text(json.dumps({"mcpServers": {"devcoach": {"command": "old"}}}))
+        commands._install_to(path, {"command": "new"}, force=False)
+        assert json.loads(path.read_text())["mcpServers"]["devcoach"]["command"] == "old"
+
+    def test_force_overwrites(self, tmp_path):
+        path = tmp_path / "claude.json"
+        path.write_text(json.dumps({"mcpServers": {"devcoach": {"command": "old"}}}))
+        commands._install_to(path, {"command": "new"}, force=True)
+        assert json.loads(path.read_text())["mcpServers"]["devcoach"]["command"] == "new"
+
+    def test_creates_parent_directories(self, tmp_path):
+        path = tmp_path / "deep" / "nested" / "claude.json"
+        commands._install_to(path, {"command": "uvx"}, force=False)
+        assert path.exists()
+
+    def test_preserves_other_top_level_keys(self, tmp_path):
+        path = tmp_path / "claude.json"
+        path.write_text(json.dumps({"otherKey": "value", "mcpServers": {}}))
+        commands._install_to(path, {"command": "uvx"}, force=False)
+        data = json.loads(path.read_text())
+        assert data["otherKey"] == "value"
+
+
+# ── cmd_install ────────────────────────────────────────────────────────────
+
+
+class TestCmdInstall:
+    def test_installs_both_by_default(self, capsys, tmp_path, monkeypatch):
+        code = tmp_path / "code.json"
+        desktop = tmp_path / "desktop.json"
+        monkeypatch.setattr(commands, "_CLAUDE_CODE_CONFIG", code)
+        monkeypatch.setattr(commands, "_CLAUDE_DESKTOP_CONFIG", desktop)
+        commands.cmd_install(_ns(claude_code=False, claude_desktop=False, force=False))
+        assert code.exists()
+        assert desktop.exists()
+
+    def test_code_only(self, capsys, tmp_path, monkeypatch):
+        code = tmp_path / "code.json"
+        desktop = tmp_path / "desktop.json"
+        monkeypatch.setattr(commands, "_CLAUDE_CODE_CONFIG", code)
+        monkeypatch.setattr(commands, "_CLAUDE_DESKTOP_CONFIG", desktop)
+        commands.cmd_install(_ns(claude_code=True, claude_desktop=False, force=False))
+        assert code.exists()
+        assert not desktop.exists()
+
+    def test_desktop_only(self, capsys, tmp_path, monkeypatch):
+        code = tmp_path / "code.json"
+        desktop = tmp_path / "desktop.json"
+        monkeypatch.setattr(commands, "_CLAUDE_CODE_CONFIG", code)
+        monkeypatch.setattr(commands, "_CLAUDE_DESKTOP_CONFIG", desktop)
+        commands.cmd_install(_ns(claude_code=False, claude_desktop=True, force=False))
+        assert not code.exists()
+        assert desktop.exists()
+
+    def test_prints_restart_reminder(self, capsys, tmp_path, monkeypatch):
+        monkeypatch.setattr(commands, "_CLAUDE_CODE_CONFIG", tmp_path / "code.json")
+        monkeypatch.setattr(commands, "_CLAUDE_DESKTOP_CONFIG", tmp_path / "desktop.json")
+        commands.cmd_install(_ns(claude_code=False, claude_desktop=False, force=False))
+        assert "Restart" in capsys.readouterr().out
+
+    def test_force_overwrites_existing(self, capsys, tmp_path, monkeypatch):
+        code = tmp_path / "code.json"
+        code.write_text(json.dumps({"mcpServers": {"devcoach": {"command": "old"}}}))
+        monkeypatch.setattr(commands, "_CLAUDE_CODE_CONFIG", code)
+        monkeypatch.setattr(commands, "_CLAUDE_DESKTOP_CONFIG", tmp_path / "desktop.json")
+        commands.cmd_install(_ns(claude_code=True, claude_desktop=False, force=True))
+        data = json.loads(code.read_text())
+        assert data["mcpServers"]["devcoach"]["command"] == "uvx"
+
+
+# ── _build_parser ──────────────────────────────────────────────────────────
+
+
+class TestBuildParser:
+    def test_profile(self):
+        assert commands._build_parser().parse_args(["profile"]).command == "profile"
+
+    def test_lessons_defaults(self):
+        args = commands._build_parser().parse_args(["lessons"])
+        assert args.period == "all"
+        assert args.starred is False
+        assert args.sort == "timestamp"
+        assert args.order == "desc"
+
+    def test_lessons_with_filters(self):
+        args = commands._build_parser().parse_args(
+            ["lessons", "--period", "week", "--starred", "--level", "mid", "--category", "python"]
+        )
+        assert args.period == "week"
+        assert args.starred is True
+        assert args.level == "mid"
+        assert args.category == "python"
+
+    def test_set_command(self):
+        args = commands._build_parser().parse_args(["set", "max_per_day", "5"])
+        assert args.key == "max_per_day"
+        assert args.value == "5"
+
+    def test_backup_default_output(self):
+        args = commands._build_parser().parse_args(["backup"])
+        assert args.output == "devcoach-backup.zip"
+
+    def test_backup_custom_output(self):
+        args = commands._build_parser().parse_args(["backup", "my.zip"])
+        assert args.output == "my.zip"
+
+    def test_restore_input(self):
+        args = commands._build_parser().parse_args(["restore", "my.zip"])
+        assert args.input == "my.zip"
+
+    def test_install_flags(self):
+        args = commands._build_parser().parse_args(["install", "--claude-code", "--force"])
+        assert args.claude_code is True
+        assert args.force is True
+
+    def test_ui_default_port(self):
+        assert commands._build_parser().parse_args(["ui"]).port == 7860
+
+    def test_ui_custom_port(self):
+        assert commands._build_parser().parse_args(["ui", "--port", "9000"]).port == 9000
+
+    def test_knowledge_add_defaults(self):
+        args = commands._build_parser().parse_args(["knowledge-add", "rust"])
+        assert args.topic == "rust"
+        assert args.confidence == 5
+        assert args.group is None
+
+    def test_feedback_choices(self):
+        args = commands._build_parser().parse_args(["feedback", "lesson-001", "know"])
+        assert args.id == "lesson-001"
+        assert args.feedback == "know"
+
+    def test_date_from_to(self):
+        args = commands._build_parser().parse_args(
+            ["lessons", "--date-from", "2026-01-01", "--date-to", "2026-12-31"]
+        )
+        assert args.date_from == "2026-01-01"
+        assert args.date_to == "2026-12-31"
+
+
+# ── run_cli ────────────────────────────────────────────────────────────────
+
+
+class TestRunCli:
+    def test_no_command_exits_zero(self, capsys, monkeypatch):
+        monkeypatch.setattr("sys.argv", ["devcoach"])
+        with pytest.raises(SystemExit) as exc:
+            commands.run_cli()
+        assert exc.value.code == 0
+
+    def test_dispatches_profile(self, capsys, monkeypatch):
+        monkeypatch.setattr("sys.argv", ["devcoach", "profile"])
+        commands.run_cli()
+
+    def test_dispatches_settings(self, capsys, monkeypatch):
+        monkeypatch.setattr("sys.argv", ["devcoach", "settings"])
+        commands.run_cli()
+        assert "max_per_day" in capsys.readouterr().out
+
+    def test_dispatches_stats(self, capsys, monkeypatch):
+        monkeypatch.setattr("sys.argv", ["devcoach", "stats"])
+        commands.run_cli()
+
+    def test_dispatches_backup(self, capsys, tmp_path, monkeypatch):
+        out = str(tmp_path / "b.zip")
+        monkeypatch.setattr("sys.argv", ["devcoach", "backup", out])
+        commands.run_cli()
+        assert Path(out).exists()
