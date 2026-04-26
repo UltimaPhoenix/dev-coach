@@ -79,12 +79,14 @@ jobs:
           echo "version=$NEXT" >> "$GITHUB_OUTPUT"
           echo "tag=v$NEXT"    >> "$GITHUB_OUTPUT"
 
-      - name: Bump version in pyproject.toml
-        run: sed -i 's/^version = ".*"/version = "${{ steps.ver.outputs.version }}"/' pyproject.toml
+      - name: Bump version in pyproject.toml and sonar-project.properties
+        run: |
+          sed -i 's/^version = ".*"/version = "${{ steps.ver.outputs.version }}"/' pyproject.toml
+          sed -i 's/^sonar.projectVersion=.*/sonar.projectVersion=${{ steps.ver.outputs.version }}/' sonar-project.properties
 
       - name: Commit and tag
         run: |
-          git add pyproject.toml
+          git add pyproject.toml sonar-project.properties
           git commit -m "chore: bump version to ${{ steps.ver.outputs.version }}"
           git tag "${{ steps.ver.outputs.tag }}"
           git push --atomic origin main "${{ steps.ver.outputs.tag }}"
