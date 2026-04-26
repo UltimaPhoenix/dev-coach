@@ -242,8 +242,8 @@
 
         {% if all_categories %}
         <div>
-          <label class="block text-xs text-gray-400 dark:text-gray-500 mb-1">Category</label>
-          <select name="category" onchange="this.form.submit()"
+          <label for="filter-category" class="block text-xs text-gray-400 dark:text-gray-500 mb-1">Category</label>
+          <select id="filter-category" name="category" onchange="this.form.submit()"
                   class="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500">
             <option value="">All categories</option>
             {% for cat in all_categories %}
@@ -255,8 +255,8 @@
 
         {% if all_projects %}
         <div>
-          <label class="block text-xs text-gray-400 dark:text-gray-500 mb-1">Project</label>
-          <select name="project" onchange="this.form.submit()"
+          <label for="filter-project" class="block text-xs text-gray-400 dark:text-gray-500 mb-1">Project</label>
+          <select id="filter-project" name="project" onchange="this.form.submit()"
                   class="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500">
             <option value="">All projects</option>
             {% for p in all_projects %}
@@ -268,8 +268,8 @@
 
         {% if all_repositories %}
         <div>
-          <label class="block text-xs text-gray-400 dark:text-gray-500 mb-1">Repository</label>
-          <select name="repository" onchange="this.form.submit()"
+          <label for="filter-repository" class="block text-xs text-gray-400 dark:text-gray-500 mb-1">Repository</label>
+          <select id="filter-repository" name="repository" onchange="this.form.submit()"
                   class="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500">
             <option value="">All repositories</option>
             {% for r in all_repositories %}
@@ -281,8 +281,8 @@
 
         {% if all_branches %}
         <div>
-          <label class="block text-xs text-gray-400 dark:text-gray-500 mb-1">Branch</label>
-          <input type="text" name="branch" value="{{ selected_branch }}"
+          <label for="filter-branch" class="block text-xs text-gray-400 dark:text-gray-500 mb-1">Branch</label>
+          <input id="filter-branch" type="text" name="branch" value="{{ selected_branch }}"
                  placeholder="e.g. main" list="branch-list" autocomplete="off"
                  class="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500" />
           <datalist id="branch-list">{% for b in all_branches %}<option value="{{ b }}">{% endfor %}</datalist>
@@ -291,8 +291,8 @@
 
         {% if all_commits %}
         <div>
-          <label class="block text-xs text-gray-400 dark:text-gray-500 mb-1">Commit</label>
-          <input type="text" name="commit" value="{{ selected_commit }}"
+          <label for="filter-commit" class="block text-xs text-gray-400 dark:text-gray-500 mb-1">Commit</label>
+          <input id="filter-commit" type="text" name="commit" value="{{ selected_commit }}"
                  placeholder="hash prefix…" list="commit-list" autocomplete="off"
                  class="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded-lg px-2.5 py-1.5 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500" />
           <datalist id="commit-list">{% for c in all_commits %}<option value="{{ c[:7] }}">{% endfor %}</datalist>
