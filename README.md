@@ -38,7 +38,7 @@ Everything runs **locally**. No data leaves your machine. One SQLite file at `~/
 ### Recommended — no permanent install needed
 
 ```bash
-uvx devcoach
+uvx devcoach mcp   # starts the MCP server directly
 ```
 
 ### Permanent install
@@ -109,6 +109,8 @@ devcoach feedback lesson-python-taskgroup-001 dont_know # need to revisit — �
 
 | Command | Description |
 |---------|-------------|
+| `devcoach` | Show all available commands |
+| `devcoach mcp` | Start the MCP server (stdio) for Claude Code / Claude Desktop |
 | `devcoach setup` | Run the onboarding wizard in the terminal |
 | `devcoach install` | Register with Claude Code / Claude Desktop |
 | `devcoach profile` | Show your knowledge map with confidence bars |
@@ -155,7 +157,7 @@ devcoach implements the [MCP 2025-11-25 spec](https://modelcontextprotocol.io/sp
     "devcoach": {
       "type": "stdio",
       "command": "uvx",
-      "args": ["devcoach"]
+      "args": ["devcoach", "mcp"]
     }
   }
 }
