@@ -169,10 +169,10 @@ jobs:
       - run: uv sync --group dev
       - name: Run tests with coverage
         run: uv run pytest tests/ -v --tb=short --cov=src/devcoach --cov-report=xml
-      - uses: sonarsource/sonarqube-scan-action@v6
+      - uses: sonarsource/sonarqube-scan-action@v7
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-      - uses: sonarsource/sonarqube-quality-gate-action@v1
+      - uses: sonarsource/sonarqube-quality-gate-action@v1.2.0
         if: github.event_name == 'pull_request'
         timeout-minutes: 5
         env:
@@ -198,12 +198,12 @@ jobs:
           python-version: "3.12"
       - run: uv sync --group docs
       - run: uv run mkdocs build
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: site/
       - name: Deploy to GitHub Pages
         id: deploy
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
 
   # ── Publish ─────────────────────────────────────────────────────────────
   # Runs when a tag is present: either created by the bump job (workflow_dispatch)
