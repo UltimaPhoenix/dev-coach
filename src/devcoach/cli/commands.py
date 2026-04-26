@@ -9,7 +9,9 @@ from pathlib import Path
 
 from rich import box
 from rich.console import Console
+from rich.panel import Panel
 from rich.table import Table
+from rich.text import Text
 
 from devcoach.core import coach, db
 
@@ -608,6 +610,68 @@ def cmd_ui(args: argparse.Namespace) -> None:
 # ── Parser ─────────────────────────────────────────────────────────────────
 
 
+def cmd_mcp(_args: argparse.Namespace) -> None:
+    """Start the devcoach MCP server (stdio transport for Claude Code / Claude Desktop)."""
+    from devcoach.mcp.server import mcp
+
+    mcp.run(transport="stdio")
+
+
+def _print_welcome() -> None:
+    """Print the devcoach welcome/overview panel when no subcommand is given."""
+    commands = [
+        ("mcp", "Start the MCP server (stdio) for Claude Code / Claude Desktop"),
+        ("ui [--port N]", "Launch the web dashboard  (default port: 7860)"),
+        ("setup", "First-run wizard: import backup or build your knowledge profile"),
+        ("install", "Register the MCP server in Claude Code / Claude Desktop config"),
+        ("", ""),
+        ("profile", "Show the knowledge map"),
+        ("stats", "Coaching statistics and rate-limit status"),
+        ("settings", "Show current settings"),
+        ("set <key> <val>", "Update a setting (max_per_day | min_gap_minutes)"),
+        ("", ""),
+        ("lessons", "List past lessons (many filter / sort options)"),
+        ("lesson <id>", "Show a single lesson in detail"),
+        ("star <id>", "Toggle the starred flag on a lesson"),
+        ("feedback <id>", "Record know / dont_know feedback for a lesson"),
+        ("", ""),
+        ("knowledge-add", "Add or update a topic in the knowledge map"),
+        ("knowledge-remove", "Remove a topic from the knowledge map"),
+        ("group-add", "Register a new knowledge group"),
+        ("group-remove", "Delete a knowledge group"),
+        ("group-assign", "Move a topic to a group"),
+        ("", ""),
+        ("backup [file]", "Export a full backup as zip"),
+        ("restore <file>", "Restore from a backup zip"),
+    ]
+
+    table = Table(box=box.SIMPLE, show_header=False, padding=(0, 2, 0, 0))
+    table.add_column(style="bold cyan", no_wrap=True)
+    table.add_column(style="dim")
+    for cmd, desc in commands:
+        if cmd == "":
+            table.add_row("", "")
+        else:
+            table.add_row(f"devcoach {cmd}", desc)
+
+    hint = Text()
+    hint.append("Run ", style="dim")
+    hint.append("devcoach <command> --help", style="bold")
+    hint.append(" for per-command options.", style="dim")
+
+    console.print()
+    console.print(
+        Panel(
+            table,
+            title="[bold #6366f1]devcoach[/]",
+            subtitle=hint,
+            border_style="#6366f1",
+            padding=(1, 2),
+        )
+    )
+    console.print()
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="devcoach",
@@ -754,6 +818,11 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Interactive first-run wizard: import backup or build knowledge profile",
     )
 
+    sub.add_parser(
+        "mcp",
+        help="Start the MCP server (stdio transport) for Claude Code / Claude Desktop",
+    )
+
     return parser
 
 
@@ -784,10 +853,11 @@ def run_cli() -> None:
         "install": cmd_install,
         "ui": cmd_ui,
         "setup": cmd_setup,
+        "mcp": cmd_mcp,
     }
 
     if args.command is None:
-        parser.print_help()
+        _print_welcome()
         sys.exit(0)
 
     dispatch[args.command](args)

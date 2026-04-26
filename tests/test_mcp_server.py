@@ -511,22 +511,15 @@ class TestPrompt:
 
 
 class TestMain:
-    def test_dispatches_to_cli_for_known_commands(self, monkeypatch):
-        monkeypatch.setattr(sys, "argv", ["devcoach", "profile"])
-        with patch("devcoach.mcp.server.mcp.run") as mock_run:
-            with patch("devcoach.cli.commands.run_cli") as mock_cli:
-                server.main()
+    def test_delegates_to_run_cli(self, monkeypatch):
+        with patch("devcoach.cli.commands.run_cli") as mock_cli:
+            server.main()
         mock_cli.assert_called_once()
-        mock_run.assert_not_called()
 
-    def test_dispatches_to_mcp_when_no_args(self, monkeypatch):
-        monkeypatch.setattr(sys, "argv", ["devcoach"])
+    def test_mcp_subcommand_starts_server(self, monkeypatch):
+        monkeypatch.setattr(sys, "argv", ["devcoach", "mcp"])
         with patch("devcoach.mcp.server.mcp.run") as mock_run:
-            server.main()
+            from devcoach.cli.commands import cmd_mcp
+            import argparse
+            cmd_mcp(argparse.Namespace())
         mock_run.assert_called_once_with(transport="stdio")
-
-    def test_dispatches_to_mcp_for_unknown_command(self, monkeypatch):
-        monkeypatch.setattr(sys, "argv", ["devcoach", "--unknown-flag"])
-        with patch("devcoach.mcp.server.mcp.run") as mock_run:
-            server.main()
-        mock_run.assert_called_once()

@@ -6,7 +6,6 @@ import importlib.resources
 import json
 import shutil
 import subprocess
-import sys
 from pathlib import Path
 from typing import Literal
 
@@ -512,33 +511,10 @@ def devcoach_instructions() -> str:
 
 
 def main() -> None:
-    """Start devcoach: CLI subcommand if given, else stdio MCP server."""
-    cli_commands = {
-        "profile",
-        "lessons",
-        "lesson",
-        "star",
-        "feedback",
-        "settings",
-        "set",
-        "stats",
-        "backup",
-        "restore",
-        "ui",
-        "knowledge-add",
-        "knowledge-remove",
-        "group-add",
-        "group-remove",
-        "group-assign",
-        "install",
-        "setup",
-    }
-    if len(sys.argv) > 1 and sys.argv[1] in cli_commands:
-        from devcoach.cli.commands import run_cli
+    """Entry point — delegates to the CLI dispatcher."""
+    from devcoach.cli.commands import run_cli
 
-        run_cli()
-    else:
-        mcp.run(transport="stdio")
+    run_cli()
 
 
 if __name__ == "__main__":
