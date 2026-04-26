@@ -84,6 +84,18 @@
   {# ── Filter bar ── #}
   <div class="flex flex-wrap items-center gap-2 mb-3">
 
+    {# Starred toggle #}
+    <button type="button"
+            onclick="var h=document.getElementById('h-starred'); h.value=h.value?'':'1'; document.getElementById('filter-form').submit()"
+            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition
+                   {% if selected_starred %}
+                     bg-yellow-400 text-yellow-900 border-yellow-400
+                   {% else %}
+                     bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-yellow-400 hover:text-yellow-500
+                   {% endif %}">
+      ★ Starred
+    </button>
+
     {# Period dropdown #}
     <div class="relative" x-data="periodPicker()" @keydown.escape="close()">
       <button type="button" @click="toggle()"
@@ -205,18 +217,6 @@
         {% endfor %}
       </div>
     </div>
-
-    {# Starred toggle #}
-    <button type="button"
-            onclick="var h=document.getElementById('h-starred'); h.value=h.value?'':'1'; document.getElementById('filter-form').submit()"
-            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition
-                   {% if selected_starred %}
-                     bg-yellow-400 text-yellow-900 border-yellow-400
-                   {% else %}
-                     bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-yellow-400 hover:text-yellow-500
-                   {% endif %}">
-      ★ Starred
-    </button>
 
     {# More filters #}
     {% if all_categories or all_projects or all_repositories or all_branches or all_commits %}
