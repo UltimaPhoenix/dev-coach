@@ -14,11 +14,14 @@ The server exposes **tools** (mutations), **resources** (read-only data), and a 
     "devcoach": {
       "type": "stdio",
       "command": "uvx",
-      "args": ["devcoach"]
+      "args": ["devcoach", "mcp"]
     }
   }
 }
 ```
+
+!!! note
+    The `mcp` subcommand is required. Running `devcoach` without it launches the CLI instead of the MCP server.
 
 ---
 

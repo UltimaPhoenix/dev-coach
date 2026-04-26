@@ -13,7 +13,7 @@
 ### One-time run (no permanent install)
 
 ```bash
-uvx devcoach
+uvx devcoach mcp
 ```
 
 ### Permanent install

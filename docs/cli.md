@@ -1,12 +1,35 @@
 # CLI reference
 
-## Global
+## Overview
+
+Running `devcoach` with no arguments prints a help panel listing every available command:
 
 ```
-devcoach <command> [options]
+devcoach
 ```
 
 All commands operate on `~/.devcoach/coaching.db`. No network access required.
+
+---
+
+## MCP server
+
+### `devcoach mcp`
+
+Start the stdio MCP server for Claude Code or Claude Desktop. This is what you put in your MCP config:
+
+```json
+{
+  "mcpServers": {
+    "devcoach": {
+      "command": "uvx",
+      "args": ["devcoach", "mcp"]
+    }
+  }
+}
+```
+
+---
 
 ---
 
@@ -191,7 +214,7 @@ Followed by optional group assignment and rate-limit settings.
 
 ### `devcoach install`
 
-Register the devcoach MCP server in Claude's config files.
+Register the devcoach MCP server (`devcoach mcp`) in Claude's config files.
 
 ```bash
 devcoach install                  # both Claude Code + Claude Desktop

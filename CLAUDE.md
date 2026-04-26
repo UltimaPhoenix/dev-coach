@@ -9,7 +9,7 @@ based on the user's knowledge map, the rate limit, and what has already been tau
 
 Repo: https://github.com/UltimaPhoenix/dev-coach
 PyPI package name: `devcoach`
-End-user command: `uvx devcoach`
+End-user command: `uvx devcoach` (CLI) / `uvx devcoach mcp` (MCP server)
 
 ---
 
@@ -240,7 +240,7 @@ npx @modelcontextprotocol/inspector devcoach
   "mcpServers": {
     "devcoach": {
       "command": "uvx",
-      "args": ["devcoach"]
+      "args": ["devcoach", "mcp"]
     }
   }
 }
