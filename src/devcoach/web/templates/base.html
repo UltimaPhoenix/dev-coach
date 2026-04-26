@@ -6,12 +6,15 @@
   <title>{% block title %}devcoach{% endblock %}</title>
   <link rel="icon" type="image/svg+xml" href="/static/favicon.svg" />
 
-  <!-- Apply theme before first paint to avoid flash -->
+  <!-- Apply theme before first paint to avoid flash.
+       Priority: session override (localStorage) > server setting > system preference. -->
+  <meta name="devcoach-theme" content="{{ settings.ui_theme if settings is defined else 'system' }}" />
   <script>
     (function () {
-      var stored = localStorage.getItem('theme');
-      var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      var dark = stored ? stored === 'dark' : prefersDark;
+      var serverTheme = document.querySelector('meta[name="devcoach-theme"]').content;
+      var session = localStorage.getItem('theme-override');
+      var active = session || serverTheme;
+      var dark = active === 'dark' || (active === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
       if (dark) document.documentElement.classList.add('dark');
     })();
   </script>
@@ -66,10 +69,18 @@
 
     function toggleTheme() {
       document.documentElement.classList.toggle('dark');
-      localStorage.setItem('theme', isDark() ? 'dark' : 'light');
+      // Store as a session-level override; this is cleared when the server
+      // setting is changed to 'system' and the page reloads.
+      localStorage.setItem('theme-override', isDark() ? 'dark' : 'light');
       updateThemeIcon();
       updateHljsTheme();
     }
+
+    // Clear the in-session override if the server now has an explicit setting.
+    (function () {
+      var serverTheme = document.querySelector('meta[name="devcoach-theme"]').content;
+      if (serverTheme !== 'system') localStorage.removeItem('theme-override');
+    })();
 
     updateThemeIcon();
     updateHljsTheme();

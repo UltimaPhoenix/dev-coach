@@ -209,6 +209,7 @@ async def lessons_page(
         all_repositories = db.get_distinct_column(conn, "repository")
         all_branches = db.get_distinct_column(conn, "branch")
         all_commits = db.get_distinct_column(conn, "commit_hash")
+        settings = db.get_settings(conn)
 
     import math
 
@@ -243,6 +244,7 @@ async def lessons_page(
             "per_page": _PER_PAGE,
             "total": total,
             "total_pages": total_pages,
+            "settings": settings,
         },
     )
 
@@ -270,12 +272,13 @@ async def submit_feedback(
 async def lesson_detail_page(request: Request, lesson_id: str) -> HTMLResponse:
     with db.connection() as conn:
         lesson = db.get_lesson_by_id(conn, lesson_id)
+        settings = db.get_settings(conn)
     if lesson is None:
         return HTMLResponse("<h1>Lesson not found</h1>", status_code=404)
     return templates.TemplateResponse(
         request,
         "lesson_detail.html",
-        {"lesson": lesson},
+        {"lesson": lesson, "settings": settings},
     )
 
 
@@ -308,10 +311,14 @@ async def settings_page(
 async def update_settings(
     max_per_day: int = Form(...),
     min_gap_minutes: int = Form(...),
+    ui_theme: str = Form("system"),
 ) -> RedirectResponse:
+    if ui_theme not in ("system", "dark", "light"):
+        ui_theme = "system"
     with db.connection() as conn:
         db.set_setting(conn, "max_per_day", str(max_per_day))
         db.set_setting(conn, "min_gap_minutes", str(min_gap_minutes))
+        db.set_setting(conn, "ui_theme", ui_theme)
     return RedirectResponse(url="/settings", status_code=303)
 
 

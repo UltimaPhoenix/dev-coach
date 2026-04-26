@@ -88,6 +88,7 @@ class Settings(BaseModel):
 
     max_per_day: int = 2
     min_gap_minutes: int = 240  # replaces min_hours_between (4h default)
+    ui_theme: Literal["system", "dark", "light"] = "system"
 
 
 class KnowledgeUpdate(BaseModel):

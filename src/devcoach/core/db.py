@@ -49,6 +49,7 @@ DEFAULT_SETTINGS: dict[str, str] = {
     "max_per_day": "2",
     "min_gap_minutes": "240",  # replaces min_hours_between
     "onboarding_completed": "0",
+    "ui_theme": "system",
 }
 
 # Ordered category → topic list mapping for the knowledge map UI.
@@ -478,6 +479,8 @@ def restore_backup_zip(conn: sqlite3.Connection, data: bytes) -> dict[str, int]:
                 set_setting(conn, "max_per_day", str(s["max_per_day"]))
             if "min_gap_minutes" in s:
                 set_setting(conn, "min_gap_minutes", str(s["min_gap_minutes"]))
+            if s.get("ui_theme") in ("system", "dark", "light"):
+                set_setting(conn, "ui_theme", s["ui_theme"])
             result["settings"] = 1
 
         if "knowledge.json" in names:
@@ -689,9 +692,12 @@ def get_settings(conn: sqlite3.Connection) -> Settings:
         gap = int(data["min_hours_between"]) * 60  # migrate hours → minutes
     else:
         gap = int(DEFAULT_SETTINGS["min_gap_minutes"])
+    raw_theme = data.get("ui_theme", DEFAULT_SETTINGS["ui_theme"])
+    theme = raw_theme if raw_theme in ("system", "dark", "light") else "system"
     return Settings(
         max_per_day=int(data.get("max_per_day", DEFAULT_SETTINGS["max_per_day"])),
         min_gap_minutes=gap,
+        ui_theme=theme,  # type: ignore[arg-type]
     )
 
 

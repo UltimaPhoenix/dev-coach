@@ -58,6 +58,28 @@
         </div>
       </div>
 
+      <div>
+        <label class="block text-sm text-gray-600 dark:text-gray-400 mb-1">UI theme</label>
+        <div class="flex gap-2">
+          {% for value, label, icon in [("system", "System", "🌓"), ("light", "Light", "☀️"), ("dark", "Dark", "🌙")] %}
+          <label class="flex-1 cursor-pointer">
+            <input type="radio" name="ui_theme" value="{{ value }}"
+                   {% if settings.ui_theme == value %}checked{% endif %}
+                   class="sr-only peer" />
+            <span class="flex flex-col items-center justify-center gap-1 px-3 py-2 rounded border
+                         border-gray-300 dark:border-gray-700
+                         peer-checked:border-indigo-500 peer-checked:bg-indigo-50 dark:peer-checked:bg-indigo-900/30
+                         peer-checked:text-indigo-700 dark:peer-checked:text-indigo-300
+                         text-gray-500 dark:text-gray-400 text-xs font-medium transition select-none">
+              <span class="text-base leading-none">{{ icon }}</span>
+              {{ label }}
+            </span>
+          </label>
+          {% endfor %}
+        </div>
+        <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">System follows your OS preference.</p>
+      </div>
+
       <button type="submit"
               class="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded px-4 py-2 text-sm transition">
         Save settings
