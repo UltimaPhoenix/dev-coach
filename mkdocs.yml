@@ -39,7 +39,6 @@ nav:
 
 plugins:
   - search
-  - search.suggest
 
 markdown_extensions:
   - admonition
