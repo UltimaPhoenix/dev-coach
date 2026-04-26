@@ -29,7 +29,7 @@ Everything runs **locally**. No data leaves your machine. One SQLite file at `~/
 
 | Knowledge map | Lesson history | Settings |
 |:---:|:---:|:---:|
-| ![Knowledge map](docs/screenshots/knowledge-map.png) | ![Lessons](docs/screenshots/lessons.png) | ![Settings](docs/screenshots/settings.png) |
+| ![Knowledge map](docs/screenshots/knowledge-map-light.png) | ![Lessons](docs/screenshots/lessons-dark.png) | ![Settings](docs/screenshots/settings-dark.png) |
 
 ---
 

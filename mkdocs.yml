@@ -21,11 +21,11 @@ theme:
         icon: material/brightness-7
         name: Switch to dark mode
   features:
-    - navigation.tabs
-    - navigation.sections
     - navigation.top
+    - navigation.indexes
     - search.highlight
     - content.code.copy
+    - toc.integrate
   icon:
     repo: fontawesome/brands/github
 
@@ -39,6 +39,7 @@ nav:
 
 plugins:
   - search
+  - search.suggest
 
 markdown_extensions:
   - admonition

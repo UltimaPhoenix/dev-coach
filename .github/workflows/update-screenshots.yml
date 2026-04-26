@@ -1,0 +1,39 @@
+name: Update documentation screenshots (GitHub Pages)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  screenshots:
+    name: Take and commit screenshots
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.12"
+
+      - name: Install devcoach
+        run: uv sync
+
+      - name: Install Playwright + Chromium
+        run: |
+          uv pip install playwright
+          uv run playwright install chromium --with-deps
+
+      - name: Restore DB and take screenshots
+        run: uv run python .github/scripts/take_screenshots.py
+
+      - name: Commit screenshots
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/screenshots/
+          git diff --staged --quiet && echo "No changes." || (
+            git commit -m "docs: update screenshots [skip ci]" &&
+            git push
+          )

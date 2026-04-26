@@ -21,15 +21,27 @@ Everything runs **locally**. No data leaves your machine. One SQLite file at `~/
 
 ### Knowledge map
 
-![Knowledge map](screenshots/knowledge-map.png)
+=== "Dark"
+    ![Knowledge map – dark theme](screenshots/knowledge-map-dark.png)
+
+=== "Light"
+    ![Knowledge map – light theme](screenshots/knowledge-map-light.png)
 
 ### Lesson history
 
-![Lessons](screenshots/lessons.png)
+=== "Dark"
+    ![Lessons – dark theme](screenshots/lessons-dark.png)
+
+=== "Light"
+    ![Lessons – light theme](screenshots/lessons-light.png)
 
 ### Settings
 
-![Settings](screenshots/settings.png)
+=== "Dark"
+    ![Settings – dark theme](screenshots/settings-dark.png)
+
+=== "Light"
+    ![Settings – light theme](screenshots/settings-dark.png)
 
 ---
 
