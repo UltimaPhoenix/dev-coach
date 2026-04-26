@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -385,10 +386,29 @@ def cmd_restore(args: argparse.Namespace) -> None:
     console.print(f"[green]✓[/green] Lessons: {', '.join(parts)}")
 
 
+def _claude_desktop_config() -> Path:
+    """Return the platform-specific Claude Desktop config path."""
+    import platform
+
+    system = platform.system()
+    if system == "Darwin":
+        return (
+            Path.home()
+            / "Library"
+            / "Application Support"
+            / "Claude"
+            / "claude_desktop_config.json"
+        )
+    if system == "Windows":
+        appdata = os.environ.get("APPDATA") or str(Path.home() / "AppData" / "Roaming")
+        return Path(appdata) / "Claude" / "claude_desktop_config.json"
+    # Linux and other Unix-like systems
+    xdg = os.environ.get("XDG_CONFIG_HOME") or str(Path.home() / ".config")
+    return Path(xdg) / "Claude" / "claude_desktop_config.json"
+
+
 _CLAUDE_CODE_CONFIG = Path.home() / ".claude.json"
-_CLAUDE_DESKTOP_CONFIG = (
-    Path.home() / "Library" / "Application Support" / "Claude" / "claude_desktop_config.json"
-)
+_CLAUDE_DESKTOP_CONFIG = _claude_desktop_config()
 _CLAUDE_CODE_ENTRY: dict = {
     "type": "stdio",
     "command": "uvx",

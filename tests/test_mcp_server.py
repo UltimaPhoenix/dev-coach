@@ -519,7 +519,9 @@ class TestMain:
     def test_mcp_subcommand_starts_server(self, monkeypatch):
         monkeypatch.setattr(sys, "argv", ["devcoach", "mcp"])
         with patch("devcoach.mcp.server.mcp.run") as mock_run:
-            from devcoach.cli.commands import cmd_mcp
             import argparse
+
+            from devcoach.cli.commands import cmd_mcp
+
             cmd_mcp(argparse.Namespace())
         mock_run.assert_called_once_with(transport="stdio")
