@@ -332,10 +332,6 @@ class TestUpdateSettings:
         result = server.update_settings("min_gap_minutes", "120")
         assert result.min_gap_minutes == 120
 
-    def test_invalid_key_raises(self):
-        with pytest.raises(ValueError, match="Unknown key"):
-            server.update_settings("unknown_key", "5")
-
     def test_non_integer_value_raises(self):
         with pytest.raises(ValueError, match="integer"):
             server.update_settings("max_per_day", "not_a_number")

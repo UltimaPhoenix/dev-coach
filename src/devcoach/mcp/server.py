@@ -264,7 +264,7 @@ def remove_group(name: str) -> Profile:
 
 
 @mcp.tool
-def update_settings(key: str, value: str) -> Settings:
+def update_settings(key: Literal["max_per_day", "min_gap_minutes"], value: str) -> Settings:
     """Update a coaching setting.
 
     key: 'max_per_day' or 'min_gap_minutes'
@@ -273,9 +273,6 @@ def update_settings(key: str, value: str) -> Settings:
       - min_gap_minutes: integer 0-1440 (minimum minutes between lessons; 0 = no cooldown)
     Returns the full updated Settings on success.
     """
-    valid_keys = {"max_per_day", "min_gap_minutes"}
-    if key not in valid_keys:
-        raise ValueError(f"Unknown key '{key}'. Valid keys: {', '.join(sorted(valid_keys))}")
     try:
         int_val = int(value)
     except ValueError:
