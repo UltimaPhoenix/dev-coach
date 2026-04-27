@@ -14,14 +14,7 @@ from fastmcp import Context, FastMCP
 from devcoach.core import coach, db
 from devcoach.core.detect import detect_stack
 from devcoach.core.git import detect_git_context
-from devcoach.core.models import (
-    Lesson,
-    Level,
-    Profile,
-    RateLimitResult,
-    RepositoryPlatform,
-    Settings,
-)
+from devcoach.core.models import Lesson, Level, Profile, RepositoryPlatform, Settings
 
 # ── FastMCP app ────────────────────────────────────────────────────────────
 
@@ -355,24 +348,39 @@ async def complete_onboarding(
 
 
 @mcp.resource("devcoach://profile")
-def profile_resource() -> Profile:
+def profile_resource() -> str:
     """Current knowledge map — topics, confidence scores, and groups."""
-    with db.connection() as conn:
-        return coach.get_profile(conn)
+    try:
+        with db.connection() as conn:
+            return coach.get_profile(conn).model_dump_json(indent=2)
+    except Exception as exc:
+        return json.dumps({"error": str(exc)})
 
 
 @mcp.resource("devcoach://settings")
-def settings_resource() -> Settings:
+def settings_resource() -> str:
     """Current coaching settings (rate limits)."""
-    with db.connection() as conn:
-        return db.get_settings(conn)
+    try:
+        with db.connection() as conn:
+            settings = db.get_settings(conn)
+        return json.dumps(settings.model_dump(), indent=2)
+    except Exception as exc:
+        return json.dumps({"error": str(exc)})
 
 
 @mcp.resource("devcoach://lessons/recent")
-def recent_lessons_resource() -> list[Lesson]:
+def recent_lessons_resource() -> str:
     """Last 10 lessons from the current week."""
-    with db.connection() as conn:
-        return db.get_lessons(conn, period="week")[:10]
+    try:
+        with db.connection() as conn:
+            lessons = db.get_lessons(conn, period="week")
+        return json.dumps(
+            [lesson.model_dump() for lesson in lessons[:10]],
+            indent=2,
+            ensure_ascii=False,
+        )
+    except Exception as exc:
+        return json.dumps({"error": str(exc)})
 
 
 @mcp.resource("devcoach://stats")
@@ -386,24 +394,30 @@ def stats_resource() -> str:
 
 
 @mcp.resource("devcoach://taught-topics")
-def taught_topics_resource() -> list[str]:
+def taught_topics_resource() -> str:
     """All topic_ids that have already been taught.
 
     Read this before selecting a new lesson topic to avoid repetition.
     """
-    with db.connection() as conn:
-        return coach.list_taught_topics(conn)
+    try:
+        with db.connection() as conn:
+            return json.dumps(coach.list_taught_topics(conn))
+    except Exception as exc:
+        return json.dumps({"error": str(exc)})
 
 
 @mcp.resource("devcoach://rate-limit")
-def rate_limit_resource() -> RateLimitResult:
+def rate_limit_resource() -> str:
     """Current rate-limit status.
 
     Returns {allowed, reason} — check this before delivering a lesson.
-    reason is omitted when allowed is true.
     """
-    with db.connection() as conn:
-        return coach.check_rate_limit(conn)
+    try:
+        with db.connection() as conn:
+            result = coach.check_rate_limit(conn)
+        return result.model_dump_json(indent=2, exclude_none=True)
+    except Exception as exc:
+        return json.dumps({"allowed": False, "reason": f"Rate limit check unavailable: {exc}"})
 
 
 @mcp.resource("devcoach://context")
@@ -451,13 +465,19 @@ def onboarding_resource() -> str:
 
 
 @mcp.resource("devcoach://lessons/{lesson_id}")
-def lesson_resource(lesson_id: str) -> Lesson:
-    """A single lesson by ID."""
-    with db.connection() as conn:
-        lesson = db.get_lesson_by_id(conn, lesson_id)
-    if lesson is None:
-        raise ValueError(f"Lesson '{lesson_id}' not found")
-    return lesson
+def lesson_resource(lesson_id: str) -> str:
+    """A single lesson by ID.
+
+    Returns the full lesson JSON, or {"error": "..."} if not found.
+    """
+    try:
+        with db.connection() as conn:
+            lesson = db.get_lesson_by_id(conn, lesson_id)
+        if lesson is None:
+            return json.dumps({"error": f"Lesson '{lesson_id}' not found"})
+        return lesson.model_dump_json(indent=2)
+    except Exception as exc:
+        return json.dumps({"error": str(exc)})
 
 
 # ── MCP Prompt ────────────────────────────────────────────────────────────
