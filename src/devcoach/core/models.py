@@ -139,4 +139,8 @@ class RateLimitResult(BaseModel):
 
     @model_serializer
     def _serialize(self) -> dict:
-        return {k: v for k, v in {"allowed": self.allowed, "reason": self.reason}.items() if v is not None}
+        return {
+            k: v
+            for k, v in {"allowed": self.allowed, "reason": self.reason}.items()
+            if v is not None
+        }
