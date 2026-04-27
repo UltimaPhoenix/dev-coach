@@ -7,6 +7,7 @@ import json
 import sqlite3
 import zipfile
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -554,3 +555,200 @@ class TestRunCli:
         monkeypatch.setattr("sys.argv", ["devcoach", "backup", out])
         commands.run_cli()
         assert Path(out).exists()
+
+
+# ── cmd_feedback ───────────────────────────────────────────────────────────
+
+
+class TestCmdFeedback:
+    def test_clear_prints_cleared(self, capsys):
+        commands.cmd_feedback(_ns(id="lesson-sqlite3-row-factory-001", feedback="clear"))
+        assert "cleared" in capsys.readouterr().out
+
+    def test_invalid_feedback_exits(self):
+        with pytest.raises(SystemExit) as exc:
+            commands.cmd_feedback(_ns(id="lesson-sqlite3-row-factory-001", feedback="bad"))
+        assert exc.value.code == 1
+
+    def test_lesson_not_found_exits(self):
+        with pytest.raises(SystemExit) as exc:
+            commands.cmd_feedback(_ns(id="nonexistent-lesson", feedback="know"))
+        assert exc.value.code == 1
+
+
+# ── cmd_group_remove (success path) ───────────────────────────────────────
+
+
+class TestCmdGroupRemoveSuccess:
+    def test_prints_removed_when_topics_cleared(self, capsys, db_path):
+        # Assign python to a group so delete_group returns count > 0
+        c = sqlite3.connect(str(db_path))
+        c.row_factory = sqlite3.Row
+        db.assign_topic_to_group(c, "python", "Languages")
+        c.close()
+        commands.cmd_group_remove(_ns(name="Languages"))
+        out = capsys.readouterr().out
+        assert "Removed" in out
+        assert "Languages" in out
+
+
+# ── cmd_restore (invalid lessons) ─────────────────────────────────────────
+
+
+class TestCmdRestoreInvalid:
+    def test_invalid_lessons_reported(self, capsys, tmp_path):
+        bad_zip = tmp_path / "bad.zip"
+        with zipfile.ZipFile(bad_zip, "w") as zf:
+            zf.writestr("lessons.json", json.dumps([{"id": "x", "not_a_lesson": True}]))
+            zf.writestr("knowledge.json", json.dumps({}))
+            zf.writestr("settings.json", json.dumps({}))
+        commands.cmd_restore(_ns(input=str(bad_zip)))
+        assert "rejected" in capsys.readouterr().out
+
+
+# ── _claude_desktop_config (platform paths) ───────────────────────────────
+
+
+class TestClaudeDesktopConfig:
+    def test_windows_path(self, monkeypatch, tmp_path):
+        monkeypatch.setenv("APPDATA", str(tmp_path))
+        with patch("platform.system", return_value="Windows"):
+            path = commands._claude_desktop_config()
+        assert "Claude" in str(path)
+        assert path.name == "claude_desktop_config.json"
+
+    def test_linux_path_with_xdg(self, monkeypatch, tmp_path):
+        monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+        with patch("platform.system", return_value="Linux"):
+            path = commands._claude_desktop_config()
+        assert str(tmp_path) in str(path)
+        assert path.name == "claude_desktop_config.json"
+
+    def test_linux_path_without_xdg(self, monkeypatch):
+        monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
+        with patch("platform.system", return_value="Linux"):
+            path = commands._claude_desktop_config()
+        assert ".config" in str(path)
+        assert path.name == "claude_desktop_config.json"
+
+
+# ── _install_via_claude_cli ────────────────────────────────────────────────
+
+
+class TestInstallViaCaudeCli:
+    def test_returns_empty_when_no_claude(self):
+        with patch("shutil.which", return_value=None):
+            assert commands._install_via_claude_cli("user", False) == ""
+
+    def test_success_message(self):
+        ok = MagicMock(returncode=0, stderr="", stdout="")
+        with patch("shutil.which", return_value="/usr/bin/claude"):
+            with patch("subprocess.run", return_value=ok):
+                result = commands._install_via_claude_cli("user", False)
+        assert "Registered" in result
+
+    def test_already_registered_message(self):
+        fail = MagicMock(returncode=1, stderr="already exists", stdout="")
+        with patch("shutil.which", return_value="/usr/bin/claude"):
+            with patch("subprocess.run", return_value=fail):
+                result = commands._install_via_claude_cli("user", False)
+        assert "Already registered" in result
+
+    def test_failure_message(self):
+        fail = MagicMock(returncode=1, stderr="permission denied", stdout="")
+        with patch("shutil.which", return_value="/usr/bin/claude"):
+            with patch("subprocess.run", return_value=fail):
+                result = commands._install_via_claude_cli("user", False)
+        assert "failed" in result
+
+    def test_force_calls_remove_first(self):
+        calls: list[list[str]] = []
+
+        def mock_run(cmd, **kwargs):
+            calls.append(cmd)
+            return MagicMock(returncode=0, stderr="", stdout="")
+
+        with patch("shutil.which", return_value="/usr/bin/claude"):
+            with patch("subprocess.run", side_effect=mock_run):
+                commands._install_via_claude_cli("user", True)
+
+        assert any("remove" in cmd for cmd in calls)
+        assert len(calls) == 2  # remove + add
+
+
+# ── cmd_ui ─────────────────────────────────────────────────────────────────
+
+
+class TestCmdUi:
+    def test_prints_url(self, capsys):
+        with patch("uvicorn.run"):
+            commands.cmd_ui(_ns(port=7860))
+        assert "7860" in capsys.readouterr().out
+
+    def test_passes_port_to_uvicorn(self):
+        with patch("uvicorn.run") as mock_run:
+            commands.cmd_ui(_ns(port=9000))
+        assert mock_run.call_args.kwargs["port"] == 9000
+
+
+# ── cmd_setup ──────────────────────────────────────────────────────────────
+
+
+class TestCmdSetup:
+    def _inputs(self, *values):
+        it = iter(values)
+        return lambda *a, **kw: next(it)
+
+    def test_backup_import_completes(self, tmp_path, monkeypatch, capsys):
+        with db.connection() as conn:
+            data = db.create_backup_zip(conn)
+        backup = tmp_path / "b.zip"
+        backup.write_bytes(data)
+        monkeypatch.setattr("builtins.input", self._inputs(str(backup)))
+        commands.cmd_setup(_ns())
+        assert "Setup complete" in capsys.readouterr().out
+
+    def test_backup_not_found_exits(self, monkeypatch):
+        monkeypatch.setattr("builtins.input", self._inputs("/no/such/file.zip"))
+        with pytest.raises(SystemExit) as exc:
+            commands.cmd_setup(_ns())
+        assert exc.value.code == 1
+
+    def test_auto_empty_stack_completes(self, monkeypatch, capsys):
+        monkeypatch.setattr("builtins.input", self._inputs("", "", "", "", ""))
+        with patch("devcoach.core.detect.detect_stack", return_value={}):
+            with patch("devcoach.core.git.detect_git_context", return_value={"folder": "/tmp"}):
+                commands.cmd_setup(_ns())
+        assert "Setup complete" in capsys.readouterr().out
+
+    def test_auto_with_detected_topic(self, monkeypatch, capsys):
+        # "" backup, "" mode(auto), "" keep python@6, "" extra, "n" no groups, "" mpd, "" gap
+        monkeypatch.setattr("builtins.input", self._inputs("", "", "", "", "n", "", ""))
+        with patch("devcoach.core.detect.detect_stack", return_value={"python": 6}):
+            with patch("devcoach.core.git.detect_git_context", return_value={"folder": "/tmp"}):
+                commands.cmd_setup(_ns())
+        assert "Setup complete" in capsys.readouterr().out
+
+    def test_auto_with_groups(self, monkeypatch, capsys):
+        # "" backup, "" auto, "" keep python, "" extra, "y" groups, "Languages" group, "" mpd, "" gap
+        monkeypatch.setattr(
+            "builtins.input", self._inputs("", "", "", "", "y", "Languages", "", "")
+        )
+        with patch("devcoach.core.detect.detect_stack", return_value={"python": 6}):
+            with patch("devcoach.core.git.detect_git_context", return_value={"folder": "/tmp"}):
+                commands.cmd_setup(_ns())
+        assert "Setup complete" in capsys.readouterr().out
+
+    def test_manual_mode(self, monkeypatch, capsys):
+        # "" backup, "m" manual, "python 7" topic, "" stop, "n" no groups, "" mpd, "" gap
+        monkeypatch.setattr("builtins.input", self._inputs("", "m", "python 7", "", "n", "", ""))
+        commands.cmd_setup(_ns())
+        assert "Setup complete" in capsys.readouterr().out
+
+    def test_auto_skip_topic(self, monkeypatch, capsys):
+        # "" backup, "" auto, "s" skip python, "" extra, "" mpd, "" gap
+        monkeypatch.setattr("builtins.input", self._inputs("", "", "s", "", "", ""))
+        with patch("devcoach.core.detect.detect_stack", return_value={"python": 6}):
+            with patch("devcoach.core.git.detect_git_context", return_value={"folder": "/tmp"}):
+                commands.cmd_setup(_ns())
+        assert "Setup complete" in capsys.readouterr().out

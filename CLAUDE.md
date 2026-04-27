@@ -252,7 +252,8 @@ npx @modelcontextprotocol/inspector devcoach
 
 - Follow **Uncle Bob's Clean Code** principles
 - Follow **PEP** standards
-- Linting and formatting enforced by **ruff** — run `uv run ruff check src/ tests/` and `uv run ruff format src/ tests/` before committing
+- Linting and formatting enforced by **ruff** — run `uv run ruff check src/ tests/` and `uv run ruff format src/ tests/` before committing. **All ruff checks must pass before committing.**
+- Test coverage must stay **at or above 80%** — run `uv run pytest --cov=src/devcoach --cov-fail-under=80` to verify. Do not merge code that drops total coverage below this threshold.
 - No external dependencies beyond `fastmcp` and `pydantic`
 - `db.py` exposes only pure functions — no business logic
 - `coach.py` never imports from `server.py` (one-way dependency)
