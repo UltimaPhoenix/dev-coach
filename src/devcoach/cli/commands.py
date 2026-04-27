@@ -131,13 +131,20 @@ def cmd_lessons(args: argparse.Namespace) -> None:
 
 def cmd_star(args: argparse.Namespace) -> None:
     with db.connection() as conn:
-        lesson = db.get_lesson_by_id(conn, args.id)
-        if lesson is None:
+        if db.get_lesson_by_id(conn, args.id) is None:
             console.print(f"[red]Lesson '{args.id}' not found.[/red]")
             sys.exit(1)
-        new_state = db.set_star(conn, args.id, not lesson.starred)
-    state_label = "[yellow]★ starred[/yellow]" if new_state else "[dim]☆ unstarred[/dim]"
-    console.print(f"Lesson [cyan]{args.id}[/cyan] → {state_label}")
+        db.set_star(conn, args.id, True)
+    console.print(f"Lesson [cyan]{args.id}[/cyan] → [yellow]★ starred[/yellow]")
+
+
+def cmd_unstar(args: argparse.Namespace) -> None:
+    with db.connection() as conn:
+        if db.get_lesson_by_id(conn, args.id) is None:
+            console.print(f"[red]Lesson '{args.id}' not found.[/red]")
+            sys.exit(1)
+        db.set_star(conn, args.id, False)
+    console.print(f"Lesson [cyan]{args.id}[/cyan] → [dim]☆ unstarred[/dim]")
 
 
 def cmd_feedback(args: argparse.Namespace) -> None:
@@ -692,7 +699,8 @@ def _print_welcome() -> None:
         ("", ""),
         ("lessons", "List past lessons (many filter / sort options)"),
         ("lesson <id>", "Show a single lesson in detail"),
-        ("star <id>", "Toggle the starred flag on a lesson"),
+        ("star <id>", "Mark a lesson as starred"),
+        ("unstar <id>", "Remove the starred mark from a lesson"),
         ("feedback <id>", "Record know / dont_know feedback for a lesson"),
         ("", ""),
         ("knowledge-add", "Add or update a topic in the knowledge map"),
@@ -795,8 +803,11 @@ def _build_parser() -> argparse.ArgumentParser:
     p_lesson = sub.add_parser("lesson", help="Show a single lesson in detail")
     p_lesson.add_argument("id", help="Lesson ID")
 
-    p_star = sub.add_parser("star", help="Toggle starred flag on a lesson")
+    p_star = sub.add_parser("star", help="Mark a lesson as starred")
     p_star.add_argument("id", help="Lesson ID")
+
+    p_unstar = sub.add_parser("unstar", help="Remove the starred mark from a lesson")
+    p_unstar.add_argument("id", help="Lesson ID")
 
     p_feedback = sub.add_parser("feedback", help="Record know/dont_know feedback for a lesson")
     p_feedback.add_argument("id", help="Lesson ID")
@@ -905,6 +916,7 @@ def run_cli() -> None:
         "lessons": cmd_lessons,
         "lesson": cmd_lesson,
         "star": cmd_star,
+        "unstar": cmd_unstar,
         "feedback": cmd_feedback,
         "settings": cmd_settings,
         "stats": cmd_stats,

@@ -7,7 +7,7 @@ from datetime import date
 
 import pytest
 
-from devcoach.cli.commands import cmd_feedback, cmd_lesson, cmd_lessons, cmd_star
+from devcoach.cli.commands import cmd_feedback, cmd_lesson, cmd_lessons, cmd_star, cmd_unstar
 from devcoach.core import db
 
 _TODAY = date.today().isoformat()
@@ -300,16 +300,34 @@ class TestToggleStar:
         result = db.set_star(conn, "lesson-sqlite3-row-factory-001", True)
         assert result is True
 
-    def test_cmd_star_toggles(self, db_path, monkeypatch, capsys):
+    def test_cmd_star_marks_starred(self, db_path, monkeypatch, capsys):
         monkeypatch.setattr(db, "DB_PATH", db_path)
         cmd_star(argparse.Namespace(id="lesson-sqlite3-row-factory-001"))
         out = capsys.readouterr().out
         assert "starred" in out
 
+    def test_cmd_unstar_marks_unstarred(self, db_path, monkeypatch, capsys):
+        monkeypatch.setattr(db, "DB_PATH", db_path)
+        cmd_unstar(argparse.Namespace(id="lesson-sqlite-upsert-patterns-001"))
+        out = capsys.readouterr().out
+        assert "unstarred" in out
+
+    def test_cmd_star_idempotent(self, db_path, monkeypatch, conn, capsys):
+        monkeypatch.setattr(db, "DB_PATH", db_path)
+        cmd_star(argparse.Namespace(id="lesson-sqlite3-row-factory-001"))
+        cmd_star(argparse.Namespace(id="lesson-sqlite3-row-factory-001"))
+        capsys.readouterr()
+        assert db.get_lesson_by_id(conn, "lesson-sqlite3-row-factory-001").starred is True
+
     def test_cmd_star_not_found_exits(self, db_path, monkeypatch):
         monkeypatch.setattr(db, "DB_PATH", db_path)
         with pytest.raises(SystemExit):
             cmd_star(argparse.Namespace(id="nonexistent"))
+
+    def test_cmd_unstar_not_found_exits(self, db_path, monkeypatch):
+        monkeypatch.setattr(db, "DB_PATH", db_path)
+        with pytest.raises(SystemExit):
+            cmd_unstar(argparse.Namespace(id="nonexistent"))
 
 
 # ── set_feedback / cmd_feedback tests ─────────────────────────────────────
