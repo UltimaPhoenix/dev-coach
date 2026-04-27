@@ -150,13 +150,20 @@ jobs:
           retention-days: 7
 
   # ── SonarCloud scan + quality gate ─────────────────────────────────────
-  # CI-based analysis: feeds coverage.xml to SonarCloud and blocks PR merge
-  # if the quality gate fails. Requires Automatic Analysis to be DISABLED on
-  # sonarcloud.io (Administration → Analysis Method).
+  # CI-based analysis: feeds coverage.xml to SonarCloud.
+  # Skipped on pull_request events — SONAR_TOKEN is not available to PR
+  # workflows (GitHub restricts secret access). Runs on main / tags / dispatch
+  # where the token is available.
+  # Requires Automatic Analysis to be DISABLED on sonarcloud.io
+  # (Administration → Analysis Method).
   sonar:
     name: SonarCloud scan
     needs: [bump, test]
-    if: always() && (needs.bump.result == 'success' || needs.bump.result == 'skipped') && needs.test.result == 'success'
+    if: >
+      always()
+      && github.event_name != 'pull_request'
+      && (needs.bump.result == 'success' || needs.bump.result == 'skipped')
+      && needs.test.result == 'success'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -170,11 +177,6 @@ jobs:
       - name: Run tests with coverage
         run: uv run pytest tests/ -v --tb=short --cov=src/devcoach --cov-report=xml
       - uses: sonarsource/sonarqube-scan-action@v7
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-      - uses: sonarsource/sonarqube-quality-gate-action@v1.2.0
-        if: github.event_name == 'pull_request'
-        timeout-minutes: 5
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
