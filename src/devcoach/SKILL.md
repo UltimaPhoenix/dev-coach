@@ -261,6 +261,24 @@ When the user responds to the **know / don't know / no response** prompt, call
 `submit_feedback` internally adjusts the confidence delta — do **not** call `update_knowledge`
 separately after `submit_feedback`.
 
+### Step 3 — Propose starring the lesson
+
+After recording feedback, check whether to propose saving the lesson as a favourite.
+Call `get_lessons` with `{ "search": "<topic_id>" }` to count how many lessons on
+this topic already exist.
+
+Propose starring (`"Want to save this one? ⭐"`) when **any** of these is true:
+
+| Condition | Reason |
+|---|---|
+| Feedback is `don't know` AND level is `mid` or `senior` | Hard lesson the user didn't absorb — good to revisit |
+| `get_lessons` returns 2+ results for the same topic | Recurring topic — user keeps needing it |
+
+If the user agrees, call `star_lesson(lesson_id, starred=True)`.  
+If they decline or ignore, do nothing — never star silently.
+
+Do **not** propose starring for: `know` on easy (`junior`) lessons, or `no response`.
+
 ---
 
 ## 6. Profile queries
@@ -303,3 +321,5 @@ Every 10 lessons delivered, re-evaluate the profile:
 - Always append the **know / don't know / no response** prompt after every lesson
 - Never call `update_knowledge` directly after `log_lesson` — wait for feedback
 - `submit_feedback` handles the confidence delta; skip it entirely on no response
+- Propose starring when `don't know` on mid/senior, or when the topic recurs 2+ times
+- Never star a lesson silently — always ask first
