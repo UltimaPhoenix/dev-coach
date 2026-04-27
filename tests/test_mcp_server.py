@@ -435,20 +435,20 @@ class TestCompleteOnboarding:
 
 
 class TestResources:
-    def test_profile_resource_returns_json(self):
-        data = json.loads(server.profile_resource())
-        assert "knowledge" in data
-        assert "groups" in data
+    def test_profile_resource_returns_profile(self):
+        profile = server.profile_resource()
+        assert hasattr(profile, "knowledge")
+        assert hasattr(profile, "groups")
 
-    def test_settings_resource_returns_json(self):
-        data = json.loads(server.settings_resource())
-        assert "max_per_day" in data
-        assert "min_gap_minutes" in data
+    def test_settings_resource_returns_settings(self):
+        settings = server.settings_resource()
+        assert hasattr(settings, "max_per_day")
+        assert hasattr(settings, "min_gap_minutes")
 
     def test_recent_lessons_resource_returns_list(self):
-        data = json.loads(server.recent_lessons_resource())
-        assert isinstance(data, list)
-        assert len(data) == 3  # all seeded with today's date (within the week)
+        lessons = server.recent_lessons_resource()
+        assert isinstance(lessons, list)
+        assert len(lessons) == 3  # all seeded with today's date (within the week)
 
     def test_stats_resource_returns_json(self):
         data = json.loads(server.stats_resource())
@@ -456,13 +456,18 @@ class TestResources:
         assert data["total_lessons"] == 3
 
     def test_taught_topics_resource_returns_list(self):
-        data = json.loads(server.taught_topics_resource())
-        assert isinstance(data, list)
-        assert "sqlite3_row_factory" in data
+        topics = server.taught_topics_resource()
+        assert isinstance(topics, list)
+        assert "sqlite3_row_factory" in topics
 
-    def test_rate_limit_resource_returns_json(self):
-        data = json.loads(server.rate_limit_resource())
-        assert "allowed" in data
+    def test_rate_limit_resource_returns_result(self):
+        result = server.rate_limit_resource()
+        assert hasattr(result, "allowed")
+
+    def test_rate_limit_resource_no_reason_when_allowed(self):
+        result = server.rate_limit_resource()
+        if result.allowed:
+            assert result.reason is None
 
     def test_context_resource_returns_json(self):
         data = json.loads(server.context_resource())
@@ -485,12 +490,12 @@ class TestResources:
         assert data["needs_onboarding"] is False
 
     def test_lesson_resource_returns_lesson(self):
-        data = json.loads(server.lesson_resource("lesson-sqlite-upsert-patterns-001"))
-        assert data["topic_id"] == "sqlite_upsert_patterns"
+        lesson = server.lesson_resource("lesson-sqlite-upsert-patterns-001")
+        assert lesson.topic_id == "sqlite_upsert_patterns"
 
-    def test_lesson_resource_not_found(self):
-        data = json.loads(server.lesson_resource("nonexistent-id"))
-        assert "error" in data
+    def test_lesson_resource_not_found_raises(self):
+        with pytest.raises(ValueError, match="not found"):
+            server.lesson_resource("nonexistent-id")
 
 
 # ── Prompt ─────────────────────────────────────────────────────────────────

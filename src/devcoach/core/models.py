@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Literal
 
-from pydantic import BaseModel, field_serializer, field_validator
+from pydantic import BaseModel, field_serializer, field_validator, model_serializer
 
 # ── Domain type aliases ────────────────────────────────────────────────────
 
@@ -103,3 +103,7 @@ class RateLimitResult(BaseModel):
 
     allowed: bool
     reason: str | None = None
+
+    @model_serializer
+    def _serialize(self) -> dict:
+        return {k: v for k, v in {"allowed": self.allowed, "reason": self.reason}.items() if v is not None}
