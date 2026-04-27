@@ -250,11 +250,13 @@ async def lessons_page(
 
 
 @app.post("/lessons/{lesson_id}/star")
-async def star_lesson(lesson_id: str, next: str = Form(default="/lessons")) -> RedirectResponse:
+async def star_lesson(
+    lesson_id: str,
+    starred: str = Form(default="0"),
+    next: str = Form(default="/lessons"),
+) -> RedirectResponse:
     with db.connection() as conn:
-        lesson = db.get_lesson_by_id(conn, lesson_id)
-        if lesson is not None:
-            db.set_star(conn, lesson_id, not lesson.starred)
+        db.set_star(conn, lesson_id, starred == "1")
     return RedirectResponse(url=_safe_redirect(next), status_code=303)
 
 

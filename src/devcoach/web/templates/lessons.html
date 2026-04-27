@@ -383,6 +383,7 @@
         {# Star #}
         <td class="px-3 py-3" onclick="event.stopPropagation()" onkeydown="event.stopPropagation()">
           <form method="post" action="/lessons/{{ lesson.id }}/star">
+            <input type="hidden" name="starred" value="{% if lesson.starred %}0{% else %}1{% endif %}" />
             <input type="hidden" name="next" value="/lessons{% if request.url.query %}?{{ request.url.query }}{% endif %}" />
             <button type="submit" title="{% if lesson.starred %}Unstar{% else %}Star{% endif %}"
                     class="w-6 text-lg text-center leading-none transition

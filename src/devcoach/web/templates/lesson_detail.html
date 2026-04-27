@@ -23,6 +23,7 @@
   <!-- Row 1: star + title + level badge -->
   <div class="flex flex-wrap items-center gap-3 mb-2">
     <form method="post" action="/lessons/{{ lesson.id }}/star">
+      <input type="hidden" name="starred" value="{% if lesson.starred %}0{% else %}1{% endif %}" />
       <input type="hidden" name="next" value="/lessons/{{ lesson.id }}" />
       <button type="submit" title="{% if lesson.starred %}Unstar{% else %}Star{% endif %}"
               class="w-6 text-center text-xl leading-none transition {% if lesson.starred %}text-yellow-400 hover:text-yellow-300{% else %}text-gray-300 dark:text-gray-600 hover:text-yellow-400{% endif %}">

@@ -260,23 +260,39 @@ class TestStarEndpoint:
     def test_star_redirects(self, client):
         r = client.post(
             "/lessons/lesson-sqlite3-row-factory-001/star",
-            data={"next": "/lessons"},
+            data={"starred": "1", "next": "/lessons"},
             follow_redirects=False,
         )
         assert r.status_code == 303
 
-    def test_star_toggles_on(self, client):
-        # row_factory starts unstarred — POST stars it
-        client.post("/lessons/lesson-sqlite3-row-factory-001/star", data={"next": "/lessons"})
+    def test_star_sets_on(self, client):
+        client.post(
+            "/lessons/lesson-sqlite3-row-factory-001/star",
+            data={"starred": "1", "next": "/lessons"},
+        )
         html = client.get("/lessons/lesson-sqlite3-row-factory-001").text
-        # After starring, the star button shows the starred state
         assert "Unstar" in html
 
-    def test_star_toggles_off(self, client):
-        # upsert_patterns starts starred — POST unstars it
-        client.post("/lessons/lesson-sqlite-upsert-patterns-001/star", data={"next": "/lessons"})
+    def test_star_sets_off(self, client):
+        client.post(
+            "/lessons/lesson-sqlite-upsert-patterns-001/star",
+            data={"starred": "0", "next": "/lessons"},
+        )
         html = client.get("/lessons/lesson-sqlite-upsert-patterns-001").text
         assert "Star" in html  # "Star" (not "Unstar")
+
+    def test_star_idempotent(self, client):
+        # Starring twice leaves it starred
+        client.post(
+            "/lessons/lesson-sqlite3-row-factory-001/star",
+            data={"starred": "1", "next": "/lessons"},
+        )
+        client.post(
+            "/lessons/lesson-sqlite3-row-factory-001/star",
+            data={"starred": "1", "next": "/lessons"},
+        )
+        html = client.get("/lessons/lesson-sqlite3-row-factory-001").text
+        assert "Unstar" in html
 
     def test_star_detail_page_button_rendered(self, client):
         html = client.get("/lessons/lesson-sqlite-upsert-patterns-001").text
