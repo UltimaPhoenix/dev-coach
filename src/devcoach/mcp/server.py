@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.resources
+import json
 import shutil
 import subprocess
 from pathlib import Path
@@ -14,15 +15,12 @@ from devcoach.core import coach, db
 from devcoach.core.detect import detect_stack
 from devcoach.core.git import detect_git_context
 from devcoach.core.models import (
-    CoachStats,
     Lesson,
     Level,
-    OnboardingStatus,
     Profile,
     RateLimitResult,
     RepositoryPlatform,
     Settings,
-    WorkspaceContext,
 )
 
 # ── FastMCP app ────────────────────────────────────────────────────────────
@@ -378,10 +376,13 @@ def recent_lessons_resource() -> list[Lesson]:
 
 
 @mcp.resource("devcoach://stats")
-def stats_resource() -> CoachStats:
+def stats_resource() -> str:
     """Aggregate coaching statistics: lesson counts, rate-limit state, weakest/strongest topics."""
-    with db.connection() as conn:
-        return coach.get_stats(conn)
+    try:
+        with db.connection() as conn:
+            return json.dumps(coach.get_stats(conn), indent=2)
+    except Exception as exc:
+        return json.dumps({"error": str(exc)})
 
 
 @mcp.resource("devcoach://taught-topics")
@@ -406,21 +407,24 @@ def rate_limit_resource() -> RateLimitResult:
 
 
 @mcp.resource("devcoach://context")
-def context_resource() -> WorkspaceContext:
+def context_resource() -> str:
     """Current workspace git context and most-used lesson metadata defaults.
 
     git: auto-detected from cwd (branch, commit, repository, platform, folder).
     usage_defaults: most-frequently used values from past lessons — used as
       fallback when git detection finds nothing.
     """
-    git = detect_git_context()
-    with db.connection() as conn:
-        usage = db.get_usage_defaults(conn)
-    return WorkspaceContext(git=git, usage_defaults=usage)
+    try:
+        git = detect_git_context()
+        with db.connection() as conn:
+            usage = db.get_usage_defaults(conn)
+        return json.dumps({"git": git, "usage_defaults": usage}, indent=2)
+    except Exception as exc:
+        return json.dumps({"error": str(exc)})
 
 
 @mcp.resource("devcoach://onboarding")
-def onboarding_resource() -> OnboardingStatus:
+def onboarding_resource() -> str:
     """Onboarding status and auto-detected stack for first-run setup.
 
     needs_onboarding: true if the user has not yet completed the setup flow.
@@ -429,15 +433,21 @@ def onboarding_resource() -> OnboardingStatus:
       the onboarding conversation before complete_onboarding is called.
     context_ready: true if a git branch was successfully detected in cwd.
     """
-    with db.connection() as conn:
-        done = db.is_onboarding_complete(conn)
-    git = detect_git_context()
-    detected = detect_stack(git["folder"] or str(Path.cwd()))
-    return OnboardingStatus(
-        needs_onboarding=not done,
-        detected_stack=detected,
-        context_ready=git["branch"] is not None,
-    )
+    try:
+        with db.connection() as conn:
+            done = db.is_onboarding_complete(conn)
+        git = detect_git_context()
+        detected = detect_stack(git["folder"] or str(Path.cwd()))
+        return json.dumps(
+            {
+                "needs_onboarding": not done,
+                "detected_stack": detected,
+                "context_ready": git["branch"] is not None,
+            },
+            indent=2,
+        )
+    except Exception as exc:
+        return json.dumps({"error": str(exc)})
 
 
 @mcp.resource("devcoach://lessons/{lesson_id}")

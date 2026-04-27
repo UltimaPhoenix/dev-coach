@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import sqlite3
 import sys
 from datetime import UTC, datetime
@@ -449,8 +450,8 @@ class TestResources:
         assert isinstance(lessons, list)
         assert len(lessons) == 3  # all seeded with today's date (within the week)
 
-    def test_stats_resource_returns_dict(self):
-        data = server.stats_resource()
+    def test_stats_resource_returns_json(self):
+        data = json.loads(server.stats_resource())
         assert "total_lessons" in data
         assert data["total_lessons"] == 3
 
@@ -468,24 +469,24 @@ class TestResources:
         if result.allowed:
             assert result.reason is None
 
-    def test_context_resource_returns_dict(self):
-        data = server.context_resource()
+    def test_context_resource_returns_json(self):
+        data = json.loads(server.context_resource())
         assert "git" in data
         assert "usage_defaults" in data
 
-    def test_onboarding_resource_returns_dict(self):
-        data = server.onboarding_resource()
+    def test_onboarding_resource_returns_json(self):
+        data = json.loads(server.onboarding_resource())
         assert "needs_onboarding" in data
         assert "detected_stack" in data
         assert "context_ready" in data
 
     def test_onboarding_needs_onboarding_true_by_default(self):
-        data = server.onboarding_resource()
+        data = json.loads(server.onboarding_resource())
         assert data["needs_onboarding"] is True
 
     def test_onboarding_needs_onboarding_false_after_complete(self, mock_ctx, db_path):
         _run(server.complete_onboarding(mock_ctx, topics={"python": 7}))
-        data = server.onboarding_resource()
+        data = json.loads(server.onboarding_resource())
         assert data["needs_onboarding"] is False
 
     def test_lesson_resource_returns_lesson(self):
