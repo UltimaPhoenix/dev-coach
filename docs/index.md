@@ -41,7 +41,7 @@ Everything runs **locally**. No data leaves your machine. One SQLite file at `~/
     ![Settings – dark theme](screenshots/settings-dark.png)
 
 === "Light"
-    ![Settings – light theme](screenshots/settings-dark.png)
+    ![Settings – light theme](screenshots/settings-light.png)
 
 ---
 
