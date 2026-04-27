@@ -3,7 +3,7 @@
 ## Prerequisites
 
 - [uv](https://docs.astral.sh/uv/) (recommended) or pip
-- Python 3.11+
+- Python 3.12+
 - Claude Code or Claude Desktop
 
 ---

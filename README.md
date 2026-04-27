@@ -1,7 +1,7 @@
 # devcoach
 
 [![PyPI](https://img.shields.io/github/v/release/UltimaPhoenix/dev-coach?label=PyPI)](https://pypi.org/project/devcoach/)
-[![Python](https://img.shields.io/badge/python-3.11%2B-blue)](https://pypi.org/project/devcoach/)
+[![Python](https://img.shields.io/badge/python-3.12%2B-blue)](https://pypi.org/project/devcoach/)
 [![CI](https://github.com/UltimaPhoenix/dev-coach/actions/workflows/ci.yml/badge.svg)](https://github.com/UltimaPhoenix/dev-coach/actions/workflows/ci.yml)
 [![Quality Gate](https://sonarcloud.io/api/project_badges/measure?project=UltimaPhoenix_dev-coach&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=UltimaPhoenix_dev-coach)
 [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=UltimaPhoenix_dev-coach&metric=coverage)](https://sonarcloud.io/summary/new_code?id=UltimaPhoenix_dev-coach)
@@ -55,7 +55,7 @@ devcoach install
 
 Restart Claude Code or Claude Desktop after installing.
 
-> **Requirements:** [uv](https://docs.astral.sh/uv/) · Python 3.11+ · Claude Code or Claude Desktop
+> **Requirements:** [uv](https://docs.astral.sh/uv/) · Python 3.12+ · Claude Code or Claude Desktop
 
 ---
 
@@ -90,7 +90,7 @@ Claude: [does the work]
 
 **Structured concurrency with asyncio.TaskGroup**
 
-TaskGroup (Python 3.11+) is the modern replacement for bare gather() calls.
+TaskGroup (Python 3.12+) is the modern replacement for bare gather() calls.
 Unlike gather(), it cancels sibling tasks automatically when one raises...
 ```
 
@@ -199,7 +199,7 @@ git tag v1.2.3
 git push origin v1.2.3
 ```
 
-The pipeline will lint, test across Python 3.11–3.13, build, publish to PyPI via OIDC Trusted Publishing, and create a GitHub Release automatically.
+The pipeline will lint, test across Python 3.12–3.13, build, publish to PyPI via OIDC Trusted Publishing, and create a GitHub Release automatically.
 
 > **First-time PyPI setup:** configure a Trusted Publisher on PyPI for `UltimaPhoenix/dev-coach` (environment: `pypi`, workflow: `ci.yml`). No API token required after that.
 

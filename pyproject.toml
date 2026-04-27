@@ -3,7 +3,7 @@ name = "devcoach"
 version = "0.3.6"
 description = "A local MCP server that acts as a progressive technical coach for Claude Code and Claude Desktop"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 license = { file = "LICENSE" }
 authors = [
     { name = "UltimaPhoenix", email = "2079222+UltimaPhoenix@users.noreply.github.com" },
@@ -15,7 +15,6 @@ classifiers = [
     "License :: OSI Approved :: Apache Software License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Topic :: Software Development :: Libraries :: Python Modules",
@@ -60,7 +59,7 @@ docs = [
 
 [tool.ruff]
 line-length = 100
-target-version = "py311"
+target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP"]
