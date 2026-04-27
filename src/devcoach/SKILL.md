@@ -201,6 +201,8 @@ Append the lesson **at the bottom of the response**, separated by a horizontal r
 Explain the WHY, not just the what. Connect it to the task just completed.]
 
 💡 *Senior tip:* [One sentence a senior would say to a junior on this topic]
+
+> Did that land? **know** · **don't know** · **no response**
 ```
 
 **Tone:** direct, like a senior colleague explaining during a code review.
@@ -210,9 +212,9 @@ Not academic, not verbose. Gets straight to the point.
 
 ## 5. Updating the MCP server
 
-After delivering a lesson, call the MCP tools `log_lesson` and `update_knowledge`:
+### Step 1 — Log the lesson immediately
 
-**`log_lesson`** — required fields:
+Call `log_lesson` right after delivering the lesson, without waiting for feedback:
 
 ```json
 {
@@ -228,21 +230,36 @@ After delivering a lesson, call the MCP tools `log_lesson` and `update_knowledge
 ```
 
 Git metadata (`project`, `repository`, `branch`, `commit_hash`, `folder`,
-`repository_platform`) is **auto-detected server-side** from the current working
-directory. Do not run git commands manually. Only include these fields if you
-already have them from conversation context (e.g. the user mentioned a branch or
-commit). Omitting them is correct and will not reduce lesson quality.
+`repository_platform`) is **auto-detected server-side**. Do not run git commands
+manually. Omitting these fields is correct and will not reduce lesson quality.
 
 `log_lesson` returns the saved `Lesson` object with all resolved fields.
 
-**`update_knowledge`** — call immediately after `log_lesson`:
+### Step 2 — Record feedback and conditionally adjust confidence
 
-```json
-{ "topic": "topic_id", "delta": 1 }
-```
+When the user responds to the **know / don't know / no response** prompt, call
+`submit_feedback` according to this table:
 
-Use `+1` when the lesson builds on solid existing knowledge. Use `-1` if the
-lesson was triggered by a gap or mistake the user made.
+| User response | Condition | Action |
+|---|---|---|
+| **know** | confidence < lesson level band | `submit_feedback(id, "know")` — confidence +1 |
+| **know** | confidence already within or above lesson level band | skip — already calibrated |
+| **don't know** | any | `submit_feedback(id, "dont_know")` — confidence −1 |
+| **no response** | any | skip — no call |
+
+**Level bands** (confidence → level):
+
+| Level | Band |
+|---|---|
+| junior | 0 – 3 |
+| mid | 4 – 6 |
+| senior | 7 – 9 |
+
+**Example:** lesson is `mid`, user confidence is `5` → already in band → skip even if "know".  
+**Example:** lesson is `mid`, user confidence is `3` → below band → "know" triggers `submit_feedback`.
+
+`submit_feedback` internally adjusts the confidence delta — do **not** call `update_knowledge`
+separately after `submit_feedback`.
 
 ---
 
@@ -283,3 +300,6 @@ Every 10 lessons delivered, re-evaluate the profile:
 - **Always read** `devcoach://profile` to calibrate level and topic selection
 - The lesson should feel **natural and contextual**, not a mechanical add-on
 - If there is nothing interesting to teach → stay silent. Better nothing than forced.
+- Always append the **know / don't know / no response** prompt after every lesson
+- Never call `update_knowledge` directly after `log_lesson` — wait for feedback
+- `submit_feedback` handles the confidence delta; skip it entirely on no response
