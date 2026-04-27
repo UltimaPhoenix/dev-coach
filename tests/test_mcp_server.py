@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import sqlite3
 import sys
 from datetime import UTC, datetime
@@ -435,61 +434,61 @@ class TestCompleteOnboarding:
 
 
 class TestResources:
-    def test_profile_resource_returns_json(self):
-        data = json.loads(server.profile_resource())
+    def test_profile_resource_returns_dict(self):
+        data = server.profile_resource()
         assert "knowledge" in data
         assert "groups" in data
 
-    def test_settings_resource_returns_json(self):
-        data = json.loads(server.settings_resource())
+    def test_settings_resource_returns_dict(self):
+        data = server.settings_resource()
         assert "max_per_day" in data
         assert "min_gap_minutes" in data
 
     def test_recent_lessons_resource_returns_list(self):
-        data = json.loads(server.recent_lessons_resource())
+        data = server.recent_lessons_resource()
         assert isinstance(data, list)
         assert len(data) == 3  # all seeded with today's date (within the week)
 
-    def test_stats_resource_returns_json(self):
-        data = json.loads(server.stats_resource())
+    def test_stats_resource_returns_dict(self):
+        data = server.stats_resource()
         assert "total_lessons" in data
         assert data["total_lessons"] == 3
 
     def test_taught_topics_resource_returns_list(self):
-        data = json.loads(server.taught_topics_resource())
+        data = server.taught_topics_resource()
         assert isinstance(data, list)
         assert "sqlite3_row_factory" in data
 
-    def test_rate_limit_resource_returns_json(self):
-        data = json.loads(server.rate_limit_resource())
+    def test_rate_limit_resource_returns_dict(self):
+        data = server.rate_limit_resource()
         assert "allowed" in data
 
-    def test_context_resource_returns_json(self):
-        data = json.loads(server.context_resource())
+    def test_context_resource_returns_dict(self):
+        data = server.context_resource()
         assert "git" in data
         assert "usage_defaults" in data
 
-    def test_onboarding_resource_returns_json(self):
-        data = json.loads(server.onboarding_resource())
+    def test_onboarding_resource_returns_dict(self):
+        data = server.onboarding_resource()
         assert "needs_onboarding" in data
         assert "detected_stack" in data
         assert "context_ready" in data
 
     def test_onboarding_needs_onboarding_true_by_default(self):
-        data = json.loads(server.onboarding_resource())
+        data = server.onboarding_resource()
         assert data["needs_onboarding"] is True
 
     def test_onboarding_needs_onboarding_false_after_complete(self, mock_ctx, db_path):
         _run(server.complete_onboarding(mock_ctx, topics={"python": 7}))
-        data = json.loads(server.onboarding_resource())
+        data = server.onboarding_resource()
         assert data["needs_onboarding"] is False
 
-    def test_lesson_resource_returns_lesson(self):
-        data = json.loads(server.lesson_resource("lesson-sqlite-upsert-patterns-001"))
+    def test_lesson_resource_returns_dict(self):
+        data = server.lesson_resource("lesson-sqlite-upsert-patterns-001")
         assert data["topic_id"] == "sqlite_upsert_patterns"
 
     def test_lesson_resource_not_found(self):
-        data = json.loads(server.lesson_resource("nonexistent-id"))
+        data = server.lesson_resource("nonexistent-id")
         assert "error" in data
 
 
