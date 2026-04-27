@@ -346,7 +346,7 @@ async def complete_onboarding(
 # ── MCP Resources ──────────────────────────────────────────────────────────
 
 
-@mcp.resource("devcoach://profile")
+@mcp.resource("devcoach://profile", mime_type="application/json")
 def profile_resource() -> dict:
     """Current knowledge map — topics, confidence scores, and groups."""
     try:
@@ -356,7 +356,7 @@ def profile_resource() -> dict:
         return {"error": str(exc)}
 
 
-@mcp.resource("devcoach://settings")
+@mcp.resource("devcoach://settings", mime_type="application/json")
 def settings_resource() -> dict:
     """Current coaching settings (rate limits)."""
     try:
@@ -366,7 +366,7 @@ def settings_resource() -> dict:
         return {"error": str(exc)}
 
 
-@mcp.resource("devcoach://lessons/recent")
+@mcp.resource("devcoach://lessons/recent", mime_type="application/json")
 def recent_lessons_resource() -> list[dict]:
     """Last 10 lessons from the current week."""
     try:
@@ -377,7 +377,7 @@ def recent_lessons_resource() -> list[dict]:
         return [{"error": str(exc)}]
 
 
-@mcp.resource("devcoach://stats")
+@mcp.resource("devcoach://stats", mime_type="application/json")
 def stats_resource() -> dict:
     """Aggregate coaching statistics: lesson counts, rate-limit state, weakest/strongest topics."""
     try:
@@ -387,7 +387,7 @@ def stats_resource() -> dict:
         return {"error": str(exc)}
 
 
-@mcp.resource("devcoach://taught-topics")
+@mcp.resource("devcoach://taught-topics", mime_type="application/json")
 def taught_topics_resource() -> list[str]:
     """All topic_ids that have already been taught.
 
@@ -400,7 +400,7 @@ def taught_topics_resource() -> list[str]:
         return []
 
 
-@mcp.resource("devcoach://rate-limit")
+@mcp.resource("devcoach://rate-limit", mime_type="application/json")
 def rate_limit_resource() -> dict:
     """Current rate-limit status.
 
@@ -415,7 +415,7 @@ def rate_limit_resource() -> dict:
         return {"allowed": False, "reason": f"Rate limit check unavailable: {exc}"}
 
 
-@mcp.resource("devcoach://context")
+@mcp.resource("devcoach://context", mime_type="application/json")
 def context_resource() -> dict:
     """Current workspace git context and most-used lesson metadata defaults.
 
@@ -432,7 +432,7 @@ def context_resource() -> dict:
         return {"error": str(exc)}
 
 
-@mcp.resource("devcoach://onboarding")
+@mcp.resource("devcoach://onboarding", mime_type="application/json")
 def onboarding_resource() -> dict:
     """Onboarding status and auto-detected stack for first-run setup.
 
@@ -456,7 +456,7 @@ def onboarding_resource() -> dict:
         return {"error": str(exc)}
 
 
-@mcp.resource("devcoach://lessons/{lesson_id}")
+@mcp.resource("devcoach://lessons/{lesson_id}", mime_type="application/json")
 def lesson_resource(lesson_id: str) -> dict:
     """A single lesson by ID."""
     try:
