@@ -55,7 +55,7 @@ Save a delivered lesson to the coaching log. Git metadata is auto-detected from 
 | `folder` | string | Absolute path to cwd |
 | `repository_platform` | `"github" \| "gitlab" \| "bitbucket" \| "local"` | VCS platform |
 
-Returns `"ok"` on success, `"error: <message>"` on failure.
+Returns the saved `Lesson` object with all resolved fields (including any auto-filled git context).
 
 ---
 
@@ -115,11 +115,13 @@ All parameters are optional and combinable. Returns `Lesson[]`.
 
 ### `star_lesson`
 
-Toggle the starred flag. Returns `"starred"` or `"unstarred"`.
+Set the starred (favourite) flag to an explicit value. Idempotent — calling with the same value twice is safe.
 
 ```json
-{ "lesson_id": "lesson-python-generators-001" }
+{ "lesson_id": "lesson-python-generators-001", "starred": true }
 ```
+
+Returns the new `starred` state as a boolean.
 
 ---
 

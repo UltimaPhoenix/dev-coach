@@ -140,12 +140,23 @@ devcoach lesson lesson-python-generators-001
 
 ### `devcoach star <id>`
 
-Toggle the starred (favourite) flag on a lesson.
+Mark a lesson as starred (favourite).
 
 ```bash
 devcoach star lesson-python-generators-001
 # → Lesson lesson-python-generators-001 → ★ starred
 ```
+
+### `devcoach unstar <id>`
+
+Remove the starred mark from a lesson.
+
+```bash
+devcoach unstar lesson-python-generators-001
+# → Lesson lesson-python-generators-001 → ☆ unstarred
+```
+
+Both commands are idempotent — calling them when the lesson is already in the target state is safe.
 
 ### `devcoach feedback <id> <value>`
 

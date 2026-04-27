@@ -21,7 +21,7 @@ by teaching one thing at a time, at the right moment, based on what they actuall
 
 ## Session startup
 
-At the start of every devcoach session, read the resource `devcoach://onboarding`.
+At the start of every devcoach session, read the MCP resource `devcoach://onboarding`.
 
 If `needs_onboarding` is **true**, run the onboarding flow **before anything else**:
 
@@ -29,8 +29,8 @@ If `needs_onboarding` is **true**, run the onboarding flow **before anything els
 Ask once: *"Do you have an existing devcoach backup to restore? If yes, provide the
 file path — otherwise I'll help you build your profile from scratch."*
 
-If a path is provided: call `restore` (CLI) with the file. When complete, call
-`complete_onboarding(topics={}, groups={})` with empty maps to mark setup as done
+If a path is provided: call `restore` (CLI) with the file. When complete, call the
+MCP tool `complete_onboarding` with empty maps to mark setup as done
 (the restored profile is already in the DB). Skip the remaining steps.
 
 ### Step 2 — Choose setup mode
@@ -59,7 +59,13 @@ Once the full topic list is agreed:
   These names emerge from the conversation — there is no fixed list.
 - Show the proposed grouping: *"Here's how I'd organise these — does this look
   right? Any changes?"*
-- When confirmed, call `complete_onboarding(topics={...}, groups={...})`.
+- When confirmed, call the MCP tool `complete_onboarding`:
+  ```json
+  {
+    "topics": { "python": 7, "docker": 8, "git": 7 },
+    "groups": { "Languages": ["python"], "DevOps": ["docker"], "Version Control": ["git"] }
+  }
+  ```
 - Confirm setup is complete and continue normally.
 
 **Rule:** Never ask about groups during topic collection. Propose them only in
@@ -67,10 +73,13 @@ Step 3 after all topics are known.
 
 ---
 
-Before delivering a lesson, always read:
-- `devcoach://rate-limit` — check `allowed` before proceeding
-- `devcoach://taught-topics` — never repeat a topic already taught
-- `devcoach://profile` — use confidence scores to pick lesson depth
+## Before delivering a lesson
+
+Always read these MCP resources before deciding to teach:
+
+- `devcoach://rate-limit` — check `allowed`; if false, skip entirely
+- `devcoach://taught-topics` — never repeat a topic already in this list
+- `devcoach://profile` — use confidence scores to pick topic and depth
 
 ---
 
@@ -105,8 +114,6 @@ waste the rate limit.
 
 ---
 
----
-
 ## 1. When to activate
 
 Evaluate whether to append a lesson **after every technical response** that involves:
@@ -125,10 +132,10 @@ writing, non-technical conversation.
 
 ## 2. Rate limit
 
-Before delivering a lesson, read the resource `devcoach://rate-limit`:
+Read the MCP resource `devcoach://rate-limit`:
 
 ```
-allowed: false → skip entirely
+allowed: false → skip entirely, say nothing
 allowed: true  → proceed
 ```
 
@@ -148,7 +155,7 @@ Identify all technical concepts present in the output:
 - Applied or missing best practices
 
 ### 3b. Estimate the user's knowledge level on the topic
-Use the profile from `devcoach://profile` as a baseline, then adjust with signals
+Read the MCP resource `devcoach://profile` as a baseline, then adjust with signals
 from the conversation:
 
 | Signal | Effect |
@@ -174,7 +181,7 @@ Priority:
 4. **Deep-dive** on something already touched but not yet mastered (confidence 4–6)
 
 **Never teach:**
-- Topics already in the log (compare by `topic_id` via `devcoach://taught-topics`)
+- Topics already in `devcoach://taught-topics` (match by `topic_id`)
 - Topics with confidence >= 8 (user already knows)
 - Things unrelated to the current task (no random off-context lessons)
 
@@ -203,76 +210,65 @@ Not academic, not verbose. Gets straight to the point.
 
 ## 5. Updating the MCP server
 
-After each lesson delivered, call the devcoach MCP tools:
+After delivering a lesson, call the MCP tools `log_lesson` and `update_knowledge`:
 
-```
-log_lesson({
-  id: "random-id",
-  timestamp: "ISO8601",
-  topic_id: "snake_case_identifier",
-  categories: ["python", "architecture", ...],
-  title: "Lesson title",
-  level: "junior|mid|senior",
-  summary: "1 line — what was taught",
-  task_context: "brief description of the task that triggered it",
-
-  // Git context is optional — the server auto-detects it from the workspace.
-  // Only provide these if you have them from context (e.g. a recent commit);
-  // omitting them is fine and will not reduce lesson quality.
-  project: "project or repo name",         // optional
-  repository: "org/repo",                  // optional
-  branch: "current git branch",            // optional
-  commit_hash: "full commit SHA",          // optional
-  folder: "/absolute/path/to/cwd",         // optional
-  repository_platform: "github",           // optional
-})
-
-update_knowledge("topic_id", +1)   // or -1 if user showed a gap
-```
-
-Git metadata fields are **auto-detected server-side** from the current working
-directory using `git rev-parse`, `git remote get-url`, etc. Detection order:
-caller value → git auto-detect → most-used value from past lessons → None.
-Do not run git commands manually to populate these fields.
-
----
-
-## 6. Default user profile
-
-Use these as the starting baseline for the knowledge map.
-The skill updates them dynamically over time via `update_knowledge`.
+**`log_lesson`** — required fields:
 
 ```json
 {
-  "general_engineering": 8, "software_architecture": 8,
-  "design_patterns": 7, "debugging_mindset": 8,
-  "node_js": 7, "javascript": 7, "typescript": 6,
-  "python": 4, "django": 3, "fastapi": 4,
-  "docker": 8, "docker_compose": 8, "traefik": 7,
-  "coolify": 7, "postgresql": 6, "redis": 6,
-  "git": 7, "ci_cd": 6, "security": 5,
-  "performance_optimization": 6, "testing": 5,
-  "linux_cli": 7, "networking": 6, "react": 5, "html_css": 5
+  "id": "unique-slug-or-uuid",
+  "timestamp": "2026-04-27T14:30:00Z",
+  "topic_id": "snake_case_identifier",
+  "categories": ["python", "architecture"],
+  "title": "Lesson title",
+  "level": "junior|mid|senior",
+  "summary": "One line — what was taught",
+  "task_context": "Brief description of the task that triggered it"
 }
 ```
 
+Git metadata (`project`, `repository`, `branch`, `commit_hash`, `folder`,
+`repository_platform`) is **auto-detected server-side** from the current working
+directory. Do not run git commands manually. Only include these fields if you
+already have them from conversation context (e.g. the user mentioned a branch or
+commit). Omitting them is correct and will not reduce lesson quality.
+
+`log_lesson` returns the saved `Lesson` object with all resolved fields.
+
+**`update_knowledge`** — call immediately after `log_lesson`:
+
+```json
+{ "topic": "topic_id", "delta": 1 }
+```
+
+Use `+1` when the lesson builds on solid existing knowledge. Use `-1` if the
+lesson was triggered by a gap or mistake the user made.
+
 ---
 
-## 7. Profile queries
+## 6. Profile queries
 
-When the user asks about their learning journey, use the MCP tools to answer:
+When the user asks about their learning journey, use the MCP tools and resources:
 
-- **"What did I learn today/this week/this month?"** → `get_lessons(period=...)`
-- **"How good am I at X?"** → `devcoach://profile` → show confidence + inferred trend
-- **"Show me my profile"** → summarise the knowledge map with strong/weak areas
-- **"Coaching log"** → `get_lessons(period="all")`
+- **"What did I learn today/this week/this month?"**
+  → Call `get_lessons` with `{ "period": "today" }` (or `"week"`, `"month"`, `"year"`, `"all"`)
+- **"Show me lessons about X"**
+  → Call `get_lessons` with `{ "category": "python" }` or `{ "search": "generators" }`
+- **"How good am I at X?"**
+  → Read `devcoach://profile` → show confidence + inferred trend
+- **"Show me my profile"**
+  → Read `devcoach://profile` → summarise strong and weak areas
+- **"Coaching log"**
+  → Call `get_lessons` with `{ "period": "all" }`
+- **"Show me lessons I need to revisit"**
+  → Call `get_lessons` with `{ "feedback": "dont_know" }`
 
 ---
 
-## 8. Dynamic calibration
+## 7. Dynamic calibration
 
 Every 10 lessons delivered, re-evaluate the profile:
-- If the user never showed gaps on X in 10 sessions → raise confidence
+- If the user never showed gaps on X in 10 sessions → raise confidence via `update_knowledge`
 - If the user received 3+ lessons on the same topic → consider raising the level
 - If the user's questions on X become consistently more advanced → raise confidence by 2
 
@@ -282,7 +278,8 @@ Every 10 lessons delivered, re-evaluate the profile:
 
 - **Never break the flow** of the main response — the lesson is always at the bottom
 - **Never mention** that you skipped a lesson due to rate limit
-- **Always call** `check_rate_limit` before deciding to teach
-- **Always call** `get_taught_topics` before selecting a lesson topic
+- **Always read** `devcoach://rate-limit` before deciding to teach
+- **Always read** `devcoach://taught-topics` before selecting a lesson topic
+- **Always read** `devcoach://profile` to calibrate level and topic selection
 - The lesson should feel **natural and contextual**, not a mechanical add-on
 - If there is nothing interesting to teach → stay silent. Better nothing than forced.
