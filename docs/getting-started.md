@@ -10,16 +10,26 @@
 
 ## 1. Install
 
-### One-time run (no permanent install)
+devcoach is published on [PyPI](https://pypi.org/project/devcoach/) and can be installed with any Python package manager.
+
+### One-time run — no install needed
 
 ```bash
 uvx devcoach mcp
 ```
 
-### Permanent install
+`uvx` fetches the latest release from PyPI and runs it in an isolated environment. Nothing is left behind.
+
+### Permanent install with uv (recommended)
 
 ```bash
 uv tool install devcoach
+```
+
+### Permanent install with pip
+
+```bash
+pip install devcoach
 ```
 
 ---

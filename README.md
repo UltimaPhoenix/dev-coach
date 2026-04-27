@@ -117,7 +117,8 @@ devcoach feedback lesson-python-taskgroup-001 dont_know # need to revisit â€” âˆ
 | `devcoach stats` | Overview: lesson counts, weakest/strongest topics |
 | `devcoach lessons` | Browse lesson history with filters |
 | `devcoach lesson <id>` | Show a single lesson in full |
-| `devcoach star <id>` | Toggle starred flag |
+| `devcoach star <id>` | Mark a lesson as starred (favourite) |
+| `devcoach unstar <id>` | Remove the starred mark from a lesson |
 | `devcoach feedback <id> <know\|dont_know\|clear>` | Record comprehension |
 | `devcoach set max_per_day <n>` | Max lessons in a 24-hour window (default 2) |
 | `devcoach set min_gap_minutes <n>` | Minimum minutes between lessons (default 240) |
