@@ -135,7 +135,7 @@ def cmd_star(args: argparse.Namespace) -> None:
         if lesson is None:
             console.print(f"[red]Lesson '{args.id}' not found.[/red]")
             sys.exit(1)
-        new_state = db.toggle_star(conn, args.id)
+        new_state = db.set_star(conn, args.id, not lesson.starred)
     state_label = "[yellow]★ starred[/yellow]" if new_state else "[dim]☆ unstarred[/dim]"
     console.print(f"Lesson [cyan]{args.id}[/cyan] → {state_label}")
 

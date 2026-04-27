@@ -390,14 +390,9 @@ class TestCmdInstall:
         assert not desktop.exists()
 
     def test_falls_back_to_file_when_no_claude_cli(self, capsys, tmp_path, monkeypatch):
-        code = tmp_path / "code.json"
         desktop = tmp_path / "desktop.json"
         monkeypatch.setattr(commands, "_CLAUDE_DESKTOP_CONFIG", desktop)
-        # Simulate missing `claude` binary by returning empty string
         monkeypatch.setattr(commands, "_install_via_claude_cli", lambda scope, force: "")
-        # Also patch the fallback path used inside cmd_install
-        import devcoach.cli.commands as _cmd
-        original_path_home = Path.home
 
         def _fake_home():
             return tmp_path

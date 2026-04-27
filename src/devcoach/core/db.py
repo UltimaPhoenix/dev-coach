@@ -349,11 +349,11 @@ def get_lessons(
     return [_row_to_lesson(row) for row in rows]
 
 
-def toggle_star(conn: sqlite3.Connection, lesson_id: str) -> bool:
-    """Flip the starred flag on a lesson. Returns the new starred state."""
+def set_star(conn: sqlite3.Connection, lesson_id: str, starred: bool) -> bool:
+    """Set the starred flag on a lesson to the given value. Returns the new starred state."""
     conn.execute(
-        "UPDATE lessons SET starred = CASE WHEN starred=1 THEN 0 ELSE 1 END WHERE id = ?",
-        (lesson_id,),
+        "UPDATE lessons SET starred = ? WHERE id = ?",
+        (1 if starred else 0, lesson_id),
     )
     conn.commit()
     row = conn.execute("SELECT starred FROM lessons WHERE id = ?", (lesson_id,)).fetchone()

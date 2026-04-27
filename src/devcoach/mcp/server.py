@@ -14,7 +14,7 @@ from fastmcp import Context, FastMCP
 from devcoach.core import coach, db
 from devcoach.core.detect import detect_stack
 from devcoach.core.git import detect_git_context
-from devcoach.core.models import Lesson, Level, Profile, RepositoryPlatform
+from devcoach.core.models import Lesson, Level, Profile, RepositoryPlatform, Settings
 
 # ── FastMCP app ────────────────────────────────────────────────────────────
 
@@ -47,7 +47,7 @@ async def log_lesson(
     commit_hash: str | None = None,
     folder: str | None = None,
     repository_platform: RepositoryPlatform | None = None,
-) -> str:
+) -> Lesson:
     """Save a delivered lesson to the coaching log.
 
     Git metadata fields (project, repository, branch, commit_hash, folder,
@@ -55,7 +55,7 @@ async def log_lesson(
     not provided. Detection order: caller value → git auto-detect → usage
     default from past lessons → None.
 
-    Returns 'ok' on success.
+    Returns the saved Lesson with all resolved fields (including any auto-filled git context).
     """
     git_ctx = detect_git_context()
     try:
@@ -101,12 +101,9 @@ async def log_lesson(
         folder=resolved_folder,
         repository_platform=resolved_platform,
     )
-    try:
-        with db.connection() as conn:
-            db.insert_lesson(conn, lesson)
-        return "ok"
-    except Exception as exc:
-        return f"error: {exc}"
+    with db.connection() as conn:
+        db.insert_lesson(conn, lesson)
+    return lesson
 
 
 @mcp.tool
@@ -175,17 +172,14 @@ def get_lessons(
 
 
 @mcp.tool
-def star_lesson(lesson_id: str) -> str:
-    """Toggle the starred (favourite) flag on a lesson.
+def star_lesson(lesson_id: str, starred: bool) -> bool:
+    """Set the starred (favourite) flag on a lesson to the given value.
 
-    Returns 'starred' or 'unstarred' to indicate the new state.
+    starred: true to mark as favourite, false to unmark.
+    Returns the new starred state. Idempotent — calling with the same value twice is safe.
     """
-    try:
-        with db.connection() as conn:
-            new_state = db.toggle_star(conn, lesson_id)
-        return "starred" if new_state else "unstarred"
-    except Exception as exc:
-        return f"error: {exc}"
+    with db.connection() as conn:
+        return db.set_star(conn, lesson_id, starred)
 
 
 @mcp.tool
@@ -270,33 +264,29 @@ def remove_group(name: str) -> Profile:
 
 
 @mcp.tool
-def update_settings(key: str, value: str) -> dict:
+def update_settings(key: str, value: str) -> Settings:
     """Update a coaching setting.
 
     key: 'max_per_day' or 'min_gap_minutes'
     value: new value as a string
       - max_per_day: integer 1-20 (max lessons delivered in a 24h window)
       - min_gap_minutes: integer 0-1440 (minimum minutes between lessons; 0 = no cooldown)
-    Returns the updated settings dict, or {"error": "..."} if validation fails.
+    Returns the full updated Settings on success.
     """
+    valid_keys = {"max_per_day", "min_gap_minutes"}
+    if key not in valid_keys:
+        raise ValueError(f"Unknown key '{key}'. Valid keys: {', '.join(sorted(valid_keys))}")
     try:
-        valid_keys = {"max_per_day", "min_gap_minutes"}
-        if key not in valid_keys:
-            return {"error": f"Unknown key '{key}'. Valid keys: {', '.join(sorted(valid_keys))}"}
-        try:
-            int_val = int(value)
-        except ValueError:
-            return {"error": f"Value must be an integer, got '{value}'"}
-        if key == "max_per_day" and not (1 <= int_val <= 20):
-            return {"error": "max_per_day must be between 1 and 20"}
-        if key == "min_gap_minutes" and not (0 <= int_val <= 1440):
-            return {"error": "min_gap_minutes must be between 0 and 1440"}
-        with db.connection() as conn:
-            db.set_setting(conn, key, str(int_val))
-            s = db.get_settings(conn)
-        return {"max_per_day": s.max_per_day, "min_gap_minutes": s.min_gap_minutes}
-    except Exception as exc:
-        return {"error": str(exc)}
+        int_val = int(value)
+    except ValueError:
+        raise ValueError(f"Value must be an integer, got '{value}'")
+    if key == "max_per_day" and not (1 <= int_val <= 20):
+        raise ValueError("max_per_day must be between 1 and 20")
+    if key == "min_gap_minutes" and not (0 <= int_val <= 1440):
+        raise ValueError("min_gap_minutes must be between 0 and 1440")
+    with db.connection() as conn:
+        db.set_setting(conn, key, str(int_val))
+        return db.get_settings(conn)
 
 
 @mcp.tool
@@ -428,7 +418,7 @@ def rate_limit_resource() -> str:
     try:
         with db.connection() as conn:
             result = coach.check_rate_limit(conn)
-        return result.model_dump_json(indent=2)
+        return result.model_dump_json(indent=2, exclude_none=True)
     except Exception as exc:
         return json.dumps({"allowed": False, "reason": f"Rate limit check unavailable: {exc}"})
 

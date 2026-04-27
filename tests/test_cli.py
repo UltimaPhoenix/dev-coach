@@ -279,23 +279,26 @@ class TestStarredFilter:
         assert "★" in out  # starred lesson marker
 
 
-# ── toggle_star tests ──────────────────────────────────────────────────────
+# ── set_star tests ─────────────────────────────────────────────────────────
 
 
 class TestToggleStar:
-    def test_toggle_star_on(self, conn):
-        # row_factory starts unstarred
-        result = db.toggle_star(conn, "lesson-sqlite3-row-factory-001")
+    def test_set_star_on(self, conn):
+        result = db.set_star(conn, "lesson-sqlite3-row-factory-001", True)
         assert result is True
         lesson = db.get_lesson_by_id(conn, "lesson-sqlite3-row-factory-001")
         assert lesson.starred is True
 
-    def test_toggle_star_off(self, conn):
-        # upsert_patterns starts starred
-        result = db.toggle_star(conn, "lesson-sqlite-upsert-patterns-001")
+    def test_set_star_off(self, conn):
+        result = db.set_star(conn, "lesson-sqlite-upsert-patterns-001", False)
         assert result is False
         lesson = db.get_lesson_by_id(conn, "lesson-sqlite-upsert-patterns-001")
         assert lesson.starred is False
+
+    def test_set_star_idempotent(self, conn):
+        db.set_star(conn, "lesson-sqlite3-row-factory-001", True)
+        result = db.set_star(conn, "lesson-sqlite3-row-factory-001", True)
+        assert result is True
 
     def test_cmd_star_toggles(self, db_path, monkeypatch, capsys):
         monkeypatch.setattr(db, "DB_PATH", db_path)

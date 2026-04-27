@@ -55,8 +55,10 @@ class TestLogLesson:
         defaults.update(kwargs)
         return _run(server.log_lesson(mock_ctx, **defaults))
 
-    def test_returns_ok(self, mock_ctx):
-        assert self._call(mock_ctx) == "ok"
+    def test_returns_lesson(self, mock_ctx):
+        result = self._call(mock_ctx)
+        assert result.id == "test-log-001"
+        assert result.topic_id == "test_topic"
 
     def test_lesson_stored_in_db(self, mock_ctx, db_path):
         self._call(mock_ctx, id="stored-001", topic_id="stored_topic")
@@ -136,11 +138,11 @@ class TestLogLesson:
         assert lesson.branch == "caller-branch"
         assert lesson.project == "caller-project"
 
-    def test_duplicate_id_returns_ok(self, mock_ctx):
+    def test_duplicate_id_returns_lesson(self, mock_ctx):
         # INSERT OR REPLACE — second call should not fail
         self._call(mock_ctx, id="dup-001")
         result = self._call(mock_ctx, id="dup-001")
-        assert result == "ok"
+        assert result.id == "dup-001"
 
 
 # ── Tools — update_knowledge ───────────────────────────────────────────────
@@ -208,20 +210,23 @@ class TestGetLessons:
 
 
 class TestStarLesson:
-    def test_returns_starred(self):
-        # row_factory starts unstarred
-        result = server.star_lesson("lesson-sqlite3-row-factory-001")
-        assert result == "starred"
+    def test_star_returns_true(self):
+        result = server.star_lesson("lesson-sqlite3-row-factory-001", starred=True)
+        assert result is True
 
-    def test_returns_unstarred(self):
-        # upsert_patterns starts starred
-        result = server.star_lesson("lesson-sqlite-upsert-patterns-001")
-        assert result == "unstarred"
+    def test_unstar_returns_false(self):
+        result = server.star_lesson("lesson-sqlite-upsert-patterns-001", starred=False)
+        assert result is False
 
-    def test_toggle_twice_restores_state(self):
-        server.star_lesson("lesson-sqlite3-row-factory-001")
-        result = server.star_lesson("lesson-sqlite3-row-factory-001")
-        assert result == "unstarred"
+    def test_idempotent_star(self):
+        server.star_lesson("lesson-sqlite3-row-factory-001", starred=True)
+        result = server.star_lesson("lesson-sqlite3-row-factory-001", starred=True)
+        assert result is True
+
+    def test_idempotent_unstar(self):
+        server.star_lesson("lesson-sqlite-upsert-patterns-001", starred=False)
+        result = server.star_lesson("lesson-sqlite-upsert-patterns-001", starred=False)
+        assert result is False
 
 
 # ── Tools — submit_feedback ────────────────────────────────────────────────
@@ -321,27 +326,27 @@ class TestGroupTools:
 class TestUpdateSettings:
     def test_update_max_per_day(self):
         result = server.update_settings("max_per_day", "5")
-        assert result["max_per_day"] == 5
+        assert result.max_per_day == 5
 
     def test_update_min_gap_minutes(self):
         result = server.update_settings("min_gap_minutes", "120")
-        assert result["min_gap_minutes"] == 120
+        assert result.min_gap_minutes == 120
 
-    def test_invalid_key_returns_error(self):
-        result = server.update_settings("unknown_key", "5")
-        assert "error" in result
+    def test_invalid_key_raises(self):
+        with pytest.raises(ValueError, match="Unknown key"):
+            server.update_settings("unknown_key", "5")
 
-    def test_non_integer_value_returns_error(self):
-        result = server.update_settings("max_per_day", "not_a_number")
-        assert "error" in result
+    def test_non_integer_value_raises(self):
+        with pytest.raises(ValueError, match="integer"):
+            server.update_settings("max_per_day", "not_a_number")
 
-    def test_out_of_range_max_per_day(self):
-        result = server.update_settings("max_per_day", "100")
-        assert "error" in result
+    def test_out_of_range_max_per_day_raises(self):
+        with pytest.raises(ValueError, match="max_per_day"):
+            server.update_settings("max_per_day", "100")
 
-    def test_out_of_range_min_gap_minutes(self):
-        result = server.update_settings("min_gap_minutes", "9999")
-        assert "error" in result
+    def test_out_of_range_min_gap_minutes_raises(self):
+        with pytest.raises(ValueError, match="min_gap_minutes"):
+            server.update_settings("min_gap_minutes", "9999")
 
 
 # ── Tools — open_ui ────────────────────────────────────────────────────────
