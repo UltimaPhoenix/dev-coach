@@ -183,7 +183,7 @@ def star_lesson(lesson_id: str, starred: bool) -> bool:
 
 
 @mcp.tool
-def submit_feedback(lesson_id: str, feedback: str) -> Profile:
+def submit_feedback(lesson_id: str, feedback: Literal["know", "dont_know", "clear"]) -> Profile:
     """Record user comprehension feedback for a lesson and update knowledge confidence.
 
     feedback: "know" (understood, confidence +1) | "dont_know" (needs practice, confidence -1)
