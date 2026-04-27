@@ -202,7 +202,10 @@ Explain the WHY, not just the what. Connect it to the task just completed.]
 
 💡 *Senior tip:* [One sentence a senior would say to a junior on this topic]
 
-> Did that land? **know** · **don't know** · **no response**
+> Did that land?
+> - **1** · ✅ know — got it
+> - **2** · ❌ don't know — need to revisit
+> - **3** · ⏭️ no response — skip
 ```
 
 **Tone:** direct, like a senior colleague explaining during a code review.
