@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import Literal
+from typing import Literal, TypedDict
 
 from pydantic import BaseModel, field_serializer, field_validator, model_serializer
 
@@ -96,6 +96,39 @@ class KnowledgeUpdate(BaseModel):
 
     topic: str
     delta: int
+
+
+class TopicScore(TypedDict):
+    topic: str
+    confidence: int
+
+
+class CoachStats(TypedDict):
+    total_lessons: int
+    lessons_today: int
+    lessons_this_week: int
+    weakest_topics: list[TopicScore]
+    strongest_topics: list[TopicScore]
+
+
+class GitContext(TypedDict):
+    project: str | None
+    repository: str | None
+    branch: str | None
+    commit_hash: str | None
+    folder: str | None
+    repository_platform: str | None
+
+
+class WorkspaceContext(TypedDict):
+    git: GitContext
+    usage_defaults: dict[str, str | None]
+
+
+class OnboardingStatus(TypedDict):
+    needs_onboarding: bool
+    detected_stack: dict[str, int]
+    context_ready: bool
 
 
 class RateLimitResult(BaseModel):

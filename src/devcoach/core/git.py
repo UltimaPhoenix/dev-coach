@@ -6,6 +6,8 @@ import re
 import subprocess
 from pathlib import Path
 
+from devcoach.core.models import GitContext
+
 
 def _run(*args: str) -> str | None:
     """Run a git command and return stdout, or None on any error."""
@@ -62,7 +64,7 @@ def _parse_remote(remote: str | None) -> tuple[str | None, str | None]:
     return remote, "local"
 
 
-def detect_git_context() -> dict[str, str | None]:
+def detect_git_context() -> GitContext:
     """Detect git metadata from the current working directory.
 
     Returns a dict with keys: project, repository, branch, commit_hash,
@@ -87,11 +89,11 @@ def detect_git_context() -> dict[str, str | None]:
     if branch == "HEAD":
         branch = None
 
-    return {
-        "project": project,
-        "repository": repository,
-        "branch": branch,
-        "commit_hash": commit,
-        "folder": folder,
-        "repository_platform": platform,
-    }
+    return GitContext(
+        project=project,
+        repository=repository,
+        branch=branch,
+        commit_hash=commit,
+        folder=folder,
+        repository_platform=platform,
+    )

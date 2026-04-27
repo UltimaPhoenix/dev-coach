@@ -17,7 +17,7 @@ from devcoach.core.db import (
     set_feedback,
     upsert_knowledge,
 )
-from devcoach.core.models import Profile, RateLimitResult
+from devcoach.core.models import CoachStats, Profile, RateLimitResult
 
 
 def check_rate_limit(conn: sqlite3.Connection) -> RateLimitResult:
@@ -105,7 +105,7 @@ def record_feedback(
     return topic_id
 
 
-def get_stats(conn: sqlite3.Connection) -> dict:
+def get_stats(conn: sqlite3.Connection) -> CoachStats:
     """Return aggregate coaching statistics.
 
     Returns total_lessons, lessons_today (last 24h), lessons_this_week (last 7d),
