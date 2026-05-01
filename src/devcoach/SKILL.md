@@ -49,7 +49,7 @@ or set it up manually through a conversation?"*
   day-to-day. For each one I'll ask how confident you are:
   1–3 = still learning · 4–6 = comfortable · 7–9 = strong · 10 = expert."*
 - Probe across domains: programming languages, frameworks, databases, infrastructure,
-  version control practices (git, branching strategies, CI/CD pipelines), testing,
+  version control practices, branching strategies, CI/CD pipelines, testing,
   architecture patterns, etc. Keep probing until the user says they're done.
 
 ### Step 3 — Propose groups and save
@@ -62,8 +62,8 @@ Once the full topic list is agreed:
 - When confirmed, call the MCP tool `complete_onboarding`:
   ```json
   {
-    "topics": { "python": 7, "docker": 8, "git": 7 },
-    "groups": { "Languages": ["python"], "DevOps": ["docker"], "Version Control": ["git"] }
+    "topics": { "lang_a": 7, "tool_b": 8, "practice_c": 7 },
+    "groups": { "Languages": ["lang_a"], "DevOps": ["tool_b"], "Version Control": ["practice_c"] }
   }
   ```
 - Confirm setup is complete and continue normally.
@@ -98,8 +98,8 @@ NOT: "what is a for loop" — that is documentation, not coaching.
 They know the basics but need to deepen their model of *how things work* and
 *when to use what*. Lessons cover trade-offs, non-obvious behaviour, performance
 implications, and patterns that separate solid code from mediocre code.
-NOT: "how to use Docker" — at this level Docker lessons cover multi-stage builds,
-layer caching trade-offs, or security hardening.
+NOT: "how to use [tool X]" — at this level lessons about a tool cover its internals,
+trade-offs, non-obvious failure modes, or security hardening.
 
 **senior** — An experienced developer who makes system-level decisions.
 Lessons operate at the level of architecture, reliability, and long-term
@@ -120,7 +120,7 @@ Evaluate whether to append a lesson **after every technical response** that invo
 - Writing or reviewing code (any language)
 - Architecture, design patterns, refactoring
 - Debugging, troubleshooting, error analysis
-- Configuration (Docker, Traefik, CI/CD, infra, etc.)
+- Configuration (containers, reverse proxies, CI/CD, infra, etc.)
 - DB queries, optimisations, migrations
 - Security, performance, scalability
 - CLI, scripting, automation
@@ -190,8 +190,8 @@ Priority:
 
 **Never teach:**
 - Topics already in `devcoach://taught-topics` — use fuzzy matching, not just exact
-  `topic_id` equality. If the log contains `python_generators`, also skip
-  `python_generator_expressions` and `generators_lazy_evaluation`. When in doubt,
+  `topic_id` equality. If the log contains `topic_foo`, also skip
+  `topic_foo_variant` and `topic_foo_extension`. When in doubt,
   pick a different angle rather than risk repeating ground already covered.
   **Exception:** confidence 10 — ignore the taught-topics filter entirely.
 - Lessons at a level **below** the user's current confidence band on that topic.
@@ -243,7 +243,7 @@ Call `log_lesson` right after delivering the lesson, without waiting for feedbac
   "id": "unique-slug-or-uuid",
   "timestamp": "2026-04-27T14:30:00Z",
   "topic_id": "snake_case_identifier",
-  "categories": ["python", "architecture"],
+  "categories": ["the_topic_category", "architecture"],
   "title": "Lesson title",
   "level": "junior|mid|senior",
   "summary": "One line — what was taught",
@@ -339,7 +339,7 @@ When the user asks about their learning journey, use the MCP tools and resources
 - **"What did I learn today/this week/this month?"**
   → Call `get_lessons` with `{ "period": "today" }` (or `"week"`, `"month"`, `"year"`, `"all"`)
 - **"Show me lessons about X"**
-  → Call `get_lessons` with `{ "category": "python" }` or `{ "search": "generators" }`
+  → Call `get_lessons` with `{ "category": "the_topic" }` or `{ "search": "keyword" }`
 - **"How good am I at X?"**
   → Read `devcoach://profile` → show confidence + inferred trend
 - **"Show me my profile"**
