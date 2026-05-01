@@ -160,6 +160,10 @@ Identify all technical concepts present in the output:
 - Potential pitfalls or antipatterns
 - Applied or missing best practices
 
+Cross-reference each concept against `devcoach://profile`. **Flag any concept that is
+prominent in the task but absent from the profile** — these are candidates for a
+profile expansion suggestion after the lesson (see Step 4).
+
 ### 3b. Estimate the user's knowledge level on the topic
 Read the MCP resource `devcoach://profile` as a baseline. Each topic in the profile
 carries two signals: **confidence** (how much the user knows) and **intent** (they have
@@ -342,6 +346,29 @@ If the user agrees, call `star_lesson(lesson_id, starred=True)`.
 If they decline or ignore, do nothing — never star silently.
 
 Do **not** propose starring for: `know` on easy (`junior`) lessons, or `no response`.
+
+### Step 4 — Suggest profile expansion for off-profile topics
+
+After the feedback/starring flow, check whether the task involved a concept that is
+**absent from `devcoach://profile`** (flagged in step 3a).
+
+If yes, suggest adding it with a one-liner:
+
+> *"I noticed you're working with `[topic]` — it's not in your profile yet.
+> Want me to track it? I'd start your confidence at [estimated score]."*
+
+Estimate the initial confidence from observed behaviour in the conversation
+(fluent use → 6–7, occasional uncertainty → 4–5, apparent first encounter → 2–3).
+
+If the user confirms: call `add_topic(topic, confidence)`.
+If they decline or ignore, drop it — never add topics silently.
+
+**Only suggest when:**
+- A lesson was just delivered on that off-profile concept, **or**
+- The concept recurred in two or more recent tasks without being in the profile
+
+Do **not** suggest for: incidental mentions, one-off tool invocations, or concepts
+the user clearly already tracks under a different `topic_id`.
 
 ---
 
