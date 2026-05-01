@@ -174,7 +174,9 @@ from the conversation:
 - `0–3` → junior: explain from scratch, use analogies, avoid jargon
 - `4–6` → mid: explain the why, mention alternatives
 - `7–9` → senior: focus on edge cases, tradeoffs, historical context
-- `10` → skip this topic (already mastered)
+- `10` → do not skip; instead, consider a cutting-edge angle — something that emerged
+  in the last ~6 months (new language feature, recent spec change, emerging pattern).
+  Only if genuinely relevant; otherwise treat as confidence 9 (senior lesson).
 
 ### 3c. Choose what to teach
 Priority:
@@ -185,8 +187,14 @@ Priority:
 4. **Deep-dive** on something already touched but not yet mastered (confidence 4–6)
 
 **Never teach:**
-- Topics already in `devcoach://taught-topics` (match by `topic_id`)
-- Topics with confidence >= 8 (user already knows)
+- Topics already in `devcoach://taught-topics` — use fuzzy matching, not just exact
+  `topic_id` equality. If the log contains `python_generators`, also skip
+  `python_generator_expressions` and `generators_lazy_evaluation`. When in doubt,
+  pick a different angle rather than risk repeating ground already covered.
+- Lessons at a level **below** the user's current confidence band on that topic.
+  If confidence is 7 (senior band), do not deliver a junior or mid lesson — only
+  senior (or cutting-edge for confidence 10). The lesson level must match or exceed
+  the band implied by the confidence score.
 - Things unrelated to the current task (no random off-context lessons)
 
 ---
