@@ -291,7 +291,7 @@ class TestToggleStar:
 
     def test_set_star_off(self, conn):
         result = db.set_star(conn, "lesson-sqlite-upsert-patterns-001", False)
-        assert result is False
+        assert result is True  # found and updated
         lesson = db.get_lesson_by_id(conn, "lesson-sqlite-upsert-patterns-001")
         assert lesson.starred is False
 

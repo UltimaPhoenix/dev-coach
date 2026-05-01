@@ -25,10 +25,11 @@ def patch_db_path(db_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
 
 @pytest.fixture
 def mock_ctx() -> MagicMock:
-    """Minimal async Context mock — records info/warning calls."""
+    """Minimal async Context mock — records info/warning/error calls."""
     ctx = MagicMock()
     ctx.info = AsyncMock()
     ctx.warning = AsyncMock()
+    ctx.error = AsyncMock()
     return ctx
 
 
@@ -148,17 +149,22 @@ class TestLogLesson:
 
 
 class TestUpdateKnowledge:
-    def test_returns_profile(self):
-        profile = server.update_knowledge("python", 1)
-        assert hasattr(profile, "knowledge")
+    def test_returns_new_confidence(self, mock_ctx, db_path):
+        c = sqlite3.connect(str(db_path))
+        c.row_factory = sqlite3.Row
+        before = db.get_all_knowledge(c).get("python", 5)
+        c.close()
+        result = _run(server.update_knowledge(mock_ctx, "python", 1))
+        assert isinstance(result, int)
+        assert result == min(10, before + 1)
 
-    def test_confidence_increases(self, db_path):
+    def test_confidence_increases(self, mock_ctx, db_path):
         c = sqlite3.connect(str(db_path))
         c.row_factory = sqlite3.Row
         before = db.get_all_knowledge(c).get("python", 5)
         c.close()
 
-        server.update_knowledge("python", 1)
+        _run(server.update_knowledge(mock_ctx, "python", 1))
 
         c = sqlite3.connect(str(db_path))
         c.row_factory = sqlite3.Row
@@ -166,8 +172,8 @@ class TestUpdateKnowledge:
         c.close()
         assert after == min(10, before + 1)
 
-    def test_creates_new_topic(self, db_path):
-        server.update_knowledge("brand_new_topic", 3)
+    def test_creates_new_topic(self, mock_ctx, db_path):
+        _run(server.update_knowledge(mock_ctx, "brand_new_topic", 3))
         c = sqlite3.connect(str(db_path))
         c.row_factory = sqlite3.Row
         knowledge = db.get_all_knowledge(c)
@@ -209,52 +215,80 @@ class TestGetLessons:
 
 
 class TestStarLesson:
-    def test_star_returns_true(self):
-        result = server.star_lesson("lesson-sqlite3-row-factory-001", starred=True)
+    def test_star_returns_true(self, mock_ctx):
+        result = _run(server.star_lesson(mock_ctx, "lesson-sqlite3-row-factory-001", starred=True))
         assert result is True
 
-    def test_unstar_returns_false(self):
-        result = server.star_lesson("lesson-sqlite-upsert-patterns-001", starred=False)
+    def test_unstar_found_returns_true(self, mock_ctx):
+        result = _run(
+            server.star_lesson(mock_ctx, "lesson-sqlite-upsert-patterns-001", starred=False)
+        )
+        assert result is True  # lesson found and updated
+
+    def test_not_found_returns_false(self, mock_ctx):
+        result = _run(server.star_lesson(mock_ctx, "nonexistent-lesson", starred=True))
         assert result is False
 
-    def test_idempotent_star(self):
-        server.star_lesson("lesson-sqlite3-row-factory-001", starred=True)
-        result = server.star_lesson("lesson-sqlite3-row-factory-001", starred=True)
+    def test_idempotent_star(self, mock_ctx):
+        _run(server.star_lesson(mock_ctx, "lesson-sqlite3-row-factory-001", starred=True))
+        result = _run(server.star_lesson(mock_ctx, "lesson-sqlite3-row-factory-001", starred=True))
         assert result is True
 
-    def test_idempotent_unstar(self):
-        server.star_lesson("lesson-sqlite-upsert-patterns-001", starred=False)
-        result = server.star_lesson("lesson-sqlite-upsert-patterns-001", starred=False)
-        assert result is False
+    def test_idempotent_unstar(self, mock_ctx):
+        _run(server.star_lesson(mock_ctx, "lesson-sqlite-upsert-patterns-001", starred=False))
+        result = _run(
+            server.star_lesson(mock_ctx, "lesson-sqlite-upsert-patterns-001", starred=False)
+        )
+        assert result is True  # still found
 
 
 # ── Tools — submit_feedback ────────────────────────────────────────────────
 
 
 class TestSubmitFeedback:
-    def test_know_returns_profile(self):
-        profile = server.submit_feedback("lesson-sqlite3-row-factory-001", "know")
-        assert hasattr(profile, "knowledge")
+    def test_know_returns_true(self, mock_ctx):
+        result = _run(server.submit_feedback(mock_ctx, "lesson-sqlite3-row-factory-001", "know"))
+        assert result is True
 
-    def test_dont_know_returns_profile(self):
-        profile = server.submit_feedback("lesson-sqlite3-row-factory-001", "dont_know")
-        assert hasattr(profile, "knowledge")
+    def test_dont_know_returns_true(self, mock_ctx):
+        result = _run(
+            server.submit_feedback(mock_ctx, "lesson-sqlite3-row-factory-001", "dont_know")
+        )
+        assert result is True
 
-    def test_clear_removes_feedback(self, db_path):
-        server.submit_feedback("lesson-sqlite-upsert-patterns-001", "clear")
+    def test_not_found_returns_false(self, mock_ctx):
+        result = _run(server.submit_feedback(mock_ctx, "nonexistent-lesson", "know"))
+        assert result is False
+
+    def test_idempotent_same_feedback(self, mock_ctx, db_path):
+        c = sqlite3.connect(str(db_path))
+        c.row_factory = sqlite3.Row
+        before = db.get_all_knowledge(c).get("sqlite_upsert_patterns", 5)
+        c.close()
+        # lesson-sqlite-upsert-patterns-001 already has feedback="know" in fixture
+        result = _run(server.submit_feedback(mock_ctx, "lesson-sqlite-upsert-patterns-001", "know"))
+        assert result is True
+        c = sqlite3.connect(str(db_path))
+        c.row_factory = sqlite3.Row
+        after = db.get_all_knowledge(c).get("sqlite_upsert_patterns", 5)
+        c.close()
+        assert after == before  # confidence unchanged — idempotent
+
+    def test_clear_removes_feedback(self, mock_ctx, db_path):
+        _run(server.submit_feedback(mock_ctx, "lesson-sqlite-upsert-patterns-001", "clear"))
         c = sqlite3.connect(str(db_path))
         c.row_factory = sqlite3.Row
         lesson = db.get_lesson_by_id(c, "lesson-sqlite-upsert-patterns-001")
         c.close()
         assert lesson.feedback is None
 
-    def test_know_bumps_confidence(self, db_path):
+    def test_know_bumps_confidence(self, mock_ctx, db_path):
         c = sqlite3.connect(str(db_path))
         c.row_factory = sqlite3.Row
         before = db.get_all_knowledge(c).get("sqlite3_row_factory", 5)
         c.close()
 
-        server.submit_feedback("lesson-sqlite3-row-factory-001", "know")
+        _run(server.submit_feedback(mock_ctx, "lesson-sqlite3-row-factory-001", "know"))
 
         c = sqlite3.connect(str(db_path))
         c.row_factory = sqlite3.Row
@@ -267,56 +301,72 @@ class TestSubmitFeedback:
 
 
 class TestTopicTools:
-    def test_add_topic_returns_profile(self):
-        profile = server.add_topic("rust", 7)
-        assert any(e.topic == "rust" for e in profile.knowledge)
+    def test_add_topic_returns_true(self, mock_ctx, db_path):
+        result = _run(server.add_topic(mock_ctx, "rust", 7))
+        assert result is True
+        c = sqlite3.connect(str(db_path))
+        c.row_factory = sqlite3.Row
+        assert "rust" in db.get_all_knowledge(c)
+        c.close()
 
-    def test_add_topic_with_group(self, db_path):
-        server.add_topic("rust", 7, group="Languages")
+    def test_add_topic_with_group(self, mock_ctx, db_path):
+        _run(server.add_topic(mock_ctx, "rust", 7, group="Languages"))
         c = sqlite3.connect(str(db_path))
         c.row_factory = sqlite3.Row
         groups = db.get_knowledge_groups(c)
         c.close()
         assert "rust" in groups.get("Languages", [])
 
-    def test_remove_topic_returns_profile(self):
-        profile = server.remove_topic("python")
-        assert not any(e.topic == "python" for e in profile.knowledge)
+    def test_remove_topic_returns_true(self, mock_ctx, db_path):
+        result = _run(server.remove_topic(mock_ctx, "python"))
+        assert result is True
+        c = sqlite3.connect(str(db_path))
+        c.row_factory = sqlite3.Row
+        assert "python" not in db.get_all_knowledge(c)
+        c.close()
 
-    def test_remove_nonexistent_topic_ok(self):
-        profile = server.remove_topic("does_not_exist")
-        assert hasattr(profile, "knowledge")
+    def test_remove_nonexistent_topic_returns_false(self, mock_ctx):
+        result = _run(server.remove_topic(mock_ctx, "does_not_exist"))
+        assert result is False
 
 
 # ── Tools — add_group / remove_group ──────────────────────────────────────
 
 
 class TestGroupTools:
-    def test_add_group_returns_profile(self, db_path):
-        profile = server.add_group("DevOps")
+    def test_add_group_returns_true(self, mock_ctx, db_path):
+        result = _run(server.add_group(mock_ctx, "DevOps"))
+        assert result is True
         c = sqlite3.connect(str(db_path))
         c.row_factory = sqlite3.Row
-        groups = db.get_knowledge_groups(c)
+        assert "DevOps" in db.get_knowledge_groups(c)
         c.close()
-        assert "DevOps" in groups
-        assert hasattr(profile, "groups")
 
-    def test_add_group_strips_whitespace(self, db_path):
-        server.add_group("  Languages  ")
+    def test_add_group_idempotent(self, mock_ctx, db_path):
+        _run(server.add_group(mock_ctx, "DevOps"))
+        result = _run(server.add_group(mock_ctx, "DevOps"))
+        assert result is True  # already exists but still ok
+
+    def test_add_group_strips_whitespace(self, mock_ctx, db_path):
+        _run(server.add_group(mock_ctx, "  Languages  "))
         c = sqlite3.connect(str(db_path))
         c.row_factory = sqlite3.Row
         groups = db.get_knowledge_groups(c)
         c.close()
         assert "Languages" in groups
 
-    def test_remove_group_returns_profile(self, db_path):
-        server.add_group("Temp")
-        server.remove_group("Temp")
+    def test_remove_group_returns_true(self, mock_ctx, db_path):
+        _run(server.add_group(mock_ctx, "Temp"))
+        result = _run(server.remove_group(mock_ctx, "Temp"))
+        assert result is True
         c = sqlite3.connect(str(db_path))
         c.row_factory = sqlite3.Row
-        groups = db.get_knowledge_groups(c)
+        assert "Temp" not in db.get_knowledge_groups(c)
         c.close()
-        assert "Temp" not in groups
+
+    def test_remove_nonexistent_group_returns_false(self, mock_ctx):
+        result = _run(server.remove_group(mock_ctx, "DoesNotExist"))
+        assert result is False
 
 
 # ── Tools — update_settings ────────────────────────────────────────────────

@@ -350,14 +350,13 @@ def get_lessons(
 
 
 def set_star(conn: sqlite3.Connection, lesson_id: str, starred: bool) -> bool:
-    """Set the starred flag on a lesson to the given value. Returns the new starred state."""
-    conn.execute(
+    """Set the starred flag on a lesson. Returns True if lesson was found, False if not found."""
+    cur = conn.execute(
         "UPDATE lessons SET starred = ? WHERE id = ?",
         (1 if starred else 0, lesson_id),
     )
     conn.commit()
-    row = conn.execute("SELECT starred FROM lessons WHERE id = ?", (lesson_id,)).fetchone()
-    return bool(row["starred"]) if row else False
+    return cur.rowcount > 0
 
 
 def set_feedback(conn: sqlite3.Connection, lesson_id: str, feedback: str | None) -> str | None:
@@ -640,24 +639,27 @@ def get_knowledge_groups(conn: sqlite3.Connection) -> dict[str, list[str]]:
     return groups
 
 
-def add_group(conn: sqlite3.Connection, group_name: str) -> None:
-    """Register a new named group (persists even when empty)."""
+def add_group(conn: sqlite3.Connection, group_name: str) -> bool:
+    """Register a new named group. Returns True if newly created, False if already existed."""
     name = group_name.strip()
     if not name:
         raise ValueError("Group name must not be empty")
-    conn.execute("INSERT OR IGNORE INTO knowledge_group_names (group_name) VALUES (?)", (name,))
+    cur = conn.execute(
+        "INSERT OR IGNORE INTO knowledge_group_names (group_name) VALUES (?)", (name,)
+    )
     conn.commit()
+    return cur.rowcount > 0
 
 
-def delete_group(conn: sqlite3.Connection, group_name: str) -> int:
+def delete_group(conn: sqlite3.Connection, group_name: str) -> bool:
     """Remove a group and its topic assignments. Topics become ungrouped (Other).
 
-    Returns the number of topic assignments removed.
+    Returns True if the group existed and was deleted, False if not found.
     """
-    cur = conn.execute("DELETE FROM knowledge_groups WHERE group_name = ?", (group_name,))
-    conn.execute("DELETE FROM knowledge_group_names WHERE group_name = ?", (group_name,))
+    conn.execute("DELETE FROM knowledge_groups WHERE group_name = ?", (group_name,))
+    cur = conn.execute("DELETE FROM knowledge_group_names WHERE group_name = ?", (group_name,))
     conn.commit()
-    return cur.rowcount
+    return cur.rowcount > 0
 
 
 def assign_topic_to_group(conn: sqlite3.Connection, topic: str, group_name: str) -> None:

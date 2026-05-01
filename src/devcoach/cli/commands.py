@@ -330,11 +330,9 @@ def cmd_group_remove(args: argparse.Namespace) -> None:
     with db.connection() as conn:
         count = db.delete_group(conn, args.name)
     if count:
-        console.print(
-            f"[green]Removed group '[cyan]{args.name}[/cyan]'[/green] ({count} topic assignment(s) cleared)"
-        )
+        console.print(f"[green]Removed group '[cyan]{args.name}[/cyan]'[/green]")
     else:
-        console.print(f"[yellow]Group '{args.name}' not found or already empty.[/yellow]")
+        console.print(f"[yellow]Group '{args.name}' not found.[/yellow]")
 
 
 def cmd_group_assign(args: argparse.Namespace) -> None:

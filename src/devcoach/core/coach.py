@@ -76,18 +76,17 @@ def get_profile(conn: sqlite3.Connection) -> Profile:
         return Profile(knowledge=[], groups=[])
 
 
-def apply_knowledge_delta(conn: sqlite3.Connection, topic: str, delta: int) -> Profile:
+def apply_knowledge_delta(conn: sqlite3.Connection, topic: str, delta: int) -> int:
     """Add delta to the current confidence for a topic (clamped 0-10).
 
     If the topic does not exist it is created with a base confidence of 5.
+    Returns the new confidence value.
     """
-    try:
-        row = conn.execute("SELECT confidence FROM knowledge WHERE topic = ?", (topic,)).fetchone()
-        current = row[0] if row else 5
-        upsert_knowledge(conn, topic, current + delta)
-        return get_profile(conn)
-    except Exception:
-        return get_profile(conn)
+    row = conn.execute("SELECT confidence FROM knowledge WHERE topic = ?", (topic,)).fetchone()
+    current = row[0] if row else 5
+    new_confidence = max(0, min(10, current + delta))
+    upsert_knowledge(conn, topic, new_confidence)
+    return new_confidence
 
 
 def record_feedback(

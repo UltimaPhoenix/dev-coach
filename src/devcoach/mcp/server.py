@@ -106,17 +106,18 @@ async def log_lesson(
 
 
 @mcp.tool
-def update_knowledge(topic: str, delta: int) -> Profile:
+async def update_knowledge(ctx: Context, topic: str, delta: int) -> int:
     """Adjust the confidence score for a topic by delta (e.g. +1 or -1).
 
-    Returns the updated Profile. Confidence is clamped to 0-10.
-    If the topic does not exist it is created with a base confidence of 5.
+    Returns the new confidence value (0-10).
+    Creates the topic at confidence 5 if it does not exist.
     """
     try:
         with db.connection() as conn:
             return coach.apply_knowledge_delta(conn, topic, delta)
-    except Exception:
-        return Profile(knowledge=[], groups=[])
+    except Exception as exc:
+        await ctx.error(f"update_knowledge failed for '{topic}': {exc}")
+        raise
 
 
 @mcp.tool
@@ -171,95 +172,135 @@ def get_lessons(
 
 
 @mcp.tool
-def star_lesson(lesson_id: str, starred: bool) -> bool:
+async def star_lesson(ctx: Context, lesson_id: str, starred: bool) -> bool:
     """Set the starred (favourite) flag on a lesson to the given value.
 
     starred: true to mark as favourite, false to unmark.
-    Returns the new starred state. Idempotent — calling with the same value twice is safe.
+    Returns True if the lesson was found and updated, False if the lesson does not exist.
+    Idempotent — calling with the same value twice is safe.
     """
-    with db.connection() as conn:
-        return db.set_star(conn, lesson_id, starred)
+    try:
+        with db.connection() as conn:
+            found = db.set_star(conn, lesson_id, starred)
+        if not found:
+            await ctx.warning(f"star_lesson: lesson '{lesson_id}' not found")
+        return found
+    except Exception as exc:
+        await ctx.error(f"star_lesson failed for '{lesson_id}': {exc}")
+        return False
 
 
 @mcp.tool
-def submit_feedback(lesson_id: str, feedback: Literal["know", "dont_know", "clear"]) -> Profile:
+async def submit_feedback(
+    ctx: Context, lesson_id: str, feedback: Literal["know", "dont_know", "clear"]
+) -> bool:
     """Record user comprehension feedback for a lesson and update knowledge confidence.
 
-    feedback: "know" (understood, confidence +1) | "dont_know" (needs practice, confidence -1)
+    feedback: "know" (confidence +1) | "dont_know" (confidence -1)
               | "clear" (remove feedback only — confidence is NOT adjusted)
-    Returns the updated Profile.
+    Returns True on success, False if the lesson does not exist or an error occurred.
+    Idempotent — submitting the same feedback twice adjusts confidence only once.
     """
     try:
         feedback_value = None if feedback == "clear" else feedback
         with db.connection() as conn:
-            coach.record_feedback(conn, lesson_id, feedback_value)
-            return coach.get_profile(conn)
-    except Exception:
-        return Profile(knowledge=[], groups=[])
+            row = conn.execute(
+                "SELECT feedback, topic_id FROM lessons WHERE id = ?", (lesson_id,)
+            ).fetchone()
+            if row is None:
+                await ctx.warning(f"submit_feedback: lesson '{lesson_id}' not found")
+                return False
+            if row["feedback"] == feedback_value:
+                await ctx.info(
+                    f"submit_feedback: feedback already '{feedback_value}' on '{lesson_id}' — no change"
+                )
+                return True
+            db.set_feedback(conn, lesson_id, feedback_value)
+            if feedback_value in ("know", "dont_know") and row["topic_id"]:
+                delta = 1 if feedback_value == "know" else -1
+                coach.apply_knowledge_delta(conn, row["topic_id"], delta)
+        return True
+    except Exception as exc:
+        await ctx.error(f"submit_feedback failed for '{lesson_id}': {exc}")
+        return False
 
 
 @mcp.tool
-def add_topic(topic: str, confidence: int = 5, group: str | None = None) -> Profile:
+async def add_topic(
+    ctx: Context, topic: str, confidence: int = 5, group: str | None = None
+) -> bool:
     """Add a new topic to the knowledge map, or update confidence if it already exists.
 
     topic: topic identifier, e.g. 'rust_lifetimes'
     confidence: initial confidence score 0-10 (default 5)
     group: optional group name; topic appears under 'Other' if omitted
-    Returns the updated Profile.
+    Returns True on success, False on error.
+    Idempotent — calling with the same topic updates the confidence.
     """
     try:
         with db.connection() as conn:
             db.upsert_knowledge(conn, topic, confidence)
             if group and group != "Other":
                 db.assign_topic_to_group(conn, topic, group)
-            return coach.get_profile(conn)
-    except Exception:
-        return Profile(knowledge=[], groups=[])
+        return True
+    except Exception as exc:
+        await ctx.error(f"add_topic failed for '{topic}': {exc}")
+        return False
 
 
 @mcp.tool
-def remove_topic(topic: str) -> Profile:
+async def remove_topic(ctx: Context, topic: str) -> bool:
     """Remove a topic from the knowledge map entirely.
 
-    Returns the updated Profile.
+    Returns True if the topic existed and was removed, False if not found.
     """
     try:
         with db.connection() as conn:
-            db.delete_knowledge(conn, topic)
-            return coach.get_profile(conn)
-    except Exception:
-        return Profile(knowledge=[], groups=[])
+            found = db.delete_knowledge(conn, topic)
+        if not found:
+            await ctx.warning(f"remove_topic: topic '{topic}' not found")
+        return found
+    except Exception as exc:
+        await ctx.error(f"remove_topic failed for '{topic}': {exc}")
+        return False
 
 
 @mcp.tool
-def add_group(name: str) -> Profile:
+async def add_group(ctx: Context, name: str) -> bool:
     """Create a new (initially empty) knowledge group.
 
     name: group name, e.g. 'Machine Learning'
     Note: add_topic(group=name) also auto-creates the group when assigning a topic.
-    Returns the updated Profile.
+    Returns True whether newly created or already existing (idempotent).
+    Returns False on error.
     """
     try:
         name = name.strip()
         with db.connection() as conn:
-            db.add_group(conn, name)
-            return coach.get_profile(conn)
-    except Exception:
-        return Profile(knowledge=[], groups=[])
+            created = db.add_group(conn, name)
+        if not created:
+            await ctx.info(f"add_group: group '{name}' already exists")
+        return True
+    except Exception as exc:
+        await ctx.error(f"add_group failed for '{name}': {exc}")
+        return False
 
 
 @mcp.tool
-def remove_group(name: str) -> Profile:
+async def remove_group(ctx: Context, name: str) -> bool:
     """Delete a knowledge group. Topics in the group move to Other.
 
-    Returns the updated Profile.
+    Returns True if the group existed and was deleted, False if not found.
     """
     try:
         with db.connection() as conn:
-            db.delete_group(conn, name)
-            return coach.get_profile(conn)
-    except Exception:
-        return Profile(knowledge=[], groups=[])
+            found = db.delete_group(conn, name)
+        if not found:
+            await ctx.warning(f"remove_group: group '{name}' not found")
+        return found
+    except Exception as exc:
+        await ctx.error(f"remove_group failed for '{name}': {exc}")
+        return False
 
 
 @mcp.tool
