@@ -210,7 +210,7 @@
     gfm: true,
   });
 
-  const raw = {{ lesson.summary | tojson }};
+  const raw = {{ (lesson.body or lesson.summary) | tojson }};
   document.getElementById('summary-content').innerHTML = marked.parse(raw);
 </script>
 {% endblock %}

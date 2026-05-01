@@ -97,6 +97,7 @@ def init_schema(conn: sqlite3.Connection) -> None:
             title               TEXT NOT NULL,
             level               TEXT NOT NULL,
             summary             TEXT NOT NULL,
+            body                TEXT,
             task_context        TEXT,
             project             TEXT,
             repository          TEXT,
@@ -150,12 +151,17 @@ def init_schema(conn: sqlite3.Connection) -> None:
             ON lessons (topic_id);
     """)
     conn.commit()
+    _migrate(conn)
     _seed_defaults(conn)
 
 
 def _migrate(conn: sqlite3.Connection) -> None:
-    """Placeholder for future schema migrations. No-op while schema is current."""
-    pass
+    """Apply incremental schema changes to existing databases."""
+    try:
+        conn.execute("ALTER TABLE lessons ADD COLUMN body TEXT")
+        conn.commit()
+    except sqlite3.OperationalError:
+        pass  # column already exists
 
 
 def _seed_defaults(conn: sqlite3.Connection) -> None:
@@ -184,10 +190,10 @@ def insert_lesson(conn: sqlite3.Connection, lesson: Lesson) -> None:
     """Insert or replace a lesson record."""
     conn.execute(
         """INSERT OR REPLACE INTO lessons
-           (id, timestamp, topic_id, categories, title, level, summary,
+           (id, timestamp, topic_id, categories, title, level, summary, body,
             task_context, project, repository, branch, commit_hash, folder,
             repository_platform, starred, feedback)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (
             lesson.id,
             lesson.timestamp_iso,
@@ -196,6 +202,7 @@ def insert_lesson(conn: sqlite3.Connection, lesson: Lesson) -> None:
             lesson.title,
             lesson.level,
             lesson.summary,
+            lesson.body,
             lesson.task_context,
             lesson.project,
             lesson.repository,
@@ -264,9 +271,9 @@ def _lesson_where(
         conditions.append("starred = ?")
         params.append(1 if starred else 0)
     if search is not None:
-        conditions.append("(title LIKE ? OR topic_id LIKE ? OR summary LIKE ?)")
+        conditions.append("(title LIKE ? OR topic_id LIKE ? OR summary LIKE ? OR body LIKE ?)")
         like = f"%{search}%"
-        params.extend([like, like, like])
+        params.extend([like, like, like, like])
     if feedback == "none":
         conditions.append("feedback IS NULL")
     elif feedback is not None:
@@ -393,10 +400,10 @@ def import_lessons(conn: sqlite3.Connection, records: list[dict]) -> tuple[int, 
             continue
         cur = conn.execute(
             """INSERT OR IGNORE INTO lessons
-               (id, timestamp, topic_id, categories, title, level, summary,
+               (id, timestamp, topic_id, categories, title, level, summary, body,
                 task_context, project, repository, branch, commit_hash, folder,
                 repository_platform, starred, feedback)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 lesson.id,
                 lesson.timestamp_iso,
@@ -407,6 +414,7 @@ def import_lessons(conn: sqlite3.Connection, records: list[dict]) -> tuple[int, 
                 lesson.title,
                 lesson.level,
                 lesson.summary,
+                lesson.body,
                 lesson.task_context,
                 lesson.project,
                 lesson.repository,
@@ -773,6 +781,7 @@ def _row_to_lesson(row: sqlite3.Row) -> Lesson:
         title=row["title"],
         level=row["level"],
         summary=row["summary"],
+        body=row["body"],
         task_context=row["task_context"],
         project=row["project"],
         repository=row["repository"],

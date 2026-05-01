@@ -27,6 +27,7 @@ class Lesson(BaseModel):
     title: str
     level: Level
     summary: str
+    body: str | None = None
     task_context: str | None = None
     project: str | None = None
     repository: str | None = None

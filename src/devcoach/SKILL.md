@@ -264,6 +264,7 @@ Call `log_lesson` right after delivering the lesson, without waiting for feedbac
   "title": "Lesson title",
   "level": "junior|mid|senior",
   "summary": "One line — what was taught",
+  "body": "The full lesson text exactly as delivered — all paragraphs, code blocks, and the senior tip. This is what the web UI displays on the lesson detail page.",
   "task_context": "Brief description of the task that triggered it"
 }
 ```
