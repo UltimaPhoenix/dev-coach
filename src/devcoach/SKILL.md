@@ -204,14 +204,12 @@ Explain the WHY, not just the what. Connect it to the task just completed.]
 ```
 
 If `AskUserQuestion` is **not** available (Claude Desktop / claude.ai web), append
-this block so the user can reply in their next message:
+this block — plain list format so the interface renders it as clickable buttons:
 
-```
-> Did that land?
-> - **1** · ✅ know — got it
-> - **2** · ❌ don't know — need to revisit
-> - **3** · ⏭️ no response — skip
-```
+Did that land?
+- ✅ know — got it
+- ❌ don't know — need to revisit
+- ⏭️ skip
 
 **Tone:** direct, like a senior colleague explaining during a code review.
 Not academic, not verbose. Gets straight to the point.
@@ -257,9 +255,18 @@ Wait for the reply, then go to Step 2 with the result.
 Do **not** append the text prompt in the lesson body — `AskUserQuestion` replaces it.
 
 **Claude Desktop / claude.ai web:** `AskUserQuestion` is not in your tool list.
-The text prompt already appended at the bottom of the lesson is the fallback.
-When the **next** user message looks like feedback (1 / 2 / 3, know, don't know,
-skip, ✅, ❌) treat it as feedback and handle it before any new request in that message.
+After the lesson body, end the response with this exact block — the interface will
+render the options as clickable buttons:
+
+Did that land?
+- ✅ know — got it
+- ❌ don't know — need to revisit
+- ⏭️ skip
+
+Keep labels short (≤ 5 words). Do not wrap in a blockquote or code fence — plain
+list format is what the client renders as buttons.
+When the user clicks or types a reply that matches feedback (know / don't know / skip,
+✅, ❌, 1 / 2 / 3), treat it as feedback before handling any new request in that message.
 
 ---
 
