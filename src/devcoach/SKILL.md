@@ -201,7 +201,12 @@ Append the lesson **at the bottom of the response**, separated by a horizontal r
 Explain the WHY, not just the what. Connect it to the task just completed.]
 
 💡 *Senior tip:* [One sentence a senior would say to a junior on this topic]
+```
 
+If `AskUserQuestion` is **not** available (Claude Desktop / claude.ai web), append
+this block so the user can reply in their next message:
+
+```
 > Did that land?
 > - **1** · ✅ know — got it
 > - **2** · ❌ don't know — need to revisit
@@ -238,9 +243,29 @@ manually. Omitting these fields is correct and will not reduce lesson quality.
 
 `log_lesson` returns the saved `Lesson` object with all resolved fields.
 
+### Step 1b — Collect feedback interactively
+
+**Claude Code (CLI / IDE):** `AskUserQuestion` is available in your tool list.
+Call it immediately after `log_lesson` returns, before the user sends another message:
+
+```
+question : "Did that land?"
+options  : ["✅ know — got it", "❌ don't know — need to revisit", "⏭️ skip"]
+```
+
+Wait for the reply, then go to Step 2 with the result.
+Do **not** append the text prompt in the lesson body — `AskUserQuestion` replaces it.
+
+**Claude Desktop / claude.ai web:** `AskUserQuestion` is not in your tool list.
+The text prompt already appended at the bottom of the lesson is the fallback.
+When the **next** user message looks like feedback (1 / 2 / 3, know, don't know,
+skip, ✅, ❌) treat it as feedback and handle it before any new request in that message.
+
+---
+
 ### Step 2 — Record feedback and conditionally adjust confidence
 
-When the user responds to the **know / don't know / no response** prompt, call
+When feedback is received (via `AskUserQuestion` reply or next-message fallback), call
 `submit_feedback` according to this table:
 
 | User response | Condition | Action |
@@ -321,7 +346,8 @@ Every 10 lessons delivered, re-evaluate the profile:
 - **Always read** `devcoach://profile` to calibrate level and topic selection
 - The lesson should feel **natural and contextual**, not a mechanical add-on
 - If there is nothing interesting to teach → stay silent. Better nothing than forced.
-- Always append the **know / don't know / no response** prompt after every lesson
+- In Claude Code: use `AskUserQuestion` after `log_lesson` — do not append the text prompt
+- In Claude Desktop / web: append the text prompt; capture reply in the next message turn
 - Never call `update_knowledge` directly after `log_lesson` — wait for feedback
 - `submit_feedback` handles the confidence delta; skip it entirely on no response
 - Propose starring when `don't know` on mid/senior, or when the topic recurs 2+ times
