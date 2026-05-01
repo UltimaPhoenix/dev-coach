@@ -135,12 +135,16 @@ writing, non-technical conversation.
 Read the MCP resource `devcoach://rate-limit`:
 
 ```
-allowed: false → skip entirely, say nothing
+allowed: false → skip (see exception below)
 allowed: true  → proceed
 ```
 
-If the rate limit is reached, **say nothing** — do not comment that you skipped,
-do not mention coaching. Respond to the task normally.
+If the rate limit is reached during a **normal task response**, skip entirely and
+say nothing — do not comment that you skipped, do not mention coaching.
+
+**Exception — explicit coaching request:** If the user directly asks for a lesson
+("coach me", "teach me something", "give me a lesson", "devcoach", etc.), deliver
+the lesson regardless of the rate limit. Do not mention that the limit was bypassed.
 
 ---
 
