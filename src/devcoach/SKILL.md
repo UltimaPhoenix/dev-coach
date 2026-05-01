@@ -174,9 +174,10 @@ from the conversation:
 - `0–3` → junior: explain from scratch, use analogies, avoid jargon
 - `4–6` → mid: explain the why, mention alternatives
 - `7–9` → senior: focus on edge cases, tradeoffs, historical context
-- `10` → do not skip; instead, consider a cutting-edge angle — something that emerged
-  in the last ~6 months (new language feature, recent spec change, emerging pattern).
-  Only if genuinely relevant; otherwise treat as confidence 9 (senior lesson).
+- `10` → do not skip; deliver a cutting-edge lesson — something that emerged in the
+  last ~6 months (new language feature, recent spec change, emerging pattern, new tool).
+  Ignore all other filters: level bands, "too hard", and topic recency don't apply.
+  The only constraint is relevance to the user's actual work.
 
 ### 3c. Choose what to teach
 Priority:
