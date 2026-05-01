@@ -356,6 +356,13 @@ def get_lessons(
     return [_row_to_lesson(row) for row in rows]
 
 
+def delete_lesson(conn: sqlite3.Connection, lesson_id: str) -> bool:
+    """Delete a lesson by ID. Returns True if found and deleted, False if not found."""
+    cur = conn.execute("DELETE FROM lessons WHERE id = ?", (lesson_id,))
+    conn.commit()
+    return cur.rowcount > 0
+
+
 def set_star(conn: sqlite3.Connection, lesson_id: str, starred: bool) -> bool:
     """Set the starred flag on a lesson. Returns True if lesson was found, False if not found."""
     cur = conn.execute(

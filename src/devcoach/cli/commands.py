@@ -147,6 +147,15 @@ def cmd_unstar(args: argparse.Namespace) -> None:
     console.print(f"Lesson [cyan]{args.id}[/cyan] → [dim]☆ unstarred[/dim]")
 
 
+def cmd_delete(args: argparse.Namespace) -> None:
+    with db.connection() as conn:
+        found = db.delete_lesson(conn, args.id)
+    if not found:
+        console.print(f"[red]Lesson '{args.id}' not found.[/red]")
+        sys.exit(1)
+    console.print(f"Lesson [cyan]{args.id}[/cyan] deleted.")
+
+
 def cmd_feedback(args: argparse.Namespace) -> None:
     valid = {"know", "dont_know", "clear"}
     if args.feedback not in valid:
@@ -807,6 +816,9 @@ def _build_parser() -> argparse.ArgumentParser:
     p_unstar = sub.add_parser("unstar", help="Remove the starred mark from a lesson")
     p_unstar.add_argument("id", help="Lesson ID")
 
+    p_delete = sub.add_parser("delete", help="Permanently delete a lesson")
+    p_delete.add_argument("id", help="Lesson ID")
+
     p_feedback = sub.add_parser("feedback", help="Record know/dont_know feedback for a lesson")
     p_feedback.add_argument("id", help="Lesson ID")
     p_feedback.add_argument(
@@ -915,6 +927,7 @@ def run_cli() -> None:
         "lesson": cmd_lesson,
         "star": cmd_star,
         "unstar": cmd_unstar,
+        "delete": cmd_delete,
         "feedback": cmd_feedback,
         "settings": cmd_settings,
         "stats": cmd_stats,

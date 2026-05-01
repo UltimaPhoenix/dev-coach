@@ -193,6 +193,23 @@ async def star_lesson(ctx: Context, lesson_id: str, starred: bool) -> bool:
 
 
 @mcp.tool
+async def delete_lesson(ctx: Context, lesson_id: str) -> bool:
+    """Permanently delete a lesson by ID.
+
+    Returns True if the lesson was found and deleted, False if not found.
+    """
+    try:
+        with db.connection() as conn:
+            found = db.delete_lesson(conn, lesson_id)
+        if not found:
+            await ctx.warning(f"delete_lesson: lesson '{lesson_id}' not found")
+        return found
+    except Exception as exc:
+        await ctx.error(f"delete_lesson failed for '{lesson_id}': {exc}")
+        return False
+
+
+@mcp.tool
 async def submit_feedback(
     ctx: Context, lesson_id: str, feedback: Literal["know", "dont_know", "clear"]
 ) -> bool:
