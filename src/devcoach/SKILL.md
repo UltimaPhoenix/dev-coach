@@ -79,7 +79,9 @@ Always read these MCP resources before deciding to teach:
 
 - `devcoach://rate-limit` — check `allowed`; if false, skip entirely
 - `devcoach://taught-topics` — never repeat a topic already in this list
-- `devcoach://profile` — use confidence scores to pick topic and depth
+- `devcoach://profile` — use confidence scores to pick depth, and treat each topic
+  present in the profile as a declared area of learning intent: the user wants to
+  grow or stay current in these domains. Prefer teaching them over off-profile topics.
 
 ---
 
@@ -159,8 +161,10 @@ Identify all technical concepts present in the output:
 - Applied or missing best practices
 
 ### 3b. Estimate the user's knowledge level on the topic
-Read the MCP resource `devcoach://profile` as a baseline, then adjust with signals
-from the conversation:
+Read the MCP resource `devcoach://profile` as a baseline. Each topic in the profile
+carries two signals: **confidence** (how much the user knows) and **intent** (they have
+opted into this domain — they want to learn or stay updated). Both signals drive selection.
+Adjust confidence with signals from the conversation:
 
 | Signal | Effect |
 |---|---|
@@ -170,7 +174,11 @@ from the conversation:
 | Correctly applied a previous lesson | Mark as "absorbed" |
 | Request to explain a basic concept | Confidence = low |
 
-**Levels:**
+The confidence score for the **specific topic being taught** determines the depth and
+angle of the lesson — not the user's general level. A user who is senior in one
+domain may be a junior in another; always read the per-topic score, not an average.
+
+**Levels (per-topic confidence):**
 - `0–3` → junior: explain from scratch, use analogies, avoid jargon
 - `4–6` → mid: explain the why, mention alternatives
 - `7–9` → senior: focus on edge cases, tradeoffs, historical context
@@ -183,10 +191,15 @@ from the conversation:
 ### 3c. Choose what to teach
 Priority:
 
-1. **Pitfall avoided or committed** in the current task — highest relevance
-2. **Interesting pattern** used in the output worth formalising
-3. **Related concept** the user probably does not know well (confidence < 5)
-4. **Deep-dive** on something already touched but not yet mastered (confidence 4–6)
+1. **Pitfall avoided or committed** in the current task on a **profile topic** — highest relevance
+2. **Interesting pattern** in the output on a **profile topic** worth formalising
+3. **Pitfall or pattern** on a topic touched in the task but **not in the profile** — relevant but lower priority than profile work
+4. **Related profile topic** the user probably does not know well (confidence < 5) — declared intent meets knowledge gap
+5. **Deep-dive** on a profile topic already touched but not yet mastered (confidence 4–6)
+
+**Tiebreaker — always prefer the profile topic** when multiple teachable concepts
+are present in the same task. A concept outside the profile can be taught only if
+it is central to the task and no applicable profile topic exists.
 
 **Never teach:**
 - Topics already in `devcoach://taught-topics` — use fuzzy matching, not just exact
