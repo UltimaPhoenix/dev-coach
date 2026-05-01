@@ -178,6 +178,7 @@ from the conversation:
   last ~6 months (new language feature, recent spec change, emerging pattern, new tool).
   Ignore all other filters: level bands, "too hard", and topic recency don't apply.
   The only constraint is relevance to the user's actual work.
+  **The rate limit still applies** — skip if `devcoach://rate-limit` returns `allowed: false`.
 
 ### 3c. Choose what to teach
 Priority:
@@ -192,10 +193,12 @@ Priority:
   `topic_id` equality. If the log contains `python_generators`, also skip
   `python_generator_expressions` and `generators_lazy_evaluation`. When in doubt,
   pick a different angle rather than risk repeating ground already covered.
+  **Exception:** confidence 10 — ignore the taught-topics filter entirely.
 - Lessons at a level **below** the user's current confidence band on that topic.
   If confidence is 7 (senior band), do not deliver a junior or mid lesson — only
   senior (or cutting-edge for confidence 10). The lesson level must match or exceed
   the band implied by the confidence score.
+  **Exception:** confidence 10 — ignore the level floor; the lesson targets the bleeding edge.
 - Things unrelated to the current task (no random off-context lessons)
 
 ---
