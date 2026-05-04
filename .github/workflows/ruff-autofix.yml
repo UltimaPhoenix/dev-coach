@@ -7,7 +7,6 @@ on:
 
 permissions:
   contents: write
-  pull-requests: write
 
 jobs:
   autofix:
@@ -29,16 +28,12 @@ jobs:
       - name: Run ruff format
         run: uv run ruff format src/ tests/
 
-      - name: Open PR if there are changes
-        uses: peter-evans/create-pull-request@v8
-        with:
-          commit-message: "style: apply ruff auto-fixes"
-          title: "style: ruff auto-fix"
-          body: |
-            Automated style fixes applied by `ruff check --fix` and `ruff format`.
-
-            This PR was opened automatically by the **Ruff auto-fix** workflow.
-            Review the diff, then merge or close.
-          branch: ruff/autofix
-          delete-branch: true
-          labels: style
+      - name: Commit and push if there are changes
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --staged --quiet && echo "No changes." || (
+            git commit -m "style: apply ruff auto-fixes [skip ci]" &&
+            git push
+          )
