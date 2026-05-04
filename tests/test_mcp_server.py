@@ -590,7 +590,9 @@ class TestExceptionPaths:
     """Cover all exception-handler branches that return safe fallbacks."""
 
     def test_log_lesson_usage_defaults_exception_falls_back(self, mock_ctx):
-        with patch("devcoach.core.db.get_usage_defaults", side_effect=sqlite3.OperationalError("err")):
+        with patch(
+            "devcoach.core.db.get_usage_defaults", side_effect=sqlite3.OperationalError("err")
+        ):
             result = _run(
                 server.log_lesson(
                     mock_ctx,
@@ -699,7 +701,9 @@ class TestExceptionPaths:
         assert "error" in result
 
     def test_devcoach_instructions_exception_returns_fallback(self):
-        with patch("devcoach.mcp.server.importlib.resources.files", side_effect=Exception("not found")):
+        with patch(
+            "devcoach.mcp.server.importlib.resources.files", side_effect=Exception("not found")
+        ):
             result = server.devcoach_instructions()
         assert "unavailable" in result
 
