@@ -27,6 +27,14 @@ PAGES = [
     ("settings", "/settings"),
 ]
 
+LESSON_PAGES = [
+    ("lesson-docker-layer-cache", "/lessons/lesson-docker-layer-cache-001"),
+    ("lesson-postgresql-explain-analyze", "/lessons/lesson-postgresql-explain-analyze-001"),
+    ("lesson-git-interactive-rebase", "/lessons/lesson-git-interactive-rebase-001"),
+    ("lesson-ci-cd-pipeline-stages", "/lessons/lesson-ci-cd-pipeline-stages-001"),
+    ("lesson-redis-cache-stampede", "/lessons/lesson-redis-cache-stampede-001"),
+]
+
 def restore_db() -> None:
     result = subprocess.run(
         ["devcoach", "restore", str(BACKUP_ZIP)],
@@ -55,25 +63,16 @@ def take_screenshots(server_proc: subprocess.Popen) -> None:
     with sync_playwright() as pw:
         browser = pw.chromium.launch()
 
-        ctx = browser.new_context(viewport=VIEWPORT, color_scheme="light")
-        page = ctx.new_page()
-        for name, path in PAGES:
-            page.goto(f"{BASE_URL}{path}")
-            page.wait_for_load_state("networkidle")
-            out = SCREENSHOTS_DIR / f"{name}-light.png"
-            page.screenshot(path=str(out))
-            print(f"  saved {out}")
-        ctx.close()
-
-        ctx = browser.new_context(viewport=VIEWPORT, color_scheme="dark")
-        page = ctx.new_page()
-        for name, path in PAGES:
-            page.goto(f"{BASE_URL}{path}")
-            page.wait_for_load_state("networkidle")
-            out = SCREENSHOTS_DIR / f"{name}-dark.png"
-            page.screenshot(path=str(out))
-            print(f"  saved {out}")
-        ctx.close()
+        for scheme in ("light", "dark"):
+            ctx = browser.new_context(viewport=VIEWPORT, color_scheme=scheme)
+            page = ctx.new_page()
+            for name, path in PAGES + LESSON_PAGES:
+                page.goto(f"{BASE_URL}{path}")
+                page.wait_for_load_state("networkidle")
+                out = SCREENSHOTS_DIR / f"{name}-{scheme}.png"
+                page.screenshot(path=str(out))
+                print(f"  saved {out}")
+            ctx.close()
 
         browser.close()
 
