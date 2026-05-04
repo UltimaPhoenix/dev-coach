@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Literal
 
 from fastmcp import Context, FastMCP
+from mcp.types import ToolAnnotations
 
 from devcoach.core import coach, db
 from devcoach.core.detect import detect_stack
@@ -29,7 +30,9 @@ mcp = FastMCP(
 # ── MCP Tools ─────────────────────────────────────────────────────────────
 
 
-@mcp.tool
+@mcp.tool(
+    annotations=ToolAnnotations(destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def log_lesson(
     ctx: Context,
     id: str,
@@ -107,7 +110,9 @@ async def log_lesson(
     return lesson
 
 
-@mcp.tool
+@mcp.tool(
+    annotations=ToolAnnotations(destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def update_knowledge(ctx: Context, topic: str, delta: int) -> int:
     """Adjust the confidence score for a topic by delta (e.g. +1 or -1).
 
@@ -122,7 +127,11 @@ async def update_knowledge(ctx: Context, topic: str, delta: int) -> int:
         raise
 
 
-@mcp.tool
+@mcp.tool(
+    annotations=ToolAnnotations(
+        readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False
+    )
+)
 def get_lessons(
     period: Literal["today", "week", "month", "year", "all"] | None = None,
     category: str | None = None,
@@ -173,7 +182,9 @@ def get_lessons(
         return []
 
 
-@mcp.tool
+@mcp.tool(
+    annotations=ToolAnnotations(destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def star_lesson(ctx: Context, lesson_id: str, starred: bool) -> bool:
     """Set the starred (favourite) flag on a lesson to the given value.
 
@@ -192,7 +203,9 @@ async def star_lesson(ctx: Context, lesson_id: str, starred: bool) -> bool:
         return False
 
 
-@mcp.tool
+@mcp.tool(
+    annotations=ToolAnnotations(destructiveHint=True, idempotentHint=True, openWorldHint=False)
+)
 async def delete_lesson(ctx: Context, lesson_id: str) -> bool:
     """Permanently delete a lesson by ID.
 
@@ -209,7 +222,9 @@ async def delete_lesson(ctx: Context, lesson_id: str) -> bool:
         return False
 
 
-@mcp.tool
+@mcp.tool(
+    annotations=ToolAnnotations(destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def submit_feedback(
     ctx: Context, lesson_id: str, feedback: Literal["know", "dont_know", "clear"]
 ) -> bool:
@@ -244,7 +259,9 @@ async def submit_feedback(
         return False
 
 
-@mcp.tool
+@mcp.tool(
+    annotations=ToolAnnotations(destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def add_topic(
     ctx: Context, topic: str, confidence: int = 5, group: str | None = None
 ) -> bool:
@@ -267,7 +284,9 @@ async def add_topic(
         return False
 
 
-@mcp.tool
+@mcp.tool(
+    annotations=ToolAnnotations(destructiveHint=True, idempotentHint=True, openWorldHint=False)
+)
 async def remove_topic(ctx: Context, topic: str) -> bool:
     """Remove a topic from the knowledge map entirely.
 
@@ -284,7 +303,9 @@ async def remove_topic(ctx: Context, topic: str) -> bool:
         return False
 
 
-@mcp.tool
+@mcp.tool(
+    annotations=ToolAnnotations(destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 async def add_group(ctx: Context, name: str) -> bool:
     """Create a new (initially empty) knowledge group.
 
@@ -305,7 +326,9 @@ async def add_group(ctx: Context, name: str) -> bool:
         return False
 
 
-@mcp.tool
+@mcp.tool(
+    annotations=ToolAnnotations(destructiveHint=True, idempotentHint=True, openWorldHint=False)
+)
 async def remove_group(ctx: Context, name: str) -> bool:
     """Delete a knowledge group. Topics in the group move to Other.
 
@@ -322,7 +345,9 @@ async def remove_group(ctx: Context, name: str) -> bool:
         return False
 
 
-@mcp.tool
+@mcp.tool(
+    annotations=ToolAnnotations(destructiveHint=False, idempotentHint=True, openWorldHint=False)
+)
 def update_settings(key: Literal["max_per_day", "min_gap_minutes"], value: str) -> Settings:
     """Update a coaching setting.
 
@@ -345,7 +370,9 @@ def update_settings(key: Literal["max_per_day", "min_gap_minutes"], value: str) 
         return db.get_settings(conn)
 
 
-@mcp.tool
+@mcp.tool(
+    annotations=ToolAnnotations(destructiveHint=False, idempotentHint=False, openWorldHint=True)
+)
 def open_ui(port: int = 7860) -> str:
     """Launch the devcoach web dashboard in the background.
 
@@ -363,7 +390,9 @@ def open_ui(port: int = 7860) -> str:
     return f"devcoach UI starting at http://localhost:{port}"
 
 
-@mcp.tool
+@mcp.tool(
+    annotations=ToolAnnotations(destructiveHint=True, idempotentHint=False, openWorldHint=False)
+)
 async def complete_onboarding(
     ctx: Context,
     topics: dict[str, int],
