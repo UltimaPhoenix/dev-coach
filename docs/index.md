@@ -8,12 +8,30 @@ Everything runs **locally**. No data leaves your machine. One SQLite file at `~/
 
 ## How it works
 
-| Step | What happens |
-|------|-------------|
-| You complete a task with Claude | Claude finishes the work as normal |
-| devcoach checks your knowledge map | Finds a topic where you have room to grow, related to what you just did |
-| A lesson appears at the end of the response | Calibrated to your level (junior / mid / senior), never repeated |
-| You mark it know / don't know | Confidence scores update, shaping future lessons |
+```mermaid
+sequenceDiagram
+    actor User
+    participant Claude as Claude (AI)
+    participant devcoach as devcoach (MCP)
+
+    User->>+Claude: Complete a technical task
+    Claude-->>User: Work completed normally
+
+    Claude->>devcoach: check rate-limit + profile + taught topics
+    devcoach-->>Claude: knowledge map · lesson history · coaching notebook
+
+    Claude->>Claude: select topic · calibrate depth · compose lesson
+
+    Claude->>devcoach: log_lesson(id, topic, level, body, …)
+    Claude-->>-User: Response + 🎓 lesson at the bottom
+
+    User->>+Claude: ✅ know · ❌ don't know · ⏭ skip
+    Claude->>devcoach: submit_feedback → confidence ±1
+    Claude->>Claude: update coaching notebook if warranted
+    Claude-->>-User: acknowledged
+```
+
+See [How it works](how-it-works.md) for the full decision flow.
 
 ---
 

@@ -34,6 +34,7 @@ theme:
 
 nav:
   - Home: index.md
+  - How it works: how-it-works.md
   - Getting started: getting-started.md
   - CLI reference: cli.md
   - MCP server: mcp-server.md
@@ -47,7 +48,11 @@ markdown_extensions:
   - admonition
   - pymdownx.highlight:
       anchor_linenums: true
-  - pymdownx.superfences
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
   - pymdownx.tabbed:
       alternate_style: true
   - tables
