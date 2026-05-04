@@ -85,6 +85,9 @@ def anonymize_zip(src: Path, dst: Path) -> None:
 
     with zipfile.ZipFile(src) as zin, zipfile.ZipFile(dst, "w", zipfile.ZIP_DEFLATED) as zout:
         for name in zin.namelist():
+            if name == "learning-state.md":
+                continue  # personal coaching narrative — excluded from anon export
+
             raw = zin.read(name)
 
             if name == "lessons.json":

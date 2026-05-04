@@ -73,6 +73,22 @@ Step 3 after all topics are known.
 
 ---
 
+## Session context
+
+After the onboarding check, read the file `~/.devcoach/learning-state.md`.
+
+If it exists and is non-empty, load it as your coaching context for this session:
+- Resume patterns and hypotheses you noted in previous sessions
+- Prioritise angles you flagged as still pending
+- Avoid re-covering ground you noted as absorbed
+
+If the file does not exist or is empty, proceed without prior context —
+it will be created when you first have something worth saving.
+
+Do not mention this file to the user. It is an internal coaching tool.
+
+---
+
 ## Before delivering a lesson
 
 Always read these MCP resources before deciding to teach:
@@ -82,6 +98,10 @@ Always read these MCP resources before deciding to teach:
 - `devcoach://profile` — use confidence scores to pick depth, and treat each topic
   present in the profile as a declared area of learning intent: the user wants to
   grow or stay current in these domains. Prefer teaching them over off-profile topics.
+- `~/.devcoach/learning-state.md` — if non-empty, scan for:
+  - **Recommended focus** entries that overlap the current task's topics → elevate those angles
+  - **Open hypotheses** relevant to the current task → watch for confirming/refuting evidence
+  - **Recurring patterns** → use them to calibrate depth and angle, not just the confidence score
 
 ---
 
@@ -178,6 +198,14 @@ Adjust confidence with signals from the conversation:
 | Correctly applied a previous lesson | Mark as "absorbed" |
 | Request to explain a basic concept | Confidence = low |
 
+If the coaching notebook (`~/.devcoach/learning-state.md`) is non-empty and mentions
+the current topic, treat it as an additional calibration signal. Notebook observations
+can **raise or lower** the effective teaching angle independently of the numeric score:
+
+- "User absorbs theory but struggles to apply it" → favour worked examples over concepts
+- "User tends to over-engineer" → anchor the lesson to concrete failure modes
+- "Hypothesis: low confidence stems from bad early habits, not ignorance" → teach correction, not introduction
+
 The confidence score for the **specific topic being taught** determines the depth and
 angle of the lesson — not the user's general level. A user who is senior in one
 domain may be a junior in another; always read the per-topic score, not an average.
@@ -195,11 +223,12 @@ domain may be a junior in another; always read the per-topic score, not an avera
 ### 3c. Choose what to teach
 Priority:
 
-1. **Pitfall avoided or committed** in the current task on a **profile topic** — highest relevance
-2. **Interesting pattern** in the output on a **profile topic** worth formalising
-3. **Pitfall or pattern** on a topic touched in the task but **not in the profile** — relevant but lower priority than profile work
-4. **Related profile topic** the user probably does not know well (confidence < 5) — declared intent meets knowledge gap
-5. **Deep-dive** on a profile topic already touched but not yet mastered (confidence 4–6)
+1. **Notebook-recommended angle** on a topic touched in the current task — when the notebook explicitly flagged a follow-up and the task provides a natural hook
+2. **Pitfall avoided or committed** in the current task on a **profile topic** — highest relevance when no notebook angle applies
+3. **Interesting pattern** in the output on a **profile topic** worth formalising
+4. **Pitfall or pattern** on a topic touched in the task but **not in the profile** — relevant but lower priority than profile work
+5. **Related profile topic** the user probably does not know well (confidence < 5) — declared intent meets knowledge gap
+6. **Deep-dive** on a profile topic already touched but not yet mastered (confidence 4–6)
 
 **Tiebreaker — always prefer the profile topic** when multiple teachable concepts
 are present in the same task. A concept outside the profile can be taught only if
@@ -347,6 +376,49 @@ If the user agrees, call `star_lesson(lesson_id, starred=True)`.
 If they decline or ignore, do nothing — never star silently.
 
 Do **not** propose starring for: `know` on easy (`junior`) lessons, or `no response`.
+
+### Step 5 — Update the coaching notebook (when warranted)
+
+After the feedback / starring / profile-expansion flow, write to
+`~/.devcoach/learning-state.md` if the session produced a meaningful new observation.
+
+Update only when one of these is true:
+
+| Trigger | Example |
+|---|---|
+| New pattern identified | "User reaches for mutable defaults under time pressure" |
+| Unexpected gap revealed | "Marked confident on X but couldn't absorb a mid-level lesson" |
+| Absorption confirmed | "Applied previous lesson on Y correctly without prompting" |
+| Useful next angle | "Cache lesson landed — follow up with eviction strategies next" |
+| Hypothesis to track | "Low testing confidence may stem from never working in TDD" |
+
+**Format** — always write the complete file, never a partial diff.
+Integrate previous observations rather than overwriting them:
+
+```markdown
+# devcoach — Coaching Notebook
+_Last updated: [ISO timestamp]_
+
+## Observations
+[Narrative: learning style, recurring error types, root-cause hypotheses.
+No lesson IDs, scores, or topic lists — those live in the DB.]
+
+## Recurring patterns
+[What keeps surfacing and the coaching angle that still needs to land]
+
+## Recommended focus
+[What to explore next and why — phrased as coaching intent, not DB queries]
+
+## Open hypotheses
+[Things to watch for over the next few sessions]
+```
+
+Do **not** update after every lesson — only when something changes how you would
+coach this user going forward.
+Do **not** include data that mirrors the MCP.
+Do **not** mention or show this file to the user.
+
+---
 
 ### Step 4 — Suggest profile expansion for off-profile topics
 

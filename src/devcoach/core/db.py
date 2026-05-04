@@ -16,6 +16,7 @@ from devcoach.core.models import KnowledgeEntry, KnowledgeGroup, Lesson, Setting
 # ── Constants ──────────────────────────────────────────────────────────────
 
 DB_PATH = Path.home() / ".devcoach" / "coaching.db"
+LEARNING_STATE_PATH = Path.home() / ".devcoach" / "learning-state.md"
 
 DEFAULT_PROFILE: dict[str, int] = {
     "general_engineering": 8,
@@ -466,6 +467,8 @@ def create_backup_zip(conn: sqlite3.Connection) -> bytes:
         zf.writestr("settings.json", json.dumps(settings.model_dump(), indent=2))
         zf.writestr("lessons.json", json.dumps(lessons, indent=2, ensure_ascii=False))
         zf.writestr("knowledge.json", json.dumps(knowledge_data, indent=2))
+        if LEARNING_STATE_PATH.exists():
+            zf.writestr("learning-state.md", LEARNING_STATE_PATH.read_text(encoding="utf-8"))
     return buf.getvalue()
 
 
@@ -482,6 +485,7 @@ def restore_backup_zip(conn: sqlite3.Connection, data: bytes) -> dict[str, int]:
         "lessons": 0,
         "skipped": 0,
         "invalid": 0,
+        "learning_state": 0,
     }
 
     with zipfile.ZipFile(io.BytesIO(data)) as zf:
@@ -532,6 +536,13 @@ def restore_backup_zip(conn: sqlite3.Connection, data: bytes) -> dict[str, int]:
             result["lessons"] = inserted
             result["skipped"] = duplicated
             result["invalid"] = invalid
+
+        if "learning-state.md" in names:
+            LEARNING_STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
+            LEARNING_STATE_PATH.write_text(
+                zf.read("learning-state.md").decode("utf-8"), encoding="utf-8"
+            )
+            result["learning_state"] = 1
 
     return result
 
