@@ -43,6 +43,14 @@ Everything runs **locally**. No data leaves your machine. One SQLite file at `~/
 === "Light"
     ![Settings – light theme](screenshots/settings-light.png)
 
+### Lesson detail
+
+=== "Dark"
+    ![Lesson detail – dark theme](screenshots/lesson-redis-cache-stampede-dark.png)
+
+=== "Light"
+    ![Lesson detail – light theme](screenshots/lesson-redis-cache-stampede-light.png)
+
 ---
 
 ## Quick install

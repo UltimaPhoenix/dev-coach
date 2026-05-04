@@ -39,6 +39,12 @@ Displays your full knowledge map with colour-coded confidence bars:
 
 **Stats bar** (top of page): total lessons, today's count vs. daily limit, this week's count, and current rate-limit status.
 
+=== "Dark"
+    ![Knowledge map – dark theme](screenshots/knowledge-map-dark.png)
+
+=== "Light"
+    ![Knowledge map – light theme](screenshots/knowledge-map-light.png)
+
 ---
 
 ### Lessons (`/lessons`)
@@ -64,11 +70,55 @@ Filterable, sortable table of all delivered lessons.
 - Feedback buttons (✓ / ✗ / clear) — record comprehension, adjusts knowledge confidence
 - Lesson ID link — opens the detail page
 
+=== "Dark"
+    ![Lessons – dark theme](screenshots/lessons-dark.png)
+
+=== "Light"
+    ![Lessons – light theme](screenshots/lessons-light.png)
+
 ---
 
 ### Lesson detail (`/lessons/<id>`)
 
-Full lesson content with title, summary, level, categories, git metadata, star and feedback state.
+Full lesson content laid out in reading order:
+
+- **Title row** — star toggle, title, level badge (junior / mid / senior)
+- **Metadata row** — relative date with tooltip, topic ID, category tags, feedback badge + clear button
+- **TL;DR callout** — one-sentence summary in a highlighted indigo box, always visible above the body
+- **Lesson body** — full markdown content with syntax-highlighted code blocks
+- **Task context** — the coding task that triggered the lesson (when available)
+- **Git metadata** — project, repository (with platform icon + link), branch, commit hash, folder (VSCode deep-link)
+- **Feedback buttons** — ✓ I know this / ✗ I don't know this (hidden once feedback is recorded)
+
+=== "Docker layer caching (Junior)"
+    === "Dark"
+        ![Docker layer caching – dark](screenshots/lesson-docker-layer-cache-dark.png)
+    === "Light"
+        ![Docker layer caching – light](screenshots/lesson-docker-layer-cache-light.png)
+
+=== "PostgreSQL EXPLAIN ANALYZE (Mid)"
+    === "Dark"
+        ![PostgreSQL EXPLAIN ANALYZE – dark](screenshots/lesson-postgresql-explain-analyze-dark.png)
+    === "Light"
+        ![PostgreSQL EXPLAIN ANALYZE – light](screenshots/lesson-postgresql-explain-analyze-light.png)
+
+=== "Git interactive rebase (Mid)"
+    === "Dark"
+        ![Git interactive rebase – dark](screenshots/lesson-git-interactive-rebase-dark.png)
+    === "Light"
+        ![Git interactive rebase – light](screenshots/lesson-git-interactive-rebase-light.png)
+
+=== "CI/CD pipeline stages (Senior)"
+    === "Dark"
+        ![CI/CD pipeline stages – dark](screenshots/lesson-ci-cd-pipeline-stages-dark.png)
+    === "Light"
+        ![CI/CD pipeline stages – light](screenshots/lesson-ci-cd-pipeline-stages-light.png)
+
+=== "Cache stampede (Senior)"
+    === "Dark"
+        ![Cache stampede – dark](screenshots/lesson-redis-cache-stampede-dark.png)
+    === "Light"
+        ![Cache stampede – light](screenshots/lesson-redis-cache-stampede-light.png)
 
 ---
 
@@ -80,6 +130,12 @@ Full lesson content with title, summary, level, categories, git metadata, star a
 - **Import lessons** — upload a previously exported JSON file
 - **Export backup** — full zip (settings + knowledge + lessons)
 - **Import backup** — restore from a backup zip
+
+=== "Dark"
+    ![Settings – dark theme](screenshots/settings-dark.png)
+
+=== "Light"
+    ![Settings – light theme](screenshots/settings-light.png)
 
 ---
 
