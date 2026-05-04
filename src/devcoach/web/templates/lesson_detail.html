@@ -30,7 +30,7 @@
         {% if lesson.starred %}★{% else %}☆{% endif %}
       </button>
     </form>
-    <h1 class="text-lg font-bold text-gray-900 dark:text-white flex-1 min-w-0">{{ lesson.title }}</h1>
+    <h1 class="text-xl font-bold text-gray-900 dark:text-white flex-1 min-w-0">{{ lesson.title }}</h1>
     <a href="/lessons?level={{ lesson.level }}"
        class="text-xs font-semibold px-2 py-0.5 rounded-full border {{ level_class }} shrink-0 hover:ring-2 hover:ring-current hover:ring-offset-1 transition-shadow">{{ lesson.level }}</a>
   </div>
@@ -66,16 +66,16 @@
     {% endif %}
   </div>
 
+  <!-- TL;DR callout -->
+  <div class="my-5 pl-4 border-l-4 border-indigo-400 dark:border-indigo-500 bg-indigo-50 dark:bg-indigo-950/40 rounded-r-lg py-3 pr-4">
+    <p class="text-xs font-semibold uppercase tracking-wide text-indigo-500 dark:text-indigo-400 mb-1">TL;DR</p>
+    <div id="summary-content" class="markdown-body text-sm text-indigo-900 dark:text-indigo-100"></div>
+  </div>
+
   <!-- Lesson body (rendered as markdown) -->
   {% if lesson.body %}
   <div id="body-content" class="markdown-body"></div>
   {% endif %}
-
-  <!-- Summary -->
-  <div class="mt-6 pt-4 border-t border-gray-100 dark:border-gray-800">
-    <h2 class="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500 mb-2">Summary</h2>
-    <div id="summary-content" class="markdown-body text-sm text-gray-600 dark:text-gray-300"></div>
-  </div>
 
   <!-- Task context -->
   {% if lesson.task_context %}
@@ -218,9 +218,9 @@
     gfm: true,
   });
 
+  document.getElementById('summary-content').innerHTML = marked.parse({{ lesson.summary | tojson }});
   {% if lesson.body %}
   document.getElementById('body-content').innerHTML = marked.parse({{ lesson.body | tojson }});
   {% endif %}
-  document.getElementById('summary-content').innerHTML = marked.parse({{ lesson.summary | tojson }});
 </script>
 {% endblock %}
