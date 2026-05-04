@@ -12,20 +12,26 @@ At the start of each Claude session devcoach checks whether the user is set up,
 loads prior coaching context, and primes lesson selection before any task is done.
 
 ```mermaid
-flowchart TD
-    A([Session starts]) --> B[Read devcoach://onboarding]
-    B --> C{needs_onboarding?}
-    C -- Yes --> D{Existing backup\nto restore?}
-    D -- Yes --> E[Restore backup\n→ mark onboarding done]
-    D -- No --> F[Detect stack\nautomatically or manually]
-    F --> G[Confirm topics + confidence\nPropose groups]
-    G --> H[complete_onboarding]
-    E & H --> I
-    C -- No --> I[Read ~/.devcoach/learning-state.md]
-    I --> J{Notebook\nnon-empty?}
-    J -- Yes --> K[Load patterns, hypotheses\nand recommended angles]
-    J -- No --> L[No prior context\nstart fresh]
-    K & L --> M([Ready to coach])
+flowchart LR
+    A([Start]) --> B{First run?}
+    B -- yes --> C[Detect stack]
+    C --> D[Confirm topics\n& groups]
+    D --> E[Save profile]
+    B -- no --> F[Load profile\n& notebook]
+    E & F --> G([Ready])
+
+    subgraph onboarding["onboarding"]
+        C
+        D
+        E
+    end
+
+    style onboarding fill:none,stroke:#AAAAAA,stroke-dasharray:5 5,color:#757575
+    classDef action fill:#D4E4D8,stroke:#8BAF96,color:#1E1E1E
+    classDef term   fill:#E8E8E4,stroke:#AAAAAA,color:#1E1E1E
+
+    class C,D,E,F action
+    class A,G term
 ```
 
 ---
@@ -37,65 +43,49 @@ The loop is silent when nothing is worth teaching or when the rate limit is reac
 
 ```mermaid
 flowchart TD
-    A([Technical task\ncompleted]) --> B[Read devcoach://rate-limit]
-    B --> C{Allowed?}
-    C -- No\nnormal task --> Z([Silent —\nno lesson])
-    C -- No\nexplicit request --> D
-    C -- Yes --> D[Read profile\ntaught topics\ncoaching notebook]
-    D --> E[Analyse task for\nteachable concepts]
-    E --> F[Select topic\nsee Lesson selection]
-    F --> G{Topic\nfound?}
-    G -- No --> Z
-    G -- Yes --> H[Compose lesson\ncalibrate depth per-topic]
-    H --> I[log_lesson to MCP]
-    I --> J([Lesson appears\nat end of response])
-    J --> K{User\nfeedback}
-    K -- ✅ know --> L{Confidence\nbelow level band?}
-    L -- Yes --> M[submit_feedback\nconfidence +1]
-    L -- No --> N[Skip — already calibrated]
-    K -- ❌ don't know --> O[submit_feedback\nconfidence −1]
-    K -- ⏭ skip --> P[No change]
-    M & N & O & P --> Q{New observation\nworth saving?}
-    Q -- Yes --> R[Write ~/.devcoach/\nlearning-state.md]
-    Q -- No --> S
-    R --> S([Loop ends])
+    A([Task completed]) --> B[Check rate limit]
+    B -->|denied| Z([Silent])
+    B -->|allowed| D
+
+    subgraph loop["coaching loop"]
+        D[Select topic & depth]
+        E[Compose & deliver]
+        G[log_lesson]
+    end
+
+    D -->|nothing| Z
+    D -->|found| E
+    E --> G
+    G --> F([Done])
+    G -.->|prompts| U(["You: ✅ ❌ ⏭"])
+
+    style loop fill:none,stroke:#AAAAAA,stroke-dasharray:5 5,color:#757575
+    classDef action fill:#D4E4D8,stroke:#8BAF96,color:#1E1E1E
+    classDef term   fill:#E8E8E4,stroke:#AAAAAA,color:#1E1E1E
+    classDef user   fill:#F5EDE3,stroke:#D4A27F,color:#1E1E1E
+
+    class B,D,E,G action
+    class A,F,Z term
+    class U user
 ```
 
 ---
 
 ## Lesson selection
 
-When a teachable concept is found, devcoach picks the highest-priority angle
-and calibrates the lesson level to the **per-topic** confidence score — not an average.
+When a teachable concept is found, devcoach walks this priority list from top to bottom
+and picks the first match. Depth is then calibrated to the per-topic confidence score.
 
-```mermaid
-flowchart TD
-    A([Concepts identified\nin current task]) --> B{Notebook flags\na follow-up angle\nrelevant to this task?}
-    B -- Yes --> P1["① Deliver notebook\nfollow-up"]
+| Priority | Trigger | Condition |
+|:---:|---|---|
+| ① | Notebook follow-up | The coaching notebook flagged an angle relevant to the current task |
+| ② | Profile pitfall | A pitfall committed or avoided on a profile topic |
+| ③ | Profile pattern | An interesting pattern on a profile topic worth formalising |
+| ④ | Off-profile pitfall | A pitfall on a topic prominent in the task but absent from the profile |
+| ⑤ | Knowledge gap | A profile topic with confidence < 5 |
+| ⑥ | Deep-dive | A profile topic at confidence 4–6, not yet mastered |
 
-    B -- No --> C{Pitfall on a\nprofile topic?}
-    C -- Yes --> P2["② Profile pitfall"]
-
-    C -- No --> D{Interesting pattern\non a profile topic?}
-    D -- Yes --> P3["③ Profile pattern"]
-
-    D -- No --> E{Off-profile concept\nprominent in task?}
-    E -- Yes --> P4["④ Off-profile pitfall"]
-
-    E -- No --> F{Profile topic with\nconfidence < 5?}
-    F -- Yes --> P5["⑤ Knowledge gap"]
-
-    F -- No --> G{Profile topic at\nconfidence 4–6?}
-    G -- Yes --> P6["⑥ Deep-dive"]
-
-    G -- No --> Z([Nothing to teach\n— stay silent])
-
-    P1 & P2 & P3 & P4 & P5 & P6 --> L[Check taught-topics\nno repeats]
-    L --> M{Already taught\nor confidence ≥ 10?}
-    M -- Already taught\nnot confidence 10 --> Z
-    M -- OK or\nconfidence = 10 --> N[Calibrate level\nper-topic confidence]
-    N --> O([Compose and\ndeliver lesson])
-```
+First match wins. No match → silent.
 
 ---
 
