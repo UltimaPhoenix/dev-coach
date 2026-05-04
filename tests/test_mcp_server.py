@@ -479,6 +479,12 @@ class TestCompleteOnboarding:
         _run(server.complete_onboarding(mock_ctx, topics={"python": 7}))
         mock_ctx.info.assert_called_once()
 
+    def test_exception_returns_empty_profile(self, mock_ctx):
+        with patch.object(db, "connection", side_effect=sqlite3.OperationalError("err")):
+            result = _run(server.complete_onboarding(mock_ctx, topics={"python": 7}))
+        assert result.knowledge == []
+        assert result.groups == []
+
 
 # ── Resources ──────────────────────────────────────────────────────────────
 
@@ -555,6 +561,147 @@ class TestPrompt:
         result = server.devcoach_instructions()
         # SKILL.md contains coaching rules — at minimum it should mention lessons or coaching
         assert any(word in result.lower() for word in ("lesson", "coach", "devcoach", "knowledge"))
+
+
+# ── Tools — delete_lesson ─────────────────────────────────────────────────
+
+
+class TestDeleteLesson:
+    def test_found_returns_true(self, mock_ctx):
+        result = _run(server.delete_lesson(mock_ctx, "lesson-sqlite3-row-factory-001"))
+        assert result is True
+
+    def test_not_found_returns_false_and_logs_warning(self, mock_ctx):
+        result = _run(server.delete_lesson(mock_ctx, "nonexistent-id"))
+        assert result is False
+        mock_ctx.warning.assert_called_once()
+
+    def test_exception_returns_false_and_logs_error(self, mock_ctx):
+        with patch.object(db, "connection", side_effect=sqlite3.OperationalError("err")):
+            result = _run(server.delete_lesson(mock_ctx, "any-id"))
+        assert result is False
+        mock_ctx.error.assert_called_once()
+
+
+# ── Exception paths ────────────────────────────────────────────────────────
+
+
+class TestExceptionPaths:
+    """Cover all exception-handler branches that return safe fallbacks."""
+
+    def test_log_lesson_usage_defaults_exception_falls_back(self, mock_ctx):
+        with patch("devcoach.core.db.get_usage_defaults", side_effect=sqlite3.OperationalError("err")):
+            result = _run(
+                server.log_lesson(
+                    mock_ctx,
+                    id="exc-log-001",
+                    timestamp=datetime.now(UTC).isoformat(),
+                    topic_id="exc_topic",
+                    categories=["test"],
+                    title="Exc test",
+                    level="mid",
+                    summary="exc summary",
+                )
+            )
+        assert result.id == "exc-log-001"
+
+    def test_update_knowledge_exception_raises_and_logs_error(self, mock_ctx):
+        with patch.object(db, "connection", side_effect=sqlite3.OperationalError("err")):
+            with pytest.raises(sqlite3.OperationalError):
+                _run(server.update_knowledge(mock_ctx, "python", 1))
+        mock_ctx.error.assert_called_once()
+
+    def test_get_lessons_exception_returns_empty_list(self):
+        with patch.object(db, "connection", side_effect=sqlite3.OperationalError("err")):
+            result = server.get_lessons()
+        assert result == []
+
+    def test_star_lesson_exception_returns_false(self, mock_ctx):
+        with patch.object(db, "connection", side_effect=sqlite3.OperationalError("err")):
+            result = _run(server.star_lesson(mock_ctx, "any-id", starred=True))
+        assert result is False
+        mock_ctx.error.assert_called_once()
+
+    def test_submit_feedback_exception_returns_false(self, mock_ctx):
+        with patch.object(db, "connection", side_effect=sqlite3.OperationalError("err")):
+            result = _run(server.submit_feedback(mock_ctx, "any-id", "know"))
+        assert result is False
+        mock_ctx.error.assert_called_once()
+
+    def test_add_topic_exception_returns_false(self, mock_ctx):
+        with patch.object(db, "connection", side_effect=sqlite3.OperationalError("err")):
+            result = _run(server.add_topic(mock_ctx, "new_topic", 5))
+        assert result is False
+        mock_ctx.error.assert_called_once()
+
+    def test_remove_topic_exception_returns_false(self, mock_ctx):
+        with patch.object(db, "connection", side_effect=sqlite3.OperationalError("err")):
+            result = _run(server.remove_topic(mock_ctx, "python"))
+        assert result is False
+        mock_ctx.error.assert_called_once()
+
+    def test_add_group_exception_returns_false(self, mock_ctx):
+        with patch.object(db, "connection", side_effect=sqlite3.OperationalError("err")):
+            result = _run(server.add_group(mock_ctx, "SomeGroup"))
+        assert result is False
+        mock_ctx.error.assert_called_once()
+
+    def test_remove_group_exception_returns_false(self, mock_ctx):
+        with patch.object(db, "connection", side_effect=sqlite3.OperationalError("err")):
+            result = _run(server.remove_group(mock_ctx, "SomeGroup"))
+        assert result is False
+        mock_ctx.error.assert_called_once()
+
+    def test_profile_resource_exception_returns_error_dict(self):
+        with patch.object(db, "connection", side_effect=sqlite3.OperationalError("err")):
+            result = server.profile_resource()
+        assert "error" in result
+
+    def test_settings_resource_exception_returns_error_dict(self):
+        with patch.object(db, "connection", side_effect=sqlite3.OperationalError("err")):
+            result = server.settings_resource()
+        assert "error" in result
+
+    def test_recent_lessons_resource_exception_returns_error_list(self):
+        with patch.object(db, "connection", side_effect=sqlite3.OperationalError("err")):
+            result = server.recent_lessons_resource()
+        assert isinstance(result, list)
+        assert "error" in result[0]
+
+    def test_stats_resource_exception_returns_error_dict(self):
+        with patch.object(db, "connection", side_effect=sqlite3.OperationalError("err")):
+            result = server.stats_resource()
+        assert "error" in result
+
+    def test_taught_topics_resource_exception_returns_empty_list(self):
+        with patch.object(db, "connection", side_effect=sqlite3.OperationalError("err")):
+            result = server.taught_topics_resource()
+        assert result == []
+
+    def test_rate_limit_resource_exception_returns_not_allowed(self):
+        with patch.object(db, "connection", side_effect=sqlite3.OperationalError("err")):
+            result = server.rate_limit_resource()
+        assert result["allowed"] is False
+
+    def test_context_resource_exception_returns_error_dict(self):
+        with patch.object(db, "connection", side_effect=sqlite3.OperationalError("err")):
+            result = server.context_resource()
+        assert "error" in result
+
+    def test_onboarding_resource_exception_returns_error_dict(self):
+        with patch.object(db, "connection", side_effect=sqlite3.OperationalError("err")):
+            result = server.onboarding_resource()
+        assert "error" in result
+
+    def test_lesson_resource_exception_returns_error_dict(self):
+        with patch.object(db, "connection", side_effect=sqlite3.OperationalError("err")):
+            result = server.lesson_resource("any-id")
+        assert "error" in result
+
+    def test_devcoach_instructions_exception_returns_fallback(self):
+        with patch("devcoach.mcp.server.importlib.resources.files", side_effect=Exception("not found")):
+            result = server.devcoach_instructions()
+        assert "unavailable" in result
 
 
 # ── Entry point ────────────────────────────────────────────────────────────
