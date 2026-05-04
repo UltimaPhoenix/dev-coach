@@ -73,9 +73,7 @@
   </div>
 
   <!-- Lesson body (rendered as markdown) -->
-  {% if lesson.body %}
   <div id="body-content" class="markdown-body"></div>
-  {% endif %}
 
   <!-- Task context -->
   {% if lesson.task_context %}
@@ -219,8 +217,6 @@
   });
 
   document.getElementById('summary-content').innerHTML = marked.parse({{ lesson.summary | tojson }});
-  {% if lesson.body %}
   document.getElementById('body-content').innerHTML = marked.parse({{ lesson.body | tojson }});
-  {% endif %}
 </script>
 {% endblock %}
