@@ -25,13 +25,6 @@ flowchart LR
         D
         E
     end
-
-    style onboarding fill:none,stroke:#AAAAAA,stroke-dasharray:5 5,color:#757575
-    classDef action fill:#D4E4D8,stroke:#8BAF96,color:#1E1E1E
-    classDef term   fill:#E8E8E4,stroke:#AAAAAA,color:#1E1E1E
-
-    class C,D,E,F action
-    class A,G term
 ```
 
 ---
@@ -58,15 +51,6 @@ flowchart TD
     E --> G
     G --> F([Done])
     G -.->|prompts| U(["You: ✅ ❌ ⏭"])
-
-    style loop fill:none,stroke:#AAAAAA,stroke-dasharray:5 5,color:#757575
-    classDef action fill:#D4E4D8,stroke:#8BAF96,color:#1E1E1E
-    classDef term   fill:#E8E8E4,stroke:#AAAAAA,color:#1E1E1E
-    classDef user   fill:#F5EDE3,stroke:#D4A27F,color:#1E1E1E
-
-    class B,D,E,G action
-    class A,F,Z term
-    class U user
 ```
 
 ---
