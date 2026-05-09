@@ -148,6 +148,7 @@ def get_lessons(
     search: str | None = None,
     date_from: str | None = None,
     date_to: str | None = None,
+    limit: int = 10,
 ) -> list[Lesson]:
     """Query the coaching lesson history.
 
@@ -162,6 +163,7 @@ def get_lessons(
     date_from / date_to: ISO date/datetime strings; override period when set.
       Date-only (YYYY-MM-DD) or with time (YYYY-MM-DDTHH:MM or YYYY-MM-DDTHH:MM:SS).
       date_to with date-only is treated as end-of-day (23:59:59).
+    limit: maximum lessons to return, newest first (default 10). Pass 0 for all.
     All filters can be combined.
     """
     try:
@@ -180,6 +182,8 @@ def get_lessons(
                 search=search,
                 date_from=date_from,
                 date_to=date_to,
+                page=1 if limit > 0 else None,
+                per_page=limit if limit > 0 else 25,
             )
     except Exception:
         return []

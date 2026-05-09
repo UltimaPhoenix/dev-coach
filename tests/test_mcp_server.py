@@ -12,6 +12,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from devcoach.core import db
+from devcoach.core.models import Lesson
 from devcoach.mcp import server
 
 # ── Fixtures ───────────────────────────────────────────────────────────────
@@ -209,6 +210,40 @@ class TestGetLessons:
     def test_returns_empty_list_for_no_match(self):
         lessons = server.get_lessons(project="nonexistent")
         assert lessons == []
+
+
+class TestGetLessonsLimit:
+    """Tests for the limit parameter on get_lessons."""
+
+    @pytest.fixture(autouse=True)
+    def _seed_extra(self, db_path: Path) -> None:
+        """Insert 12 lessons so the DB has more than the default limit of 10."""
+        c = sqlite3.connect(str(db_path))
+        c.row_factory = sqlite3.Row
+        for i in range(12):
+            lesson = Lesson(
+                id=f"limit-test-lesson-{i:03d}",
+                timestamp=f"2026-01-{i + 1:02d}T10:00:00Z",
+                topic_id=f"limit_topic_{i}",
+                categories=["test"],
+                title=f"Limit test lesson {i}",
+                level="mid",
+                summary=f"Summary {i}",
+            )
+            db.insert_lesson(c, lesson)
+        c.close()
+
+    def test_default_limit_returns_at_most_ten(self):
+        lessons = server.get_lessons()
+        assert len(lessons) <= 10
+
+    def test_explicit_limit_returns_at_most_n(self):
+        lessons = server.get_lessons(limit=3)
+        assert len(lessons) <= 3
+
+    def test_limit_zero_returns_all(self):
+        lessons = server.get_lessons(limit=0)
+        assert len(lessons) >= 12  # 12 extra + 3 from conftest
 
 
 # ── Tools — star_lesson ────────────────────────────────────────────────────
