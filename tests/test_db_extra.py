@@ -56,15 +56,16 @@ class TestGetUsageDefaults:
 
 class TestIsOnboardingComplete:
     def test_false_by_default(self, conn):
-        assert db.is_onboarding_complete(conn) is False
+        assert db.is_onboarding_complete(conn)["knowledge_ready"] is False
 
-    def test_true_after_setting(self, conn):
-        db.set_setting(conn, "onboarding_completed", "1")
-        assert db.is_onboarding_complete(conn) is True
+    def test_true_after_knowledge_insert(self, conn):
+        db.upsert_knowledge(conn, "python", 7)
+        assert db.is_onboarding_complete(conn)["knowledge_ready"] is True
 
-    def test_false_when_value_is_zero(self, conn):
-        db.set_setting(conn, "onboarding_completed", "0")
-        assert db.is_onboarding_complete(conn) is False
+    def test_false_when_table_is_empty(self, conn):
+        conn.execute("DELETE FROM knowledge")
+        conn.commit()
+        assert db.is_onboarding_complete(conn)["knowledge_ready"] is False
 
 
 # ── get_distinct_column allowlist ──────────────────────────────────────────
@@ -213,7 +214,7 @@ class TestBackupRestore:
         assert result["skipped"] == 3
 
     def test_restore_knowledge_groups(self, conn):
-        # Use "python" — it's in DEFAULT_PROFILE so it exists in the knowledge table
+        db.upsert_knowledge(conn, "python", 7)
         db.add_group(conn, "Languages")
         db.assign_topic_to_group(conn, "python", "Languages")
         data = db.create_backup_zip(conn)

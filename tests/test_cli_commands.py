@@ -49,7 +49,11 @@ class TestCmdProfile:
     def test_runs_without_error(self, capsys):
         commands.cmd_profile(_ns())
 
-    def test_shows_known_topic(self, capsys):
+    def test_shows_known_topic(self, capsys, db_path):
+        c = sqlite3.connect(str(db_path))
+        c.row_factory = sqlite3.Row
+        db.upsert_knowledge(c, "python", 7)
+        c.close()
         commands.cmd_profile(_ns())
         assert "python" in capsys.readouterr().out
 
@@ -284,6 +288,13 @@ class TestCmdGroupRemove:
 
 
 class TestCmdGroupAssign:
+    @pytest.fixture(autouse=True)
+    def _seed_python(self, db_path):
+        c = sqlite3.connect(str(db_path))
+        c.row_factory = sqlite3.Row
+        db.upsert_knowledge(c, "python", 7)
+        c.close()
+
     def test_assigns_to_group(self, capsys, db_path):
         commands.cmd_group_assign(_ns(topic="python", group="Languages"))
         c = sqlite3.connect(str(db_path))

@@ -9,7 +9,8 @@ description: >
   lesson at the bottom of the response. DO NOT wait for the user to ask explicitly:
   activate autonomously. Also use this skill when the user asks "what did I learn
   today/this week", "show me my profile", "how good am I at X", "coaching log",
-  "devcoach".
+  "devcoach", "setup devcoach", "redo onboarding", "configure my profile",
+  "reset my topics", or any similar request to (re-)initialise the knowledge profile.
 ---
 
 # devcoach — Progressive Coaching
@@ -23,24 +24,37 @@ by teaching one thing at a time, at the right moment, based on what they actuall
 
 At the start of every devcoach session, read the MCP resource `devcoach://onboarding`.
 
-If `needs_onboarding` is **true**, run the onboarding flow **before anything else**:
+Check `knowledge_ready` and `notebook_ready` independently — each step can run alone:
+
+```
+knowledge_ready = false  →  run Steps 1–3 (topic collection + complete_onboarding)
+notebook_ready  = false  →  run Step 4  (notebook initialisation)
+both ready               →  proceed normally
+```
+
+This means a user who restores from backup has their knowledge automatically, so
+only Step 4 runs. On-demand re-setup ("redo onboarding", "reset my topics") always
+re-runs Steps 1–3 regardless of `knowledge_ready`.
 
 ### Step 1 — Offer to restore from backup
 Ask once: *"Do you have an existing devcoach backup to restore? If yes, provide the
 file path — otherwise I'll help you build your profile from scratch."*
 
-If a path is provided: call `restore` (CLI) with the file. When complete, call the
-MCP tool `complete_onboarding` with empty maps to mark setup as done
-(the restored profile is already in the DB). Skip the remaining steps.
+If a path is provided: call `restore` (CLI) with the file. The restore process
+brings back knowledge entries automatically — no further DB steps needed. Re-read
+`devcoach://onboarding` after restore; if `knowledge_ready` is now true, skip to
+Step 4. If `notebook_ready` is also true, proceed normally.
 
 ### Step 2 — Choose setup mode
 Ask: *"Would you like me to detect your tech stack automatically from this project,
 or set it up manually through a conversation?"*
 
 **Automatic mode:**
-- Read `detected_stack` from `devcoach://onboarding` and present those topics in a
-  clear list with their suggested confidence scores.
-- For each, ask the user to confirm or adjust: *"Looks right? Or enter 1–10."*
+- Read `devcoach://onboarding` and present a merged topic list: `detected_stack`
+  (auto-detected from project files) enriched with relevant entries from
+  `default_topics` (the project's default knowledge map).
+- Show each topic with its suggested confidence. Ask the user to confirm, adjust,
+  or remove each: *"Looks right? Or enter 1–10 to change it."*
 - After the list, ask: *"Anything else I missed? List any tools, languages,
   frameworks, or practices you work with regularly."* — add each with a confidence.
 
@@ -48,9 +62,9 @@ or set it up manually through a conversation?"*
 - Have a free-form conversation: *"Tell me about the technologies you work with
   day-to-day. For each one I'll ask how confident you are:
   1–3 = still learning · 4–6 = comfortable · 7–9 = strong · 10 = expert."*
-- Probe across domains: programming languages, frameworks, databases, infrastructure,
-  version control practices, branching strategies, CI/CD pipelines, testing,
-  architecture patterns, etc. Keep probing until the user says they're done.
+- Use `default_topics` as a domain checklist: probe areas the user hasn't mentioned
+  (languages, frameworks, databases, infrastructure, version control, CI/CD, testing,
+  architecture patterns, etc.). Keep probing until the user says they're done.
 
 ### Step 3 — Propose groups and save
 Once the full topic list is agreed:
@@ -66,10 +80,34 @@ Once the full topic list is agreed:
     "groups": { "Languages": ["lang_a"], "DevOps": ["tool_b"], "Version Control": ["practice_c"] }
   }
   ```
-- Confirm setup is complete and continue normally.
+- Confirm setup is complete and continue to Step 4.
 
 **Rule:** Never ask about groups during topic collection. Propose them only in
 Step 3 after all topics are known.
+
+### Step 4 — Initialise the coaching notebook
+
+Write `~/.devcoach/learning-state.md` with observations from this conversation.
+If the file already exists (returning user or post-restore), integrate new
+observations without overwriting prior entries.
+
+```markdown
+# devcoach — Coaching Notebook
+_Last updated: [ISO timestamp]_
+
+## Observations
+[User background, confidence style, or gaps noted during onboarding.
+Leave empty if nothing notable was observed.]
+
+## Recurring patterns
+[Leave empty — nothing observed yet.]
+
+## Recommended focus
+[Topics the user flagged as priorities or areas of uncertainty.]
+
+## Open hypotheses
+[Leave empty — nothing to track yet.]
+```
 
 ---
 
@@ -102,6 +140,10 @@ Always read these MCP resources before deciding to teach:
   - **Recommended focus** entries that overlap the current task's topics → elevate those angles
   - **Open hypotheses** relevant to the current task → watch for confirming/refuting evidence
   - **Recurring patterns** → use them to calibrate depth and angle, not just the confidence score
+
+If `devcoach://profile` returns an **empty knowledge map**, do not deliver a lesson.
+Run the onboarding flow first (Steps 1–3 of Session startup), then resume lesson
+delivery once `complete_onboarding` has been called.
 
 ---
 
@@ -488,3 +530,5 @@ Every 10 lessons delivered, re-evaluate the profile:
 - `submit_feedback` handles the confidence delta; skip it entirely on no response
 - Propose starring when `don't know` on mid/senior, or when the topic recurs 2+ times
 - Never star a lesson silently — always ask first
+- After each `log_lesson`, check `total_lessons` from `devcoach://rate-limit`;
+  when `total_lessons % 10 == 0`, run the dynamic calibration from section 7

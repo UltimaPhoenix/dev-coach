@@ -49,7 +49,6 @@ DEFAULT_PROFILE: dict[str, int] = {
 DEFAULT_SETTINGS: dict[str, str] = {
     "max_per_day": "2",
     "min_gap_minutes": "240",  # replaces min_hours_between
-    "onboarding_completed": "0",
     "ui_theme": "system",
 }
 
@@ -166,15 +165,9 @@ def _migrate(conn: sqlite3.Connection) -> None:
 
 
 def _seed_defaults(conn: sqlite3.Connection) -> None:
-    """Seed knowledge and settings tables on the first run. Idempotent."""
-    row = conn.execute("SELECT COUNT(*) FROM knowledge").fetchone()
-    if row[0] == 0:
-        now = datetime.now(UTC).isoformat()
-        conn.executemany(
-            "INSERT INTO knowledge (topic, confidence, updated_at) VALUES (?, ?, ?)",
-            [(topic, confidence, now) for topic, confidence in DEFAULT_PROFILE.items()],
-        )
-
+    """Seed settings table on the first run. Idempotent. Knowledge is not seeded —
+    it is populated by complete_onboarding so that an empty table reliably means
+    onboarding has not been completed yet."""
     for key, value in DEFAULT_SETTINGS.items():
         conn.execute(
             "INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)",
@@ -738,10 +731,14 @@ def set_setting(conn: sqlite3.Connection, key: str, value: str) -> None:
     conn.commit()
 
 
-def is_onboarding_complete(conn: sqlite3.Connection) -> bool:
-    """Return True if the user has completed the onboarding setup flow."""
-    row = conn.execute("SELECT value FROM settings WHERE key = 'onboarding_completed'").fetchone()
-    return row is not None and row[0] == "1"
+def is_onboarding_complete(conn: sqlite3.Connection) -> dict[str, bool]:
+    """Return per-component onboarding status.
+
+    knowledge_ready: True if the knowledge table has at least one topic saved.
+    An empty knowledge table reliably means complete_onboarding has not yet run.
+    """
+    row = conn.execute("SELECT COUNT(*) FROM knowledge").fetchone()
+    return {"knowledge_ready": row[0] > 0}
 
 
 def get_usage_defaults(conn: sqlite3.Connection) -> dict[str, str | None]:

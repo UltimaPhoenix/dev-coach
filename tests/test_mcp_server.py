@@ -318,6 +318,10 @@ class TestTopicTools:
         assert "rust" in groups.get("Languages", [])
 
     def test_remove_topic_returns_true(self, mock_ctx, db_path):
+        c = sqlite3.connect(str(db_path))
+        c.row_factory = sqlite3.Row
+        db.upsert_knowledge(c, "python", 7)
+        c.close()
         result = _run(server.remove_topic(mock_ctx, "python"))
         assert result is True
         c = sqlite3.connect(str(db_path))
@@ -463,7 +467,7 @@ class TestCompleteOnboarding:
         _run(server.complete_onboarding(mock_ctx, topics={"python": 7}))
         c = sqlite3.connect(str(db_path))
         c.row_factory = sqlite3.Row
-        assert db.is_onboarding_complete(c) is True
+        assert db.is_onboarding_complete(c)["knowledge_ready"] is True
         c.close()
 
     def test_confidence_clamped(self, mock_ctx, db_path):

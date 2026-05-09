@@ -12,9 +12,12 @@ from fastmcp import Context, FastMCP
 from mcp.types import ToolAnnotations
 
 from devcoach.core import coach, db
+from devcoach.core.db import DEFAULT_PROFILE
 from devcoach.core.detect import detect_stack
 from devcoach.core.git import detect_git_context
 from devcoach.core.models import Lesson, Level, Profile, RepositoryPlatform, Settings
+
+NOTEBOOK_PATH = Path.home() / ".devcoach" / "learning-state.md"
 
 # ── FastMCP app ────────────────────────────────────────────────────────────
 
@@ -491,15 +494,18 @@ def taught_topics_resource() -> list[str]:
 
 @mcp.resource("devcoach://rate-limit", mime_type="application/json")
 def rate_limit_resource() -> dict:
-    """Current rate-limit status.
+    """Current rate-limit status and running lesson total.
 
-    Returns {allowed, reason} — check this before delivering a lesson.
-    reason is omitted when allowed is true.
+    allowed: whether a lesson may be delivered now.
+    reason: why delivery is blocked (omitted when allowed is true).
+    total_lessons: total lessons delivered across all sessions — used by the
+      skill to trigger dynamic calibration every 10 lessons.
     """
     try:
         with db.connection() as conn:
             result = coach.check_rate_limit(conn)
-        return result.model_dump(exclude_none=True)
+            total = conn.execute("SELECT COUNT(*) FROM lessons").fetchone()[0]
+        return {**result.model_dump(exclude_none=True), "total_lessons": total}
     except Exception as exc:
         return {"allowed": False, "reason": f"Rate limit check unavailable: {exc}"}
 
@@ -523,22 +529,29 @@ def context_resource() -> dict:
 
 @mcp.resource("devcoach://onboarding", mime_type="application/json")
 def onboarding_resource() -> dict:
-    """Onboarding status and auto-detected stack for first-run setup.
+    """Onboarding status, auto-detected stack, and project topic defaults.
 
-    needs_onboarding: true if the user has not yet completed the setup flow.
+    knowledge_ready: true if the knowledge table has at least one saved topic.
+    notebook_ready: true if ~/.devcoach/learning-state.md exists and is non-empty.
+    needs_onboarding: true if either component is missing (convenience alias).
     detected_stack: {topic_id: confidence} inferred from project files in cwd.
-      These are suggestions only — the user confirms or adjusts them during
-      the onboarding conversation before complete_onboarding is called.
+    default_topics: {topic_id: confidence} project-level defaults — shown to the
+      user alongside detected_stack so they can build a richer initial profile.
     context_ready: true if a git branch was successfully detected in cwd.
     """
     try:
         with db.connection() as conn:
-            done = db.is_onboarding_complete(conn)
+            status = db.is_onboarding_complete(conn)
+        knowledge_ready = status["knowledge_ready"]
+        notebook_ready = NOTEBOOK_PATH.exists() and NOTEBOOK_PATH.stat().st_size > 0
         git = detect_git_context()
         detected = detect_stack(git["folder"] or str(Path.cwd()))
         return {
-            "needs_onboarding": not done,
+            "knowledge_ready": knowledge_ready,
+            "notebook_ready": notebook_ready,
+            "needs_onboarding": not (knowledge_ready and notebook_ready),
             "detected_stack": detected,
+            "default_topics": DEFAULT_PROFILE,
             "context_ready": git["branch"] is not None,
         }
     except Exception as exc:
