@@ -24,6 +24,18 @@ def patch_db_path(db_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(db, "DB_PATH", db_path)
 
 
+class _ElicitResult:
+    """Minimal elicitation result stub for tests."""
+
+    def __init__(self, feedback: str | None = None):
+        self.data = _ElicitData(feedback) if feedback is not None else None
+
+
+class _ElicitData:
+    def __init__(self, feedback: str):
+        self.feedback = feedback
+
+
 @pytest.fixture
 def mock_ctx() -> MagicMock:
     """Minimal async Context mock — records info/warning/error calls."""
@@ -31,6 +43,7 @@ def mock_ctx() -> MagicMock:
     ctx.info = AsyncMock()
     ctx.warning = AsyncMock()
     ctx.error = AsyncMock()
+    ctx.elicit = AsyncMock(return_value=_ElicitResult(None))  # no response by default
     return ctx
 
 
@@ -620,6 +633,82 @@ class TestDeleteLesson:
             result = _run(server.delete_lesson(mock_ctx, "any-id"))
         assert result is False
         mock_ctx.error.assert_called_once()
+
+
+# ── log_lesson elicitation feedback ───────────────────────────────────────
+
+
+class TestLogLessonFeedback:
+    def _call(self, mock_ctx, **kwargs):
+        defaults = dict(
+            id="elicit-test-001",
+            timestamp=datetime.now(UTC).isoformat(),
+            topic_id="elicit_topic",
+            categories=["test"],
+            title="Elicit test",
+            level="mid",
+            summary="Elicit summary",
+        )
+        defaults.update(kwargs)
+        return _run(server.log_lesson(mock_ctx, **defaults))
+
+    def test_feedback_know_updates_knowledge(self, mock_ctx, db_path):
+        mock_ctx.elicit = AsyncMock(return_value=_ElicitResult("know"))
+        c = sqlite3.connect(str(db_path))
+        c.row_factory = sqlite3.Row
+        db.upsert_knowledge(c, "elicit_topic", 3)
+        c.close()
+
+        lesson = self._call(mock_ctx)
+
+        assert lesson.feedback == "know"
+        c = sqlite3.connect(str(db_path))
+        c.row_factory = sqlite3.Row
+        assert db.get_all_knowledge(c).get("elicit_topic", 3) == 4  # +1 delta
+        assert db.get_lesson_by_id(c, "elicit-test-001").feedback == "know"
+        c.close()
+
+    def test_feedback_dont_know_updates_knowledge(self, mock_ctx, db_path):
+        mock_ctx.elicit = AsyncMock(return_value=_ElicitResult("dont_know"))
+        c = sqlite3.connect(str(db_path))
+        c.row_factory = sqlite3.Row
+        db.upsert_knowledge(c, "elicit_topic", 5)
+        c.close()
+
+        lesson = self._call(mock_ctx)
+
+        assert lesson.feedback == "dont_know"
+        c = sqlite3.connect(str(db_path))
+        c.row_factory = sqlite3.Row
+        assert db.get_all_knowledge(c).get("elicit_topic", 5) == 4  # -1 delta
+        c.close()
+
+    def test_feedback_skip_no_update(self, mock_ctx, db_path):
+        mock_ctx.elicit = AsyncMock(return_value=_ElicitResult("skip"))
+        c = sqlite3.connect(str(db_path))
+        c.row_factory = sqlite3.Row
+        db.upsert_knowledge(c, "elicit_topic", 5)
+        c.close()
+
+        lesson = self._call(mock_ctx)
+
+        assert lesson.feedback is None
+        c = sqlite3.connect(str(db_path))
+        c.row_factory = sqlite3.Row
+        assert db.get_all_knowledge(c).get("elicit_topic", 5) == 5  # unchanged
+        c.close()
+
+    def test_elicitation_exception_graceful(self, mock_ctx, db_path):
+        mock_ctx.elicit = AsyncMock(side_effect=RuntimeError("not supported"))
+
+        lesson = self._call(mock_ctx)
+
+        assert lesson.id == "elicit-test-001"
+        assert lesson.feedback is None
+        c = sqlite3.connect(str(db_path))
+        c.row_factory = sqlite3.Row
+        assert db.get_lesson_by_id(c, "elicit-test-001") is not None
+        c.close()
 
 
 # ── Exception paths ────────────────────────────────────────────────────────

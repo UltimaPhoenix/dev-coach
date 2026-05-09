@@ -10,6 +10,7 @@ from typing import Literal
 
 from fastmcp import Context, FastMCP
 from mcp.types import ToolAnnotations
+from pydantic import BaseModel, Field
 
 from devcoach.core import coach, db
 from devcoach.core.db import DEFAULT_PROFILE
@@ -31,6 +32,13 @@ mcp = FastMCP(
 
 
 # ── MCP Tools ─────────────────────────────────────────────────────────────
+
+
+class LessonFeedbackResponse(BaseModel):
+    feedback: Literal["know", "dont_know", "skip"] = Field(
+        default="skip",
+        description="know = got it · dont_know = need to revisit · skip = no feedback",
+    )
 
 
 @mcp.tool(
@@ -110,6 +118,19 @@ async def log_lesson(
     )
     with db.connection() as conn:
         db.insert_lesson(conn, lesson)
+
+    try:
+        result = await ctx.elicit("Did that land?", response_type=LessonFeedbackResponse)
+        if hasattr(result, "data") and result.data and result.data.feedback != "skip":
+            fb = result.data.feedback
+            with db.connection() as conn:
+                db.set_feedback(conn, id, fb)
+                delta = 1 if fb == "know" else -1
+                coach.apply_knowledge_delta(conn, topic_id, delta)
+            lesson = lesson.model_copy(update={"feedback": fb})
+    except Exception:
+        pass  # elicitation not supported by this client — lesson is already saved
+
     return lesson
 
 

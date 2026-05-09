@@ -354,39 +354,33 @@ manually. Omitting these fields is correct and will not reduce lesson quality.
 
 `log_lesson` returns the saved `Lesson` object with all resolved fields.
 
-### Step 1b — Collect feedback interactively
+### Step 1b — Feedback is collected by log_lesson
 
-**Claude Code (CLI / IDE):** `AskUserQuestion` is available in your tool list.
-Call it immediately after `log_lesson` returns, before the user sends another message:
+`log_lesson` asks "Did that land?" via an interactive MCP elicitation prompt.
+The user selects know / don't know / skip directly in the client UI — no text
+parsing required.
 
-```
-question : "Did that land?"
-options  : ["✅ know — got it", "❌ don't know — need to revisit", "⏭️ skip"]
-```
+Read the `feedback` field of the returned `Lesson` object:
 
-Wait for the reply, then go to Step 2 with the result.
-Do **not** append the text prompt in the lesson body — `AskUserQuestion` replaces it.
+- `"know"` or `"dont_know"` → feedback was given and confidence was already
+  adjusted server-side. Go to Step 3 (starring). **Do not call `submit_feedback`.**
+- `null` / absent → elicitation was declined or not supported by this client.
+  Fall back: append the text prompt below, capture the reply in the next message
+  turn, then call `submit_feedback` manually (Step 2).
 
-**Claude Desktop / claude.ai web:** `AskUserQuestion` is not in your tool list.
-After the lesson body, end the response with this exact block — the interface will
-render the options as clickable buttons:
+**Fallback prompt (only when feedback is null):**
 
 Did that land?
 - ✅ know — got it
 - ❌ don't know — need to revisit
 - ⏭️ skip
 
-Keep labels short (≤ 5 words). Do not wrap in a blockquote or code fence — plain
-list format is what the client renders as buttons.
-When the user clicks or types a reply that matches feedback (know / don't know / skip,
-✅, ❌, 1 / 2 / 3), treat it as feedback before handling any new request in that message.
-
 ---
 
-### Step 2 — Record feedback and conditionally adjust confidence
+### Step 2 — Record feedback and conditionally adjust confidence (fallback only)
 
-When feedback is received (via `AskUserQuestion` reply or next-message fallback), call
-`submit_feedback` according to this table:
+When `log_lesson` returned `feedback: null` (elicitation declined or not supported),
+collect feedback via the fallback prompt and call `submit_feedback` according to this table:
 
 | User response | Condition | Action |
 |---|---|---|
@@ -568,10 +562,9 @@ Never delete prior entries — integrate new observations alongside existing one
 - **Always read** `devcoach://profile` to calibrate level and topic selection
 - The lesson should feel **natural and contextual**, not a mechanical add-on
 - If there is nothing interesting to teach → stay silent. Better nothing than forced.
-- In Claude Code: use `AskUserQuestion` after `log_lesson` — do not append the text prompt
-- In Claude Desktop / web: append the text prompt; capture reply in the next message turn
-- Never call `update_knowledge` directly after `log_lesson` — wait for feedback
-- `submit_feedback` handles the confidence delta; skip it entirely on no response
+- Feedback is handled inside `log_lesson` via MCP elicitation — only call
+  `submit_feedback` manually if `log_lesson` returned `feedback: null`
+- Never call `update_knowledge` directly after `log_lesson` — feedback handles the delta
 - Propose starring when `don't know` on mid/senior, or when the topic recurs 2+ times
 - Never star a lesson silently — always ask first
 - After each `log_lesson`, check `total_lessons` from `devcoach://rate-limit`;
