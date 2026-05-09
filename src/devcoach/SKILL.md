@@ -188,6 +188,14 @@ Evaluate whether to append a lesson **after every technical response** that invo
 - DB queries, optimisations, migrations
 - Security, performance, scalability
 - CLI, scripting, automation
+- Completing a git commit — the commit is a natural unit-of-work checkpoint;
+  treat it as a **high-priority** lesson trigger
+
+**Commit checkpoint:** When a successful `git commit` is the trigger, the staged
+diff and commit message visible in the preceding Bash output are the primary
+teaching context — they capture exactly what was written and why. Use the changed
+code (not the commit mechanics themselves) as the basis for lesson selection,
+exactly as you would for any other code task.
 
 **Do not activate** for: pure factual questions, web searches, translations, creative
 writing, non-technical conversation.
