@@ -63,8 +63,8 @@ support MCP prompts (Claude Code, Claude Desktop) load it automatically when con
 to the server — no separate SKILL.md installation needed.
 
 The prompt is read at runtime directly from `SKILL.md` bundled inside the package.
-`SKILL.md` is therefore the **single source of truth** for coaching behaviour: update
-it once and both the MCP prompt and any separately installed skill reflect the change.
+`SKILL.md` is the **single source of truth** for coaching behaviour: update it once
+and the change is live for all connected clients on the next server restart.
 
 ```python
 # server.py
@@ -72,7 +72,7 @@ import importlib.resources
 
 @mcp.prompt()
 def devcoach_instructions() -> str:
-    return importlib.resources.read_text("devcoach", "SKILL.md")
+    return importlib.resources.files("devcoach").joinpath("SKILL.md").read_text(encoding="utf-8")
 ```
 
 `SKILL.md` must be declared as package data in `pyproject.toml`:
@@ -85,8 +85,8 @@ packages = ["src/devcoach"]
 "src/devcoach/SKILL.md" = "devcoach/SKILL.md"
 ```
 
-For clients that do **not** support MCP prompts (claude.ai web), install the
-`.skill` file generated from the same `SKILL.md` via the Claude.ai Skills settings.
+For claude.ai web (which does not support MCP prompts), copy the content of
+`src/devcoach/SKILL.md` into the Claude.ai Skills settings manually.
 
 ---
 
