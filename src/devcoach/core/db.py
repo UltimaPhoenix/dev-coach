@@ -345,7 +345,7 @@ def get_lessons(
     query = f"SELECT * FROM lessons {where} ORDER BY {col} {direction}"
     if page is not None:
         query += " LIMIT ? OFFSET ?"
-        params = list(params) + [per_page, (page - 1) * per_page]
+        params.extend([per_page, (page - 1) * per_page])
     rows = conn.execute(query, params).fetchall()
     return [_row_to_lesson(row) for row in rows]
 
@@ -409,9 +409,7 @@ def import_lessons(conn: sqlite3.Connection, records: list[dict]) -> tuple[int, 
                 lesson.id,
                 lesson.timestamp_iso,
                 lesson.topic_id,
-                json.dumps(lesson.categories)
-                if isinstance(lesson.categories, list)
-                else lesson.categories,
+                json.dumps(lesson.categories),
                 lesson.title,
                 lesson.level,
                 lesson.summary,
@@ -500,20 +498,14 @@ def restore_backup_zip(conn: sqlite3.Connection, data: bytes) -> dict[str, int]:
                 # Current format: {"groups": [...], "topics": [{topic, confidence, group}, ...]}
                 groups_added = 0
                 for g in knowledge.get("groups", []):
-                    cur = conn.execute(
-                        "INSERT OR IGNORE INTO knowledge_group_names (group_name) VALUES (?)",
-                        (g.strip(),),
-                    )
-                    groups_added += cur.rowcount
+                    if add_group(conn, g):
+                        groups_added += 1
                 for item in knowledge.get("topics", []):
                     upsert_knowledge(conn, item["topic"], item["confidence"])
                     group = item.get("group")
                     if group and group != "Other":
-                        cur = conn.execute(
-                            "INSERT OR IGNORE INTO knowledge_group_names (group_name) VALUES (?)",
-                            (group.strip(),),
-                        )
-                        groups_added += cur.rowcount
+                        if add_group(conn, group):
+                            groups_added += 1
                         assign_topic_to_group(conn, item["topic"], group)
                 result["topics"] = len(knowledge.get("topics", []))
                 result["groups"] = groups_added
@@ -558,15 +550,10 @@ def get_lesson_by_id(conn: sqlite3.Connection, lesson_id: str) -> Lesson | None:
 
 def get_all_categories(conn: sqlite3.Connection) -> list[str]:
     """Return a distinct sorted list of all category tags across all lessons."""
-    rows = conn.execute("SELECT categories FROM lessons").fetchall()
-    seen: set[str] = set()
-    for row in rows:
-        try:
-            tags: list[str] = json.loads(row[0])
-            seen.update(tags)
-        except (json.JSONDecodeError, TypeError):
-            pass
-    return sorted(seen)
+    rows = conn.execute(
+        "SELECT DISTINCT value FROM lessons, json_each(lessons.categories) ORDER BY value"
+    ).fetchall()
+    return [row[0] for row in rows]
 
 
 def get_taught_topic_ids(conn: sqlite3.Connection) -> list[str]:
@@ -644,18 +631,7 @@ def delete_knowledge(conn: sqlite3.Connection, topic: str) -> bool:
 
 def get_knowledge_groups(conn: sqlite3.Connection) -> dict[str, list[str]]:
     """Return all named groups as {group_name: [topic, ...]} (empty groups included)."""
-    groups: dict[str, list[str]] = {
-        row[0]: []
-        for row in conn.execute(
-            "SELECT group_name FROM knowledge_group_names ORDER BY group_name"
-        ).fetchall()
-    }
-    for row in conn.execute(
-        "SELECT group_name, topic FROM knowledge_groups ORDER BY group_name, topic"
-    ).fetchall():
-        if row[0] in groups:
-            groups[row[0]].append(row[1])
-    return groups
+    return {g.name: g.topics for g in get_knowledge_group_list(conn)}
 
 
 def add_group(conn: sqlite3.Connection, group_name: str) -> bool:
@@ -751,10 +727,6 @@ def get_usage_defaults(conn: sqlite3.Connection) -> dict[str, str | None]:
     """
     result: dict[str, str | None] = {}
     for col in ("project", "repository", "branch", "repository_platform"):
-        # col is from a hardcoded tuple above — allowlist-check is a belt-and-suspenders guard
-        if col not in _METADATA_COLUMNS:
-            result[col] = None
-            continue
         row = conn.execute(
             f"SELECT {col}, COUNT(*) c FROM lessons "  # noqa: S608
             f"WHERE {col} IS NOT NULL GROUP BY {col} ORDER BY c DESC LIMIT 1"

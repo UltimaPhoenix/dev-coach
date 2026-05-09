@@ -18,8 +18,6 @@ from devcoach.core.detect import detect_stack
 from devcoach.core.git import detect_git_context
 from devcoach.core.models import Lesson, Level, Profile, RepositoryPlatform, Settings
 
-NOTEBOOK_PATH = Path.home() / ".devcoach" / "learning-state.md"
-
 # ── FastMCP app ────────────────────────────────────────────────────────────
 
 mcp = FastMCP(
@@ -204,7 +202,7 @@ def get_lessons(
                 date_from=date_from,
                 date_to=date_to,
                 page=1 if limit > 0 else None,
-                per_page=limit if limit > 0 else 25,
+                per_page=limit,
             )
     except Exception:
         return []
@@ -456,7 +454,8 @@ async def complete_onboarding(
             profile = coach.get_profile(conn)
         await ctx.info(f"Onboarding complete — {len(topics)} topics, {len(groups or {})} groups")
         return profile
-    except Exception:
+    except Exception as exc:
+        await ctx.error(f"complete_onboarding failed: {exc}")
         return Profile(knowledge=[], groups=[])
 
 
@@ -488,8 +487,8 @@ def recent_lessons_resource() -> list[dict]:
     """Last 10 lessons from the current week."""
     try:
         with db.connection() as conn:
-            lessons = db.get_lessons(conn, period="week")
-        return [lesson.model_dump(mode="json") for lesson in lessons[:10]]
+            lessons = db.get_lessons(conn, period="week", page=1, per_page=10)
+        return [lesson.model_dump(mode="json") for lesson in lessons]
     except Exception as exc:
         return [{"error": str(exc)}]
 
@@ -529,7 +528,7 @@ def rate_limit_resource() -> dict:
     try:
         with db.connection() as conn:
             result = coach.check_rate_limit(conn)
-            total = conn.execute("SELECT COUNT(*) FROM lessons").fetchone()[0]
+            total = db.count_filtered_lessons(conn)
         return {**result.model_dump(exclude_none=True), "total_lessons": total}
     except Exception as exc:
         return {"allowed": False, "reason": f"Rate limit check unavailable: {exc}"}
@@ -568,7 +567,9 @@ def onboarding_resource() -> dict:
         with db.connection() as conn:
             status = db.is_onboarding_complete(conn)
         knowledge_ready = status["knowledge_ready"]
-        notebook_ready = NOTEBOOK_PATH.exists() and NOTEBOOK_PATH.stat().st_size > 0
+        notebook_ready = (
+            db.LEARNING_STATE_PATH.exists() and db.LEARNING_STATE_PATH.stat().st_size > 0
+        )
         git = detect_git_context()
         detected = detect_stack(git["folder"] or str(Path.cwd()))
         return {
