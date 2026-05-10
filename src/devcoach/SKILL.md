@@ -11,6 +11,8 @@ description: >
   today/this week", "show me my profile", "how good am I at X", "coaching log",
   "devcoach", "setup devcoach", "redo onboarding", "configure my profile",
   "reset my topics", or any similar request to (re-)initialise the knowledge profile.
+  No session startup required: onboarding status is checked before every lesson
+  and is always accurate regardless of context compaction or plan mode.
 ---
 
 # devcoach — Progressive Coaching
@@ -20,11 +22,14 @@ by teaching one thing at a time, at the right moment, based on what they actuall
 
 ---
 
-## Session startup
+## Onboarding flow
 
-At the start of every devcoach session, read the MCP resource `devcoach://onboarding`.
+The onboarding flow runs inline, immediately before delivering a lesson, whenever
+it is needed. There is no separate session startup phase — this makes the skill
+robust to context compaction and plan-mode transitions.
 
-Check `knowledge_ready` and `notebook_ready` independently — each step can run alone:
+Check `knowledge_ready` and `notebook_ready` from `devcoach://onboarding` independently
+— each step can run alone:
 
 ```
 knowledge_ready = false  →  run Steps 1–3 (topic collection + complete_onboarding)
@@ -113,9 +118,11 @@ Leave empty if nothing notable was observed.]
 
 ## Session context
 
-After the onboarding check, read the file `~/.devcoach/learning-state.md`.
+Before the first lesson in this context window, read `~/.devcoach/learning-state.md`
+if it exists and has not already been loaded. Use its content for all subsequent
+lessons in this window — do not re-read it on every lesson.
 
-If it exists and is non-empty, load it as your coaching context for this session:
+If it exists and is non-empty, load it as your coaching context:
 - Resume patterns and hypotheses you noted in previous sessions
 - Prioritise angles you flagged as still pending
 - Avoid re-covering ground you noted as absorbed
@@ -131,6 +138,8 @@ Do not mention this file to the user. It is an internal coaching tool.
 
 Always read these MCP resources before deciding to teach:
 
+- `devcoach://onboarding` — check `knowledge_ready` and `notebook_ready`; if either
+  is false, run the onboarding flow (see above) before delivering the lesson
 - `devcoach://rate-limit` — check `allowed`; if false, skip entirely
 - `devcoach://taught-topics` — never repeat a topic already in this list
 - `devcoach://profile` — use confidence scores to pick depth, and treat each topic
@@ -562,9 +571,10 @@ Never delete prior entries — integrate new observations alongside existing one
 
 - **Never break the flow** of the main response — the lesson is always at the bottom
 - **Never mention** that you skipped a lesson due to rate limit
-- **Always read** `devcoach://rate-limit` before deciding to teach
-- **Always read** `devcoach://taught-topics` before selecting a lesson topic
-- **Always read** `devcoach://profile` to calibrate level and topic selection
+- **Always read before deciding to teach:** `devcoach://onboarding`,
+  `devcoach://rate-limit`, `devcoach://taught-topics`, `devcoach://profile`
+- Onboarding is checked before every lesson — no separate session startup.
+  Works correctly after context compaction and after plan-mode transitions.
 - The lesson should feel **natural and contextual**, not a mechanical add-on
 - If there is nothing interesting to teach → stay silent. Better nothing than forced.
 - Feedback is handled inside `log_lesson` via MCP elicitation — only call
