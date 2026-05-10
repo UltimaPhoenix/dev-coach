@@ -293,6 +293,7 @@ async def settings_page(
     skipped: int | None = None,
     invalid: int | None = None,
     groups: int | None = None,
+    notebook: int | None = None,
 ) -> HTMLResponse:
     with db.connection() as conn:
         settings = db.get_settings(conn)
@@ -307,6 +308,7 @@ async def settings_page(
             "skipped": skipped,
             "invalid": invalid,
             "groups": groups,
+            "notebook": notebook,
         },
     )
 
@@ -345,6 +347,10 @@ async def import_settings_route(file: UploadFile = File(...)) -> RedirectRespons
     with db.connection() as conn:
         result = db.restore_backup_zip(conn, content)
     return RedirectResponse(
-        url=f"/settings?imported={result['lessons']}&skipped={result['skipped']}&invalid={result['invalid']}&groups={result['groups']}",
+        url=(
+            f"/settings?imported={result['lessons']}&skipped={result['skipped']}"
+            f"&invalid={result['invalid']}&groups={result['groups']}"
+            f"&notebook={result['learning_state']}"
+        ),
         status_code=303,
     )

@@ -169,6 +169,20 @@ class TestCmdRestore:
             commands.cmd_restore(_ns(input=str(tmp_path / "no.zip")))
         assert exc.value.code == 1
 
+    def test_prints_notebook_result(self, capsys, tmp_path):
+        import io as _io
+
+        buf = _io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as zf:
+            zf.writestr("lessons.json", "[]")
+            zf.writestr("knowledge.json", json.dumps({"groups": [], "topics": []}))
+            zf.writestr("settings.json", "{}")
+            zf.writestr("learning-state.md", "# Notes\n")
+        path = tmp_path / "with-notebook.zip"
+        path.write_bytes(buf.getvalue())
+        commands.cmd_restore(_ns(input=str(path)))
+        assert "Notebook" in capsys.readouterr().out
+
 
 # ── cmd_knowledge_add ──────────────────────────────────────────────────────
 

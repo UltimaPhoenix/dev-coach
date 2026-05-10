@@ -369,10 +369,11 @@ def cmd_backup(args: argparse.Namespace) -> None:
 
     out_path = Path(args.output)
     out_path.write_bytes(data)
+    notebook_note = " + notebook" if db.LEARNING_STATE_PATH.exists() else ""
     console.print(
         f"[green]Backup saved:[/green] {out_path}  "
         f"([cyan]{lessons_count}[/cyan] lessons, "
-        f"[cyan]{knowledge_count}[/cyan] topics)"
+        f"[cyan]{knowledge_count}[/cyan] topics{notebook_note})"
     )
 
 
@@ -398,6 +399,8 @@ def cmd_restore(args: argparse.Namespace) -> None:
     if result["invalid"]:
         parts.append(f"[red]{result['invalid']}[/red] rejected (invalid)")
     console.print(f"[green]✓[/green] Lessons: {', '.join(parts)}")
+    if result["learning_state"]:
+        console.print("[green]✓[/green] Notebook restored")
 
 
 def _claude_desktop_config() -> Path:
@@ -543,6 +546,7 @@ def cmd_setup(_args: argparse.Namespace) -> None:
             db.set_setting(conn, "onboarding_completed", "1")
         console.print(
             f"[green]✓[/green] Restored: {result['topics']} topics, {result['lessons']} lessons"
+            + (", notebook" if result["learning_state"] else "")
         )
         console.print("[green]Setup complete![/green]")
         return

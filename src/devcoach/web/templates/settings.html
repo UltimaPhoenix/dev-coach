@@ -15,6 +15,7 @@
   {%- if skipped %} {{ skipped }} skipped (already in DB).{% endif %}
   {%- if invalid %} {{ invalid }} rejected (failed validation).{% endif %}
   {%- if groups is not none %} {{ groups }} group{{ 's' if groups != 1 }} added.{% endif %}
+  {%- if notebook %} Notebook restored.{% endif %}
 </div>
 {% endif %}
 

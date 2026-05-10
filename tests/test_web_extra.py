@@ -157,6 +157,20 @@ class TestImportBackup:
         )
         assert "imported=2" in str(r.url) or "2" in r.text
 
+    def test_import_with_notebook_shows_notebook_param(self, client):
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as zf:
+            zf.writestr("lessons.json", "[]")
+            zf.writestr("knowledge.json", json.dumps({"groups": [], "topics": []}))
+            zf.writestr("settings.json", "{}")
+            zf.writestr("learning-state.md", "# Notes\n")
+        r = client.post(
+            "/settings/import",
+            files={"file": ("backup.zip", buf.getvalue(), "application/zip")},
+            follow_redirects=False,
+        )
+        assert "notebook=1" in r.headers["location"]
+
 
 # ── GET /lessons/export ────────────────────────────────────────────────────
 
