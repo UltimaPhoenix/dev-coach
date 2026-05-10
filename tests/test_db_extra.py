@@ -355,7 +355,7 @@ class TestCountAndTimestamp:
     def test_get_last_lesson_timestamp(self, conn):
         ts = db.get_last_lesson_timestamp(conn)
         assert ts is not None
-        assert "17:30:00" in ts  # latest lesson in conftest
+        assert "00:03:00" in ts  # latest lesson in conftest
 
     def test_get_last_lesson_timestamp_empty(self, tmp_path):
         path = tmp_path / "empty.db"

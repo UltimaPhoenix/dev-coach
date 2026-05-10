@@ -293,7 +293,8 @@ async def add_topic(
 ) -> bool:
     """Add a new topic to the knowledge map, or update confidence if it already exists.
 
-    topic: topic identifier, e.g. 'rust_lifetimes'
+    topic: topic identifier — prefer a single word (e.g. 'rust', 'sqlite', 'docker');
+      use multiple words only when strictly necessary (e.g. 'ci_cd'); max 3 words
     confidence: initial confidence score 0-10 (default 5)
     group: optional group name; topic appears under 'Other' if omitted
     Returns True on success, False on error.

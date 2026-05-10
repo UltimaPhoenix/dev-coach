@@ -18,6 +18,8 @@ from devcoach.core import db
 from devcoach.core.models import Lesson
 
 # Use today's date so period="today" filters always match in tests.
+# Times are chosen to be early UTC so they are always in the past regardless of
+# when the test suite runs (midnight-edge risk is acceptable for CI).
 _TODAY = date.today().isoformat()
 
 
@@ -26,7 +28,7 @@ _TODAY = date.today().isoformat()
 TEST_LESSONS: list[Lesson] = [
     Lesson(
         id="lesson-sqlite3-row-factory-001",
-        timestamp=f"{_TODAY}T12:00:00Z",
+        timestamp=f"{_TODAY}T00:01:00Z",
         topic_id="sqlite3_row_factory",
         categories=["python", "sqlite", "databases"],
         title="sqlite3.Row: accessing query results by column name",
@@ -36,7 +38,7 @@ TEST_LESSONS: list[Lesson] = [
     ),
     Lesson(
         id="lesson-sqlite-upsert-patterns-001",
-        timestamp=f"{_TODAY}T16:10:00Z",
+        timestamp=f"{_TODAY}T00:02:00Z",
         topic_id="sqlite_upsert_patterns",
         categories=["python", "sqlite", "databases"],
         title="INSERT OR REPLACE vs ON CONFLICT DO UPDATE",
@@ -53,7 +55,7 @@ TEST_LESSONS: list[Lesson] = [
     ),
     Lesson(
         id="lesson-sqlite-pragma-introspection-001",
-        timestamp=f"{_TODAY}T17:30:00Z",
+        timestamp=f"{_TODAY}T00:03:00Z",
         topic_id="sqlite_pragma_introspection",
         categories=["python", "sqlite", "databases"],
         title="PRAGMA table_info — zero-dependency schema migrations in SQLite",

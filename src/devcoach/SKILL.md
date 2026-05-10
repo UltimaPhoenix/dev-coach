@@ -338,7 +338,7 @@ Call `log_lesson` right after delivering the lesson, without waiting for feedbac
 {
   "id": "unique-slug-or-uuid",
   "timestamp": "2026-04-27T14:30:00Z",
-  "topic_id": "snake_case_identifier",
+  "topic_id": "topic",
   "categories": ["the_topic_category", "architecture"],
   "title": "Lesson title",
   "level": "junior|mid|senior",
@@ -347,6 +347,11 @@ Call `log_lesson` right after delivering the lesson, without waiting for feedbac
   "task_context": "Brief description of the task that triggered it"
 }
 ```
+
+**`topic_id` naming:** use the single most characterizing word for the domain
+(e.g. `sqlite`, `python`, `docker`). For compound concepts with no single-word
+equivalent, keep the essential part — `ci_cd_pipeline_design` → `ci_cd`. Never
+more than 3 words.
 
 Git metadata (`project`, `repository`, `branch`, `commit_hash`, `folder`,
 `repository_platform`) is **auto-detected server-side**. Do not run git commands

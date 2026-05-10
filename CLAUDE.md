@@ -182,7 +182,7 @@ The `log_lesson` tool accepts this schema:
 {
   "id": "uuid-or-random-string",
   "timestamp": "2025-01-15T20:30:00Z",
-  "topic_id": "python_generators",
+  "topic_id": "python",
   "category": "python",
   "title": "Generator expressions vs list comprehensions",
   "level": "mid",

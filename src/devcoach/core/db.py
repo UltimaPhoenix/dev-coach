@@ -19,18 +19,17 @@ DB_PATH = Path.home() / ".devcoach" / "coaching.db"
 LEARNING_STATE_PATH = Path.home() / ".devcoach" / "learning-state.md"
 
 DEFAULT_PROFILE: dict[str, int] = {
-    "general_engineering": 8,
-    "software_architecture": 8,
-    "design_patterns": 7,
-    "debugging_mindset": 8,
-    "node_js": 7,
+    "engineering": 8,
+    "architecture": 8,
+    "patterns": 7,
+    "debugging": 8,
+    "node": 7,
     "javascript": 7,
     "typescript": 6,
     "python": 4,
     "django": 3,
     "fastapi": 4,
     "docker": 8,
-    "docker_compose": 8,
     "traefik": 7,
     "coolify": 7,
     "postgresql": 6,
@@ -38,12 +37,12 @@ DEFAULT_PROFILE: dict[str, int] = {
     "git": 7,
     "ci_cd": 6,
     "security": 5,
-    "performance_optimization": 6,
+    "performance": 6,
     "testing": 5,
-    "linux_cli": 7,
+    "linux": 7,
     "networking": 6,
     "react": 5,
-    "html_css": 5,
+    "frontend": 5,
 }
 
 DEFAULT_SETTINGS: dict[str, str] = {

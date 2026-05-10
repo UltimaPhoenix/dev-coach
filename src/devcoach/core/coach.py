@@ -50,10 +50,14 @@ def check_rate_limit(conn: sqlite3.Connection) -> RateLimitResult:
                 remaining = settings.min_gap_minutes - elapsed_minutes
                 gap_h, gap_m = divmod(settings.min_gap_minutes, 60)
                 rem_h, rem_m = divmod(int(remaining), 60)
+                if elapsed_minutes < 0:
+                    ago_text = f"in {-elapsed_minutes:.0f}m (future timestamp)"
+                else:
+                    ago_text = f"{elapsed_minutes:.0f}m ago"
                 return RateLimitResult(
                     allowed=False,
                     reason=(
-                        f"Too soon: last lesson {elapsed_minutes:.0f}m ago, "
+                        f"Too soon: last lesson {ago_text}, "
                         f"minimum interval is {gap_h}h {gap_m}m "
                         f"({rem_h}h {rem_m}m remaining)"
                     ),

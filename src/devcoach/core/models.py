@@ -41,16 +41,18 @@ class Lesson(BaseModel):
     @field_validator("timestamp", mode="before")
     @classmethod
     def parse_and_normalize_timestamp(cls, v: str | datetime) -> datetime:
-        """Accept any ISO 8601 string or datetime; always return UTC-aware datetime."""
+        """Accept any ISO 8601 string or datetime; always return UTC-aware datetime clamped to now."""
         if isinstance(v, datetime):
-            return v if v.tzinfo else v.replace(tzinfo=UTC)
-        try:
-            dt = datetime.fromisoformat(v)
-            if dt.tzinfo is None:
-                dt = dt.replace(tzinfo=UTC)
-            return dt.astimezone(UTC)
-        except ValueError:
-            raise ValueError(f"Cannot parse timestamp {v!r} — expected ISO 8601")
+            dt = v if v.tzinfo else v.replace(tzinfo=UTC)
+        else:
+            try:
+                dt = datetime.fromisoformat(v)
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=UTC)
+                dt = dt.astimezone(UTC)
+            except ValueError:
+                raise ValueError(f"Cannot parse timestamp {v!r} — expected ISO 8601")
+        return min(dt, datetime.now(UTC))
 
     @field_serializer("timestamp")
     def serialize_timestamp(self, v: datetime) -> str:
