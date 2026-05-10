@@ -19,9 +19,12 @@ from devcoach.mcp import server
 
 
 @pytest.fixture(autouse=True)
-def patch_db_path(db_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Redirect all db.connection() calls to the seeded test database."""
+def patch_db_path(db_path: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Redirect all db.connection() and LEARNING_STATE_PATH calls to temp paths."""
     monkeypatch.setattr(db, "DB_PATH", db_path)
+    learning_state = tmp_path / "learning-state.md"
+    learning_state.write_text("# Learning state\n")
+    monkeypatch.setattr(db, "LEARNING_STATE_PATH", learning_state)
 
 
 class _ElicitResult:
