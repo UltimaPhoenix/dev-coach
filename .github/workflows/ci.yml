@@ -257,11 +257,61 @@ jobs:
           path: dist/
       - uses: pypa/gh-action-pypi-publish@release/v1
 
+  # ── Build binaries ──────────────────────────────────────────────────────
+  # Builds PyInstaller single-file executables for all target platforms.
+  # Only runs on releases (tag push or workflow_dispatch) — not on PRs or main pushes.
+  build-binaries:
+    name: Build binary (${{ matrix.platform }})
+    needs: [bump, lint, test]
+    if: >
+      always()
+      && (needs.bump.result == 'success' || needs.bump.result == 'skipped')
+      && needs.lint.result == 'success'
+      && needs.test.result == 'success'
+      && (startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch')
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: darwin-arm64
+            runs-on: macos-latest
+          - platform: darwin-amd64
+            runs-on: macos-13
+          - platform: linux-amd64
+            runs-on: ubuntu-latest
+          - platform: linux-arm64
+            runs-on: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runs-on }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.bump.outputs.tag || github.ref }}
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.12"
+      - name: Install dependencies and PyInstaller
+        run: |
+          uv sync
+          uv pip install pyinstaller
+      - name: Build binary
+        run: uv run pyinstaller devcoach.spec --distpath dist
+      - name: Rename binary
+        run: mv dist/devcoach dist/devcoach-${{ matrix.platform }}
+      - uses: actions/upload-artifact@v7
+        with:
+          name: binary-${{ matrix.platform }}
+          path: dist/devcoach-${{ matrix.platform }}
+          retention-days: 7
+
   # ── GitHub Release ──────────────────────────────────────────────────────
   github-release:
     name: Create GitHub Release
-    needs: [bump, publish]
-    if: always() && needs.publish.result == 'success' && (needs.bump.result == 'success' || startsWith(github.ref, 'refs/tags/v'))
+    needs: [bump, publish, build-binaries]
+    if: >
+      always()
+      && needs.publish.result == 'success'
+      && needs.build-binaries.result == 'success'
+      && (needs.bump.result == 'success' || startsWith(github.ref, 'refs/tags/v'))
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -273,9 +323,102 @@ jobs:
         with:
           name: dist
           path: dist/
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: binary-*
+          merge-multiple: true
+          path: dist/
       - uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ needs.bump.outputs.tag || github.ref_name }}
           files: dist/*
           generate_release_notes: true
           fail_on_unmatched_files: true
+
+  # ── Bump Homebrew formula ────────────────────────────────────────────────
+  # After a successful release, updates Formula/devcoach.rb in homebrew-tap
+  # with the new version and SHA256 hashes for all platform binaries.
+  # Requires secret HOMEBREW_TAP_TOKEN (classic PAT, repo scope on homebrew-tap).
+  bump-homebrew-formula:
+    name: Bump Homebrew formula
+    needs: [bump, github-release, build-binaries]
+    if: >
+      always()
+      && needs.github-release.result == 'success'
+      && needs.build-binaries.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: binary-*
+          merge-multiple: true
+          path: binaries/
+      - name: Compute SHA256 hashes
+        id: sha
+        run: |
+          echo "darwin_arm64=$(sha256sum binaries/devcoach-darwin-arm64 | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+          echo "darwin_amd64=$(sha256sum binaries/devcoach-darwin-amd64 | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+          echo "linux_amd64=$(sha256sum  binaries/devcoach-linux-amd64  | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+          echo "linux_arm64=$(sha256sum  binaries/devcoach-linux-arm64  | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+      - name: Clone homebrew-tap
+        run: |
+          git clone "https://x-access-token:${{ secrets.HOMEBREW_TAP_TOKEN }}@github.com/UltimaPhoenix/homebrew-tap.git" tap
+      - name: Update formula
+        env:
+          TAG: ${{ needs.bump.outputs.tag || github.ref_name }}
+          DARWIN_ARM64_SHA: ${{ steps.sha.outputs.darwin_arm64 }}
+          DARWIN_AMD64_SHA: ${{ steps.sha.outputs.darwin_amd64 }}
+          LINUX_AMD64_SHA:  ${{ steps.sha.outputs.linux_amd64 }}
+          LINUX_ARM64_SHA:  ${{ steps.sha.outputs.linux_arm64 }}
+        run: |
+          VERSION="${TAG#v}"
+          cat > tap/Formula/devcoach.rb << FORMULA
+          class Devcoach < Formula
+            desc "Progressive technical coaching MCP server for Claude Code and Claude Desktop"
+            homepage "https://github.com/UltimaPhoenix/dev-coach"
+            version "$VERSION"
+            license "Apache-2.0"
+
+            on_macos do
+              on_arm do
+                url "https://github.com/UltimaPhoenix/dev-coach/releases/download/$TAG/devcoach-darwin-arm64"
+                sha256 "$DARWIN_ARM64_SHA"
+              end
+              on_intel do
+                url "https://github.com/UltimaPhoenix/dev-coach/releases/download/$TAG/devcoach-darwin-amd64"
+                sha256 "$DARWIN_AMD64_SHA"
+              end
+            end
+
+            on_linux do
+              on_arm do
+                url "https://github.com/UltimaPhoenix/dev-coach/releases/download/$TAG/devcoach-linux-arm64"
+                sha256 "$LINUX_ARM64_SHA"
+              end
+              on_intel do
+                url "https://github.com/UltimaPhoenix/dev-coach/releases/download/$TAG/devcoach-linux-amd64"
+                sha256 "$LINUX_AMD64_SHA"
+              end
+            end
+
+            def install
+              binary = Dir["devcoach-*"].first
+              chmod 0755, binary
+              bin.install binary => "devcoach"
+            end
+
+            test do
+              assert_match "devcoach", shell_output("#{bin}/devcoach --help 2>&1")
+            end
+          end
+          FORMULA
+      - name: Commit and push
+        run: |
+          TAG="${{ needs.bump.outputs.tag || github.ref_name }}"
+          VERSION="${TAG#v}"
+          cd tap
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Formula/devcoach.rb
+          git diff --cached --quiet || git commit -m "devcoach $VERSION"
+          git push

@@ -49,13 +49,21 @@ Everything runs **locally**. No data leaves your machine. One SQLite file at `~/
 
 ## Installation
 
-### Recommended — no permanent install needed
+### Homebrew (macOS / Linux)
+
+```bash
+brew tap UltimaPhoenix/tap && brew install devcoach
+```
+
+Pre-built native binaries — no Python required.
+
+### uvx — no permanent install needed
 
 ```bash
 uvx devcoach mcp   # starts the MCP server directly
 ```
 
-### Permanent install
+### uv tool — permanent install
 
 ```bash
 uv tool install devcoach
@@ -69,7 +77,7 @@ devcoach install
 
 Restart Claude Code or Claude Desktop after installing.
 
-> **Requirements:** [uv](https://docs.astral.sh/uv/) · Python 3.12+ · Claude Code or Claude Desktop
+> **Requirements (uvx/uv):** [uv](https://docs.astral.sh/uv/) · Python 3.12+ · Claude Code or Claude Desktop
 
 ---
 
