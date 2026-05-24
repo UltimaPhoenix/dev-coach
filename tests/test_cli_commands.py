@@ -525,6 +525,19 @@ class TestCmdInstall:
         ]
         assert len(devcoach_hooks) == 1
 
+    def test_install_hook_writes_exact_claude_code_structure(self, tmp_path):
+        settings = tmp_path / ".claude" / "settings.json"
+        settings.parent.mkdir()
+        commands._install_hook(settings, force=False)
+        data = json.loads(settings.read_text())
+        stop = data["hooks"]["Stop"]
+        assert isinstance(stop, list) and len(stop) == 1
+        inner = stop[0]["hooks"]
+        assert isinstance(inner, list) and len(inner) == 1
+        hook = inner[0]
+        assert hook["type"] == "command"
+        assert hook["command"] == commands._HOOK_COMMAND
+
     def test_install_hook_preserves_existing_settings(self, tmp_path):
         settings = tmp_path / ".claude" / "settings.json"
         settings.parent.mkdir()
@@ -549,11 +562,13 @@ class TestCmdInstall:
 class TestCmdLessonReady:
     """Tests for cmd_lesson_ready — the Claude Code Stop hook signal."""
 
-    def test_prints_onboarding_prompt_when_not_onboarded(self, capsys):
-        commands.cmd_lesson_ready(_ns())
-        assert "Onboarding" in capsys.readouterr().out
+    def test_exits_2_with_onboarding_prompt_on_stderr_when_not_onboarded(self, capsys):
+        with pytest.raises(SystemExit) as exc:
+            commands.cmd_lesson_ready(_ns())
+        assert exc.value.code == 2
+        assert "onboarding" in capsys.readouterr().err.lower()
 
-    def test_silent_when_rate_limited(self, capsys, monkeypatch):
+    def test_exits_0_silently_when_rate_limited(self, capsys, monkeypatch):
         with db.connection() as conn:
             db.upsert_knowledge(conn, "python", 5)
             db.set_setting(conn, "onboarding_completed", "1")
@@ -562,10 +577,13 @@ class TestCmdLessonReady:
             "check_rate_limit",
             lambda conn: type("R", (), {"allowed": False, "reason": "limit"})(),
         )
-        commands.cmd_lesson_ready(_ns())
-        assert capsys.readouterr().out == ""
+        with pytest.raises(SystemExit) as exc:
+            commands.cmd_lesson_ready(_ns())
+        assert exc.value.code == 0
+        out = capsys.readouterr()
+        assert out.out == "" and out.err == ""
 
-    def test_prints_lesson_prompt_when_allowed(self, capsys, monkeypatch):
+    def test_exits_2_with_lesson_prompt_on_stderr_when_allowed(self, capsys, monkeypatch):
         with db.connection() as conn:
             db.upsert_knowledge(conn, "python", 5)
             db.set_setting(conn, "onboarding_completed", "1")
@@ -574,13 +592,18 @@ class TestCmdLessonReady:
             "check_rate_limit",
             lambda conn: type("R", (), {"allowed": True})(),
         )
-        commands.cmd_lesson_ready(_ns())
-        assert "devcoach" in capsys.readouterr().out.lower()
+        with pytest.raises(SystemExit) as exc:
+            commands.cmd_lesson_ready(_ns())
+        assert exc.value.code == 2
+        assert "devcoach" in capsys.readouterr().err.lower()
 
-    def test_silent_on_db_error(self, capsys, monkeypatch):
+    def test_exits_0_silently_on_db_error(self, capsys, monkeypatch):
         monkeypatch.setattr(commands.db, "connection", lambda: (_ for _ in ()).throw(Exception("fail")))
-        commands.cmd_lesson_ready(_ns())
-        assert capsys.readouterr().out == ""
+        with pytest.raises(SystemExit) as exc:
+            commands.cmd_lesson_ready(_ns())
+        assert exc.value.code == 0
+        out = capsys.readouterr()
+        assert out.out == "" and out.err == ""
 
 
 # ── _build_parser ──────────────────────────────────────────────────────────

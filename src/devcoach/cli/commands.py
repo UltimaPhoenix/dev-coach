@@ -732,27 +732,33 @@ def cmd_mcp(_args: argparse.Namespace) -> None:
 def cmd_lesson_ready(_args: argparse.Namespace) -> None:
     """Signal whether a lesson can be delivered now — designed for the Claude Code Stop hook.
 
-    Always exits 0. Prints nothing when rate-limited (hook stays silent).
-    Prints a prompt when a lesson is due or onboarding is needed — Claude Code
-    displays the output, cueing Claude to deliver an AI-generated lesson.
+    Exit 0: rate-limited or error — hook stays completely silent.
+    Exit 2: lesson due or onboarding needed — Claude Code injects stdout as a new
+            user message, prompting Claude to deliver a lesson or start onboarding.
     """
     try:
         with db.connection() as conn:
             if not db.is_onboarding_complete(conn)["knowledge_ready"]:
-                print("Onboarding is incomplete — run the devcoach onboarding flow now.")
-                return
+                print(
+                    "devcoach onboarding has not been completed yet. "
+                    "Use the devcoach skill to run the onboarding flow now.",
+                    file=sys.stderr,
+                )
+                sys.exit(2)
             result = coach.check_rate_limit(conn)
     except Exception:
-        return
+        sys.exit(0)
 
     if not result.allowed:
-        return
+        sys.exit(0)
 
     print(
         "Deliver a devcoach lesson based on the work in this conversation. "
         "Use the devcoach skill: check devcoach://rate-limit, devcoach://profile, "
-        "and devcoach://taught-topics before selecting a topic."
+        "and devcoach://taught-topics before selecting a topic.",
+        file=sys.stderr,
     )
+    sys.exit(2)
 
 
 def _print_welcome() -> None:
