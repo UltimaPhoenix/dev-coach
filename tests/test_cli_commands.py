@@ -562,11 +562,12 @@ class TestCmdInstall:
 class TestCmdLessonReady:
     """Tests for cmd_lesson_ready — the Claude Code Stop hook signal."""
 
-    def test_exits_2_with_onboarding_prompt_on_stderr_when_not_onboarded(self, capsys):
+    def test_exits_0_silently_when_not_onboarded(self, capsys):
         with pytest.raises(SystemExit) as exc:
             commands.cmd_lesson_ready(_ns())
-        assert exc.value.code == 2
-        assert "onboarding" in capsys.readouterr().err.lower()
+        assert exc.value.code == 0
+        out = capsys.readouterr()
+        assert out.out == "" and out.err == ""
 
     def test_exits_0_silently_when_rate_limited(self, capsys, monkeypatch):
         with db.connection() as conn:

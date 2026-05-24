@@ -739,12 +739,7 @@ def cmd_lesson_ready(_args: argparse.Namespace) -> None:
     try:
         with db.connection() as conn:
             if not db.is_onboarding_complete(conn)["knowledge_ready"]:
-                print(
-                    "devcoach onboarding has not been completed yet. "
-                    "Use the devcoach skill to run the onboarding flow now.",
-                    file=sys.stderr,
-                )
-                sys.exit(2)
+                sys.exit(0)  # onboarding is a deliberate flow, not a hook nag
             result = coach.check_rate_limit(conn)
     except Exception:
         sys.exit(0)
