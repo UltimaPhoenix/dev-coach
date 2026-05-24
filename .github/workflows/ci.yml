@@ -47,6 +47,7 @@ jobs:
     name: Bump version and tag
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       contents: write
     outputs:
@@ -97,6 +98,7 @@ jobs:
     needs: [bump]
     if: always() && (needs.bump.result == 'success' || needs.bump.result == 'skipped')
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v6
         with:
@@ -114,6 +116,7 @@ jobs:
     needs: [bump]
     if: always() && (needs.bump.result == 'success' || needs.bump.result == 'skipped')
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -135,6 +138,7 @@ jobs:
     needs: [bump, lint, test]
     if: always() && (needs.bump.result == 'success' || needs.bump.result == 'skipped') && needs.lint.result == 'success' && needs.test.result == 'success'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v6
         with:
@@ -159,6 +163,7 @@ jobs:
       github.event_name == 'pull_request'
       && (needs.bump.result == 'success' || needs.bump.result == 'skipped')
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       pull-requests: write
     steps:
@@ -191,6 +196,7 @@ jobs:
       && (needs.bump.result == 'success' || needs.bump.result == 'skipped')
       && needs.test.result == 'success'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v6
         with:
@@ -213,6 +219,7 @@ jobs:
     needs: [bump, build]
     if: always() && needs.build.result == 'success' && github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       pages: write
       id-token: write
@@ -245,6 +252,7 @@ jobs:
     needs: [bump, build]
     if: always() && needs.build.result == 'success' && (needs.bump.result == 'success' || startsWith(github.ref, 'refs/tags/v'))
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     environment:
       name: pypi
       url: https://pypi.org/p/devcoach
@@ -269,6 +277,7 @@ jobs:
       && needs.lint.result == 'success'
       && needs.test.result == 'success'
       && (startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch')
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -311,6 +320,7 @@ jobs:
       && needs.build-binaries.result == 'success'
       && (needs.bump.result == 'success' || startsWith(github.ref, 'refs/tags/v'))
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       contents: write
     steps:
@@ -345,6 +355,7 @@ jobs:
       && needs.github-release.result == 'success'
       && needs.build-binaries.result == 'success'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/download-artifact@v8
         with:
