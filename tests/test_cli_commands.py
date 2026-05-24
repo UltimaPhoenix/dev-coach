@@ -400,24 +400,29 @@ class TestCmdInstall:
     """Tests for cmd_install — claude CLI path is mocked out; desktop uses file fallback."""
 
     def _ns_install(self, **kwargs):
-        defaults = dict(claude_code=False, claude_desktop=False, global_scope=False, force=False)
+        defaults = dict(
+            claude_code=False, claude_desktop=False, global_scope=False, force=False, skip_hook=False
+        )
         defaults.update(kwargs)
         return _ns(**defaults)
 
+    def _patch_code(self, monkeypatch, tmp_path):
+        """Patch both desktop config and Claude Code settings to tmp paths."""
+        monkeypatch.setattr(commands, "_CLAUDE_DESKTOP_CONFIG", tmp_path / "desktop.json")
+        monkeypatch.setattr(commands, "_CLAUDE_CODE_SETTINGS", tmp_path / ".claude" / "settings.json")
+
     def test_installs_via_claude_cli_for_code(self, capsys, tmp_path, monkeypatch):
-        desktop = tmp_path / "desktop.json"
-        monkeypatch.setattr(commands, "_CLAUDE_DESKTOP_CONFIG", desktop)
+        self._patch_code(monkeypatch, tmp_path)
         monkeypatch.setattr(
             commands, "_install_via_claude_cli", lambda scope, force: "[green]✓[/green] Registered"
         )
         commands.cmd_install(self._ns_install(claude_code=True))
         out = capsys.readouterr().out
         assert "Registered" in out
-        assert not desktop.exists()
+        assert not (tmp_path / "desktop.json").exists()
 
     def test_falls_back_to_file_when_no_claude_cli(self, capsys, tmp_path, monkeypatch):
-        desktop = tmp_path / "desktop.json"
-        monkeypatch.setattr(commands, "_CLAUDE_DESKTOP_CONFIG", desktop)
+        self._patch_code(monkeypatch, tmp_path)
         monkeypatch.setattr(commands, "_install_via_claude_cli", lambda scope, force: "")
 
         def _fake_home():
@@ -428,33 +433,30 @@ class TestCmdInstall:
         assert (tmp_path / ".claude.json").exists()
 
     def test_desktop_only_writes_file(self, capsys, tmp_path, monkeypatch):
-        desktop = tmp_path / "desktop.json"
-        monkeypatch.setattr(commands, "_CLAUDE_DESKTOP_CONFIG", desktop)
+        self._patch_code(monkeypatch, tmp_path)
         monkeypatch.setattr(commands, "_install_via_claude_cli", lambda scope, force: "")
         commands.cmd_install(self._ns_install(claude_desktop=True))
+        desktop = tmp_path / "desktop.json"
         assert desktop.exists()
         data = json.loads(desktop.read_text())
         assert data["mcpServers"]["devcoach"]["command"] == "uvx"
 
     def test_both_by_default(self, capsys, tmp_path, monkeypatch):
-        desktop = tmp_path / "desktop.json"
-        monkeypatch.setattr(commands, "_CLAUDE_DESKTOP_CONFIG", desktop)
+        self._patch_code(monkeypatch, tmp_path)
         monkeypatch.setattr(
             commands, "_install_via_claude_cli", lambda scope, force: "[green]✓[/green] Registered"
         )
         commands.cmd_install(self._ns_install())
-        assert desktop.exists()
+        assert (tmp_path / "desktop.json").exists()
 
     def test_restart_reminder_shown_for_desktop(self, capsys, tmp_path, monkeypatch):
-        desktop = tmp_path / "desktop.json"
-        monkeypatch.setattr(commands, "_CLAUDE_DESKTOP_CONFIG", desktop)
+        self._patch_code(monkeypatch, tmp_path)
         monkeypatch.setattr(commands, "_install_via_claude_cli", lambda scope, force: "")
         commands.cmd_install(self._ns_install(claude_desktop=True))
         assert "Restart" in capsys.readouterr().out
 
     def test_no_restart_reminder_when_cli_succeeds(self, capsys, tmp_path, monkeypatch):
-        desktop = tmp_path / "no_desktop.json"
-        monkeypatch.setattr(commands, "_CLAUDE_DESKTOP_CONFIG", desktop)
+        self._patch_code(monkeypatch, tmp_path)
         monkeypatch.setattr(
             commands, "_install_via_claude_cli", lambda scope, force: "[green]✓[/green] Registered"
         )
@@ -462,8 +464,7 @@ class TestCmdInstall:
         assert "Restart" not in capsys.readouterr().out
 
     def test_force_flag_passed_to_cli(self, monkeypatch, tmp_path):
-        desktop = tmp_path / "desktop.json"
-        monkeypatch.setattr(commands, "_CLAUDE_DESKTOP_CONFIG", desktop)
+        self._patch_code(monkeypatch, tmp_path)
         received = {}
         monkeypatch.setattr(
             commands,
@@ -476,10 +477,110 @@ class TestCmdInstall:
     def test_force_overwrites_desktop_file(self, capsys, tmp_path, monkeypatch):
         desktop = tmp_path / "desktop.json"
         desktop.write_text(json.dumps({"mcpServers": {"devcoach": {"command": "old"}}}))
+        self._patch_code(monkeypatch, tmp_path)
         monkeypatch.setattr(commands, "_CLAUDE_DESKTOP_CONFIG", desktop)
         monkeypatch.setattr(commands, "_install_via_claude_cli", lambda scope, force: "")
         commands.cmd_install(self._ns_install(claude_desktop=True, force=True))
         assert json.loads(desktop.read_text())["mcpServers"]["devcoach"]["command"] == "uvx"
+
+    def test_claude_code_installs_stop_hook(self, capsys, tmp_path, monkeypatch):
+        self._patch_code(monkeypatch, tmp_path)
+        monkeypatch.setattr(
+            commands, "_install_via_claude_cli", lambda scope, force: "[green]✓[/green] Registered"
+        )
+        commands.cmd_install(self._ns_install(claude_code=True))
+        settings = tmp_path / ".claude" / "settings.json"
+        assert settings.exists()
+        data = json.loads(settings.read_text())
+        stop_hooks = data["hooks"]["Stop"]
+        assert any(
+            "devcoach" in h.get("command", "")
+            for entry in stop_hooks
+            for h in entry.get("hooks", [])
+        )
+
+    def test_skip_hook_omits_hook_installation(self, capsys, tmp_path, monkeypatch):
+        self._patch_code(monkeypatch, tmp_path)
+        monkeypatch.setattr(
+            commands, "_install_via_claude_cli", lambda scope, force: "[green]✓[/green] Registered"
+        )
+        commands.cmd_install(self._ns_install(claude_code=True, skip_hook=True))
+        settings = tmp_path / ".claude" / "settings.json"
+        assert not settings.exists()
+
+    def test_hook_already_installed_not_duplicated(self, capsys, tmp_path, monkeypatch):
+        self._patch_code(monkeypatch, tmp_path)
+        monkeypatch.setattr(
+            commands, "_install_via_claude_cli", lambda scope, force: "[green]✓[/green] Registered"
+        )
+        commands.cmd_install(self._ns_install(claude_code=True))
+        commands.cmd_install(self._ns_install(claude_code=True))
+        settings = tmp_path / ".claude" / "settings.json"
+        data = json.loads(settings.read_text())
+        devcoach_hooks = [
+            h
+            for entry in data["hooks"]["Stop"]
+            for h in entry.get("hooks", [])
+            if "devcoach" in h.get("command", "")
+        ]
+        assert len(devcoach_hooks) == 1
+
+    def test_install_hook_preserves_existing_settings(self, tmp_path):
+        settings = tmp_path / ".claude" / "settings.json"
+        settings.parent.mkdir()
+        settings.write_text(
+            json.dumps({
+                "permissions": {"allow": ["Read(**)", "Bash(git:*)"]},
+                "mcpServers": {"memory": {"command": "npx", "args": ["-y", "@modelcontextprotocol/server-memory"]}},
+                "effortLevel": "high",
+            })
+        )
+        commands._install_hook(settings, force=False)
+        data = json.loads(settings.read_text())
+        assert data["permissions"]["allow"] == ["Read(**)", "Bash(git:*)"]
+        assert data["mcpServers"]["memory"]["command"] == "npx"
+        assert data["effortLevel"] == "high"
+        assert "Stop" in data["hooks"]
+
+
+# ── cmd_lesson_ready ───────────────────────────────────────────────────────
+
+
+class TestCmdLessonReady:
+    """Tests for cmd_lesson_ready — the Claude Code Stop hook signal."""
+
+    def test_prints_onboarding_prompt_when_not_onboarded(self, capsys):
+        commands.cmd_lesson_ready(_ns())
+        assert "Onboarding" in capsys.readouterr().out
+
+    def test_silent_when_rate_limited(self, capsys, monkeypatch):
+        with db.connection() as conn:
+            db.upsert_knowledge(conn, "python", 5)
+            db.set_setting(conn, "onboarding_completed", "1")
+        monkeypatch.setattr(
+            commands.coach,
+            "check_rate_limit",
+            lambda conn: type("R", (), {"allowed": False, "reason": "limit"})(),
+        )
+        commands.cmd_lesson_ready(_ns())
+        assert capsys.readouterr().out == ""
+
+    def test_prints_lesson_prompt_when_allowed(self, capsys, monkeypatch):
+        with db.connection() as conn:
+            db.upsert_knowledge(conn, "python", 5)
+            db.set_setting(conn, "onboarding_completed", "1")
+        monkeypatch.setattr(
+            commands.coach,
+            "check_rate_limit",
+            lambda conn: type("R", (), {"allowed": True})(),
+        )
+        commands.cmd_lesson_ready(_ns())
+        assert "devcoach" in capsys.readouterr().out.lower()
+
+    def test_silent_on_db_error(self, capsys, monkeypatch):
+        monkeypatch.setattr(commands.db, "connection", lambda: (_ for _ in ()).throw(Exception("fail")))
+        commands.cmd_lesson_ready(_ns())
+        assert capsys.readouterr().out == ""
 
 
 # ── _build_parser ──────────────────────────────────────────────────────────

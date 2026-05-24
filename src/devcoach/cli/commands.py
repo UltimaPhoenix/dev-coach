@@ -470,9 +470,40 @@ def _install_to(path: Path, entry: dict, force: bool) -> str:
     return f"[green]✓[/green] Installed into {path}"
 
 
+_CLAUDE_CODE_SETTINGS = Path.home() / ".claude" / "settings.json"
+_HOOK_COMMAND = "uvx devcoach lesson-ready"
+
+
+def _install_hook(path: Path, force: bool) -> str:
+    """Add the devcoach Stop hook to a Claude Code settings.json file."""
+    data: dict = json.loads(path.read_text()) if path.exists() else {}
+    stop_hooks: list = data.setdefault("hooks", {}).setdefault("Stop", [])
+
+    existing_idx = next(
+        (
+            i
+            for i, entry in enumerate(stop_hooks)
+            if any("devcoach" in h.get("command", "") for h in entry.get("hooks", []))
+        ),
+        None,
+    )
+    if existing_idx is not None:
+        if not force:
+            return (
+                f"[yellow]Stop hook already installed[/yellow] in {path} (use --force to overwrite)"
+            )
+        stop_hooks.pop(existing_idx)
+
+    stop_hooks.append({"hooks": [{"type": "command", "command": _HOOK_COMMAND}]})
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data, indent=2) + "\n")
+    return f"[green]✓[/green] Stop hook installed into {path}"
+
+
 def cmd_install(args: argparse.Namespace) -> None:
     do_code = args.claude_code or not args.claude_desktop
     do_desktop = args.claude_desktop or not args.claude_code
+    skip_hook = getattr(args, "skip_hook", False)
     needs_restart = False
 
     if do_code:
@@ -495,6 +526,9 @@ def cmd_install(args: argparse.Namespace) -> None:
             msg = _install_to(claude_code_config, claude_code_entry, args.force)
             needs_restart = True
         console.print(msg)
+
+        if not skip_hook:
+            console.print(_install_hook(_CLAUDE_CODE_SETTINGS, args.force))
 
     if do_desktop:
         console.print(_install_to(_CLAUDE_DESKTOP_CONFIG, _CLAUDE_DESKTOP_ENTRY, args.force))
@@ -695,13 +729,40 @@ def cmd_mcp(_args: argparse.Namespace) -> None:
     mcp.run(transport="stdio")
 
 
+def cmd_lesson_ready(_args: argparse.Namespace) -> None:
+    """Signal whether a lesson can be delivered now — designed for the Claude Code Stop hook.
+
+    Always exits 0. Prints nothing when rate-limited (hook stays silent).
+    Prints a prompt when a lesson is due or onboarding is needed — Claude Code
+    displays the output, cueing Claude to deliver an AI-generated lesson.
+    """
+    try:
+        with db.connection() as conn:
+            if not db.is_onboarding_complete(conn)["knowledge_ready"]:
+                print("Onboarding is incomplete — run the devcoach onboarding flow now.")
+                return
+            result = coach.check_rate_limit(conn)
+    except Exception:
+        return
+
+    if not result.allowed:
+        return
+
+    print(
+        "Deliver a devcoach lesson based on the work in this conversation. "
+        "Use the devcoach skill: check devcoach://rate-limit, devcoach://profile, "
+        "and devcoach://taught-topics before selecting a topic."
+    )
+
+
 def _print_welcome() -> None:
     """Print the devcoach welcome/overview panel when no subcommand is given."""
     commands = [
         ("mcp", "Start the MCP server (stdio) for Claude Code / Claude Desktop"),
         ("ui [--port N]", "Launch the web dashboard  (default port: 7860)"),
         ("setup", "First-run wizard: import backup or build your knowledge profile"),
-        ("install", "Register the MCP server in Claude Code / Claude Desktop config"),
+        ("install", "Register the MCP server + Stop hook in Claude Code / Claude Desktop config"),
+        ("lesson-ready", "Claude Code Stop hook: exit 2 when a lesson is due (triggers AI lesson)"),
         ("", ""),
         ("profile", "Show the knowledge map"),
         ("stats", "Coaching statistics and rate-limit status"),
@@ -900,6 +961,12 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Install at global scope instead of user scope (Claude Code only)",
     )
     p_install.add_argument("--force", action="store_true", help="Overwrite existing devcoach entry")
+    p_install.add_argument(
+        "--skip-hook",
+        dest="skip_hook",
+        action="store_true",
+        help="Register MCP server only — do not install the Claude Code Stop hook",
+    )
 
     p_ui = sub.add_parser("ui", help="Launch the web dashboard")
     p_ui.add_argument("--port", type=int, default=7860, help="Port (default: 7860)")
@@ -912,6 +979,14 @@ def _build_parser() -> argparse.ArgumentParser:
     sub.add_parser(
         "mcp",
         help="Start the MCP server (stdio transport) for Claude Code / Claude Desktop",
+    )
+
+    sub.add_parser(
+        "lesson-ready",
+        help=(
+            "Check whether a lesson can be delivered now (for the Claude Code Stop hook). "
+            "Exit 0 = rate-limited. Exit 2 = lesson due or onboarding needed."
+        ),
     )
 
     return parser
@@ -947,6 +1022,7 @@ def run_cli() -> None:
         "ui": cmd_ui,
         "setup": cmd_setup,
         "mcp": cmd_mcp,
+        "lesson-ready": cmd_lesson_ready,
     }
 
     if args.command is None:
