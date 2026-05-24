@@ -523,7 +523,8 @@ class TestCmdInstall:
             for h in entry.get("hooks", [])
             if "devcoach" in h.get("command", "")
         ]
-        assert len(devcoach_hooks) == 1
+        # Two hooks: onboard-hook + lesson-ready; second install is a no-op
+        assert len(devcoach_hooks) == 2
 
     def test_install_hook_writes_exact_claude_code_structure(self, tmp_path):
         settings = tmp_path / ".claude" / "settings.json"
@@ -531,12 +532,13 @@ class TestCmdInstall:
         commands._install_hook(settings, force=False)
         data = json.loads(settings.read_text())
         stop = data["hooks"]["Stop"]
-        assert isinstance(stop, list) and len(stop) == 1
-        inner = stop[0]["hooks"]
-        assert isinstance(inner, list) and len(inner) == 1
-        hook = inner[0]
-        assert hook["type"] == "command"
-        assert hook["command"] == commands._HOOK_COMMAND
+        assert isinstance(stop, list) and len(stop) == 2
+        commands_installed = [stop[i]["hooks"][0]["command"] for i in range(2)]
+        assert commands._ONBOARD_HOOK_COMMAND in commands_installed
+        assert commands._HOOK_COMMAND in commands_installed
+        for entry in stop:
+            hook = entry["hooks"][0]
+            assert hook["type"] == "command"
 
     def test_install_hook_preserves_existing_settings(self, tmp_path):
         settings = tmp_path / ".claude" / "settings.json"
@@ -556,13 +558,51 @@ class TestCmdInstall:
         assert "Stop" in data["hooks"]
 
 
+# ── cmd_onboard_hook ───────────────────────────────────────────────────────
+
+
+class TestCmdOnboardHook:
+    """Tests for cmd_onboard_hook — silent profile seeding on first Stop event."""
+
+    def test_seeds_profile_when_absent(self, capsys):
+        with pytest.raises(SystemExit) as exc:
+            commands.cmd_onboard_hook(_ns())
+        assert exc.value.code == 0
+        with db.connection() as conn:
+            assert db.is_onboarding_complete(conn)["knowledge_ready"]
+
+    def test_always_exits_0_silently(self, capsys):
+        with pytest.raises(SystemExit) as exc:
+            commands.cmd_onboard_hook(_ns())
+        assert exc.value.code == 0
+        out = capsys.readouterr()
+        assert out.out == "" and out.err == ""
+
+    def test_noop_when_profile_already_exists(self, capsys):
+        with db.connection() as conn:
+            db.upsert_knowledge(conn, "python", 7)
+            db.set_setting(conn, "onboarding_completed", "1")
+        with pytest.raises(SystemExit) as exc:
+            commands.cmd_onboard_hook(_ns())
+        assert exc.value.code == 0
+
+    def test_exits_0_silently_on_db_error(self, capsys, monkeypatch):
+        monkeypatch.setattr(commands.db, "connection", lambda: (_ for _ in ()).throw(Exception("fail")))
+        with pytest.raises(SystemExit) as exc:
+            commands.cmd_onboard_hook(_ns())
+        assert exc.value.code == 0
+        out = capsys.readouterr()
+        assert out.out == "" and out.err == ""
+
+
 # ── cmd_lesson_ready ───────────────────────────────────────────────────────
 
 
 class TestCmdLessonReady:
-    """Tests for cmd_lesson_ready — the Claude Code Stop hook signal."""
+    """Tests for cmd_lesson_ready — the Claude Code Stop hook lesson signal."""
 
-    def test_auto_onboards_and_fires_lesson_when_profile_absent(self, capsys, monkeypatch):
+    def test_exits_0_silently_when_profile_absent(self, capsys, monkeypatch):
+        # lesson-ready defers to onboard-hook; exits 0 when no profile
         monkeypatch.setattr(
             commands.coach,
             "check_rate_limit",
@@ -570,11 +610,9 @@ class TestCmdLessonReady:
         )
         with pytest.raises(SystemExit) as exc:
             commands.cmd_lesson_ready(_ns())
-        assert exc.value.code == 2
+        assert exc.value.code == 0
         out = capsys.readouterr()
-        assert "devcoach" in out.err.lower()
-        with db.connection() as conn:
-            assert db.is_onboarding_complete(conn)["knowledge_ready"]
+        assert out.out == "" and out.err == ""
 
     def test_exits_0_silently_when_rate_limited(self, capsys, monkeypatch):
         with db.connection() as conn:
@@ -682,6 +720,12 @@ class TestBuildParser:
         )
         assert args.date_from == "2026-01-01"
         assert args.date_to == "2026-12-31"
+
+    def test_onboard_hook_command(self):
+        assert commands._build_parser().parse_args(["onboard-hook"]).command == "onboard-hook"
+
+    def test_lesson_ready_command(self):
+        assert commands._build_parser().parse_args(["lesson-ready"]).command == "lesson-ready"
 
 
 # ── run_cli ────────────────────────────────────────────────────────────────

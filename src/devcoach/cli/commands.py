@@ -472,33 +472,37 @@ def _install_to(path: Path, entry: dict, force: bool) -> str:
 
 
 _CLAUDE_CODE_SETTINGS = Path.home() / ".claude" / "settings.json"
+_ONBOARD_HOOK_COMMAND = "uvx devcoach onboard-hook"
 _HOOK_COMMAND = "uvx devcoach lesson-ready"
 
 
 def _install_hook(path: Path, force: bool) -> str:
-    """Add the devcoach Stop hook to a Claude Code settings.json file."""
+    """Add the devcoach Stop hooks to a Claude Code settings.json file.
+
+    Installs two sequential hooks: onboard-hook (silent profile seeding) followed by
+    lesson-ready (lesson prompt when rate limit allows). Both are idempotent.
+    """
     data: dict = json.loads(path.read_text()) if path.exists() else {}
     stop_hooks: list = data.setdefault("hooks", {}).setdefault("Stop", [])
 
-    existing_idx = next(
-        (
-            i
-            for i, entry in enumerate(stop_hooks)
-            if any("devcoach" in h.get("command", "") for h in entry.get("hooks", []))
-        ),
-        None,
-    )
-    if existing_idx is not None:
+    existing_indices = [
+        i
+        for i, entry in enumerate(stop_hooks)
+        if any("devcoach" in h.get("command", "") for h in entry.get("hooks", []))
+    ]
+    if existing_indices:
         if not force:
             return (
-                f"[yellow]Stop hook already installed[/yellow] in {path} (use --force to overwrite)"
+                f"[yellow]Stop hooks already installed[/yellow] in {path} (use --force to overwrite)"
             )
-        stop_hooks.pop(existing_idx)
+        for i in reversed(existing_indices):
+            stop_hooks.pop(i)
 
+    stop_hooks.append({"hooks": [{"type": "command", "command": _ONBOARD_HOOK_COMMAND}]})
     stop_hooks.append({"hooks": [{"type": "command", "command": _HOOK_COMMAND}]})
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(data, indent=2) + "\n")
-    return f"[green]✓[/green] Stop hook installed into {path}"
+    return f"[green]✓[/green] Stop hooks installed into {path}"
 
 
 def cmd_install(args: argparse.Namespace) -> None:
@@ -765,20 +769,36 @@ def _auto_onboard(conn: sqlite3.Connection) -> None:
         )
 
 
+def cmd_onboard_hook(_args: argparse.Namespace) -> None:
+    """Silently seed the knowledge profile on first run — for the Claude Code Stop hook.
+
+    If the profile is not yet initialised, calls _auto_onboard() to detect the project
+    stack and write DEFAULT_PROFILE to the DB. Subsequent calls are a no-op because
+    onboarding_completed is set. Always exits 0 (silent) — never outputs anything.
+    """
+    try:
+        with db.connection() as conn:
+            if not db.is_onboarding_complete(conn)["knowledge_ready"]:
+                _auto_onboard(conn)
+    except Exception:
+        pass
+    sys.exit(0)
+
+
 def cmd_lesson_ready(_args: argparse.Namespace) -> None:
-    """Signal whether a lesson can be delivered now — designed for the Claude Code Stop hook.
+    """Signal whether a lesson can be delivered now — for the Claude Code Stop hook.
 
-    If the knowledge profile is absent, auto-seeds it from the detected stack and
-    DEFAULT_PROFILE (no user interaction, no loop) then falls through to the lesson check.
+    Requires the profile to already exist (run onboard-hook first). Exits 0 silently
+    when no profile is present, the rate limit is hit, or any error occurs.
 
-    Exit 0: rate-limited or error — hook stays completely silent.
+    Exit 0: no lesson due — hook stays completely silent.
     Exit 2: lesson ready — Claude Code shows the stderr message, cueing Claude to
             deliver an AI-generated lesson via the devcoach skill.
     """
     try:
         with db.connection() as conn:
             if not db.is_onboarding_complete(conn)["knowledge_ready"]:
-                _auto_onboard(conn)
+                sys.exit(0)
             result = coach.check_rate_limit(conn)
     except Exception:
         sys.exit(0)
@@ -802,6 +822,7 @@ def _print_welcome() -> None:
         ("ui [--port N]", "Launch the web dashboard  (default port: 7860)"),
         ("setup", "First-run wizard: import backup or build your knowledge profile"),
         ("install", "Register the MCP server + Stop hook in Claude Code / Claude Desktop config"),
+        ("onboard-hook", "Claude Code Stop hook: silently seed profile on first run (always exit 0)"),
         ("lesson-ready", "Claude Code Stop hook: exit 2 when a lesson is due (triggers AI lesson)"),
         ("", ""),
         ("profile", "Show the knowledge map"),
@@ -1022,10 +1043,18 @@ def _build_parser() -> argparse.ArgumentParser:
     )
 
     sub.add_parser(
+        "onboard-hook",
+        help=(
+            "Silently seed the knowledge profile on first run (Claude Code Stop hook). "
+            "Always exits 0. No-op once the profile is initialised."
+        ),
+    )
+
+    sub.add_parser(
         "lesson-ready",
         help=(
             "Check whether a lesson can be delivered now (for the Claude Code Stop hook). "
-            "Exit 0 = rate-limited. Exit 2 = lesson due or onboarding needed."
+            "Exit 0 = silent (no profile yet, rate-limited, or error). Exit 2 = lesson due."
         ),
     )
 
@@ -1062,6 +1091,7 @@ def run_cli() -> None:
         "ui": cmd_ui,
         "setup": cmd_setup,
         "mcp": cmd_mcp,
+        "onboard-hook": cmd_onboard_hook,
         "lesson-ready": cmd_lesson_ready,
     }
 
