@@ -473,6 +473,8 @@ def _install_to(path: Path, entry: dict, force: bool) -> str:
 _CLAUDE_CODE_SETTINGS = Path.home() / ".claude" / "settings.json"
 _ONBOARD_HOOK_COMMAND = "uvx devcoach onboard-hook"
 _HOOK_COMMAND = "uvx devcoach lesson-ready"
+_ONBOARD_LOCK_PATH = Path.home() / ".devcoach" / "onboard.lock"
+_ONBOARD_LOCK_TIMEOUT_HOURS = 24
 
 
 def _install_hook(path: Path, force: bool) -> str:
@@ -731,12 +733,30 @@ def cmd_mcp(_args: argparse.Namespace) -> None:
     mcp.run(transport="stdio")
 
 
-def cmd_onboard_hook(_args: argparse.Namespace) -> None:
-    """Prompt the user to choose an onboarding mode — for the Claude Code Stop hook.
+def _onboard_lock_is_active() -> bool:
+    """Return True if a recent onboarding session lock exists.
 
-    If the profile is already initialised, exits 0 silently (no-op).
-    Otherwise, writes a choice prompt to stderr and exits 2 so Claude Code surfaces
-    it and Claude can present the user with automatic vs guided onboarding.
+    The lock is created when the hook first prompts the user. While active it
+    suppresses repeated prompts so guided/import conversations can proceed
+    uninterrupted. Expires after _ONBOARD_LOCK_TIMEOUT_HOURS.
+    """
+    from datetime import UTC, datetime
+
+    if not _ONBOARD_LOCK_PATH.exists():
+        return False
+    age = datetime.now(UTC) - datetime.fromtimestamp(_ONBOARD_LOCK_PATH.stat().st_mtime, UTC)
+    return age.total_seconds() < _ONBOARD_LOCK_TIMEOUT_HOURS * 3600
+
+
+def cmd_onboard_hook(_args: argparse.Namespace) -> None:
+    """Prompt the user to choose an onboarding option — for the Claude Code Stop hook.
+
+    Fires once when no profile exists, then stays silent while the onboarding
+    conversation is in progress (lock file). The lock expires after
+    _ONBOARD_LOCK_TIMEOUT_HOURS so abandoned sessions eventually re-prompt.
+
+    Exit 0: profile complete, session in progress, or any error — hook is silent.
+    Exit 2: no profile and no active session — shows the three-option choice prompt.
     """
     try:
         with db.connection() as conn:
@@ -745,15 +765,23 @@ def cmd_onboard_hook(_args: argparse.Namespace) -> None:
         sys.exit(0)
 
     if ready:
+        _ONBOARD_LOCK_PATH.unlink(missing_ok=True)
         sys.exit(0)
 
+    if _onboard_lock_is_active():
+        sys.exit(0)
+
+    _ONBOARD_LOCK_PATH.parent.mkdir(parents=True, exist_ok=True)
+    _ONBOARD_LOCK_PATH.touch()
+
     print(
-        "devcoach profile is not set up yet. Ask the user to choose their onboarding mode:\n"
+        "devcoach profile is not set up yet. Ask the user to pick one of these options:\n"
         "- Automatic: detect the tech stack from this project and build a profile immediately "
         "(fast, no questions asked).\n"
         "- Guided: a conversation to map knowledge, confidence levels, and topic groups "
         "step by step (thorough, interactive).\n"
-        "Then use the devcoach skill to run the chosen onboarding flow.",
+        "- Import: restore knowledge, lessons, and settings from an existing backup file.\n"
+        "Then use the devcoach skill to run the chosen option.",
         file=sys.stderr,
     )
     sys.exit(2)

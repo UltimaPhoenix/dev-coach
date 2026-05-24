@@ -574,23 +574,67 @@ class TestCmdInstall:
 # ── cmd_onboard_hook ───────────────────────────────────────────────────────
 
 
-class TestCmdOnboardHook:
-    """Tests for cmd_onboard_hook — onboarding choice prompt on first Stop event."""
+_ONBOARD_LOCK_TIMEOUT_HOURS = commands._ONBOARD_LOCK_TIMEOUT_HOURS
 
-    def test_exits_2_with_choice_prompt_when_profile_absent(self, capsys):
+
+class TestCmdOnboardHook:
+    """Tests for cmd_onboard_hook — three-option prompt with lock-file guard."""
+
+    @pytest.fixture(autouse=True)
+    def _patch_lock(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(commands, "_ONBOARD_LOCK_PATH", tmp_path / "onboard.lock")
+
+    def test_exits_2_with_three_options_when_profile_absent(self, capsys):
         with pytest.raises(SystemExit) as exc:
             commands.cmd_onboard_hook(_ns())
         assert exc.value.code == 2
         err = capsys.readouterr().err
         assert "Automatic" in err
         assert "Guided" in err
+        assert "Import" in err
 
-    def test_choice_prompt_on_stderr_not_stdout_when_absent(self, capsys):
+    def test_prompt_goes_to_stderr_not_stdout(self, capsys):
         with pytest.raises(SystemExit):
             commands.cmd_onboard_hook(_ns())
         out = capsys.readouterr()
         assert out.out == ""
         assert out.err != ""
+
+    def test_creates_lock_file_when_prompting(self, tmp_path):
+        with pytest.raises(SystemExit):
+            commands.cmd_onboard_hook(_ns())
+        assert (tmp_path / "onboard.lock").exists()
+
+    def test_exits_0_silently_when_lock_active(self, tmp_path, capsys):
+        (tmp_path / "onboard.lock").touch()
+        with pytest.raises(SystemExit) as exc:
+            commands.cmd_onboard_hook(_ns())
+        assert exc.value.code == 0
+        out = capsys.readouterr()
+        assert out.out == "" and out.err == ""
+
+    def test_reprompts_when_lock_expired(self, tmp_path, capsys):
+        import os
+        import time
+
+        lock = tmp_path / "onboard.lock"
+        lock.touch()
+        past = time.time() - (_ONBOARD_LOCK_TIMEOUT_HOURS + 1) * 3600
+        os.utime(lock, (past, past))
+        with pytest.raises(SystemExit) as exc:
+            commands.cmd_onboard_hook(_ns())
+        assert exc.value.code == 2
+
+    def test_removes_lock_when_profile_complete(self, tmp_path):
+        lock = tmp_path / "onboard.lock"
+        lock.touch()
+        with db.connection() as conn:
+            db.upsert_knowledge(conn, "python", 7)
+            db.set_setting(conn, "onboarding_completed", "1")
+        with pytest.raises(SystemExit) as exc:
+            commands.cmd_onboard_hook(_ns())
+        assert exc.value.code == 0
+        assert not lock.exists()
 
     def test_exits_0_silently_when_profile_exists(self, capsys):
         with db.connection() as conn:
