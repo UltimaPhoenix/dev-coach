@@ -275,8 +275,6 @@ jobs:
         include:
           - platform: darwin-arm64
             runs-on: macos-latest
-          - platform: darwin-amd64
-            runs-on: macos-13
           - platform: linux-amd64
             runs-on: ubuntu-latest
           - platform: linux-arm64
@@ -357,7 +355,6 @@ jobs:
         id: sha
         run: |
           echo "darwin_arm64=$(sha256sum binaries/devcoach-darwin-arm64 | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
-          echo "darwin_amd64=$(sha256sum binaries/devcoach-darwin-amd64 | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
           echo "linux_amd64=$(sha256sum  binaries/devcoach-linux-amd64  | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
           echo "linux_arm64=$(sha256sum  binaries/devcoach-linux-arm64  | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
       - name: Clone homebrew-tap
@@ -367,7 +364,6 @@ jobs:
         env:
           TAG: ${{ needs.bump.outputs.tag || github.ref_name }}
           DARWIN_ARM64_SHA: ${{ steps.sha.outputs.darwin_arm64 }}
-          DARWIN_AMD64_SHA: ${{ steps.sha.outputs.darwin_amd64 }}
           LINUX_AMD64_SHA:  ${{ steps.sha.outputs.linux_amd64 }}
           LINUX_ARM64_SHA:  ${{ steps.sha.outputs.linux_arm64 }}
         run: |
@@ -380,14 +376,8 @@ jobs:
             license "Apache-2.0"
 
             on_macos do
-              on_arm do
-                url "https://github.com/UltimaPhoenix/dev-coach/releases/download/$TAG/devcoach-darwin-arm64"
-                sha256 "$DARWIN_ARM64_SHA"
-              end
-              on_intel do
-                url "https://github.com/UltimaPhoenix/dev-coach/releases/download/$TAG/devcoach-darwin-amd64"
-                sha256 "$DARWIN_AMD64_SHA"
-              end
+              url "https://github.com/UltimaPhoenix/dev-coach/releases/download/$TAG/devcoach-darwin-arm64"
+              sha256 "$DARWIN_ARM64_SHA"
             end
 
             on_linux do
