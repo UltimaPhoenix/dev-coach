@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import sqlite3
 import sys
 from pathlib import Path
 
@@ -729,17 +730,55 @@ def cmd_mcp(_args: argparse.Namespace) -> None:
     mcp.run(transport="stdio")
 
 
+def _auto_onboard(conn: sqlite3.Connection) -> None:
+    """Seed the knowledge profile from detected stack + DEFAULT_PROFILE and mark onboarding done.
+
+    Called by cmd_lesson_ready when no profile exists yet. Merges detected stack
+    (higher signal) over the default map so project-specific topics take precedence.
+    Also creates a minimal coaching notebook if one does not already exist.
+    """
+    from datetime import UTC, datetime
+
+    from devcoach.core.db import DEFAULT_PROFILE, LEARNING_STATE_PATH
+    from devcoach.core.detect import detect_stack
+    from devcoach.core.git import detect_git_context
+
+    git_ctx = detect_git_context()
+    folder = git_ctx.get("folder") or str(Path.cwd())
+    detected = detect_stack(folder)
+
+    topics = {**DEFAULT_PROFILE, **detected}
+    for topic, confidence in topics.items():
+        db.upsert_knowledge(conn, topic, max(0, min(10, confidence)))
+    db.set_setting(conn, "onboarding_completed", "1")
+
+    if not LEARNING_STATE_PATH.exists() or LEARNING_STATE_PATH.stat().st_size == 0:
+        LEARNING_STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
+        now = datetime.now(UTC).isoformat(timespec="seconds")
+        LEARNING_STATE_PATH.write_text(
+            f"# devcoach — Coaching Notebook\n_Last updated: {now}_\n\n"
+            "## Observations\nAuto-initialized via hook.\n\n"
+            "## Recurring patterns\n\n"
+            "## Recommended focus\n\n"
+            "## Open hypotheses\n",
+            encoding="utf-8",
+        )
+
+
 def cmd_lesson_ready(_args: argparse.Namespace) -> None:
     """Signal whether a lesson can be delivered now — designed for the Claude Code Stop hook.
 
+    If the knowledge profile is absent, auto-seeds it from the detected stack and
+    DEFAULT_PROFILE (no user interaction, no loop) then falls through to the lesson check.
+
     Exit 0: rate-limited or error — hook stays completely silent.
-    Exit 2: lesson due or onboarding needed — Claude Code injects stdout as a new
-            user message, prompting Claude to deliver a lesson or start onboarding.
+    Exit 2: lesson ready — Claude Code shows the stderr message, cueing Claude to
+            deliver an AI-generated lesson via the devcoach skill.
     """
     try:
         with db.connection() as conn:
             if not db.is_onboarding_complete(conn)["knowledge_ready"]:
-                sys.exit(0)  # onboarding is a deliberate flow, not a hook nag
+                _auto_onboard(conn)
             result = coach.check_rate_limit(conn)
     except Exception:
         sys.exit(0)
