@@ -401,7 +401,11 @@ class TestCmdInstall:
 
     def _ns_install(self, **kwargs):
         defaults = dict(
-            claude_code=False, claude_desktop=False, global_scope=False, force=False, skip_hook=False
+            claude_code=False,
+            claude_desktop=False,
+            global_scope=False,
+            force=False,
+            skip_hook=False,
         )
         defaults.update(kwargs)
         return _ns(**defaults)
@@ -409,7 +413,9 @@ class TestCmdInstall:
     def _patch_code(self, monkeypatch, tmp_path):
         """Patch both desktop config and Claude Code settings to tmp paths."""
         monkeypatch.setattr(commands, "_CLAUDE_DESKTOP_CONFIG", tmp_path / "desktop.json")
-        monkeypatch.setattr(commands, "_CLAUDE_CODE_SETTINGS", tmp_path / ".claude" / "settings.json")
+        monkeypatch.setattr(
+            commands, "_CLAUDE_CODE_SETTINGS", tmp_path / ".claude" / "settings.json"
+        )
 
     def test_installs_via_claude_cli_for_code(self, capsys, tmp_path, monkeypatch):
         self._patch_code(monkeypatch, tmp_path)
@@ -544,11 +550,18 @@ class TestCmdInstall:
         settings = tmp_path / ".claude" / "settings.json"
         settings.parent.mkdir()
         settings.write_text(
-            json.dumps({
-                "permissions": {"allow": ["Read(**)", "Bash(git:*)"]},
-                "mcpServers": {"memory": {"command": "npx", "args": ["-y", "@modelcontextprotocol/server-memory"]}},
-                "effortLevel": "high",
-            })
+            json.dumps(
+                {
+                    "permissions": {"allow": ["Read(**)", "Bash(git:*)"]},
+                    "mcpServers": {
+                        "memory": {
+                            "command": "npx",
+                            "args": ["-y", "@modelcontextprotocol/server-memory"],
+                        }
+                    },
+                    "effortLevel": "high",
+                }
+            )
         )
         commands._install_hook(settings, force=False)
         data = json.loads(settings.read_text())
@@ -562,32 +575,37 @@ class TestCmdInstall:
 
 
 class TestCmdOnboardHook:
-    """Tests for cmd_onboard_hook — silent profile seeding on first Stop event."""
+    """Tests for cmd_onboard_hook — onboarding choice prompt on first Stop event."""
 
-    def test_seeds_profile_when_absent(self, capsys):
+    def test_exits_2_with_choice_prompt_when_profile_absent(self, capsys):
         with pytest.raises(SystemExit) as exc:
             commands.cmd_onboard_hook(_ns())
-        assert exc.value.code == 0
-        with db.connection() as conn:
-            assert db.is_onboarding_complete(conn)["knowledge_ready"]
+        assert exc.value.code == 2
+        err = capsys.readouterr().err
+        assert "Automatic" in err
+        assert "Guided" in err
 
-    def test_always_exits_0_silently(self, capsys):
-        with pytest.raises(SystemExit) as exc:
+    def test_choice_prompt_on_stderr_not_stdout_when_absent(self, capsys):
+        with pytest.raises(SystemExit):
             commands.cmd_onboard_hook(_ns())
-        assert exc.value.code == 0
         out = capsys.readouterr()
-        assert out.out == "" and out.err == ""
+        assert out.out == ""
+        assert out.err != ""
 
-    def test_noop_when_profile_already_exists(self, capsys):
+    def test_exits_0_silently_when_profile_exists(self, capsys):
         with db.connection() as conn:
             db.upsert_knowledge(conn, "python", 7)
             db.set_setting(conn, "onboarding_completed", "1")
         with pytest.raises(SystemExit) as exc:
             commands.cmd_onboard_hook(_ns())
         assert exc.value.code == 0
+        out = capsys.readouterr()
+        assert out.out == "" and out.err == ""
 
     def test_exits_0_silently_on_db_error(self, capsys, monkeypatch):
-        monkeypatch.setattr(commands.db, "connection", lambda: (_ for _ in ()).throw(Exception("fail")))
+        monkeypatch.setattr(
+            commands.db, "connection", lambda: (_ for _ in ()).throw(Exception("fail"))
+        )
         with pytest.raises(SystemExit) as exc:
             commands.cmd_onboard_hook(_ns())
         assert exc.value.code == 0
@@ -644,7 +662,9 @@ class TestCmdLessonReady:
         assert "devcoach" in capsys.readouterr().err.lower()
 
     def test_exits_0_silently_on_db_error(self, capsys, monkeypatch):
-        monkeypatch.setattr(commands.db, "connection", lambda: (_ for _ in ()).throw(Exception("fail")))
+        monkeypatch.setattr(
+            commands.db, "connection", lambda: (_ for _ in ()).throw(Exception("fail"))
+        )
         with pytest.raises(SystemExit) as exc:
             commands.cmd_lesson_ready(_ns())
         assert exc.value.code == 0

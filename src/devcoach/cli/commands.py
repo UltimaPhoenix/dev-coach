@@ -5,7 +5,6 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import sqlite3
 import sys
 from pathlib import Path
 
@@ -492,9 +491,7 @@ def _install_hook(path: Path, force: bool) -> str:
     ]
     if existing_indices:
         if not force:
-            return (
-                f"[yellow]Stop hooks already installed[/yellow] in {path} (use --force to overwrite)"
-            )
+            return f"[yellow]Stop hooks already installed[/yellow] in {path} (use --force to overwrite)"
         for i in reversed(existing_indices):
             stop_hooks.pop(i)
 
@@ -734,55 +731,32 @@ def cmd_mcp(_args: argparse.Namespace) -> None:
     mcp.run(transport="stdio")
 
 
-def _auto_onboard(conn: sqlite3.Connection) -> None:
-    """Seed the knowledge profile from detected stack + DEFAULT_PROFILE and mark onboarding done.
-
-    Called by cmd_lesson_ready when no profile exists yet. Merges detected stack
-    (higher signal) over the default map so project-specific topics take precedence.
-    Also creates a minimal coaching notebook if one does not already exist.
-    """
-    from datetime import UTC, datetime
-
-    from devcoach.core.db import DEFAULT_PROFILE, LEARNING_STATE_PATH
-    from devcoach.core.detect import detect_stack
-    from devcoach.core.git import detect_git_context
-
-    git_ctx = detect_git_context()
-    folder = git_ctx.get("folder") or str(Path.cwd())
-    detected = detect_stack(folder)
-
-    topics = {**DEFAULT_PROFILE, **detected}
-    for topic, confidence in topics.items():
-        db.upsert_knowledge(conn, topic, max(0, min(10, confidence)))
-    db.set_setting(conn, "onboarding_completed", "1")
-
-    if not LEARNING_STATE_PATH.exists() or LEARNING_STATE_PATH.stat().st_size == 0:
-        LEARNING_STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
-        now = datetime.now(UTC).isoformat(timespec="seconds")
-        LEARNING_STATE_PATH.write_text(
-            f"# devcoach — Coaching Notebook\n_Last updated: {now}_\n\n"
-            "## Observations\nAuto-initialized via hook.\n\n"
-            "## Recurring patterns\n\n"
-            "## Recommended focus\n\n"
-            "## Open hypotheses\n",
-            encoding="utf-8",
-        )
-
-
 def cmd_onboard_hook(_args: argparse.Namespace) -> None:
-    """Silently seed the knowledge profile on first run — for the Claude Code Stop hook.
+    """Prompt the user to choose an onboarding mode — for the Claude Code Stop hook.
 
-    If the profile is not yet initialised, calls _auto_onboard() to detect the project
-    stack and write DEFAULT_PROFILE to the DB. Subsequent calls are a no-op because
-    onboarding_completed is set. Always exits 0 (silent) — never outputs anything.
+    If the profile is already initialised, exits 0 silently (no-op).
+    Otherwise, writes a choice prompt to stderr and exits 2 so Claude Code surfaces
+    it and Claude can present the user with automatic vs guided onboarding.
     """
     try:
         with db.connection() as conn:
-            if not db.is_onboarding_complete(conn)["knowledge_ready"]:
-                _auto_onboard(conn)
+            ready = db.is_onboarding_complete(conn)["knowledge_ready"]
     except Exception:
-        pass
-    sys.exit(0)
+        sys.exit(0)
+
+    if ready:
+        sys.exit(0)
+
+    print(
+        "devcoach profile is not set up yet. Ask the user to choose their onboarding mode:\n"
+        "- Automatic: detect the tech stack from this project and build a profile immediately "
+        "(fast, no questions asked).\n"
+        "- Guided: a conversation to map knowledge, confidence levels, and topic groups "
+        "step by step (thorough, interactive).\n"
+        "Then use the devcoach skill to run the chosen onboarding flow.",
+        file=sys.stderr,
+    )
+    sys.exit(2)
 
 
 def cmd_lesson_ready(_args: argparse.Namespace) -> None:
@@ -822,7 +796,10 @@ def _print_welcome() -> None:
         ("ui [--port N]", "Launch the web dashboard  (default port: 7860)"),
         ("setup", "First-run wizard: import backup or build your knowledge profile"),
         ("install", "Register the MCP server + Stop hook in Claude Code / Claude Desktop config"),
-        ("onboard-hook", "Claude Code Stop hook: silently seed profile on first run (always exit 0)"),
+        (
+            "onboard-hook",
+            "Claude Code Stop hook: silently seed profile on first run (always exit 0)",
+        ),
         ("lesson-ready", "Claude Code Stop hook: exit 2 when a lesson is due (triggers AI lesson)"),
         ("", ""),
         ("profile", "Show the knowledge map"),
