@@ -294,9 +294,13 @@ async def settings_page(
     invalid: int | None = None,
     groups: int | None = None,
     notebook: int | None = None,
+    notebook_saved: int | None = None,
 ) -> HTMLResponse:
+    from devcoach.core.db import LEARNING_STATE_PATH
+
     with db.connection() as conn:
         settings = db.get_settings(conn)
+    notebook_content = LEARNING_STATE_PATH.read_text(encoding="utf-8") if LEARNING_STATE_PATH.exists() else ""
     return templates.TemplateResponse(
         request,
         "settings.html",
@@ -309,8 +313,20 @@ async def settings_page(
             "invalid": invalid,
             "groups": groups,
             "notebook": notebook,
+            "notebook_saved": notebook_saved,
+            "notebook_content": notebook_content,
+            "notebook_path": str(LEARNING_STATE_PATH),
         },
     )
+
+
+@app.post("/settings/notebook")
+async def save_notebook(content: str = Form(default="")) -> RedirectResponse:
+    from devcoach.core.db import LEARNING_STATE_PATH
+
+    LEARNING_STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    LEARNING_STATE_PATH.write_text(content, encoding="utf-8")
+    return RedirectResponse(url="/settings?notebook_saved=1", status_code=303)
 
 
 @app.post("/settings", response_class=HTMLResponse)
