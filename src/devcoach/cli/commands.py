@@ -749,7 +749,9 @@ def _onboard_session_active(knowledge_ready: bool) -> bool:
     path = db.LEARNING_STATE_PATH
     if not path.exists():
         return False
-    age_hours = (datetime.now(UTC) - datetime.fromtimestamp(path.stat().st_mtime, UTC)).total_seconds() / 3600
+    age_hours = (
+        datetime.now(UTC) - datetime.fromtimestamp(path.stat().st_mtime, UTC)
+    ).total_seconds() / 3600
     return age_hours < _ONBOARD_SESSION_TIMEOUT_HOURS
 
 

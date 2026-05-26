@@ -300,7 +300,9 @@ async def settings_page(
 
     with db.connection() as conn:
         settings = db.get_settings(conn)
-    notebook_content = LEARNING_STATE_PATH.read_text(encoding="utf-8") if LEARNING_STATE_PATH.exists() else ""
+    notebook_content = (
+        LEARNING_STATE_PATH.read_text(encoding="utf-8") if LEARNING_STATE_PATH.exists() else ""
+    )
     return templates.TemplateResponse(
         request,
         "settings.html",
