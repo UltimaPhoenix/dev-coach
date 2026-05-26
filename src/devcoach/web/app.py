@@ -40,8 +40,6 @@ app.mount("/static", StaticFiles(directory=str(_HERE / "static")), name="static"
 
 @app.get("/", response_class=HTMLResponse)
 async def profile_page(request: Request) -> HTMLResponse:
-    from devcoach.core.db import LEARNING_STATE_PATH
-
     with db.connection() as conn:
         profile = coach.get_profile(conn)
         stats = coach.get_stats(conn)
@@ -55,9 +53,6 @@ async def profile_page(request: Request) -> HTMLResponse:
         categorised.setdefault(key, []).append(entry)
 
     all_groups = [g.name for g in profile.groups]
-    notebook_content = (
-        LEARNING_STATE_PATH.read_text(encoding="utf-8") if LEARNING_STATE_PATH.exists() else ""
-    )
 
     return templates.TemplateResponse(
         request,
@@ -68,8 +63,6 @@ async def profile_page(request: Request) -> HTMLResponse:
             "stats": stats,
             "rate_limit": rate_limit,
             "max_per_day": settings.max_per_day,
-            "notebook_content": notebook_content,
-            "notebook_path": str(LEARNING_STATE_PATH),
         },
     )
 

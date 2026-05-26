@@ -235,44 +235,5 @@
 </section>
 {% endfor %}
 
-<!-- Coaching Notebook -->
-<div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-6 mt-6"
-     x-data="{ nbMode: 'preview' }">
-  <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
-    <p class="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">Coaching Notebook</p>
-    <div class="flex items-center gap-2">
-      <div class="flex rounded border border-gray-200 dark:border-gray-700 overflow-hidden text-xs font-medium">
-        <button type="button" @click="nbMode = 'preview'"
-                :class="nbMode === 'preview' ? 'bg-indigo-600 text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'"
-                class="px-3 py-1.5 transition">Preview</button>
-        <button type="button" @click="nbMode = 'source'"
-                :class="nbMode === 'source' ? 'bg-indigo-600 text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'"
-                class="px-3 py-1.5 transition border-l border-gray-200 dark:border-gray-700">Source</button>
-      </div>
-      <a href="/settings/notebook/download"
-         class="inline-flex items-center gap-1.5 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 font-medium rounded px-3 py-1.5 text-xs transition">
-        ↓ Download
-      </a>
-      <a href="vscode://file/{{ notebook_path }}"
-         title="Open in VS Code"
-         class="inline-flex items-center gap-1.5 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 font-medium rounded px-3 py-1.5 text-xs transition">
-        <img src="/static/vscode.svg" class="w-4 h-4" alt="VS Code" />
-        Open in VS Code
-      </a>
-    </div>
-  </div>
-  <div x-show="nbMode === 'preview'" id="notebook-preview-profile" class="markdown-body min-h-24"></div>
-  <pre x-show="nbMode === 'source'" style="display:none"
-       class="text-xs font-mono bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded p-3 overflow-x-auto whitespace-pre-wrap text-gray-700 dark:text-gray-200 min-h-24">{{ notebook_content | e }}</pre>
 </div>
-
-</div>
-{% endblock %}
-
-{% block scripts %}
-<script src="/static/vendor/marked.min.js"></script>
-<script>
-  marked.setOptions({ breaks: true, gfm: true });
-  document.getElementById('notebook-preview-profile').innerHTML = marked.parse({{ notebook_content | tojson }});
-</script>
 {% endblock %}
