@@ -813,9 +813,7 @@ def cmd_lesson_ready(_args: argparse.Namespace) -> None:
 
     print(
         "Deliver a devcoach lesson based on the work in this conversation. "
-        "Use the devcoach skill: check devcoach://profile and devcoach://taught-topics "
-        "before selecting a topic. The rate limit has already been checked — skip "
-        "devcoach://rate-limit.",
+        "Use the devcoach skill: ignore the devcoach://rate-limit check because it is already checked by this command ",
         file=sys.stderr,
     )
     sys.exit(2)
