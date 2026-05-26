@@ -574,15 +574,15 @@ class TestCmdInstall:
 # ── cmd_onboard_hook ───────────────────────────────────────────────────────
 
 
-_ONBOARD_LOCK_TIMEOUT_HOURS = commands._ONBOARD_LOCK_TIMEOUT_HOURS
+_ONBOARD_SESSION_TIMEOUT_HOURS = commands._ONBOARD_SESSION_TIMEOUT_HOURS
 
 
 class TestCmdOnboardHook:
-    """Tests for cmd_onboard_hook — three-option prompt with lock-file guard."""
+    """Tests for cmd_onboard_hook — three-option prompt, session guard via learning-state.md."""
 
     @pytest.fixture(autouse=True)
-    def _patch_lock(self, tmp_path, monkeypatch):
-        monkeypatch.setattr(commands, "_ONBOARD_LOCK_PATH", tmp_path / "onboard.lock")
+    def _patch_notebook(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(commands.db, "LEARNING_STATE_PATH", tmp_path / "learning-state.md")
 
     def test_exits_2_with_three_options_when_profile_absent(self, capsys):
         with pytest.raises(SystemExit) as exc:
@@ -600,46 +600,34 @@ class TestCmdOnboardHook:
         assert out.out == ""
         assert out.err != ""
 
-    def test_creates_lock_file_when_prompting(self, tmp_path):
+    def test_creates_notebook_stub_when_prompting(self, tmp_path):
         with pytest.raises(SystemExit):
             commands.cmd_onboard_hook(_ns())
-        assert (tmp_path / "onboard.lock").exists()
+        assert (tmp_path / "learning-state.md").exists()
 
-    def test_exits_0_silently_when_lock_active(self, tmp_path, capsys):
-        (tmp_path / "onboard.lock").touch()
+    def test_exits_0_silently_when_notebook_recent(self, tmp_path, capsys):
+        (tmp_path / "learning-state.md").touch()  # just now — within session window
         with pytest.raises(SystemExit) as exc:
             commands.cmd_onboard_hook(_ns())
         assert exc.value.code == 0
         out = capsys.readouterr()
         assert out.out == "" and out.err == ""
 
-    def test_reprompts_when_lock_expired(self, tmp_path, capsys):
+    def test_reprompts_when_notebook_expired(self, tmp_path, capsys):
         import os
         import time
 
-        lock = tmp_path / "onboard.lock"
-        lock.touch()
-        past = time.time() - (_ONBOARD_LOCK_TIMEOUT_HOURS + 1) * 3600
-        os.utime(lock, (past, past))
+        nb = tmp_path / "learning-state.md"
+        nb.touch()
+        past = time.time() - (_ONBOARD_SESSION_TIMEOUT_HOURS + 1) * 3600
+        os.utime(nb, (past, past))
         with pytest.raises(SystemExit) as exc:
             commands.cmd_onboard_hook(_ns())
         assert exc.value.code == 2
 
-    def test_removes_lock_when_profile_complete(self, tmp_path):
-        lock = tmp_path / "onboard.lock"
-        lock.touch()
-        with db.connection() as conn:
-            db.upsert_knowledge(conn, "python", 7)
-            db.set_setting(conn, "onboarding_completed", "1")
-        with pytest.raises(SystemExit) as exc:
-            commands.cmd_onboard_hook(_ns())
-        assert exc.value.code == 0
-        assert not lock.exists()
-
     def test_exits_0_silently_when_profile_exists(self, capsys):
         with db.connection() as conn:
             db.upsert_knowledge(conn, "python", 7)
-            db.set_setting(conn, "onboarding_completed", "1")
         with pytest.raises(SystemExit) as exc:
             commands.cmd_onboard_hook(_ns())
         assert exc.value.code == 0
@@ -664,7 +652,6 @@ class TestCmdLessonReady:
     """Tests for cmd_lesson_ready — the Claude Code Stop hook lesson signal."""
 
     def test_exits_0_silently_when_profile_absent(self, capsys, monkeypatch):
-        # lesson-ready defers to onboard-hook; exits 0 when no profile
         monkeypatch.setattr(
             commands.coach,
             "check_rate_limit",
@@ -679,7 +666,6 @@ class TestCmdLessonReady:
     def test_exits_0_silently_when_rate_limited(self, capsys, monkeypatch):
         with db.connection() as conn:
             db.upsert_knowledge(conn, "python", 5)
-            db.set_setting(conn, "onboarding_completed", "1")
         monkeypatch.setattr(
             commands.coach,
             "check_rate_limit",
@@ -694,7 +680,6 @@ class TestCmdLessonReady:
     def test_exits_2_with_lesson_prompt_on_stderr_when_allowed(self, capsys, monkeypatch):
         with db.connection() as conn:
             db.upsert_knowledge(conn, "python", 5)
-            db.set_setting(conn, "onboarding_completed", "1")
         monkeypatch.setattr(
             commands.coach,
             "check_rate_limit",

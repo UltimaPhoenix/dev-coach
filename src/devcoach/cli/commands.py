@@ -473,8 +473,7 @@ def _install_to(path: Path, entry: dict, force: bool) -> str:
 _CLAUDE_CODE_SETTINGS = Path.home() / ".claude" / "settings.json"
 _ONBOARD_HOOK_COMMAND = "uvx devcoach onboard-hook"
 _HOOK_COMMAND = "uvx devcoach lesson-ready"
-_ONBOARD_LOCK_PATH = Path.home() / ".devcoach" / "onboard.lock"
-_ONBOARD_LOCK_TIMEOUT_HOURS = 24
+_ONBOARD_SESSION_TIMEOUT_HOURS = 24
 
 
 def _install_hook(path: Path, force: bool) -> str:
@@ -733,27 +732,29 @@ def cmd_mcp(_args: argparse.Namespace) -> None:
     mcp.run(transport="stdio")
 
 
-def _onboard_lock_is_active() -> bool:
-    """Return True if a recent onboarding session lock exists.
+def _onboard_session_active() -> bool:
+    """Return True if the learning-state notebook was written within _ONBOARD_SESSION_TIMEOUT_HOURS.
 
-    The lock is created when the hook first prompts the user. While active it
-    suppresses repeated prompts so guided/import conversations can proceed
-    uninterrupted. Expires after _ONBOARD_LOCK_TIMEOUT_HOURS.
+    Used by onboard-hook to detect an in-progress guided/import conversation:
+    the hook writes a stub notebook on first fire; subsequent fires see it and
+    stay silent while the multi-turn conversation continues.
+    Expires after _ONBOARD_SESSION_TIMEOUT_HOURS so abandoned sessions re-prompt.
     """
     from datetime import UTC, datetime
 
-    if not _ONBOARD_LOCK_PATH.exists():
+    path = db.LEARNING_STATE_PATH
+    if not path.exists():
         return False
-    age = datetime.now(UTC) - datetime.fromtimestamp(_ONBOARD_LOCK_PATH.stat().st_mtime, UTC)
-    return age.total_seconds() < _ONBOARD_LOCK_TIMEOUT_HOURS * 3600
+    age = datetime.now(UTC) - datetime.fromtimestamp(path.stat().st_mtime, UTC)
+    return age.total_seconds() < _ONBOARD_SESSION_TIMEOUT_HOURS * 3600
 
 
 def cmd_onboard_hook(_args: argparse.Namespace) -> None:
     """Prompt the user to choose an onboarding option — for the Claude Code Stop hook.
 
     Fires once when no profile exists, then stays silent while the onboarding
-    conversation is in progress (lock file). The lock expires after
-    _ONBOARD_LOCK_TIMEOUT_HOURS so abandoned sessions eventually re-prompt.
+    conversation is in progress (detected via learning-state.md recency).
+    Expires after _ONBOARD_SESSION_TIMEOUT_HOURS so abandoned sessions re-prompt.
 
     Exit 0: profile complete, session in progress, or any error — hook is silent.
     Exit 2: no profile and no active session — shows the three-option choice prompt.
@@ -765,14 +766,16 @@ def cmd_onboard_hook(_args: argparse.Namespace) -> None:
         sys.exit(0)
 
     if ready:
-        _ONBOARD_LOCK_PATH.unlink(missing_ok=True)
         sys.exit(0)
 
-    if _onboard_lock_is_active():
+    if _onboard_session_active():
         sys.exit(0)
 
-    _ONBOARD_LOCK_PATH.parent.mkdir(parents=True, exist_ok=True)
-    _ONBOARD_LOCK_PATH.touch()
+    db.LEARNING_STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    if not db.LEARNING_STATE_PATH.exists():
+        db.LEARNING_STATE_PATH.write_text("# devcoach — Coaching Notebook\n")
+    else:
+        db.LEARNING_STATE_PATH.touch()
 
     print(
         "devcoach profile is not set up yet. Ask the user to pick one of these options:\n"
@@ -792,6 +795,7 @@ def cmd_lesson_ready(_args: argparse.Namespace) -> None:
 
     Requires the profile to already exist (run onboard-hook first). Exits 0 silently
     when no profile is present, the rate limit is hit, or any error occurs.
+    Cooldown is enforced by check_rate_limit via min_gap_minutes (last lesson timestamp).
 
     Exit 0: no lesson due — hook stays completely silent.
     Exit 2: lesson ready — Claude Code shows the stderr message, cueing Claude to
