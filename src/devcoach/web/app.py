@@ -329,6 +329,20 @@ async def settings_page(
     )
 
 
+@app.get("/settings/notebook/download")
+async def download_notebook() -> Response:
+    from devcoach.core.db import LEARNING_STATE_PATH
+
+    content = (
+        LEARNING_STATE_PATH.read_text(encoding="utf-8") if LEARNING_STATE_PATH.exists() else ""
+    )
+    return Response(
+        content=content,
+        media_type="text/markdown",
+        headers={"Content-Disposition": "attachment; filename=devcoach-notebook.md"},
+    )
+
+
 @app.post("/settings/notebook")
 async def save_notebook(
     content: str = Form(default=""),
