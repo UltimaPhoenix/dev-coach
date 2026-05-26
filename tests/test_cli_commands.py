@@ -532,10 +532,11 @@ class TestCmdInstall:
         # Two hooks: onboard-hook + lesson-ready; second install is a no-op
         assert len(devcoach_hooks) == 2
 
-    def test_install_hook_writes_exact_claude_code_structure(self, tmp_path):
+    def test_install_hook_writes_exact_claude_code_structure(self, tmp_path, monkeypatch):
         settings = tmp_path / ".claude" / "settings.json"
         settings.parent.mkdir()
-        commands._install_hook(settings, force=False)
+        monkeypatch.setattr(commands, "_CLAUDE_CODE_SETTINGS", settings)
+        commands._install_hook(force=False)
         data = json.loads(settings.read_text())
         stop = data["hooks"]["Stop"]
         assert isinstance(stop, list) and len(stop) == 2
@@ -546,7 +547,7 @@ class TestCmdInstall:
             hook = entry["hooks"][0]
             assert hook["type"] == "command"
 
-    def test_install_hook_preserves_existing_settings(self, tmp_path):
+    def test_install_hook_preserves_existing_settings(self, tmp_path, monkeypatch):
         settings = tmp_path / ".claude" / "settings.json"
         settings.parent.mkdir()
         settings.write_text(
@@ -563,7 +564,8 @@ class TestCmdInstall:
                 }
             )
         )
-        commands._install_hook(settings, force=False)
+        monkeypatch.setattr(commands, "_CLAUDE_CODE_SETTINGS", settings)
+        commands._install_hook(force=False)
         data = json.loads(settings.read_text())
         assert data["permissions"]["allow"] == ["Read(**)", "Bash(git:*)"]
         assert data["mcpServers"]["memory"]["command"] == "npx"

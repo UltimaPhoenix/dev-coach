@@ -14,7 +14,7 @@
       var serverTheme = document.querySelector('meta[name="devcoach-theme"]').content;
       var session = localStorage.getItem('theme-override');
       var active = session || serverTheme;
-      var dark = active === 'dark' || (active === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+      var dark = active === 'dark' || (active === 'system' && globalThis.matchMedia('(prefers-color-scheme: dark)').matches);
       if (dark) document.documentElement.classList.add('dark');
     })();
   </script>

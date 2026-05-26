@@ -141,7 +141,7 @@ async def import_lessons_route(file: UploadFile = File(...)) -> RedirectResponse
     content = await file.read()
     try:
         records = json.loads(content)
-    except (json.JSONDecodeError, ValueError):
+    except json.JSONDecodeError:
         return RedirectResponse(url="/settings?imported=0&skipped=0&invalid=1", status_code=303)
     if not isinstance(records, list):
         return RedirectResponse(url="/settings?imported=0&skipped=0&invalid=1", status_code=303)

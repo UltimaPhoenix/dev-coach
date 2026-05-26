@@ -18,6 +18,11 @@ from devcoach.core.models import KnowledgeEntry, KnowledgeGroup, Lesson, Setting
 DB_PATH = Path.home() / ".devcoach" / "coaching.db"
 LEARNING_STATE_PATH = Path.home() / ".devcoach" / "learning-state.md"
 
+_ZIP_SETTINGS = "settings.json"
+_ZIP_LESSONS = "lessons.json"
+_ZIP_KNOWLEDGE = "knowledge.json"
+_ZIP_NOTEBOOK = "learning-state.md"
+
 DEFAULT_PROFILE: dict[str, int] = {
     "engineering": 8,
     "architecture": 8,
@@ -454,11 +459,11 @@ def create_backup_zip(conn: sqlite3.Connection) -> bytes:
 
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
-        zf.writestr("settings.json", json.dumps(settings.model_dump(), indent=2))
-        zf.writestr("lessons.json", json.dumps(lessons, indent=2, ensure_ascii=False))
-        zf.writestr("knowledge.json", json.dumps(knowledge_data, indent=2))
+        zf.writestr(_ZIP_SETTINGS, json.dumps(settings.model_dump(), indent=2))
+        zf.writestr(_ZIP_LESSONS, json.dumps(lessons, indent=2, ensure_ascii=False))
+        zf.writestr(_ZIP_KNOWLEDGE, json.dumps(knowledge_data, indent=2))
         if LEARNING_STATE_PATH.exists():
-            zf.writestr("learning-state.md", LEARNING_STATE_PATH.read_text(encoding="utf-8"))
+            zf.writestr(_ZIP_NOTEBOOK, LEARNING_STATE_PATH.read_text(encoding="utf-8"))
     return buf.getvalue()
 
 
@@ -481,8 +486,8 @@ def restore_backup_zip(conn: sqlite3.Connection, data: bytes) -> dict[str, int]:
     with zipfile.ZipFile(io.BytesIO(data)) as zf:
         names = zf.namelist()
 
-        if "settings.json" in names:
-            s = json.loads(zf.read("settings.json"))
+        if _ZIP_SETTINGS in names:
+            s = json.loads(zf.read(_ZIP_SETTINGS))
             if "max_per_day" in s:
                 set_setting(conn, "max_per_day", str(s["max_per_day"]))
             if "min_gap_minutes" in s:
@@ -491,8 +496,8 @@ def restore_backup_zip(conn: sqlite3.Connection, data: bytes) -> dict[str, int]:
                 set_setting(conn, "ui_theme", s["ui_theme"])
             result["settings"] = 1
 
-        if "knowledge.json" in names:
-            knowledge = json.loads(zf.read("knowledge.json"))
+        if _ZIP_KNOWLEDGE in names:
+            knowledge = json.loads(zf.read(_ZIP_KNOWLEDGE))
             if isinstance(knowledge, dict) and "topics" in knowledge:
                 # Current format: {"groups": [...], "topics": [{topic, confidence, group}, ...]}
                 groups_added = 0
@@ -514,18 +519,16 @@ def restore_backup_zip(conn: sqlite3.Connection, data: bytes) -> dict[str, int]:
                     upsert_knowledge(conn, topic, confidence)
                 result["topics"] = len(knowledge)
 
-        if "lessons.json" in names:
-            lessons_data = json.loads(zf.read("lessons.json"))
+        if _ZIP_LESSONS in names:
+            lessons_data = json.loads(zf.read(_ZIP_LESSONS))
             inserted, duplicated, invalid = import_lessons(conn, lessons_data)
             result["lessons"] = inserted
             result["skipped"] = duplicated
             result["invalid"] = invalid
 
-        if "learning-state.md" in names:
+        if _ZIP_NOTEBOOK in names:
             LEARNING_STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
-            LEARNING_STATE_PATH.write_text(
-                zf.read("learning-state.md").decode("utf-8"), encoding="utf-8"
-            )
+            LEARNING_STATE_PATH.write_text(zf.read(_ZIP_NOTEBOOK).decode("utf-8"), encoding="utf-8")
             result["learning_state"] = 1
 
     return result

@@ -27,6 +27,30 @@ def _confidence_bar(confidence: int) -> str:
     return "█" * filled + "░" * (10 - filled)
 
 
+def _confidence_color(confidence: int) -> str:
+    if confidence >= 7:
+        return "green"
+    if confidence >= 4:
+        return "yellow"
+    return "red"
+
+
+def _feedback_icon(feedback: str | None) -> str:
+    if feedback == "know":
+        return " [green]✓[/green]"
+    if feedback == "dont_know":
+        return " [red]✗[/red]"
+    return ""
+
+
+def _feedback_label(feedback: str | None) -> str:
+    if feedback == "know":
+        return "[green]✓ I know this[/green]"
+    if feedback == "dont_know":
+        return "[red]✗ I don't know this[/red]"
+    return "[dim]no feedback[/dim]"
+
+
 # ── Subcommand handlers ────────────────────────────────────────────────────
 
 
@@ -44,7 +68,7 @@ def cmd_profile(_args: argparse.Namespace) -> None:
 
     for entry in sorted(profile.knowledge, key=lambda e: -e.confidence):
         bar = _confidence_bar(entry.confidence)
-        color = "green" if entry.confidence >= 7 else "yellow" if entry.confidence >= 4 else "red"
+        color = _confidence_color(entry.confidence)
         group = topic_group.get(entry.topic, "Other")
         table.add_row(
             entry.topic,
@@ -105,11 +129,7 @@ def cmd_lessons(args: argparse.Namespace) -> None:
         level_color = {"junior": "green", "mid": "yellow", "senior": "red"}.get(
             lesson.level, "white"
         )
-        feedback_icon = (
-            " [green]✓[/green]"
-            if lesson.feedback == "know"
-            else (" [red]✗[/red]" if lesson.feedback == "dont_know" else "")
-        )
+        feedback_icon = _feedback_icon(lesson.feedback)
         row = [
             "[yellow]★[/yellow]" if lesson.starred else "[dim]·[/dim]",
             lesson.timestamp_iso[:10],
@@ -205,13 +225,7 @@ def cmd_lesson(args: argparse.Namespace) -> None:
     console.print(f"[dim]Categories:[/dim]  {', '.join(lesson.categories)}")
     console.print(f"[dim]Level:[/dim]       [{level_color}]{lesson.level}[/{level_color}]")
     star_label = "[yellow]★ starred[/yellow]" if lesson.starred else "[dim]☆ not starred[/dim]"
-    feedback_label = (
-        "[green]✓ I know this[/green]"
-        if lesson.feedback == "know"
-        else "[red]✗ I don't know this[/red]"
-        if lesson.feedback == "dont_know"
-        else "[dim]no feedback[/dim]"
-    )
+    feedback_label = _feedback_label(lesson.feedback)
     console.print(f"[dim]Star:[/dim]        {star_label}   [dim]Feedback:[/dim] {feedback_label}")
     if lesson.task_context:
         console.print(f"[dim]Context:[/dim]     {lesson.task_context}")
@@ -476,13 +490,14 @@ _HOOK_COMMAND = "uvx devcoach lesson-ready"
 _ONBOARD_SESSION_TIMEOUT_HOURS = 24
 
 
-def _install_hook(path: Path, force: bool) -> str:
-    """Add the devcoach Stop hooks to a Claude Code settings.json file.
+def _install_hook(force: bool) -> str:
+    """Add the devcoach Stop hooks to the Claude Code settings.json file.
 
     Installs two sequential hooks: onboard-hook (silent profile seeding) followed by
     lesson-ready (lesson prompt when rate limit allows). Both are idempotent.
     """
-    data: dict = json.loads(path.read_text()) if path.exists() else {}
+    settings_path = _CLAUDE_CODE_SETTINGS
+    data: dict = json.loads(settings_path.read_text()) if settings_path.exists() else {}
     stop_hooks: list = data.setdefault("hooks", {}).setdefault("Stop", [])
 
     existing_indices = [
@@ -492,15 +507,15 @@ def _install_hook(path: Path, force: bool) -> str:
     ]
     if existing_indices:
         if not force:
-            return f"[yellow]Stop hooks already installed[/yellow] in {path} (use --force to overwrite)"
+            return f"[yellow]Stop hooks already installed[/yellow] in {settings_path} (use --force to overwrite)"
         for i in reversed(existing_indices):
             stop_hooks.pop(i)
 
     stop_hooks.append({"hooks": [{"type": "command", "command": _ONBOARD_HOOK_COMMAND}]})
     stop_hooks.append({"hooks": [{"type": "command", "command": _HOOK_COMMAND}]})
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(data, indent=2) + "\n")
-    return f"[green]✓[/green] Stop hooks installed into {path}"
+    settings_path.parent.mkdir(parents=True, exist_ok=True)
+    settings_path.write_text(json.dumps(data, indent=2) + "\n")
+    return f"[green]✓[/green] Stop hooks installed into {settings_path}"
 
 
 def cmd_install(args: argparse.Namespace) -> None:
@@ -531,7 +546,7 @@ def cmd_install(args: argparse.Namespace) -> None:
         console.print(msg)
 
         if not skip_hook:
-            console.print(_install_hook(_CLAUDE_CODE_SETTINGS, args.force))
+            console.print(_install_hook(args.force))
 
     if do_desktop:
         console.print(_install_to(_CLAUDE_DESKTOP_CONFIG, _CLAUDE_DESKTOP_ENTRY, args.force))
@@ -696,7 +711,7 @@ def cmd_setup(_args: argparse.Namespace) -> None:
     final_table.add_column("Bar", no_wrap=True)
     for entry in sorted(profile.knowledge, key=lambda e: -e.confidence):
         bar = _confidence_bar(entry.confidence)
-        color = "green" if entry.confidence >= 7 else "yellow" if entry.confidence >= 4 else "red"
+        color = _confidence_color(entry.confidence)
         group_name = topic_group.get(entry.topic, "Other")
         final_table.add_row(
             entry.topic,
