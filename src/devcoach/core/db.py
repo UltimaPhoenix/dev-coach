@@ -15,8 +15,9 @@ from devcoach.core.models import KnowledgeEntry, KnowledgeGroup, Lesson, Setting
 
 # ── Constants ──────────────────────────────────────────────────────────────
 
-DB_PATH = Path.home() / ".devcoach" / "coaching.db"
-LEARNING_STATE_PATH = Path.home() / ".devcoach" / "learning-state.md"
+DEVCOACH_DIR = Path.home() / ".devcoach"
+DB_PATH = DEVCOACH_DIR / "coaching.db"
+LEARNING_STATE_PATH = DEVCOACH_DIR / "learning-state.md"
 
 _ZIP_SETTINGS = "settings.json"
 _ZIP_LESSONS = "lessons.json"

@@ -74,10 +74,28 @@ TEST_LESSONS: list[Lesson] = [
 # ── DB fixtures ────────────────────────────────────────────────────────────
 
 
+@pytest.fixture(autouse=True)
+def _isolated_devcoach_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Redirect all devcoach file I/O to a per-test temp directory.
+
+    Patches DEVCOACH_DIR, DB_PATH, and LEARNING_STATE_PATH so no test can
+    touch the real ~/.devcoach directory. Cleanup is automatic (tmp_path).
+    """
+    devcoach_dir = tmp_path / ".devcoach"
+    devcoach_dir.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(db, "DEVCOACH_DIR", devcoach_dir)
+    monkeypatch.setattr(db, "DB_PATH", devcoach_dir / "coaching.db")
+    monkeypatch.setattr(db, "LEARNING_STATE_PATH", devcoach_dir / "learning-state.md")
+
+
 @pytest.fixture
-def db_path(tmp_path: Path) -> Path:
-    """Path to a temporary SQLite file seeded with TEST_LESSONS."""
-    path = tmp_path / "test.db"
+def db_path() -> Path:
+    """Seed the isolated DB with TEST_LESSONS and return its path.
+
+    Relies on _isolated_devcoach_dir (autouse) having already redirected
+    db.DB_PATH to a tmp directory before this fixture runs.
+    """
+    path = db.DB_PATH
     conn = sqlite3.connect(str(path))
     conn.row_factory = sqlite3.Row
     db.init_schema(conn)
