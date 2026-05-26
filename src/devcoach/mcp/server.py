@@ -443,7 +443,6 @@ async def complete_onboarding(
             conn.execute("DELETE FROM knowledge")
             conn.execute("DELETE FROM knowledge_groups")
             conn.execute("DELETE FROM knowledge_group_names")
-            conn.commit()
             for topic, confidence in topics.items():
                 db.upsert_knowledge(conn, topic, max(0, min(10, confidence)))
             if groups:
@@ -451,7 +450,7 @@ async def complete_onboarding(
                     for t in group_topics:
                         if t in topics:
                             db.assign_topic_to_group(conn, t, group_name)
-            db.set_setting(conn, "onboarding_completed", "1")
+            conn.commit()
             profile = coach.get_profile(conn)
         await ctx.info(f"Onboarding complete — {len(topics)} topics, {len(groups or {})} groups")
         return profile

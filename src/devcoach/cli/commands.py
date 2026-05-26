@@ -580,7 +580,6 @@ def cmd_setup(_args: argparse.Namespace) -> None:
             sys.exit(1)
         with db.connection() as conn:
             result = db.restore_backup_zip(conn, p.read_bytes())
-            db.set_setting(conn, "onboarding_completed", "1")
         console.print(
             f"[green]✓[/green] Restored: {result['topics']} topics, {result['lessons']} lessons"
             + (", notebook" if result["learning_state"] else "")
@@ -687,7 +686,6 @@ def cmd_setup(_args: argparse.Namespace) -> None:
                 db.assign_topic_to_group(conn, t, group_name)
         db.set_setting(conn, "max_per_day", str(max_per_day))
         db.set_setting(conn, "min_gap_minutes", str(min_gap))
-        db.set_setting(conn, "onboarding_completed", "1")
         profile = coach.get_profile(conn)
 
     topic_group = {t: g.name for g in profile.groups for t in g.topics}
@@ -732,21 +730,27 @@ def cmd_mcp(_args: argparse.Namespace) -> None:
     mcp.run(transport="stdio")
 
 
-def _onboard_session_active() -> bool:
-    """Return True if the learning-state notebook was written within _ONBOARD_SESSION_TIMEOUT_HOURS.
+def _onboard_session_active(knowledge_ready: bool) -> bool:
+    """Return True if an onboarding session is complete or currently in progress.
 
-    Used by onboard-hook to detect an in-progress guided/import conversation:
-    the hook writes a stub notebook on first fire; subsequent fires see it and
-    stay silent while the multi-turn conversation continues.
-    Expires after _ONBOARD_SESSION_TIMEOUT_HOURS so abandoned sessions re-prompt.
+    Computes state from two signals — no settings key required:
+    - knowledge_ready: knowledge map has entries (profile built)
+    - learning-state.md exists: notebook was written (session started or completed)
+
+    Complete: both present → stay silent forever.
+    In progress: notebook exists and is recent, but knowledge still empty → session underway.
+    Not started / abandoned: notebook absent or older than _ONBOARD_SESSION_TIMEOUT_HOURS.
     """
     from datetime import UTC, datetime
+
+    if knowledge_ready:
+        return True
 
     path = db.LEARNING_STATE_PATH
     if not path.exists():
         return False
-    age = datetime.now(UTC) - datetime.fromtimestamp(path.stat().st_mtime, UTC)
-    return age.total_seconds() < _ONBOARD_SESSION_TIMEOUT_HOURS * 3600
+    age_hours = (datetime.now(UTC) - datetime.fromtimestamp(path.stat().st_mtime, UTC)).total_seconds() / 3600
+    return age_hours < _ONBOARD_SESSION_TIMEOUT_HOURS
 
 
 def cmd_onboard_hook(_args: argparse.Namespace) -> None:
@@ -765,10 +769,7 @@ def cmd_onboard_hook(_args: argparse.Namespace) -> None:
     except Exception:
         sys.exit(0)
 
-    if ready:
-        sys.exit(0)
-
-    if _onboard_session_active():
+    if _onboard_session_active(ready):
         sys.exit(0)
 
     db.LEARNING_STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
