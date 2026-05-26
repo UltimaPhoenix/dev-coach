@@ -97,7 +97,7 @@
       <!-- Export full backup -->
       <div class="flex flex-col gap-1">
         <p class="text-sm font-medium text-gray-700 dark:text-gray-200">Full backup</p>
-        <p class="text-xs text-gray-400 dark:text-gray-500">Settings + knowledge map + lessons as a zip file.</p>
+        <p class="text-xs text-gray-400 dark:text-gray-500">Settings + knowledge map + lessons + coaching notebook as a zip file.</p>
         <a href="/settings/export"
            class="mt-auto inline-flex items-center justify-center gap-1.5 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 font-medium rounded px-4 py-2 text-sm transition">
           ↓ Download backup
@@ -107,7 +107,7 @@
       <!-- Restore from backup -->
       <div class="flex flex-col gap-1">
         <p class="text-sm font-medium text-gray-700 dark:text-gray-200">Restore backup</p>
-        <p class="text-xs text-gray-400 dark:text-gray-500">Overwrites settings &amp; knowledge; duplicate lessons are skipped.</p>
+        <p class="text-xs text-gray-400 dark:text-gray-500">Overwrites settings, knowledge map &amp; coaching notebook; duplicate lessons are skipped.</p>
         <form id="form-restore" method="post" action="/settings/import" enctype="multipart/form-data" class="mt-auto flex flex-col gap-2">
           <input id="file-restore" type="file" name="file" accept=".zip,.json" class="hidden" onchange="updateLabel('file-restore','label-restore','restore-submit')" />
           <label id="label-restore" for="file-restore"
