@@ -372,8 +372,11 @@ jobs:
           echo "linux_amd64=$(sha256sum  binaries/devcoach-linux-amd64  | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
           echo "linux_arm64=$(sha256sum  binaries/devcoach-linux-arm64  | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
       - name: Clone homebrew-tap
+        env:
+          TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
         run: |
-          git clone "https://x-access-token:${{ secrets.HOMEBREW_TAP_TOKEN }}@github.com/UltimaPhoenix/homebrew-tap.git" tap
+          TOKEN=$(printf '%s' "$TAP_TOKEN" | tr -d '[:space:]')
+          git clone "https://x-access-token:${TOKEN}@github.com/UltimaPhoenix/homebrew-tap.git" tap
       - name: Update formula
         env:
           TAG: ${{ needs.bump.outputs.tag || github.ref_name }}
