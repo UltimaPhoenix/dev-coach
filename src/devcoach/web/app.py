@@ -40,6 +40,8 @@ app.mount("/static", StaticFiles(directory=str(_HERE / "static")), name="static"
 
 @app.get("/", response_class=HTMLResponse)
 async def profile_page(request: Request) -> HTMLResponse:
+    from devcoach.core.db import LEARNING_STATE_PATH
+
     with db.connection() as conn:
         profile = coach.get_profile(conn)
         stats = coach.get_stats(conn)
@@ -53,6 +55,9 @@ async def profile_page(request: Request) -> HTMLResponse:
         categorised.setdefault(key, []).append(entry)
 
     all_groups = [g.name for g in profile.groups]
+    notebook_content = (
+        LEARNING_STATE_PATH.read_text(encoding="utf-8") if LEARNING_STATE_PATH.exists() else ""
+    )
 
     return templates.TemplateResponse(
         request,
@@ -63,6 +68,8 @@ async def profile_page(request: Request) -> HTMLResponse:
             "stats": stats,
             "rate_limit": rate_limit,
             "max_per_day": settings.max_per_day,
+            "notebook_content": notebook_content,
+            "notebook_path": str(LEARNING_STATE_PATH),
         },
     )
 
@@ -323,12 +330,16 @@ async def settings_page(
 
 
 @app.post("/settings/notebook")
-async def save_notebook(content: str = Form(default="")) -> RedirectResponse:
+async def save_notebook(
+    content: str = Form(default=""),
+    next: str = Form(default=""),
+) -> RedirectResponse:
     from devcoach.core.db import LEARNING_STATE_PATH
 
     LEARNING_STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
     LEARNING_STATE_PATH.write_text(content, encoding="utf-8")
-    return RedirectResponse(url="/settings?notebook_saved=1", status_code=303)
+    redirect = _safe_redirect(next, "/settings?notebook_saved=1")
+    return RedirectResponse(url=redirect, status_code=303)
 
 
 @app.post("/settings", response_class=HTMLResponse)
