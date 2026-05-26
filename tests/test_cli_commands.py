@@ -169,9 +169,10 @@ class TestCmdRestore:
             commands.cmd_restore(_ns(input=str(tmp_path / "no.zip")))
         assert exc.value.code == 1
 
-    def test_prints_notebook_result(self, capsys, tmp_path):
+    def test_prints_notebook_result(self, capsys, tmp_path, monkeypatch):
         import io as _io
 
+        monkeypatch.setattr(db, "LEARNING_STATE_PATH", tmp_path / "learning-state.md")
         buf = _io.BytesIO()
         with zipfile.ZipFile(buf, "w") as zf:
             zf.writestr("lessons.json", "[]")

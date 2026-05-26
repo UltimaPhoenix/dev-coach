@@ -16,8 +16,9 @@ from devcoach.web.app import _safe_redirect, app
 
 
 @pytest.fixture
-def client(db_path: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
+def client(db_path: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
     monkeypatch.setattr(db, "DB_PATH", db_path)
+    monkeypatch.setattr(db, "LEARNING_STATE_PATH", tmp_path / "learning-state.md")
     return TestClient(app)
 
 
