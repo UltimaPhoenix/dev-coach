@@ -778,13 +778,12 @@ def cmd_onboard_hook(_args: argparse.Namespace) -> None:
         db.LEARNING_STATE_PATH.touch()
 
     print(
-        "devcoach profile is not set up yet. Ask the user to pick one of these options:\n"
-        "- Automatic: detect the tech stack from this project and build a profile immediately "
-        "(fast, no questions asked).\n"
+        "devcoach profile is not set up yet. Use the devcoach skill to run onboarding. "
+        "Default: Automatic (detect the tech stack from this project and build a profile "
+        "immediately, no questions asked). Other options if the user prefers:\n"
         "- Guided: a conversation to map knowledge, confidence levels, and topic groups "
         "step by step (thorough, interactive).\n"
-        "- Import: restore knowledge, lessons, and settings from an existing backup file.\n"
-        "Then use the devcoach skill to run the chosen option.",
+        "- Import: restore knowledge, lessons, and settings from an existing backup file.",
         file=sys.stderr,
     )
     sys.exit(2)
@@ -805,17 +804,18 @@ def cmd_lesson_ready(_args: argparse.Namespace) -> None:
         with db.connection() as conn:
             if not db.is_onboarding_complete(conn)["knowledge_ready"]:
                 sys.exit(0)
-            result = coach.check_rate_limit(conn)
+            rate_limit = coach.check_rate_limit(conn)
     except Exception:
         sys.exit(0)
 
-    if not result.allowed:
+    if not rate_limit.allowed:
         sys.exit(0)
 
     print(
         "Deliver a devcoach lesson based on the work in this conversation. "
-        "Use the devcoach skill: check devcoach://rate-limit, devcoach://profile, "
-        "and devcoach://taught-topics before selecting a topic.",
+        "Use the devcoach skill: check devcoach://profile and devcoach://taught-topics "
+        "before selecting a topic. The rate limit has already been checked — skip "
+        "devcoach://rate-limit.",
         file=sys.stderr,
     )
     sys.exit(2)
