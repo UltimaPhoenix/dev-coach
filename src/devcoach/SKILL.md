@@ -22,6 +22,14 @@ by teaching one thing at a time, at the right moment, based on what they actuall
 
 ---
 
+## Plan-mode suppression
+
+If you are currently in **plan mode** (plan mode is active and `ExitPlanMode` has not
+yet been called in this session), **exit this skill immediately** — do not read any
+devcoach MCP resources, do not run onboarding, do not deliver or log any lesson.
+
+---
+
 ## Onboarding flow
 
 The onboarding flow runs inline, immediately before delivering a lesson, whenever
@@ -86,6 +94,7 @@ Once the full topic list is agreed:
   }
   ```
 - Confirm setup is complete and continue to Step 4.
+  Do not deliver a lesson in this turn — the rate-limit clock starts after onboarding.
 
 **Rule:** Never ask about groups during topic collection. Propose them only in
 Step 3 after all topics are known.
@@ -151,8 +160,9 @@ Always read these MCP resources before deciding to teach:
   - **Recurring patterns** → use them to calibrate depth and angle, not just the confidence score
 
 If `devcoach://profile` returns an **empty knowledge map**, do not deliver a lesson.
-Run the onboarding flow first (Steps 1–3 of Session startup), then resume lesson
-delivery once `complete_onboarding` has been called.
+Run the onboarding flow first (Steps 1–3 of Session startup). **Do not deliver a
+lesson in the same turn as `complete_onboarding`.** End the response after
+confirming setup is complete. Lesson delivery resumes normally from the next task.
 
 ---
 
