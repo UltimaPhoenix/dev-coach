@@ -807,7 +807,11 @@ def cmd_ui(args: argparse.Namespace) -> None:
     console.print(
         f"[bold green]devcoach UI[/bold green] running at [link]http://localhost:{port}[/link]"
     )
-    uvicorn.run(app, host="127.0.0.1", port=port, log_level="warning")
+    try:
+        uvicorn.run(app, host="127.0.0.1", port=port, log_level="error")
+    except KeyboardInterrupt:
+        pass
+    console.print("[dim]Stopped.[/dim]")
 
 
 # ── Parser ─────────────────────────────────────────────────────────────────
