@@ -625,9 +625,7 @@ def cmd_install(args: argparse.Namespace) -> None:
 
     console.print(
         "[dim]Tip: run [bold]devcoach backup[/bold] to export your profile, lessons and settings.\n"
-        "     run [bold]devcoach restore <file>[/bold] to import a backup on a new machine.\n"
-        "     The coaching skill is served automatically via the MCP prompt — always up to date.\n"
-        "     If you copied it manually to Claude.ai, re-paste it after each devcoach update.[/dim]"
+        "     run [bold]devcoach restore <file>[/bold] to import a backup on a new machine.[/dim]"
     )
 
 

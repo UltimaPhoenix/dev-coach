@@ -163,18 +163,6 @@ Edit the config file for your platform:
 
 Use `"command": "uvx", "args": ["devcoach", "mcp"]` if using uvx.
 
-#### Claude.ai web (skill copy)
-
-Claude.ai does not support MCP servers. Install the coaching instructions as a skill instead:
-
-1. Copy the content of [`src/devcoach/SKILL.md`](src/devcoach/SKILL.md)
-2. Go to **claude.ai → Settings → Custom instructions** (or Skills, depending on your plan)
-3. Paste the content and save
-
-This gives claude.ai the coaching behaviour without the MCP tools (lesson logging and profile tracking will not work).
-
-> **Keep the skill up to date.** For Claude Code / Claude Desktop, the skill is served automatically via the MCP prompt and is always current. If you copied it manually to Claude.ai, re-paste the latest `SKILL.md` after each devcoach update.
-
 </details>
 
 ### Uninstallation
