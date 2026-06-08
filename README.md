@@ -163,6 +163,33 @@ Edit the config file for your platform:
 
 Use `"command": "uvx", "args": ["devcoach", "mcp"]` if using uvx.
 
+#### Other MCP-compatible agents
+
+devcoach uses standard stdio MCP transport and works with any agent that supports it. Add the following MCP server entry to the agent's config file:
+
+```json
+{
+  "mcpServers": {
+    "devcoach": {
+      "command": "devcoach",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+Use `"command": "uvx", "args": ["devcoach", "mcp"]` if using uvx.
+
+| Agent | Config file |
+|-------|-------------|
+| **Cursor** | `~/.cursor/mcp.json` |
+| **Windsurf** | `~/.codeium/windsurf/mcp_config.json` |
+| **Cline** (VS Code) | VS Code Settings → `cline.mcpServers` |
+| **Continue.dev** | `~/.continue/config.json` → `mcpServers` |
+| **Zed** | `.zed/settings.json` → `context_servers` |
+
+> **Note:** Stop hooks (lesson delivery, onboarding) are a Claude Code-specific feature. Other agents will have access to all MCP tools and resources but won't trigger lessons automatically — you can invoke coaching manually by calling the MCP tools directly.
+
 #### Claude.ai web (skill copy)
 
 Claude.ai does not support MCP servers. Install the coaching instructions as a skill instead:
