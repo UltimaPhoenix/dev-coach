@@ -162,6 +162,36 @@ This gives claude.ai the coaching behaviour without the MCP tools (lesson loggin
 
 </details>
 
+### Uninstallation
+
+**1. Remove the binary**
+
+```bash
+brew uninstall devcoach && brew untap UltimaPhoenix/tap   # Homebrew
+uv tool uninstall devcoach                                  # uv tool
+# uvx: nothing to remove
+```
+
+**2. Remove from Claude Code**
+
+```bash
+claude mcp remove devcoach   # via CLI (recommended)
+```
+
+Or manually remove the `devcoach` entry from `~/.claude.json` → `mcpServers`, and remove the two devcoach hook entries from `~/.claude/settings.json` → `hooks.Stop`.
+
+**3. Remove from Claude Desktop**
+
+Edit the config file for your platform (paths in the [Manual setup](#manual-setup-if-devcoach-install-is-not-available) section above) and delete the `devcoach` key from `mcpServers`.
+
+**4. Delete all devcoach data**
+
+```bash
+rm -rf ~/.devcoach
+```
+
+This removes the coaching database, knowledge map, lessons, settings, and notebook. It cannot be undone — take a backup first if needed (`devcoach backup`).
+
 ---
 
 ## Quick start
