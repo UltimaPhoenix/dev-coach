@@ -114,7 +114,13 @@ Replace `devcoach` with `uvx devcoach` in hook commands if using uvx.
 | Windows | `%APPDATA%\Claude\claude_desktop_config.json` |
 | Linux | `~/.config/Claude/claude_desktop_config.json` |
 
-**Claude.ai web** is not supported — it does not implement the MCP protocol that devcoach requires.
+**Claude.ai web (skill copy)** — Claude.ai does not support MCP servers. Copy the content of
+[`src/devcoach/SKILL.md`](../src/devcoach/SKILL.md) into **Settings → Custom instructions**.
+Lesson logging and profile tracking will not work without the MCP server.
+
+> **Keep the skill up to date.** When using Claude Code or Claude Desktop, the coaching skill
+> is served automatically via the MCP prompt and is always current with the installed version.
+> If you copied it manually to Claude.ai, re-paste the latest `SKILL.md` after each devcoach update.
 
 ### Backup and restore
 
