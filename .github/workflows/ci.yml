@@ -346,86 +346,36 @@ jobs:
           fail_on_unmatched_files: true
 
   # ── Bump Homebrew formula ────────────────────────────────────────────────
-  # After a successful release, updates Formula/devcoach.rb in homebrew-tap
-  # with the new version and SHA256 hashes for all platform binaries.
+  # After a successful release, regenerates Formula/devcoach.rb in homebrew-tap
+  # as a Language::Python::Virtualenv formula pointing to the PyPI sdist.
   # Requires secret HOMEBREW_TAP_TOKEN (classic PAT, repo scope on homebrew-tap).
   bump-homebrew-formula:
     name: Bump Homebrew formula
-    needs: [bump, github-release, build-binaries]
+    needs: [bump, github-release]
     if: >
       always()
       && needs.github-release.result == 'success'
-      && needs.build-binaries.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/download-artifact@v8
+      - uses: actions/checkout@v6
         with:
-          pattern: binary-*
-          merge-multiple: true
-          path: binaries/
-      - name: Compute SHA256 hashes
-        id: sha
-        run: |
-          echo "darwin_arm64=$(sha256sum binaries/devcoach-darwin-arm64 | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
-          echo "darwin_amd64=$(sha256sum binaries/devcoach-darwin-amd64 | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
-          echo "linux_amd64=$(sha256sum  binaries/devcoach-linux-amd64  | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
-          echo "linux_arm64=$(sha256sum  binaries/devcoach-linux-arm64  | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+          ref: ${{ needs.bump.outputs.tag || github.ref }}
       - name: Clone homebrew-tap
         env:
           TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
         run: |
           TOKEN=$(printf '%s' "$TAP_TOKEN" | tr -d '[:space:]')
           git clone "https://x-access-token:${TOKEN}@github.com/UltimaPhoenix/homebrew-tap.git" tap
-      - name: Update formula
+      - name: Generate formula
         env:
           TAG: ${{ needs.bump.outputs.tag || github.ref_name }}
-          DARWIN_ARM64_SHA: ${{ steps.sha.outputs.darwin_arm64 }}
-          DARWIN_AMD64_SHA: ${{ steps.sha.outputs.darwin_amd64 }}
-          LINUX_AMD64_SHA:  ${{ steps.sha.outputs.linux_amd64 }}
-          LINUX_ARM64_SHA:  ${{ steps.sha.outputs.linux_arm64 }}
         run: |
           VERSION="${TAG#v}"
-          cat > tap/Formula/devcoach.rb << FORMULA
-          class Devcoach < Formula
-            desc "Progressive technical coaching MCP server for Claude Code and Claude Desktop"
-            homepage "https://github.com/UltimaPhoenix/dev-coach"
-            version "$VERSION"
-            license "Apache-2.0"
-
-            on_macos do
-              on_arm do
-                url "https://github.com/UltimaPhoenix/dev-coach/releases/download/$TAG/devcoach-darwin-arm64"
-                sha256 "$DARWIN_ARM64_SHA"
-              end
-              on_intel do
-                url "https://github.com/UltimaPhoenix/dev-coach/releases/download/$TAG/devcoach-darwin-amd64"
-                sha256 "$DARWIN_AMD64_SHA"
-              end
-            end
-
-            on_linux do
-              on_arm do
-                url "https://github.com/UltimaPhoenix/dev-coach/releases/download/$TAG/devcoach-linux-arm64"
-                sha256 "$LINUX_ARM64_SHA"
-              end
-              on_intel do
-                url "https://github.com/UltimaPhoenix/dev-coach/releases/download/$TAG/devcoach-linux-amd64"
-                sha256 "$LINUX_AMD64_SHA"
-              end
-            end
-
-            def install
-              binary = Dir["devcoach-*"].first
-              chmod 0755, binary
-              bin.install binary => "devcoach"
-            end
-
-            test do
-              assert_match "devcoach", shell_output("#{bin}/devcoach --help 2>&1")
-            end
-          end
-          FORMULA
+          python scripts/generate_homebrew_formula.py \
+            --version "$VERSION" \
+            --uv-lock uv.lock \
+            > tap/Formula/devcoach.rb
       - name: Commit and push
         run: |
           TAG="${{ needs.bump.outputs.tag || github.ref_name }}"
