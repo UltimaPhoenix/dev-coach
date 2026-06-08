@@ -97,6 +97,71 @@ devcoach install --mode uvx       # uvx (no permanent install)
 
 Restart Claude Code or Claude Desktop after running.
 
+<details>
+<summary><strong>Manual setup</strong> (if <code>devcoach install</code> is not available)</summary>
+
+#### Claude Code
+
+Add to `~/.claude.json` under `mcpServers`, then restart:
+
+```json
+// Homebrew or uv tool (devcoach on PATH)
+{ "mcpServers": { "devcoach": { "type": "stdio", "command": "devcoach", "args": ["mcp"] } } }
+
+// uvx
+{ "mcpServers": { "devcoach": { "type": "stdio", "command": "uvx", "args": ["devcoach", "mcp"] } } }
+```
+
+Then add the Stop hooks to `~/.claude/settings.json`:
+
+```json
+{
+  "hooks": {
+    "Stop": [
+      { "hooks": [{ "type": "command", "command": "devcoach onboard-hook" }] },
+      { "hooks": [{ "type": "command", "command": "devcoach lesson-ready" }] }
+    ]
+  }
+}
+```
+
+Replace `devcoach` with `uvx devcoach` in the hook commands if using uvx.
+
+#### Claude Desktop
+
+Edit the config file for your platform:
+
+| Platform | Config file |
+|----------|-------------|
+| macOS | `~/Library/Application Support/Claude/claude_desktop_config.json` |
+| Windows | `%APPDATA%\Claude\claude_desktop_config.json` |
+| Linux | `~/.config/Claude/claude_desktop_config.json` |
+
+```json
+{
+  "mcpServers": {
+    "devcoach": {
+      "command": "devcoach",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+Use `"command": "uvx", "args": ["devcoach", "mcp"]` if using uvx.
+
+#### Claude.ai web (skill copy)
+
+Claude.ai does not support MCP servers. Install the coaching instructions as a skill instead:
+
+1. Copy the content of [`src/devcoach/SKILL.md`](src/devcoach/SKILL.md)
+2. Go to **claude.ai → Settings → Custom instructions** (or Skills, depending on your plan)
+3. Paste the content and save
+
+This gives claude.ai the coaching behaviour without the MCP tools (lesson logging and profile tracking will not work).
+
+</details>
+
 ---
 
 ## Quick start
@@ -193,19 +258,7 @@ Full reference: [docs/web-ui.md](docs/web-ui.md)
 
 devcoach implements the [MCP 2025-11-25 spec](https://modelcontextprotocol.io/specification/2025-11-25/server) via [FastMCP](https://github.com/jlowin/fastmcp).
 
-**Manual Claude config** (if `devcoach install` isn't available):
-
-```json
-{
-  "mcpServers": {
-    "devcoach": {
-      "type": "stdio",
-      "command": "uvx",
-      "args": ["devcoach", "mcp"]
-    }
-  }
-}
-```
+Run `devcoach install` to register automatically, or see [Manual setup](#manual-setup-if-devcoach-install-is-not-available) in the Installation section above for per-install-method JSON snippets.
 
 Full MCP reference (tools, resources, data models): [docs/mcp-server.md](docs/mcp-server.md)
 
