@@ -102,10 +102,23 @@ Restart Claude Code or Claude Desktop after running.
 
 #### Claude Code
 
-Add to `~/.claude.json` under `mcpServers`, then restart:
+**Option A — via `claude mcp` CLI (recommended):**
+
+```bash
+# Homebrew or uv tool (devcoach on PATH)
+claude mcp add devcoach devcoach -- mcp
+
+# uvx
+claude mcp add devcoach uvx -- devcoach mcp
+
+# global scope (all projects)
+claude mcp add --scope global devcoach devcoach -- mcp
+```
+
+**Option B — edit `~/.claude.json` directly:**
 
 ```json
-// Homebrew or uv tool (devcoach on PATH)
+// Homebrew or uv tool
 { "mcpServers": { "devcoach": { "type": "stdio", "command": "devcoach", "args": ["mcp"] } } }
 
 // uvx
