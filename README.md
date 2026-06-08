@@ -49,35 +49,53 @@ Everything runs **locally**. No data leaves your machine. One SQLite file at `~/
 
 ## Installation
 
-### Homebrew (macOS / Linux)
+### Step 1 — Install devcoach
+
+Choose the method that fits your setup:
+
+#### Homebrew (macOS / Linux — recommended)
 
 ```bash
 brew tap UltimaPhoenix/tap && brew install devcoach
 ```
 
-Pre-built native binaries — no Python required.
+Pre-built native binary — no Python required.
 
-### uvx — no permanent install needed
+#### uvx (no permanent install)
 
 ```bash
-uvx devcoach mcp   # starts the MCP server directly
+uvx devcoach mcp   # run the MCP server directly without installing
 ```
 
-### uv tool — permanent install
+Requires [uv](https://docs.astral.sh/uv/) · Python 3.12+
+
+#### uv tool (permanent install)
 
 ```bash
 uv tool install devcoach
 ```
 
-Then register with Claude:
+Requires [uv](https://docs.astral.sh/uv/) · Python 3.12+
+
+---
+
+### Step 2 — Register with Claude
+
+Run once after installing to add devcoach to your Claude config:
 
 ```bash
 devcoach install
 ```
 
-Restart Claude Code or Claude Desktop after installing.
+`devcoach install` auto-detects how it was installed and writes the correct MCP server entry. Use `--mode` to override if needed:
 
-> **Requirements (uvx/uv):** [uv](https://docs.astral.sh/uv/) · Python 3.12+ · Claude Code or Claude Desktop
+```bash
+devcoach install --mode binary    # Homebrew / self-contained binary
+devcoach install --mode uv-tool   # uv tool install
+devcoach install --mode uvx       # uvx (no permanent install)
+```
+
+Restart Claude Code or Claude Desktop after running.
 
 ---
 
@@ -86,8 +104,11 @@ Restart Claude Code or Claude Desktop after installing.
 ### 1. Install and register
 
 ```bash
-uv tool install devcoach
-devcoach install          # writes MCP entry to Claude config
+# Pick one:
+brew tap UltimaPhoenix/tap && brew install devcoach   # Homebrew
+uv tool install devcoach                               # uv tool
+
+devcoach install          # auto-detects install method, writes MCP config
 # Restart Claude Code / Claude Desktop
 ```
 

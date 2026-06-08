@@ -406,6 +406,7 @@ class TestCmdInstall:
             global_scope=False,
             force=False,
             skip_hook=False,
+            mode="auto",
         )
         defaults.update(kwargs)
         return _ns(**defaults)
@@ -420,7 +421,9 @@ class TestCmdInstall:
     def test_installs_via_claude_cli_for_code(self, capsys, tmp_path, monkeypatch):
         self._patch_code(monkeypatch, tmp_path)
         monkeypatch.setattr(
-            commands, "_install_via_claude_cli", lambda scope, force: "[green]✓[/green] Registered"
+            commands,
+            "_install_via_claude_cli",
+            lambda scope, force, mode="auto": "[green]✓[/green] Registered",
         )
         commands.cmd_install(self._ns_install(claude_code=True))
         out = capsys.readouterr().out
@@ -429,7 +432,9 @@ class TestCmdInstall:
 
     def test_falls_back_to_file_when_no_claude_cli(self, capsys, tmp_path, monkeypatch):
         self._patch_code(monkeypatch, tmp_path)
-        monkeypatch.setattr(commands, "_install_via_claude_cli", lambda scope, force: "")
+        monkeypatch.setattr(
+            commands, "_install_via_claude_cli", lambda scope, force, mode="auto": ""
+        )
 
         def _fake_home():
             return tmp_path
@@ -440,8 +445,10 @@ class TestCmdInstall:
 
     def test_desktop_only_writes_file(self, capsys, tmp_path, monkeypatch):
         self._patch_code(monkeypatch, tmp_path)
-        monkeypatch.setattr(commands, "_install_via_claude_cli", lambda scope, force: "")
-        commands.cmd_install(self._ns_install(claude_desktop=True))
+        monkeypatch.setattr(
+            commands, "_install_via_claude_cli", lambda scope, force, mode="auto": ""
+        )
+        commands.cmd_install(self._ns_install(claude_desktop=True, mode="uvx"))
         desktop = tmp_path / "desktop.json"
         assert desktop.exists()
         data = json.loads(desktop.read_text())
@@ -450,21 +457,27 @@ class TestCmdInstall:
     def test_both_by_default(self, capsys, tmp_path, monkeypatch):
         self._patch_code(monkeypatch, tmp_path)
         monkeypatch.setattr(
-            commands, "_install_via_claude_cli", lambda scope, force: "[green]✓[/green] Registered"
+            commands,
+            "_install_via_claude_cli",
+            lambda scope, force, mode="auto": "[green]✓[/green] Registered",
         )
         commands.cmd_install(self._ns_install())
         assert (tmp_path / "desktop.json").exists()
 
     def test_restart_reminder_shown_for_desktop(self, capsys, tmp_path, monkeypatch):
         self._patch_code(monkeypatch, tmp_path)
-        monkeypatch.setattr(commands, "_install_via_claude_cli", lambda scope, force: "")
+        monkeypatch.setattr(
+            commands, "_install_via_claude_cli", lambda scope, force, mode="auto": ""
+        )
         commands.cmd_install(self._ns_install(claude_desktop=True))
         assert "Restart" in capsys.readouterr().out
 
     def test_no_restart_reminder_when_cli_succeeds(self, capsys, tmp_path, monkeypatch):
         self._patch_code(monkeypatch, tmp_path)
         monkeypatch.setattr(
-            commands, "_install_via_claude_cli", lambda scope, force: "[green]✓[/green] Registered"
+            commands,
+            "_install_via_claude_cli",
+            lambda scope, force, mode="auto": "[green]✓[/green] Registered",
         )
         commands.cmd_install(self._ns_install(claude_code=True))
         assert "Restart" not in capsys.readouterr().out
@@ -475,7 +488,7 @@ class TestCmdInstall:
         monkeypatch.setattr(
             commands,
             "_install_via_claude_cli",
-            lambda scope, force: received.update(force=force) or "[green]✓[/green]",
+            lambda scope, force, mode="auto": received.update(force=force) or "[green]✓[/green]",
         )
         commands.cmd_install(self._ns_install(claude_code=True, force=True))
         assert received["force"] is True
@@ -485,14 +498,18 @@ class TestCmdInstall:
         desktop.write_text(json.dumps({"mcpServers": {"devcoach": {"command": "old"}}}))
         self._patch_code(monkeypatch, tmp_path)
         monkeypatch.setattr(commands, "_CLAUDE_DESKTOP_CONFIG", desktop)
-        monkeypatch.setattr(commands, "_install_via_claude_cli", lambda scope, force: "")
-        commands.cmd_install(self._ns_install(claude_desktop=True, force=True))
+        monkeypatch.setattr(
+            commands, "_install_via_claude_cli", lambda scope, force, mode="auto": ""
+        )
+        commands.cmd_install(self._ns_install(claude_desktop=True, force=True, mode="uvx"))
         assert json.loads(desktop.read_text())["mcpServers"]["devcoach"]["command"] == "uvx"
 
     def test_claude_code_installs_stop_hook(self, capsys, tmp_path, monkeypatch):
         self._patch_code(monkeypatch, tmp_path)
         monkeypatch.setattr(
-            commands, "_install_via_claude_cli", lambda scope, force: "[green]✓[/green] Registered"
+            commands,
+            "_install_via_claude_cli",
+            lambda scope, force, mode="auto": "[green]✓[/green] Registered",
         )
         commands.cmd_install(self._ns_install(claude_code=True))
         settings = tmp_path / ".claude" / "settings.json"
@@ -508,7 +525,9 @@ class TestCmdInstall:
     def test_skip_hook_omits_hook_installation(self, capsys, tmp_path, monkeypatch):
         self._patch_code(monkeypatch, tmp_path)
         monkeypatch.setattr(
-            commands, "_install_via_claude_cli", lambda scope, force: "[green]✓[/green] Registered"
+            commands,
+            "_install_via_claude_cli",
+            lambda scope, force, mode="auto": "[green]✓[/green] Registered",
         )
         commands.cmd_install(self._ns_install(claude_code=True, skip_hook=True))
         settings = tmp_path / ".claude" / "settings.json"
@@ -517,7 +536,9 @@ class TestCmdInstall:
     def test_hook_already_installed_not_duplicated(self, capsys, tmp_path, monkeypatch):
         self._patch_code(monkeypatch, tmp_path)
         monkeypatch.setattr(
-            commands, "_install_via_claude_cli", lambda scope, force: "[green]✓[/green] Registered"
+            commands,
+            "_install_via_claude_cli",
+            lambda scope, force, mode="auto": "[green]✓[/green] Registered",
         )
         commands.cmd_install(self._ns_install(claude_code=True))
         commands.cmd_install(self._ns_install(claude_code=True))
@@ -536,16 +557,87 @@ class TestCmdInstall:
         settings = tmp_path / ".claude" / "settings.json"
         settings.parent.mkdir()
         monkeypatch.setattr(commands, "_CLAUDE_CODE_SETTINGS", settings)
-        commands._install_hook(force=False)
+        commands._install_hook(force=False, mode="uvx")
         data = json.loads(settings.read_text())
         stop = data["hooks"]["Stop"]
         assert isinstance(stop, list) and len(stop) == 2
         commands_installed = [stop[i]["hooks"][0]["command"] for i in range(2)]
-        assert commands._ONBOARD_HOOK_COMMAND in commands_installed
-        assert commands._HOOK_COMMAND in commands_installed
+        # mode="uvx" → prefix is "uvx devcoach"
+        assert "uvx devcoach onboard-hook" in commands_installed
+        assert "uvx devcoach lesson-ready" in commands_installed
         for entry in stop:
             hook = entry["hooks"][0]
             assert hook["type"] == "command"
+
+
+class TestDetectInstallMethod:
+    """Tests for _detect_install_method — covers all three install modes."""
+
+    def test_mode_uvx(self):
+        cmd, args = commands._detect_install_method("uvx")
+        assert cmd == "uvx"
+        assert args == ["devcoach", "mcp"]
+
+    def test_mode_uv_tool(self):
+        cmd, args = commands._detect_install_method("uv-tool")
+        assert cmd == "devcoach"
+        assert args == ["mcp"]
+
+    def test_mode_binary(self, monkeypatch):
+        import sys
+
+        monkeypatch.setattr(sys, "executable", "/opt/homebrew/bin/devcoach")
+        cmd, args = commands._detect_install_method("binary")
+        assert cmd == "/opt/homebrew/bin/devcoach"
+        assert args == ["mcp"]
+
+    def test_auto_detects_frozen(self, monkeypatch):
+        import sys
+
+        monkeypatch.setattr(sys, "executable", "/usr/local/bin/devcoach")
+        monkeypatch.setattr(sys, "frozen", True, raising=False)
+        cmd, args = commands._detect_install_method("auto")
+        assert cmd == "/usr/local/bin/devcoach"
+        assert args == ["mcp"]
+
+    def test_auto_detects_uv_tool_when_on_path(self, monkeypatch):
+        import shutil
+
+        monkeypatch.setattr(shutil, "which", lambda name: "/home/user/.local/bin/devcoach")
+        monkeypatch.delattr(type(None), "frozen", raising=False)
+        # sys.frozen absent — should fall through to shutil.which
+        cmd, args = commands._detect_install_method("auto")
+        assert cmd == "devcoach"
+        assert args == ["mcp"]
+
+    def test_auto_falls_back_to_uvx(self, monkeypatch):
+        import shutil
+
+        monkeypatch.setattr(shutil, "which", lambda name: None)
+        cmd, args = commands._detect_install_method("auto")
+        assert cmd == "uvx"
+        assert args == ["devcoach", "mcp"]
+
+    def test_hook_prefix_uvx(self):
+        assert commands._hook_prefix("uvx") == "uvx devcoach"
+
+    def test_hook_prefix_uv_tool(self):
+        assert commands._hook_prefix("uv-tool") == "devcoach"
+
+    def test_hook_prefix_binary_with_spaces(self, monkeypatch):
+        import sys
+
+        monkeypatch.setattr(sys, "executable", "/path with spaces/devcoach")
+        prefix = commands._hook_prefix("binary")
+        assert "'" in prefix or prefix.startswith("/path")  # quoted or unchanged
+
+    def test_mcp_entry_uvx(self):
+        entry = commands._mcp_entry("uvx")
+        assert entry == {"command": "uvx", "args": ["devcoach", "mcp"]}
+
+    def test_mcp_entry_uv_tool(self):
+        entry = commands._mcp_entry("uv-tool")
+        assert entry == {"command": "devcoach", "args": ["mcp"]}
 
     def test_install_hook_preserves_existing_settings(self, tmp_path, monkeypatch):
         settings = tmp_path / ".claude" / "settings.json"

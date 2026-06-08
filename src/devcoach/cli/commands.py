@@ -439,13 +439,45 @@ def _claude_desktop_config() -> Path:
 
 
 _CLAUDE_DESKTOP_CONFIG = _claude_desktop_config()
-_CLAUDE_DESKTOP_ENTRY: dict = {
-    "command": "uvx",
-    "args": ["devcoach", "mcp"],
-}
+INSTALL_MODES = ("auto", "binary", "uv-tool", "uvx")
 
 
-def _install_via_claude_cli(scope: str, force: bool) -> str:
+def _detect_install_method(mode: str = "auto") -> tuple[str, list[str]]:
+    """Return (command, args) for the MCP server entry.
+
+    mode="auto"     — detect: PyInstaller binary → uv-tool → uvx fallback.
+    mode="binary"   — force binary path (Homebrew or self-contained exe).
+    mode="uv-tool"  — force "devcoach mcp" (uv tool install).
+    mode="uvx"      — force "uvx devcoach mcp".
+    """
+    import shutil
+
+    if mode == "binary" or (mode == "auto" and getattr(sys, "frozen", False)):
+        return sys.executable, ["mcp"]
+    if mode == "uv-tool" or (mode == "auto" and shutil.which("devcoach")):
+        return "devcoach", ["mcp"]
+    return "uvx", ["devcoach", "mcp"]
+
+
+def _mcp_entry(mode: str = "auto") -> dict:
+    """Build the MCP server JSON entry for Claude config files."""
+    command, args = _detect_install_method(mode)
+    return {"command": command, "args": args}
+
+
+def _hook_prefix(mode: str = "auto") -> str:
+    """Return the shell prefix for devcoach hook commands, quoted if the path has spaces."""
+    import shlex
+
+    command, args = _detect_install_method(mode)
+    if args == ["mcp"]:
+        # binary or uv-tool install — use the command, quoted if the path has spaces
+        return shlex.quote(command) if " " in command else command
+    # uvx: "uvx devcoach"
+    return f"{command} {args[0]}"
+
+
+def _install_via_claude_cli(scope: str, force: bool, mode: str = "auto") -> str:
     """Register devcoach using the `claude mcp` CLI. Returns a status message or '' if unavailable."""
     import shutil
     import subprocess
@@ -459,8 +491,9 @@ def _install_via_claude_cli(scope: str, force: bool) -> str:
             capture_output=True,
         )
 
+    command, args = _detect_install_method(mode)
     result = subprocess.run(
-        ["claude", "mcp", "add", "--scope", scope, "devcoach", "uvx", "--", "devcoach", "mcp"],
+        ["claude", "mcp", "add", "--scope", scope, "devcoach", command, "--", *args],
         capture_output=True,
         text=True,
     )
@@ -485,17 +518,22 @@ def _install_to(path: Path, entry: dict, force: bool) -> str:
 
 
 _CLAUDE_CODE_SETTINGS = Path.home() / ".claude" / "settings.json"
-_ONBOARD_HOOK_COMMAND = "uvx devcoach onboard-hook"
-_HOOK_COMMAND = "uvx devcoach lesson-ready"
 _ONBOARD_SESSION_TIMEOUT_HOURS = 24
 
 
-def _install_hook(force: bool) -> str:
+def _install_hook(force: bool, mode: str = "auto") -> str:
     """Add the devcoach Stop hooks to the Claude Code settings.json file.
 
     Installs two sequential hooks: onboard-hook (silent profile seeding) followed by
     lesson-ready (lesson prompt when rate limit allows). Both are idempotent.
+    The hook commands use the same binary/command as the MCP server entry.
     """
+    # Build hook commands using the same install-method detection as the MCP entry,
+    # so brew installs use the binary path and uvx installs use "uvx devcoach ...".
+    prefix = _hook_prefix(mode)
+    onboard_cmd = f"{prefix} onboard-hook"
+    lesson_cmd = f"{prefix} lesson-ready"
+
     settings_path = _CLAUDE_CODE_SETTINGS
     data: dict = json.loads(settings_path.read_text()) if settings_path.exists() else {}
     stop_hooks: list = data.setdefault("hooks", {}).setdefault("Stop", [])
@@ -511,14 +549,21 @@ def _install_hook(force: bool) -> str:
         for i in reversed(existing_indices):
             stop_hooks.pop(i)
 
-    stop_hooks.append({"hooks": [{"type": "command", "command": _ONBOARD_HOOK_COMMAND}]})
-    stop_hooks.append({"hooks": [{"type": "command", "command": _HOOK_COMMAND}]})
+    stop_hooks.append({"hooks": [{"type": "command", "command": onboard_cmd}]})
+    stop_hooks.append({"hooks": [{"type": "command", "command": lesson_cmd}]})
     settings_path.parent.mkdir(parents=True, exist_ok=True)
     settings_path.write_text(json.dumps(data, indent=2) + "\n")
     return f"[green]✓[/green] Stop hooks installed into {settings_path}"
 
 
 def cmd_install(args: argparse.Namespace) -> None:
+    # Resolve the install mode: explicit --mode flag overrides auto-detection.
+    # auto   → detect: binary (sys.frozen) → uv-tool (devcoach on PATH) → uvx
+    # binary → Homebrew or any self-contained PyInstaller exe
+    # uv-tool → permanent install via "uv tool install devcoach"
+    # uvx    → transient install via "uvx devcoach ..."
+    mode: str = getattr(args, "mode", "auto") or "auto"
+
     do_code = args.claude_code or not args.claude_desktop
     do_desktop = args.claude_desktop or not args.claude_code
     skip_hook = getattr(args, "skip_hook", False)
@@ -529,27 +574,21 @@ def cmd_install(args: argparse.Namespace) -> None:
         msg = _install_via_claude_cli(
             scope="global" if getattr(args, "global_scope", False) else "user",
             force=args.force,
+            mode=mode,
         )
         if not msg:
-            # `claude` CLI not found — fall back to direct JSON edit
-            from pathlib import Path as _P
-
-            claude_code_config = _P.home() / ".claude.json"
-            claude_code_entry: dict = {
-                "type": "stdio",
-                "command": "uvx",
-                "args": ["devcoach", "mcp"],
-                "env": {},
-            }
+            # `claude` CLI not found — fall back to direct JSON edit.
+            claude_code_config = Path.home() / ".claude.json"
+            claude_code_entry: dict = {"type": "stdio", "env": {}, **_mcp_entry(mode)}
             msg = _install_to(claude_code_config, claude_code_entry, args.force)
             needs_restart = True
         console.print(msg)
 
         if not skip_hook:
-            console.print(_install_hook(args.force))
+            console.print(_install_hook(args.force, mode))
 
     if do_desktop:
-        console.print(_install_to(_CLAUDE_DESKTOP_CONFIG, _CLAUDE_DESKTOP_ENTRY, args.force))
+        console.print(_install_to(_CLAUDE_DESKTOP_CONFIG, _mcp_entry(mode), args.force))
         needs_restart = True
 
     if needs_restart:
@@ -1052,6 +1091,17 @@ def _build_parser() -> argparse.ArgumentParser:
         dest="skip_hook",
         action="store_true",
         help="Register MCP server only — do not install the Claude Code Stop hook",
+    )
+    p_install.add_argument(
+        "--mode",
+        choices=INSTALL_MODES,
+        default="auto",
+        help=(
+            "Installation mode for the MCP command (default: auto-detect). "
+            "'binary' = Homebrew/PyInstaller exe; "
+            "'uv-tool' = permanent uv tool install; "
+            "'uvx' = transient uvx invocation."
+        ),
     )
 
     p_ui = sub.add_parser("ui", help="Launch the web dashboard")
