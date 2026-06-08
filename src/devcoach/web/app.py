@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, File, Form, Request, UploadFile
@@ -14,13 +13,7 @@ from fastapi.templating import Jinja2Templates
 from devcoach.core import coach, db
 from devcoach.core.models import KnowledgeEntry
 
-
-@asynccontextmanager
-async def lifespan(_app: FastAPI):
-    yield  # nothing to set up or tear down; prevents CancelledError on Ctrl+C
-
-
-app = FastAPI(title="devcoach", docs_url=None, redoc_url=None, lifespan=lifespan)
+app = FastAPI(title="devcoach", docs_url=None, redoc_url=None)
 
 _HERE = Path(__file__).parent
 
