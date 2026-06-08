@@ -1,17 +1,32 @@
 #!/usr/bin/env python3
 """Generate a Homebrew formula for devcoach that delegates to uv.
 
-Fetches the devcoach sdist info from the PyPI JSON API and generates a formula
+Reads the maximum supported Python version from pyproject.toml classifiers,
+fetches the devcoach sdist info from the PyPI JSON API, and generates a formula
 that uses `uv tool install` to install devcoach and all its dependencies.
-No resource blocks — uv resolves and downloads deps from PyPI at install time,
-picking pre-compiled wheels for the target platform automatically.
 
 Usage:
-    python scripts/generate_homebrew_formula.py --version 0.3.25
+    python scripts/generate_homebrew_formula.py --version 0.3.27
 """
 import argparse
 import json
+import re
 import urllib.request
+
+
+def max_python_version(pyproject_path: str) -> str:
+    """Return the highest Python version listed in pyproject.toml classifiers."""
+    content = open(pyproject_path).read()
+    versions = [
+        (int(ma), int(mi))
+        for ma, mi in re.findall(
+            r"Programming Language :: Python :: (\d+)\.(\d+)", content
+        )
+    ]
+    if not versions:
+        raise RuntimeError("No Python version classifiers found in pyproject.toml")
+    major, minor = max(versions)
+    return f"{major}.{minor}"
 
 
 def fetch_pypi_sdist(package: str, version: str) -> tuple[str, str]:
@@ -24,7 +39,7 @@ def fetch_pypi_sdist(package: str, version: str) -> tuple[str, str]:
     raise RuntimeError(f"No sdist found for {package}=={version} on PyPI")
 
 
-def render(version: str, pkg_url: str, pkg_sha: str) -> str:
+def render(version: str, pkg_url: str, pkg_sha: str, python_version: str) -> str:
     return f"""\
 class Devcoach < Formula
   desc "Progressive technical coaching MCP server for Claude Code and Claude Desktop"
@@ -34,21 +49,21 @@ class Devcoach < Formula
   version "{version}"
   license "Apache-2.0"
 
-  depends_on "python@3.12"
+  depends_on "python@{python_version}"
   depends_on "uv"
 
   def install
     ENV["UV_TOOL_DIR"] = libexec
     system Formula["uv"].opt_bin/"uv", "tool", "install",
-           "--python", Formula["python@3.12"].opt_bin/"python3.12",
+           "--python", Formula["python@{python_version}"].opt_bin/"python{python_version}",
            "devcoach==#{{version}}"
 
     # uv writes '#!/.../bin/python' in the entry point shebang, but Homebrew's
-    # Python venv only creates python3/python3.12 — not the bare 'python' symlink.
-    # Write our own wrapper that calls python3.12 explicitly, bypassing the shebang.
+    # Python venv only creates python3/python{python_version} — not the bare 'python' symlink.
+    # Write our own wrapper that calls python{python_version} explicitly, bypassing the shebang.
     (bin/"devcoach").write <<~SH
       #!/bin/sh
-      exec "#{{libexec}}/devcoach/bin/python3.12" "#{{libexec}}/devcoach/bin/devcoach" "$@"
+      exec "#{{libexec}}/devcoach/bin/python{python_version}" "#{{libexec}}/devcoach/bin/devcoach" "$@"
     SH
   end
 
@@ -61,11 +76,13 @@ end
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--version", required=True, help="devcoach release version, e.g. 0.3.25")
+    parser.add_argument("--version", required=True, help="devcoach release version, e.g. 0.3.27")
+    parser.add_argument("--pyproject", default="pyproject.toml", help="path to pyproject.toml")
     args = parser.parse_args()
 
+    python_version = max_python_version(args.pyproject)
     pkg_url, pkg_sha = fetch_pypi_sdist("devcoach", args.version)
-    print(render(args.version, pkg_url, pkg_sha), end="")
+    print(render(args.version, pkg_url, pkg_sha, python_version), end="")
 
 
 if __name__ == "__main__":
