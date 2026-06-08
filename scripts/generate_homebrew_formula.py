@@ -34,12 +34,15 @@ class Devcoach < Formula
   version "{version}"
   license "Apache-2.0"
 
+  depends_on "python@3.12"
   depends_on "uv"
 
   def install
     ENV["UV_TOOL_DIR"] = libexec
     ENV["UV_TOOL_BIN_DIR"] = libexec/"bin"
-    system Formula["uv"].opt_bin/"uv", "tool", "install", "devcoach==#{{version}}"
+    system Formula["uv"].opt_bin/"uv", "tool", "install",
+           "--python", Formula["python@3.12"].opt_bin/"python3.12",
+           "devcoach==#{{version}}"
     bin.install_symlink libexec/"bin/devcoach"
   end
 
