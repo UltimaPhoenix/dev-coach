@@ -367,6 +367,8 @@ jobs:
         run: |
           TOKEN=$(printf '%s' "$TAP_TOKEN" | tr -d '[:space:]')
           git clone "https://x-access-token:${TOKEN}@github.com/UltimaPhoenix/homebrew-tap.git" tap
+      - name: Wait for PyPI index to propagate
+        run: sleep 60
       - name: Generate formula
         env:
           TAG: ${{ needs.bump.outputs.tag || github.ref_name }}
