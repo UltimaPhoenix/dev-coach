@@ -1,14 +1,29 @@
 # -*- mode: python ; coding: utf-8 -*-
 import sys
 from pathlib import Path
+from PyInstaller.utils.hooks import copy_metadata
 
 src = Path("src/devcoach")
 
-datas = [
-    (str(src / "SKILL.md"), "devcoach"),
-    (str(src / "web" / "templates"), "devcoach/web/templates"),
-    (str(src / "web" / "static"), "devcoach/web/static"),
-]
+# Bundle dist-info for every package that calls importlib.metadata.version()
+# at import time (fastmcp checks both names; others may check their own version).
+datas = (
+    copy_metadata("fastmcp")
+    + copy_metadata("fastmcp-slim")
+    + copy_metadata("mcp")
+    + copy_metadata("pydantic")
+    + copy_metadata("pydantic-core")
+    + copy_metadata("uvicorn")
+    + copy_metadata("starlette")
+    + copy_metadata("fastapi")
+    + copy_metadata("rich")
+    + copy_metadata("jinja2")
+    + [
+        (str(src / "SKILL.md"), "devcoach"),
+        (str(src / "web" / "templates"), "devcoach/web/templates"),
+        (str(src / "web" / "static"), "devcoach/web/static"),
+    ]
+)
 
 hidden_imports = [
     # pydantic-core is a compiled extension — ensure it's picked up
