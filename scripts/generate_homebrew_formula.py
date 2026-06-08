@@ -54,9 +54,12 @@ class Devcoach < Formula
 
   def install
     ENV["UV_TOOL_DIR"] = libexec
+    # Install from the already-downloaded sdist (buildpath) rather than by version
+    # string, so uv does not need to query the PyPI simple index — which can lag
+    # minutes behind the JSON API after a fresh publish.
     system Formula["uv"].opt_bin/"uv", "tool", "install",
            "--python", Formula["python@{python_version}"].opt_bin/"python{python_version}",
-           "devcoach==#{{version}}"
+           buildpath
 
     # uv writes '#!/.../bin/python' in the entry point shebang, but Homebrew's
     # Python venv only creates python3/python{python_version} — not the bare 'python' symlink.
