@@ -372,6 +372,11 @@ jobs:
           TAG: ${{ needs.bump.outputs.tag || github.ref_name }}
         run: |
           VERSION="${TAG#v}"
+          WAITED=0
+          until curl -sf "https://pypi.org/pypi/devcoach/${VERSION}/json" > /dev/null; do
+            [ $WAITED -ge 60 ] && echo "Timed out waiting for PyPI" && exit 1
+            echo "Waiting for devcoach==$VERSION on PyPI..."; sleep 5; WAITED=$((WAITED+5))
+          done
           python scripts/generate_homebrew_formula.py \
             --version "$VERSION" \
             > tap/Formula/devcoach.rb
