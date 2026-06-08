@@ -556,6 +556,19 @@ def _install_hook(force: bool, mode: str = "auto") -> str:
     return f"[green]✓[/green] Stop hooks installed into {settings_path}"
 
 
+def _resolved_mode_label(mode: str) -> str:
+    """Human-readable label for the resolved install mode."""
+    command, args = _detect_install_method(mode)
+    if mode != "auto":
+        labels = {"binary": "binary", "uv-tool": "uv tool", "uvx": "uvx"}
+        return labels[mode]
+    if getattr(sys, "frozen", False):
+        return "binary (auto-detected)"
+    if command == "devcoach":
+        return "uv tool (auto-detected)"
+    return "uvx (auto-detected)"
+
+
 def cmd_install(args: argparse.Namespace) -> None:
     # Resolve the install mode: explicit --mode flag overrides auto-detection.
     # auto   → detect: binary (sys.frozen) → uv-tool (devcoach on PATH) → uvx
@@ -569,8 +582,17 @@ def cmd_install(args: argparse.Namespace) -> None:
     skip_hook = getattr(args, "skip_hook", False)
     needs_restart = False
 
+    command, mcp_args = _detect_install_method(mode)
+    console.print(
+        f"[bold]Setting up devcoach[/bold]  [dim]({_resolved_mode_label(mode)} · {command} {' '.join(mcp_args)})[/dim]"
+    )
+    console.print()
+
     if do_code:
-        # Prefer the official `claude mcp add` CLI — no file path hunting needed.
+        console.print("[bold]Claude Code[/bold]")
+
+        # MCP server entry
+        console.print("  MCP server…", end="  ")
         msg = _install_via_claude_cli(
             scope="global" if getattr(args, "global_scope", False) else "user",
             force=args.force,
@@ -584,15 +606,29 @@ def cmd_install(args: argparse.Namespace) -> None:
             needs_restart = True
         console.print(msg)
 
+        # Stop hooks
         if not skip_hook:
+            console.print("  Stop hooks…", end=" ")
             console.print(_install_hook(args.force, mode))
 
+        console.print()
+
     if do_desktop:
+        console.print("[bold]Claude Desktop[/bold]")
+        console.print("  MCP server…", end="  ")
         console.print(_install_to(_CLAUDE_DESKTOP_CONFIG, _mcp_entry(mode), args.force))
         needs_restart = True
+        console.print()
 
     if needs_restart:
-        console.print("\n[dim]Restart Claude Desktop to pick up the new server.[/dim]")
+        console.print("[yellow]→[/yellow] Restart Claude Desktop to pick up the new server.\n")
+
+    console.print(
+        "[dim]Tip: run [bold]devcoach backup[/bold] to export your profile, lessons and settings.\n"
+        "     run [bold]devcoach restore <file>[/bold] to import a backup on a new machine.\n"
+        "     The coaching skill is served automatically via the MCP prompt — always up to date.\n"
+        "     If you copied it manually to Claude.ai, re-paste it after each devcoach update.[/dim]"
+    )
 
 
 def cmd_setup(_args: argparse.Namespace) -> None:

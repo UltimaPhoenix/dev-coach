@@ -160,6 +160,8 @@ Claude.ai does not support MCP servers. Install the coaching instructions as a s
 
 This gives claude.ai the coaching behaviour without the MCP tools (lesson logging and profile tracking will not work).
 
+> **Keep the skill up to date.** For Claude Code / Claude Desktop, the skill is served automatically via the MCP prompt and is always current. If you copied it manually to Claude.ai, re-paste the latest `SKILL.md` after each devcoach update.
+
 </details>
 
 ### Uninstallation
