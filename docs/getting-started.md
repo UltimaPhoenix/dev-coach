@@ -1,8 +1,12 @@
 # Getting started
 
+devcoach is an AI-integrated coaching tool — it lives inside your agent (Claude Code, Cursor, Windsurf, etc.) and delivers lessons automatically as you work. There is no separate app to open and no workflow to change.
+
+---
+
 ## Prerequisites
 
-- Claude Code or Claude Desktop
+- Claude Code, Claude Desktop, or another MCP-compatible agent
 - [uv](https://docs.astral.sh/uv/) (for uvx / uv tool installs) · Python 3.12+
 - No Python required for Homebrew installs
 
@@ -10,29 +14,17 @@
 
 ## 1. Install
 
-### Homebrew (macOS / Linux — recommended)
-
-```bash
-brew tap UltimaPhoenix/tap && brew install devcoach
-```
-
-Pre-built native binary. No Python required.
-
-### uvx — no permanent install needed
-
-```bash
-uvx devcoach mcp   # run directly without installing
-```
-
-### uv tool — permanent install
-
-```bash
-uv tool install devcoach
-```
+| Method | Command |
+|--------|---------|
+| **Homebrew** (macOS / Linux — recommended) | `brew tap UltimaPhoenix/tap && brew install devcoach` |
+| **uv tool** (permanent) | `uv tool install devcoach` |
+| **uvx** (no install) | used directly in MCP config — see Step 2 |
 
 ---
 
-## 2. Register with Claude
+## 2. Connect to your agent
+
+### Claude Code / Claude Desktop
 
 Run once after installing:
 
@@ -40,7 +32,7 @@ Run once after installing:
 devcoach install
 ```
 
-`devcoach install` auto-detects how it was installed and produces output like:
+Sample output:
 
 ```
 Setting up devcoach  (uv tool (auto-detected) · devcoach mcp)
@@ -61,37 +53,28 @@ devcoach install --mode uv-tool   # uv tool install
 devcoach install --mode uvx       # uvx (no permanent install)
 ```
 
-Other flags:
-
-| Flag | Effect |
-|------|--------|
-| `--claude-code` | Register in Claude Code only |
-| `--claude-desktop` | Register in Claude Desktop only |
-| `--global` | Use global scope instead of user scope (Claude Code) |
-| `--force` | Overwrite an existing devcoach entry |
-| `--skip-hook` | Register MCP server only, skip Stop hooks |
-
 **Restart Claude Code / Claude Desktop** after running.
 
-### Manual registration (if `devcoach install` is not available)
+### Manual registration (Claude Code)
 
-**Claude Code** — add to `~/.claude.json` → `mcpServers`:
+```bash
+# via claude CLI
+claude mcp add devcoach devcoach -- mcp          # uv tool / Homebrew
+claude mcp add devcoach uvx -- devcoach mcp      # uvx
+claude mcp add --scope global devcoach devcoach -- mcp  # global scope
+```
+
+Or edit `~/.claude.json` directly:
 
 ```json
 {
   "mcpServers": {
-    "devcoach": {
-      "type": "stdio",
-      "command": "devcoach",
-      "args": ["mcp"]
-    }
+    "devcoach": { "type": "stdio", "command": "devcoach", "args": ["mcp"] }
   }
 }
 ```
 
-Use `"command": "uvx", "args": ["devcoach", "mcp"]` if using uvx.
-
-Add to `~/.claude/settings.json` → `hooks.Stop`:
+Add Stop hooks to `~/.claude/settings.json`:
 
 ```json
 {
@@ -106,7 +89,9 @@ Add to `~/.claude/settings.json` → `hooks.Stop`:
 
 Replace `devcoach` with `uvx devcoach` in hook commands if using uvx.
 
-**Claude Desktop** — edit the config file for your platform:
+### Manuel registration (Claude Desktop)
+
+Edit the config file for your platform:
 
 | Platform | Config file |
 |----------|-------------|
@@ -114,21 +99,25 @@ Replace `devcoach` with `uvx devcoach` in hook commands if using uvx.
 | Windows | `%APPDATA%\Claude\claude_desktop_config.json` |
 | Linux | `~/.config/Claude/claude_desktop_config.json` |
 
-**Other MCP-compatible agents** — devcoach uses standard stdio MCP transport and works with any
-agent that supports it. Add the server entry to the agent's config file:
-
 ```json
 {
   "mcpServers": {
-    "devcoach": {
-      "command": "devcoach",
-      "args": ["mcp"]
-    }
+    "devcoach": { "command": "devcoach", "args": ["mcp"] }
   }
 }
 ```
 
-Use `"command": "uvx", "args": ["devcoach", "mcp"]` if using uvx.
+### Other MCP-compatible agents (Cursor, Windsurf, Cline, Continue, Zed)
+
+Add the server entry to the agent's config file:
+
+```json
+{
+  "mcpServers": {
+    "devcoach": { "command": "devcoach", "args": ["mcp"] }
+  }
+}
+```
 
 | Agent | Config file |
 |-------|-------------|
@@ -138,15 +127,9 @@ Use `"command": "uvx", "args": ["devcoach", "mcp"]` if using uvx.
 | **Continue.dev** | `~/.continue/config.json` → `mcpServers` |
 | **Zed** | `.zed/settings.json` → `context_servers` |
 
-> Stop hooks (lesson delivery, onboarding) are Claude Code-specific. Other agents can call the MCP tools directly but won't trigger lessons automatically.
+> Stop hooks (automatic lesson delivery) are Claude Code-specific. Other agents can invoke coaching manually by prompting their agent or calling the MCP tools directly.
 
-**Claude.ai web (skill copy)** — Claude.ai does not support MCP servers. Copy the content of
-[`src/devcoach/SKILL.md`](../src/devcoach/SKILL.md) into **Settings → Custom instructions**.
-Lesson logging and profile tracking will not work without the MCP server.
-
-> **Keep the skill up to date.** When using Claude Code or Claude Desktop, the coaching skill
-> is served automatically via the MCP prompt and is always current with the installed version.
-> If you copied it manually to Claude.ai, re-paste the latest `SKILL.md` after each devcoach update.
+**Claude.ai web** is not supported — it does not implement the MCP protocol that devcoach requires.
 
 ### Backup and restore
 
@@ -163,69 +146,96 @@ The backup includes your knowledge map, all lessons, settings, and coaching note
 
 ## 3. Onboarding
 
-On your first Claude session after connecting devcoach, Claude will detect that onboarding is needed and guide you through:
+The first time your agent connects to devcoach, it detects that your profile isn't set up and walks you through it inline — no separate command needed.
 
-### Option A — restore from backup
-
-If you have a previous devcoach backup:
+### Phase 1 — Choose setup mode
 
 ```
-Do you have an existing devcoach backup to restore? Path: ~/devcoach-backup.zip
+devcoach: Your knowledge profile isn't set up yet.
+
+Do you have an existing devcoach backup to restore?
+If yes, provide the file path — otherwise I'll help you build
+your profile from scratch.
 ```
 
-Claude calls the restore tool and your full profile (knowledge map + lessons + settings) is imported.
+**Option A — restore from backup:** Provide the path to your backup zip. Your full profile (knowledge map, lessons, settings) is imported instantly and you skip the rest of onboarding.
 
-### Option B — automatic stack detection
+**Option B — build from scratch:** Choose between automatic detection or a guided conversation.
 
-Claude scans your current project directory for manifest files and proposes topics:
+---
+
+### Phase 2A — Automatic stack detection (recommended)
+
+devcoach scans your project files and proposes your stack:
 
 ```
 I detected these technologies in your project:
-  python         → confidence 6  (keep? or enter 0-10)
-  docker         → confidence 7  (keep? or enter 0-10)
-  github_actions → confidence 6  (keep? or enter 0-10)
 
-Anything I missed?
+  python         → confidence 6  (keep? or enter 0–10 to adjust)
+  docker         → confidence 7  (keep? or enter 0–10 to adjust)
+  github_actions → confidence 6  (keep? or enter 0–10 to adjust)
+  fastapi        → confidence 5  (keep? or enter 0–10 to adjust)
+
+Anything I missed? List any tools, languages, or practices
+you work with regularly.
 ```
 
-You confirm, adjust, or skip each one. Then add anything else you work with.
+You confirm, adjust confidence scores, or add topics the scan missed. Then devcoach proposes logical groups and saves your profile.
 
-### Option C — manual
+---
 
-A free-form conversation:
+### Phase 2B — Guided conversation
 
-```
-Tell me about the technologies you work with day-to-day.
-For each one, how confident are you?
-  1–3 = still learning  ·  4–6 = comfortable  ·  7–9 = strong  ·  10 = expert
-```
-
-### Group proposal
-
-After your topics are finalised, Claude proposes groupings:
+If you prefer to describe your stack manually:
 
 ```
-Here's how I'd organise these:
+devcoach: Tell me about the technologies you work with day-to-day.
+          For each one I'll ask how confident you are:
+          1–3 = still learning · 4–6 = comfortable · 7–9 = strong · 10 = expert
 
-  Languages       → python, typescript
-  Backend         → fastapi, django
-  DevOps          → docker, docker_compose, github_actions
-  Version Control → git
+You: I mostly do Node.js and TypeScript backend, some React, PostgreSQL,
+     Docker. About 3 years experience.
 
-Does this look right?
+devcoach: Got it. Let me go through each:
+
+  Node.js — you said mostly. I'd say 7. Sound right?
+  TypeScript — comfortable or strong?
+  React — how often, and how deep?
+  PostgreSQL — raw SQL or mostly ORM?
+  Docker — day-to-day or just deployment?
 ```
 
-Groups are always proposed by Claude — never asked about during topic collection.
+devcoach probes until you're done, then proposes groupings.
 
-### Completing setup
+---
 
-Claude calls `complete_onboarding` and saves everything. From this point on, lessons start after every technical task.
+### Phase 3 — Groups and save
+
+```
+Here's how I'd organise your topics:
+
+  Languages  → python, typescript, javascript
+  Backend    → fastapi, node, django
+  DevOps     → docker, github_actions
+  Databases  → postgresql, redis
+
+Does this look right? Any changes?
+```
+
+When you confirm:
+
+```
+✓ Profile saved — 24 topics across 6 groups.
+
+From now on I'll deliver a short lesson after technical tasks,
+calibrated to your current confidence on each topic.
+```
 
 ---
 
 ## 4. CLI alternative
 
-Run the wizard in your terminal instead of through Claude:
+Run the onboarding wizard in your terminal instead of through your agent:
 
 ```bash
 devcoach setup
@@ -235,35 +245,59 @@ devcoach setup
 
 ## 5. Your first lesson
 
-Work on any technical task with Claude. After the response you'll see something like:
+Work on any technical task with your agent. After the response, devcoach appends a lesson:
 
 ```
+You: Refactor this endpoint to handle concurrent requests properly.
+
+[agent refactors the code]
+
 ---
-🎓 **devcoach** · Python · Level: Mid
+🎓 devcoach · Python · Level: Mid
 
-**Generator expressions vs list comprehensions**
+**asyncio.TaskGroup — structured concurrency without gather() surprises**
 
-Generators are lazy: they yield one item at a time without loading everything
-into memory. A list comprehension builds the entire result up front...
+asyncio.gather() swallows exceptions from sibling tasks by default. If one
+coroutine fails, the others keep running and the exception is only raised
+after all of them complete — or silently dropped if return_exceptions=True.
 
-💡 *Senior tip:* Prefer generators any time you're chaining multiple
-transformations — `sum(x*x for x in data)` never builds an intermediate list.
+TaskGroup (Python 3.11+) is the fix: it cancels all sibling tasks the moment
+one raises, and re-raises immediately. No silent failures, no leaked coroutines.
+
+    async with asyncio.TaskGroup() as tg:
+        task_a = tg.create_task(fetch_user(user_id))
+        task_b = tg.create_task(fetch_orders(user_id))
+
+💡 Senior tip: TaskGroup also makes collecting results trivial — read
+   task.result() after the block, no zip() gymnastics needed.
+
+Did that land?  ✅ know · ❌ don't know · ⏭ skip
 ```
+
+Responding adjusts your confidence on that topic and shapes future lessons.
 
 ---
 
 ## 6. Track your progress
 
+### Web dashboard
+
+```bash
+devcoach ui   # → http://localhost:7860
+```
+
+| Page | What you can do |
+|------|-----------------|
+| **Knowledge map** | See all topics with confidence bars; adjust scores directly |
+| **Lessons** | Browse and filter your full lesson history; star lessons to revisit |
+| **Settings** | Change rate limits, import/export your profile, take a backup |
+
+### CLI
+
 ```bash
 devcoach stats          # overview + weakest/strongest topics
 devcoach lessons        # full history
 devcoach profile        # knowledge map with confidence bars
-```
-
-Or open the web dashboard:
-
-```bash
-devcoach ui
 ```
 
 ---
