@@ -39,11 +39,17 @@ class Devcoach < Formula
 
   def install
     ENV["UV_TOOL_DIR"] = libexec
-    ENV["UV_TOOL_BIN_DIR"] = libexec/"bin"
     system Formula["uv"].opt_bin/"uv", "tool", "install",
            "--python", Formula["python@3.12"].opt_bin/"python3.12",
            "devcoach==#{{version}}"
-    bin.install_symlink libexec/"bin/devcoach"
+
+    # uv writes '#!/.../bin/python' in the entry point shebang, but Homebrew's
+    # Python venv only creates python3/python3.12 — not the bare 'python' symlink.
+    # Write our own wrapper that calls python3.12 explicitly, bypassing the shebang.
+    (bin/"devcoach").write <<~SH
+      #!/bin/sh
+      exec "#{{libexec}}/devcoach/bin/python3.12" "#{{libexec}}/devcoach/bin/devcoach" "$@"
+    SH
   end
 
   test do
