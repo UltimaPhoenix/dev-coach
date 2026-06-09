@@ -281,7 +281,7 @@ jobs:
     if: >
       always()
       && needs.github-release.result == 'success'
-    timeout-minutes: 60
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
