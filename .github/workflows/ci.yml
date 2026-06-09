@@ -208,6 +208,12 @@ jobs:
       - run: uv sync --group dev
       - name: Run tests with coverage
         run: uv run pytest tests/ -v --tb=short --cov=src/devcoach --cov-report=xml
+      - name: Cache SonarCloud scanner
+        uses: actions/cache@v5
+        with:
+          path: ~/.sonar/cache
+          key: ${{ runner.os }}-sonar
+          restore-keys: ${{ runner.os }}-sonar
       - uses: sonarsource/sonarqube-scan-action@v8
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
