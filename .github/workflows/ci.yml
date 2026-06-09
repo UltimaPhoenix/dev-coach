@@ -391,3 +391,91 @@ jobs:
           git add Formula/devcoach.rb
           git diff --cached --quiet || git commit -m "devcoach $VERSION"
           git push
+
+  # ── Build Homebrew bottles ───────────────────────────────────────────────────
+  # Builds a pre-compiled bottle on each macOS platform so users get a fast
+  # unpack instead of a pip-install session.
+  build-bottle:
+    name: Build bottle (${{ matrix.runs-on }})
+    needs: [bump, bump-homebrew-formula]
+    if: >
+      always()
+      && needs.bump-homebrew-formula.result == 'success'
+    runs-on: ${{ matrix.runs-on }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        runs-on: [macos-latest, macos-13]
+    steps:
+      - name: Tap and install (build-bottle mode)
+        env:
+          TAG: ${{ needs.bump.outputs.tag || github.ref_name }}
+        run: |
+          brew tap ultimaphoenix/tap
+          brew install --build-bottle ultimaphoenix/tap/devcoach
+      - name: Generate bottle JSON
+        env:
+          TAG: ${{ needs.bump.outputs.tag || github.ref_name }}
+        run: |
+          brew bottle --json \
+            --root-url "https://github.com/UltimaPhoenix/dev-coach/releases/download/$TAG" \
+            ultimaphoenix/tap/devcoach
+      - name: Upload bottle artifacts
+        uses: actions/upload-artifact@v8
+        with:
+          name: bottle-${{ matrix.runs-on }}
+          path: "*.bottle.*"
+          retention-days: 1
+
+  # ── Merge bottles into formula ───────────────────────────────────────────────
+  # Combines bottle JSONs from all platforms, uploads .tar.gz to the GitHub
+  # release, and pushes the updated formula (with bottle do block) to the tap.
+  merge-bottles:
+    name: Merge bottles into formula
+    needs: [bump, github-release, build-bottle]
+    if: >
+      always()
+      && needs.build-bottle.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.bump.outputs.tag || github.ref }}
+      - name: Download bottle artifacts
+        uses: actions/download-artifact@v8
+        with:
+          pattern: bottle-*
+          merge-multiple: true
+      - name: Clone homebrew-tap
+        env:
+          TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          TOKEN=$(printf '%s' "$TAP_TOKEN" | tr -d '[:space:]')
+          git clone "https://x-access-token:${TOKEN}@github.com/UltimaPhoenix/homebrew-tap.git" tap
+      - name: Inject bottle block into formula
+        env:
+          TAG: ${{ needs.bump.outputs.tag || github.ref_name }}
+        run: |
+          python scripts/inject_bottle_block.py \
+            --formula tap/Formula/devcoach.rb \
+            --root-url "https://github.com/UltimaPhoenix/dev-coach/releases/download/$TAG" \
+            *.bottle.json
+      - name: Upload bottles to GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.bump.outputs.tag || github.ref_name }}
+        run: gh release upload "$TAG" *.bottle.tar.gz
+      - name: Commit and push formula
+        run: |
+          TAG="${{ needs.bump.outputs.tag || github.ref_name }}"
+          VERSION="${TAG#v}"
+          cd tap
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Formula/devcoach.rb
+          git diff --cached --quiet || git commit -m "devcoach $VERSION: add bottle hashes"
+          git push
