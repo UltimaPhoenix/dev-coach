@@ -379,6 +379,7 @@ jobs:
           done
           python scripts/generate_homebrew_formula.py \
             --version "$VERSION" \
+            --uv-lock uv.lock \
             > tap/Formula/devcoach.rb
       - name: Commit and push
         run: |
