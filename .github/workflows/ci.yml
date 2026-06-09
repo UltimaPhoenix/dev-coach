@@ -406,7 +406,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runs-on: [macos-latest, macos-13]
+        runs-on: [macos-latest, macos-13, ubuntu-latest, ubuntu-24.04-arm]
     steps:
       - name: Tap and install (build-bottle mode)
         env:
