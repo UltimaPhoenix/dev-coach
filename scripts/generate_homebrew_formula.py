@@ -55,24 +55,21 @@ class Devcoach < Formula
   license "Apache-2.0"
 
   depends_on "python@{python_version}"
+  depends_on "uv"
 
   def install
+    uv = Formula["uv"].opt_bin/"uv"
     python = Formula["python@{python_version}"].opt_bin/"python3"
-    xy = Language::Python.major_minor_version python
-    # Install from PyPI by name so pip uses the pre-built wheel.
-    # Wheels require no build isolation (no internal `python -m venv` call),
-    # which is necessary because venv creation fails silently inside
-    # Homebrew's formula build environment on GitHub Actions runners.
-    system python, "-m", "pip", "install",
-           "--prefix=#{{libexec}}",
-           "--no-cache-dir", "--prefer-binary",
-           "--only-binary=devcoach",
-           "--no-warn-script-location",
+    # uv venv is a Rust implementation — never calls python -m venv.
+    # uv pip install is also Rust — no pip subprocess, no build-isolation venv.
+    # Both avoid the silent python -m venv failure in Homebrew's formula
+    # build environment on GitHub Actions runners.
+    system uv, "venv", "--python", python, libexec
+    system uv, "pip", "install",
+           "--python", libexec,
+           "--no-cache",
            "devcoach==#{{version}}"
-    (bin/"devcoach").write_env_script(
-      libexec/"bin/devcoach",
-      PYTHONPATH: "#{{libexec}}/lib/python#{{xy}}/site-packages"
-    )
+    bin.install_symlink libexec/"bin/devcoach"
   end
 
   test do
