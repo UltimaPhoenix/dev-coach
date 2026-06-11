@@ -464,7 +464,13 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ needs.bump.outputs.tag || github.ref_name }}
-        run: gh release upload "$TAG" *.bottle.tar.gz
+        run: |
+          # Homebrew's url_encode uses a single dash separator (name-version.platform.bottle.tar.gz)
+          # for non-GitHub-Packages root_url values (see utils/bottles.rb path_resolved_basename).
+          # brew bottle produces double-dash local filenames; rename before upload so the
+          # release asset name matches the URL Homebrew constructs at install time.
+          for f in *--*.bottle.tar.gz; do mv "$f" "${f//--/-}"; done
+          gh release upload "$TAG" *.bottle.tar.gz
       - name: Inject bottle block into formula
         env:
           TAG: ${{ needs.bump.outputs.tag || github.ref_name }}
