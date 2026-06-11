@@ -319,14 +319,17 @@ jobs:
             echo "Waiting for devcoach==$VERSION on PyPI..."; sleep 5; WAITED=$((WAITED+5))
           done
           uv run python scripts/generate_homebrew_formula.py --version "$VERSION" > /tmp/devcoach.rb
-          brew install --build-bottle /tmp/devcoach.rb
+          # Homebrew 4.x requires formulae to be in a tap; local file paths are rejected
+          brew tap-new local/devcoach
+          cp /tmp/devcoach.rb "$(brew --repository local/devcoach)/Formula/devcoach.rb"
+          brew install --build-bottle local/devcoach/devcoach
       - name: Generate bottle JSON
         env:
           TAG: ${{ needs.bump.outputs.tag || github.ref_name }}
         run: |
           brew bottle --json \
             --root-url "https://github.com/UltimaPhoenix/dev-coach/releases/download/$TAG" \
-            devcoach
+            local/devcoach/devcoach
       - uses: actions/upload-artifact@v7
         with:
           name: binary-${{ matrix.platform }}
