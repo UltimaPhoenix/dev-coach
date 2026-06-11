@@ -334,7 +334,12 @@ jobs:
           # --build-bottle is required for brew bottle to accept the result.
           # uv venv + uv pip install are Rust-based, so they work in the
           # --build-bottle environment (unlike python -m venv / pip).
-          brew install --build-bottle local/devcoach/devcoach
+          # Pre-built binary wheels (watchfiles Rust extension) may lack
+          # header padding for dylib ID rewriting; Homebrew exits 1 for
+          # that warning even though the formula installed successfully.
+          # Verify actual install success before treating it as a failure.
+          brew install --build-bottle local/devcoach/devcoach \
+            || brew list local/devcoach/devcoach > /dev/null
       - name: Generate bottle JSON
         env:
           TAG: ${{ needs.bump.outputs.tag || github.ref_name }}
