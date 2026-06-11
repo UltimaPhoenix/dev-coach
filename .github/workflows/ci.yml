@@ -311,7 +311,7 @@ jobs:
           echo "HOMEBREW_PREFIX=/home/linuxbrew/.linuxbrew" >> "$GITHUB_ENV"
           echo "HOMEBREW_CELLAR=/home/linuxbrew/.linuxbrew/Cellar" >> "$GITHUB_ENV"
           echo "HOMEBREW_REPOSITORY=/home/linuxbrew/.linuxbrew/Homebrew" >> "$GITHUB_ENV"
-      - name: Generate formula and install (build-bottle mode)
+      - name: Generate formula and install
         env:
           TAG: ${{ needs.bump.outputs.tag || github.ref_name }}
           HOMEBREW_NO_ENV_HINTS: "1"
@@ -331,10 +331,14 @@ jobs:
           # Homebrew 4.x requires formulae to be in a tap; local file paths are rejected
           brew tap-new local/devcoach
           cp /tmp/devcoach.rb "$(brew --repository local/devcoach)/Formula/devcoach.rb"
-          brew install --build-bottle local/devcoach/devcoach
+          # Normal install (not --build-bottle): --build-bottle restricts the environment
+          # in a way that silently kills Python subprocesses. Install normally, then
+          # brew bottle packages the result into the same bottle archive.
+          brew install local/devcoach/devcoach
       - name: Generate bottle JSON
         env:
           TAG: ${{ needs.bump.outputs.tag || github.ref_name }}
+          HOMEBREW_NO_ENV_HINTS: "1"
         run: |
           brew bottle --json \
             --root-url "https://github.com/UltimaPhoenix/dev-coach/releases/download/$TAG" \
