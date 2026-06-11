@@ -23,26 +23,33 @@ def main() -> None:
     parser.add_argument("json_files", nargs="+", help="brew bottle --json output files")
     args = parser.parse_args()
 
-    # Collect platform tags + sha256 from all JSON files
-    tags: dict[str, str] = {}
-    cellar = ":any"
+    # Collect platform tags + sha256 + cellar from all JSON files.
+    # In Homebrew's bottle JSON the cellar is stored per-tag, not at the
+    # bottle level. Each entry: {sha256, cellar} where cellar is a Ruby
+    # symbol (:any, :any_skip_relocation) or an absolute path string.
+    tags: dict[str, dict[str, str]] = {}
     for path in args.json_files:
         data = json.load(open(path))
         pkg = next(iter(data.values()))
         bottle = pkg["bottle"]
-        if "cellar" in bottle:
-            cellar = bottle["cellar"]
         for tag, info in bottle["tags"].items():
-            tags[tag] = info["sha256"]
+            tags[tag] = {
+                "sha256": info["sha256"],
+                "cellar": info.get("cellar", ":any_skip_relocation"),
+            }
 
     if not tags:
         print("ERROR: no bottle tags found in JSON files", file=sys.stderr)
         sys.exit(1)
 
-    # Build bottle do block
+    # Build bottle do block. Each sha256 line carries its own cellar value.
+    # Ruby symbols start with ':' and need no quotes; paths need quotes.
     lines = ["  bottle do", f'    root_url "{args.root_url}"']
     for tag in sorted(tags):
-        lines.append(f'    sha256 cellar: {cellar}, {tag}: "{tags[tag]}"')
+        cellar = tags[tag]["cellar"]
+        sha256 = tags[tag]["sha256"]
+        cellar_ruby = cellar if cellar.startswith(":") else f'"{cellar}"'
+        lines.append(f'    sha256 cellar: {cellar_ruby}, {tag}: "{sha256}"')
     lines.append("  end")
     block = "\n".join(lines) + "\n"
 

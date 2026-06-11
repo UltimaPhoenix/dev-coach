@@ -59,15 +59,16 @@ class Devcoach < Formula
 
   def install
     uv = Formula["uv"].opt_bin/"uv"
-    python = Formula["python@{python_version}"].opt_bin/"python3"
+    python = Formula["python@{python_version}"].opt_bin/"python{python_version}"
     # uv venv is a Rust implementation — never calls python -m venv.
     # uv pip install is also Rust — no pip subprocess, no build-isolation venv.
     # Both avoid the silent python -m venv failure in Homebrew's formula
     # build environment on GitHub Actions runners.
-    system uv, "venv", "--python", python, libexec
+    system uv, "venv", "--python", python, "--python-preference", "only-system", libexec
     system uv, "pip", "install",
            "--python", libexec,
            "--no-cache",
+           "--python-preference", "only-system",
            "devcoach==#{{version}}"
     bin.install_symlink libexec/"bin/devcoach"
   end
