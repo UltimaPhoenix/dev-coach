@@ -69,7 +69,7 @@ class Devcoach < Formula
            "--python", libexec,
            "--no-cache",
            "--python-preference", "only-system",
-           "devcoach==#{{version}}"
+           buildpath
     bin.install_symlink libexec/"bin/devcoach"
   end
 
