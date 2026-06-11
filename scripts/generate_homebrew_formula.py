@@ -47,8 +47,6 @@ def fetch_pypi_sdist(package: str, version: str) -> tuple[str, str]:
 def render(version: str, pkg_url: str, pkg_sha: str, python_version: str) -> str:
     return f"""\
 class Devcoach < Formula
-  include Language::Python::Virtualenv
-
   desc "Progressive technical coaching MCP server for Claude Code and Claude Desktop"
   homepage "https://github.com/UltimaPhoenix/dev-coach"
   url "{pkg_url}"
@@ -59,11 +57,19 @@ class Devcoach < Formula
   depends_on "python@{python_version}"
 
   def install
-    venv = virtualenv_create(libexec, Formula["python@{python_version}"].opt_bin/"python3")
-    system venv.root/"bin/pip", "install",
+    python = Formula["python@{python_version}"].opt_bin/"python3"
+    xy = Language::Python.major_minor_version python
+    # Install directly into libexec with pip --prefix; avoids python -m venv
+    system python, "-m", "pip", "install",
+           "--prefix=#{{libexec}}",
            "--no-cache-dir", "--prefer-binary",
+           "--no-warn-script-location",
            buildpath
-    bin.install_symlink venv.root/"bin/devcoach"
+    # Wrapper that sets PYTHONPATH so the entry point finds installed packages
+    (bin/"devcoach").write_env_script(
+      libexec/"bin/devcoach",
+      PYTHONPATH: "#{{libexec}}/lib/python#{{xy}}/site-packages"
+    )
   end
 
   test do
