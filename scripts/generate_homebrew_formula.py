@@ -59,13 +59,16 @@ class Devcoach < Formula
   def install
     python = Formula["python@{python_version}"].opt_bin/"python3"
     xy = Language::Python.major_minor_version python
-    # Install directly into libexec with pip --prefix; avoids python -m venv
+    # Install from PyPI by name so pip uses the pre-built wheel.
+    # Wheels require no build isolation (no internal `python -m venv` call),
+    # which is necessary because venv creation fails silently inside
+    # Homebrew's formula build environment on GitHub Actions runners.
     system python, "-m", "pip", "install",
            "--prefix=#{{libexec}}",
            "--no-cache-dir", "--prefer-binary",
+           "--only-binary=devcoach",
            "--no-warn-script-location",
-           buildpath
-    # Wrapper that sets PYTHONPATH so the entry point finds installed packages
+           "devcoach==#{{version}}"
     (bin/"devcoach").write_env_script(
       libexec/"bin/devcoach",
       PYTHONPATH: "#{{libexec}}/lib/python#{{xy}}/site-packages"
