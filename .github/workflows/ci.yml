@@ -306,8 +306,11 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-          echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"' >> "$GITHUB_ENV"
-          eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+          echo "/home/linuxbrew/.linuxbrew/bin" >> "$GITHUB_PATH"
+          echo "/home/linuxbrew/.linuxbrew/sbin" >> "$GITHUB_PATH"
+          echo "HOMEBREW_PREFIX=/home/linuxbrew/.linuxbrew" >> "$GITHUB_ENV"
+          echo "HOMEBREW_CELLAR=/home/linuxbrew/.linuxbrew/Cellar" >> "$GITHUB_ENV"
+          echo "HOMEBREW_REPOSITORY=/home/linuxbrew/.linuxbrew/Homebrew" >> "$GITHUB_ENV"
       - name: Generate formula and install (build-bottle mode)
         env:
           TAG: ${{ needs.bump.outputs.tag || github.ref_name }}
@@ -397,7 +400,6 @@ jobs:
           done
           python scripts/generate_homebrew_formula.py \
             --version "$VERSION" \
-            --uv-lock uv.lock \
             > tap/Formula/devcoach.rb
       - name: Commit and push
         run: |
