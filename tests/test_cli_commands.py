@@ -1091,3 +1091,62 @@ class TestCmdSetup:
             with patch("devcoach.core.git.detect_git_context", return_value={"folder": "/tmp"}):
                 commands.cmd_setup(_ns())
         assert "Setup complete" in capsys.readouterr().out
+
+
+# ── version flag ───────────────────────────────────────────────────────────
+
+
+class TestVersionFlag:
+    def _run(self, flag: str, capsys) -> str:
+        with pytest.raises(SystemExit) as exc:
+            commands._build_parser().parse_args([flag])
+        assert exc.value.code == 0
+        return capsys.readouterr().out
+
+    def test_long_flag_prints_version(self, capsys):
+        import devcoach
+
+        out = self._run("--version", capsys)
+        assert out.strip() == f"devcoach {devcoach.__version__}"
+
+    def test_short_flag_prints_version(self, capsys):
+        import devcoach
+
+        out = self._run("-v", capsys)
+        assert out.strip() == f"devcoach {devcoach.__version__}"
+
+    def test_version_matches_installed_metadata(self):
+        from importlib.metadata import version
+
+        import devcoach
+
+        assert devcoach.__version__ == version("devcoach")
+
+    def test_run_cli_version_flag(self, capsys, monkeypatch):
+        import devcoach
+
+        monkeypatch.setattr("sys.argv", ["devcoach", "--version"])
+        with pytest.raises(SystemExit) as exc:
+            commands.run_cli()
+        assert exc.value.code == 0
+        assert f"devcoach {devcoach.__version__}" in capsys.readouterr().out
+
+    def test_welcome_panel_shows_version(self, capsys, monkeypatch):
+        import devcoach
+
+        monkeypatch.setattr("sys.argv", ["devcoach"])
+        with pytest.raises(SystemExit) as exc:
+            commands.run_cli()
+        assert exc.value.code == 0
+        assert f"v{devcoach.__version__}" in capsys.readouterr().out
+
+    def test_version_fallback_when_not_installed(self):
+        import importlib
+        from importlib.metadata import PackageNotFoundError
+
+        import devcoach
+
+        with patch("importlib.metadata.version", side_effect=PackageNotFoundError):
+            importlib.reload(devcoach)
+            assert devcoach.__version__ == "0.0.0+unknown"
+        importlib.reload(devcoach)  # restore the real version for other tests
