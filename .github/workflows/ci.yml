@@ -120,7 +120,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.12", "3.13"]
+        python-version: ["3.12", "3.13", "3.14"]
     steps:
       - uses: actions/checkout@v6
         with:
@@ -274,9 +274,12 @@ jobs:
   # ── Build Homebrew bottles ───────────────────────────────────────────────
   # Builds a pre-compiled Homebrew bottle on each platform so brew install
   # users get an instant unpack rather than running pip themselves.
+  # Bottle tags are macOS-version-specific: the arm64 bottle tag follows
+  # whatever macOS version the macos-latest runner currently is; users on
+  # other macOS versions fall back to building from source.
   # Linux runners need Homebrew installed first (not pre-installed on Ubuntu).
   build-binaries:
-    name: Build binary (${{ matrix.platform }})
+    name: Build bottle (${{ matrix.platform }})
     needs: [bump, github-release]
     if: >
       always()
@@ -292,8 +295,10 @@ jobs:
             runs-on: macos-26-intel
           - platform: linux-amd64
             runs-on: ubuntu-latest
+          # no ubuntu-latest-arm label exists (-latest is x64-only); pin the
+          # newest ARM image and bump it manually when a newer one ships
           - platform: linux-arm64
-            runs-on: ubuntu-24.04-arm
+            runs-on: ubuntu-26.04-arm
     runs-on: ${{ matrix.runs-on }}
     steps:
       - uses: actions/checkout@v6
