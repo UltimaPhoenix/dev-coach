@@ -5,14 +5,18 @@ Creates a virtualenv, then installs devcoach (and all its deps) in one pip
 call directly from the sdist. This avoids build-backend availability issues
 that arise from two-pass installs.
 
+The formula depends on the newest python@X.Y formula Homebrew ships,
+resolved at generation time by probing formulae.brew.sh upward from the
+highest Python classifier in pyproject.toml.
+
 Usage:
     python scripts/generate_homebrew_formula.py --version 0.3.30
 """
 import argparse
 import json
 import re
+import urllib.error
 import urllib.request
-
 
 # ── pyproject.toml ────────────────────────────────────────────────────────────
 
@@ -27,6 +31,34 @@ def max_python_version(pyproject_path: str) -> str:
     if not versions:
         raise RuntimeError("No Python version classifiers found in pyproject.toml")
     major, minor = max(versions)
+    return f"{major}.{minor}"
+
+
+# ── Homebrew ──────────────────────────────────────────────────────────────────
+
+def homebrew_has_python(version: str) -> bool:
+    url = f"https://formulae.brew.sh/api/formula/python@{version}.json"
+    try:
+        with urllib.request.urlopen(url) as r:
+            return r.status == 200
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            return False
+        raise
+
+
+def latest_homebrew_python(floor: str) -> str:
+    """Return the newest python@X.Y Homebrew ships, probing upward from floor.
+
+    The formulae.brew.sh API has no endpoint that resolves the unversioned
+    `python` alias, so the only token-free way to find the newest version is
+    to probe the versioned formulae one minor at a time.
+    """
+    major, minor = (int(part) for part in floor.split("."))
+    if not homebrew_has_python(f"{major}.{minor}"):
+        raise RuntimeError(f"Homebrew has no python@{major}.{minor} formula")
+    while homebrew_has_python(f"{major}.{minor + 1}"):
+        minor += 1
     return f"{major}.{minor}"
 
 
@@ -55,7 +87,8 @@ class Devcoach < Formula
   license "Apache-2.0"
 
   depends_on "python@{python_version}"
-  depends_on "uv"
+  # uv is only needed to build the venv; brew autoremove can drop it afterwards
+  depends_on "uv" => :build
 
   def install
     uv = Formula["uv"].opt_bin/"uv"
@@ -88,7 +121,7 @@ def main() -> None:
     parser.add_argument("--pyproject", default="pyproject.toml")
     args = parser.parse_args()
 
-    python_version = max_python_version(args.pyproject)
+    python_version = latest_homebrew_python(max_python_version(args.pyproject))
     pkg_url, pkg_sha = fetch_pypi_sdist("devcoach", args.version)
     print(render(args.version, pkg_url, pkg_sha, python_version), end="")
 
