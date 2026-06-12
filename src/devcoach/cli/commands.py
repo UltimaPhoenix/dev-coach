@@ -14,6 +14,7 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
+import devcoach
 from devcoach.core import coach, db
 
 console = Console()
@@ -968,7 +969,7 @@ def _print_welcome() -> None:
     console.print(
         Panel(
             table,
-            title="[bold #6366f1]devcoach[/]",
+            title=f"[bold #6366f1]devcoach[/] [dim]v{devcoach.__version__}[/]",
             subtitle=hint,
             border_style="#6366f1",
             padding=(1, 2),
@@ -981,6 +982,9 @@ def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="devcoach",
         description="devcoach — progressive technical coaching",
+    )
+    parser.add_argument(
+        "-v", "--version", action="version", version=f"%(prog)s {devcoach.__version__}"
     )
     sub = parser.add_subparsers(dest="command")
 
