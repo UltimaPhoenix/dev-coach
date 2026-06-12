@@ -296,8 +296,6 @@ jobs:
         include:
           - platform: darwin-arm64
             runs-on: macos-latest
-          - platform: darwin-amd64
-            runs-on: macos-26-intel
           - platform: linux-amd64
             runs-on: ubuntu-latest
           # no ubuntu-latest-arm label exists (-latest is x64-only); pin the

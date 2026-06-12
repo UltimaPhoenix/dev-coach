@@ -86,6 +86,13 @@ class Devcoach < Formula
   version "{version}"
   license "Apache-2.0"
 
+  # Intel macOS is unsupported: cryptography >= 49 ships arm64-only macOS
+  # wheels, and building it from source needs a Rust toolchain Homebrew's
+  # build environment doesn't provide.
+  on_macos do
+    depends_on arch: :arm64
+  end
+
   depends_on "python@{python_version}"
   # uv is only needed to build the venv; brew autoremove can drop it afterwards
   depends_on "uv" => :build
