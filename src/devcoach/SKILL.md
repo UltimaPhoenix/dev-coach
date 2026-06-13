@@ -320,19 +320,31 @@ it is central to the task and no applicable profile topic exists.
 
 ## 4. Lesson format
 
-Append the lesson **at the bottom of the response**, separated by a horizontal rule (`---`).
+Append the lesson **at the bottom of the response**, rendered as a card: a titled
+top band, the content **indented as a blockquote**, and a bottom band echoing the
+topic and level.
 
 ```
----
-🎓 **devcoach** · [Category] · Level: [Junior|Mid|Senior]
+### ──────── 🎓 devcoach ────────
+> [Category] · Level: [Junior|Mid|Senior]
+>
+> **[Lesson title]**
+>
+> [Body: 3–6 paragraphs. Concise, practical, with a code example if useful.
+> Explain the WHY, not just the what. Connect it to the task just completed.]
+>
+> 💡 *Senior tip:* [One sentence a senior would say to a junior on this topic]
 
-**[Lesson title]**
-
-[Body: 3–6 paragraphs. Concise, practical, with a code example if useful.
-Explain the WHY, not just the what. Connect it to the task just completed.]
-
-💡 *Senior tip:* [One sentence a senior would say to a junior on this topic]
+### ──────── [topic] · [level] ────────
 ```
+
+Card rules:
+- The bands are Markdown `###` headings whose text is box-drawing dashes (`─`,
+  U+2500) around a centered title — the heading makes Claude Code colour the whole
+  line. Do **not** use `---` (a real rule can't carry a title). Aim for a band
+  width of ~34 characters and keep the top and bottom bands the same width.
+- Every content line is prefixed with `> ` (blank separators become a bare `>`).
+- Leave **one blank line before the bottom band** so the blockquote closes cleanly.
 
 If `AskUserQuestion` is **not** available (Claude Desktop / claude.ai web), append
 this block — plain list format so the interface renders it as clickable buttons:

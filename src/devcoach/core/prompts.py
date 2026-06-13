@@ -4,22 +4,46 @@ from __future__ import annotations
 
 from devcoach.core.models import Lesson
 
+# Visual width (in columns) of a band's "<dashes> title <dashes>" region,
+# excluding the leading "### " heading marker. Bands are normalised to this
+# width so the top and bottom of the card line up.
+_BAND_WIDTH = 34
+
+
+def _band(title: str) -> str:
+    """Build a titled, centered rule rendered as a Markdown heading.
+
+    The ``### `` prefix lets the Claude Code terminal renderer colour the whole
+    line; the surrounding box-drawing dashes are centered around ``title`` to a
+    constant width so every card is symmetric.
+    """
+    pad = max(_BAND_WIDTH - len(title) - 2, 2)  # 2 = the spaces flanking the title
+    left = pad // 2
+    return f"### {'─' * left} {title} {'─' * (pad - left)}"
+
 
 def format_lesson_for_display(lesson: Lesson) -> str:
     """Format a Lesson as the markdown block appended to a coaching response."""
     level_label = lesson.level.capitalize()
     category_str = " · ".join(lesson.categories)
-    lines = [
-        "---",
-        f"🎓 **devcoach** · {category_str} · Level: {level_label}",
+    content = [
+        f"{category_str} · Level: {level_label}",
         "",
         f"**{lesson.title}**",
         "",
         lesson.summary,
     ]
     if lesson.task_context:
-        lines += ["", f"*Context: {lesson.task_context}*"]
-    return "\n".join(lines)
+        content += ["", f"*Context: {lesson.task_context}*"]
+    quoted = [f"> {line}".rstrip() for line in content]
+    return "\n".join(
+        [
+            _band("🎓 devcoach"),
+            *quoted,
+            "",
+            _band(f"{lesson.topic_id} · {lesson.level}"),
+        ]
+    )
 
 
 def build_prompt_for_level(topic: str, context: str, confidence: int) -> str:
