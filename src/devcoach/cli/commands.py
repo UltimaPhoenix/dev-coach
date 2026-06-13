@@ -850,14 +850,25 @@ def _onboard_session_active(knowledge_ready: bool) -> bool:
     return age_hours < _ONBOARD_SESSION_TIMEOUT_HOURS
 
 
-def _emit_stop_block(reason: str) -> None:
-    """Emit a Claude Code Stop-hook `decision: block` payload, then exit 0.
+def _emit_stop_context(context: str) -> None:
+    """Emit Claude Code Stop-hook `additionalContext` feedback, then exit 0.
 
-    Uses the JSON-on-stdout hook protocol so `reason` is fed to Claude as its next
-    instruction without being rendered to the user as a `Stop hook error` banner.
-    `suppressOutput` keeps the raw JSON out of the transcript view.
+    Uses the `hookSpecificOutput.additionalContext` protocol, which continues the
+    conversation and feeds `context` to Claude as non-error guidance — without being
+    rendered to the user as a `Stop hook error` banner (which is what `decision: block`
+    does). `suppressOutput` keeps the raw JSON out of the transcript view.
     """
-    print(json.dumps({"decision": "block", "reason": reason, "suppressOutput": True}))
+    print(
+        json.dumps(
+            {
+                "hookSpecificOutput": {
+                    "hookEventName": "Stop",
+                    "additionalContext": context,
+                },
+                "suppressOutput": True,
+            }
+        )
+    )
     sys.exit(0)
 
 
@@ -869,7 +880,7 @@ def cmd_onboard_hook(_args: argparse.Namespace) -> None:
     Expires after _ONBOARD_SESSION_TIMEOUT_HOURS so abandoned sessions re-prompt.
 
     Exit 0: always — the hook never errors. When no profile and no active session
-            exist, it emits a JSON `decision: block` payload on stdout to cue Claude
+            exist, it emits JSON `additionalContext` feedback on stdout to cue Claude
             (without surfacing the instruction to the user); otherwise it stays silent.
     """
     try:
@@ -887,7 +898,7 @@ def cmd_onboard_hook(_args: argparse.Namespace) -> None:
     else:
         db.LEARNING_STATE_PATH.touch()
 
-    _emit_stop_block(
+    _emit_stop_context(
         "devcoach profile is not set up yet. Use the devcoach skill to run onboarding. "
         "Default: Automatic (detect the tech stack from this project and build a profile "
         "immediately, no questions asked). Other options if the user prefers:\n"
@@ -905,7 +916,7 @@ def cmd_lesson_ready(_args: argparse.Namespace) -> None:
     Cooldown is enforced by check_rate_limit via min_gap_minutes (last lesson timestamp).
 
     Exit 0: always — the hook never errors. When no lesson is due it stays silent;
-            when one is ready it emits a JSON `decision: block` payload on stdout that
+            when one is ready it emits JSON `additionalContext` feedback on stdout that
             cues Claude to deliver an AI-generated lesson via the devcoach skill,
             without surfacing the instruction to the user.
     """
@@ -920,7 +931,7 @@ def cmd_lesson_ready(_args: argparse.Namespace) -> None:
     if not rate_limit.allowed:
         sys.exit(0)
 
-    _emit_stop_block(
+    _emit_stop_context(
         "Deliver a devcoach lesson based on the work in this conversation. "
         "Use the devcoach skill: ignore the devcoach://rate-limit check because it is "
         "already checked by this command"
