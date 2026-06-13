@@ -850,6 +850,17 @@ def _onboard_session_active(knowledge_ready: bool) -> bool:
     return age_hours < _ONBOARD_SESSION_TIMEOUT_HOURS
 
 
+def _emit_stop_block(reason: str) -> None:
+    """Emit a Claude Code Stop-hook `decision: block` payload, then exit 0.
+
+    Uses the JSON-on-stdout hook protocol so `reason` is fed to Claude as its next
+    instruction without being rendered to the user as a `Stop hook error` banner.
+    `suppressOutput` keeps the raw JSON out of the transcript view.
+    """
+    print(json.dumps({"decision": "block", "reason": reason, "suppressOutput": True}))
+    sys.exit(0)
+
+
 def cmd_onboard_hook(_args: argparse.Namespace) -> None:
     """Prompt the user to choose an onboarding option — for the Claude Code Stop hook.
 
@@ -857,8 +868,9 @@ def cmd_onboard_hook(_args: argparse.Namespace) -> None:
     conversation is in progress (detected via learning-state.md recency).
     Expires after _ONBOARD_SESSION_TIMEOUT_HOURS so abandoned sessions re-prompt.
 
-    Exit 0: profile complete, session in progress, or any error — hook is silent.
-    Exit 2: no profile and no active session — shows the three-option choice prompt.
+    Exit 0: always — the hook never errors. When no profile and no active session
+            exist, it emits a JSON `decision: block` payload on stdout to cue Claude
+            (without surfacing the instruction to the user); otherwise it stays silent.
     """
     try:
         with db.connection() as conn:
@@ -875,16 +887,14 @@ def cmd_onboard_hook(_args: argparse.Namespace) -> None:
     else:
         db.LEARNING_STATE_PATH.touch()
 
-    print(
+    _emit_stop_block(
         "devcoach profile is not set up yet. Use the devcoach skill to run onboarding. "
         "Default: Automatic (detect the tech stack from this project and build a profile "
         "immediately, no questions asked). Other options if the user prefers:\n"
         "- Guided: a conversation to map knowledge, confidence levels, and topic groups "
         "step by step (thorough, interactive).\n"
-        "- Import: restore knowledge, lessons, and settings from an existing backup file.",
-        file=sys.stderr,
+        "- Import: restore knowledge, lessons, and settings from an existing backup file."
     )
-    sys.exit(2)
 
 
 def cmd_lesson_ready(_args: argparse.Namespace) -> None:
@@ -894,9 +904,10 @@ def cmd_lesson_ready(_args: argparse.Namespace) -> None:
     when no profile is present, the rate limit is hit, or any error occurs.
     Cooldown is enforced by check_rate_limit via min_gap_minutes (last lesson timestamp).
 
-    Exit 0: no lesson due — hook stays completely silent.
-    Exit 2: lesson ready — Claude Code shows the stderr message, cueing Claude to
-            deliver an AI-generated lesson via the devcoach skill.
+    Exit 0: always — the hook never errors. When no lesson is due it stays silent;
+            when one is ready it emits a JSON `decision: block` payload on stdout that
+            cues Claude to deliver an AI-generated lesson via the devcoach skill,
+            without surfacing the instruction to the user.
     """
     try:
         with db.connection() as conn:
@@ -909,12 +920,11 @@ def cmd_lesson_ready(_args: argparse.Namespace) -> None:
     if not rate_limit.allowed:
         sys.exit(0)
 
-    print(
+    _emit_stop_block(
         "Deliver a devcoach lesson based on the work in this conversation. "
-        "Use the devcoach skill: ignore the devcoach://rate-limit check because it is already checked by this command ",
-        file=sys.stderr,
+        "Use the devcoach skill: ignore the devcoach://rate-limit check because it is "
+        "already checked by this command"
     )
-    sys.exit(2)
 
 
 def _print_welcome() -> None:
