@@ -49,18 +49,26 @@ This means a user who restores from backup has their knowledge automatically, so
 only Step 4 runs. On-demand re-setup ("redo onboarding", "reset my topics") always
 re-runs Steps 1–3 regardless of `knowledge_ready`.
 
-### Step 1 — Offer to restore from backup
-Ask once: *"Do you have an existing devcoach backup to restore? If yes, provide the
-file path — otherwise I'll help you build your profile from scratch."*
+### Step 1 — Ask how to set up (always ask; never pick for the user)
+Present a single choice using the client's question UI (e.g. AskUserQuestion in
+Claude Code). Offer exactly three options and mark **Automatic** as recommended:
 
-If a path is provided: call `restore` (CLI) with the file. The restore process
+- **Automatic (Recommended)** — detect the tech stack from this project and build a
+  profile from it.
+- **Guided** — a step-by-step conversation to map knowledge, confidence levels, and
+  topic groups (thorough, interactive).
+- **Import backup** — restore knowledge, lessons, and settings from an existing
+  backup file.
+
+Do **not** default to Automatic silently — surface the choice and wait for the user's
+answer before proceeding.
+
+**If Import backup:** ask for the file path and call `restore` (CLI) with it. Restore
 brings back knowledge entries automatically — no further DB steps needed. Re-read
 `devcoach://onboarding` after restore; if `knowledge_ready` is now true, skip to
 Step 4. If `notebook_ready` is also true, proceed normally.
 
-### Step 2 — Choose setup mode
-Ask: *"Would you like me to detect your tech stack automatically from this project,
-or set it up manually through a conversation?"*
+### Step 2 — Collect topics for the chosen mode
 
 **Automatic mode:**
 - Read `devcoach://onboarding` and present a merged topic list: `detected_stack`
@@ -71,7 +79,7 @@ or set it up manually through a conversation?"*
 - After the list, ask: *"Anything else I missed? List any tools, languages,
   frameworks, or practices you work with regularly."* — add each with a confidence.
 
-**Manual mode:**
+**Guided mode:**
 - Have a free-form conversation: *"Tell me about the technologies you work with
   day-to-day. For each one I'll ask how confident you are:
   1–3 = still learning · 4–6 = comfortable · 7–9 = strong · 10 = expert."*
@@ -93,11 +101,25 @@ Once the full topic list is agreed:
     "groups": { "Languages": ["lang_a"], "DevOps": ["tool_b"], "Version Control": ["practice_c"] }
   }
   ```
-- Confirm setup is complete and continue to Step 4.
-  Do not deliver a lesson in this turn — the rate-limit clock starts after onboarding.
+- Continue to Step 4. Do not deliver a lesson in this turn — the rate-limit clock
+  starts after onboarding.
 
 **Rule:** Never ask about groups during topic collection. Propose them only in
 Step 3 after all topics are known.
+
+### Step 3b — Show the setup summary
+After saving (or after a restore), show the user a concise summary of what was set up:
+- The topics with their confidences, organised under their groups.
+
+Then tell the user **how to change any of it later**, across all three surfaces:
+- **In chat** — just ask, e.g. *"set my Python confidence to 7"*, *"add Rust at 4"*,
+  or *"redo onboarding"*. (Backed by the `update_knowledge`, `add_topic`, and
+  `add_group` tools.)
+- **CLI** — `devcoach profile` to view; `devcoach knowledge-add <topic> <0-10>
+  [--group <Group>]` to add/update; `devcoach knowledge-remove <topic>` to remove;
+  `devcoach group-add` / `devcoach group-assign` to organise groups.
+- **UI** — `devcoach ui` (web dashboard at http://localhost:7860), or ask me to open
+  it (the `open_ui` tool).
 
 ### Step 4 — Initialise the coaching notebook
 
