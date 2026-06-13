@@ -678,21 +678,22 @@ class TestCmdOnboardHook:
     def _patch_notebook(self, tmp_path, monkeypatch):
         monkeypatch.setattr(commands.db, "LEARNING_STATE_PATH", tmp_path / "learning-state.md")
 
-    def test_exits_2_with_three_options_when_profile_absent(self, capsys):
+    def test_blocks_with_three_options_when_profile_absent(self, capsys):
         with pytest.raises(SystemExit) as exc:
             commands.cmd_onboard_hook(_ns())
-        assert exc.value.code == 2
-        err = capsys.readouterr().err
-        assert "Automatic" in err
-        assert "Guided" in err
-        assert "Import" in err
+        assert exc.value.code == 0
+        payload = json.loads(capsys.readouterr().out)
+        assert payload["decision"] == "block"
+        assert "Automatic" in payload["reason"]
+        assert "Guided" in payload["reason"]
+        assert "Import" in payload["reason"]
 
-    def test_prompt_goes_to_stderr_not_stdout(self, capsys):
+    def test_prompt_goes_to_stdout_as_json_not_stderr(self, capsys):
         with pytest.raises(SystemExit):
             commands.cmd_onboard_hook(_ns())
         out = capsys.readouterr()
-        assert out.out == ""
-        assert out.err != ""
+        assert out.err == ""
+        assert json.loads(out.out)["decision"] == "block"
 
     def test_creates_notebook_stub_when_prompting(self, tmp_path):
         with pytest.raises(SystemExit):
@@ -717,7 +718,8 @@ class TestCmdOnboardHook:
         os.utime(nb, (past, past))
         with pytest.raises(SystemExit) as exc:
             commands.cmd_onboard_hook(_ns())
-        assert exc.value.code == 2
+        assert exc.value.code == 0
+        assert json.loads(capsys.readouterr().out)["decision"] == "block"
 
     def test_exits_0_silently_when_profile_exists(self, capsys):
         with db.connection() as conn:
@@ -766,7 +768,7 @@ class TestCmdLessonReady:
         out = capsys.readouterr()
         assert out.out == "" and out.err == ""
 
-    def test_exits_2_when_profile_exists_and_allowed(self, capsys, monkeypatch):
+    def test_blocks_when_profile_exists_and_allowed(self, capsys, monkeypatch):
         with db.connection() as conn:
             db.upsert_knowledge(conn, "python", 5)
         monkeypatch.setattr(
@@ -776,8 +778,10 @@ class TestCmdLessonReady:
         )
         with pytest.raises(SystemExit) as exc:
             commands.cmd_lesson_ready(_ns())
-        assert exc.value.code == 2
-        assert "devcoach" in capsys.readouterr().err.lower()
+        assert exc.value.code == 0
+        payload = json.loads(capsys.readouterr().out)
+        assert payload["decision"] == "block"
+        assert "devcoach" in payload["reason"].lower()
 
     def test_exits_0_silently_on_db_error(self, capsys, monkeypatch):
         monkeypatch.setattr(
