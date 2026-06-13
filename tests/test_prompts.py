@@ -47,10 +47,29 @@ class TestFormatLessonForDisplay:
         output = format_lesson_for_display(lesson)
         assert "Senior" in output
 
-    def test_starts_with_separator(self):
+    def test_starts_with_titled_band(self):
         lesson = _make_lesson()
         output = format_lesson_for_display(lesson)
-        assert output.startswith("---")
+        first_line = output.splitlines()[0]
+        assert first_line.startswith("### ")
+        assert "🎓 devcoach" in first_line
+
+    def test_ends_with_topic_level_band(self):
+        lesson = _make_lesson(topic_id="python_generators", level="mid")
+        output = format_lesson_for_display(lesson)
+        last_line = output.splitlines()[-1]
+        assert last_line.startswith("### ")
+        assert "python_generators · mid" in last_line
+
+    def test_body_is_blockquoted(self):
+        lesson = _make_lesson()
+        output = format_lesson_for_display(lesson)
+        assert "> **Generator expressions vs list comprehensions**" in output
+
+    def test_bands_share_one_width(self):
+        lesson = _make_lesson()
+        lines = format_lesson_for_display(lesson).splitlines()
+        assert len(lines[0]) == len(lines[-1])
 
     def test_task_context_included_when_present(self):
         lesson = _make_lesson(task_context="Refactoring a large data pipeline")
