@@ -678,16 +678,15 @@ class TestCmdOnboardHook:
     def _patch_notebook(self, tmp_path, monkeypatch):
         monkeypatch.setattr(commands.db, "LEARNING_STATE_PATH", tmp_path / "learning-state.md")
 
-    def test_feeds_three_options_when_profile_absent(self, capsys):
+    def test_feeds_onboarding_cue_when_profile_absent(self, capsys):
         with pytest.raises(SystemExit) as exc:
             commands.cmd_onboard_hook(_ns())
         assert exc.value.code == 0
         payload = json.loads(capsys.readouterr().out)
         assert payload["hookSpecificOutput"]["hookEventName"] == "Stop"
         context = payload["hookSpecificOutput"]["additionalContext"]
-        assert "Automatic" in context
-        assert "Guided" in context
-        assert "Import" in context
+        assert "devcoach skill" in context
+        assert "profile" in context
 
     def test_prompt_goes_to_stdout_as_json_not_stderr(self, capsys):
         with pytest.raises(SystemExit):

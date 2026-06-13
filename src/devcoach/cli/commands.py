@@ -899,12 +899,8 @@ def cmd_onboard_hook(_args: argparse.Namespace) -> None:
         db.LEARNING_STATE_PATH.touch()
 
     _emit_stop_context(
-        "devcoach profile is not set up yet. Use the devcoach skill to run onboarding. "
-        "Default: Automatic (detect the tech stack from this project and build a profile "
-        "immediately, no questions asked). Other options if the user prefers:\n"
-        "- Guided: a conversation to map knowledge, confidence levels, and topic groups "
-        "step by step (thorough, interactive).\n"
-        "- Import: restore knowledge, lessons, and settings from an existing backup file."
+        "devcoach: no profile yet — use the devcoach skill to ask the user how to set up "
+        "their profile. Do not pick a setup mode for them."
     )
 
 
