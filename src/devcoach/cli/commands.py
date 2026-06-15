@@ -850,28 +850,6 @@ def _onboard_session_active(knowledge_ready: bool) -> bool:
     return age_hours < _ONBOARD_SESSION_TIMEOUT_HOURS
 
 
-def _emit_stop_context(context: str) -> None:
-    """Emit Claude Code Stop-hook `additionalContext` feedback, then exit 0.
-
-    Uses the `hookSpecificOutput.additionalContext` protocol, which continues the
-    conversation and feeds `context` to Claude as non-error guidance — without being
-    rendered to the user as a `Stop hook error` banner (which is what `decision: block`
-    does). `suppressOutput` keeps the raw JSON out of the transcript view.
-    """
-    print(
-        json.dumps(
-            {
-                "hookSpecificOutput": {
-                    "hookEventName": "Stop",
-                    "additionalContext": context,
-                },
-                "suppressOutput": True,
-            }
-        )
-    )
-    sys.exit(0)
-
-
 def cmd_onboard_hook(_args: argparse.Namespace) -> None:
     """Prompt the user to choose an onboarding option — for the Claude Code Stop hook.
 
@@ -879,9 +857,9 @@ def cmd_onboard_hook(_args: argparse.Namespace) -> None:
     conversation is in progress (detected via learning-state.md recency).
     Expires after _ONBOARD_SESSION_TIMEOUT_HOURS so abandoned sessions re-prompt.
 
-    Exit 0: always — the hook never errors. When no profile and no active session
-            exist, it emits JSON `additionalContext` feedback on stdout to cue Claude
-            (without surfacing the instruction to the user); otherwise it stays silent.
+    Exit 0: profile complete, session in progress, or any error — hook is silent.
+    Exit 2: no profile and no active session — prints the onboarding instruction to
+            stderr, which Claude Code feeds to Claude to run onboarding this turn.
     """
     try:
         with db.connection() as conn:
@@ -898,10 +876,15 @@ def cmd_onboard_hook(_args: argparse.Namespace) -> None:
     else:
         db.LEARNING_STATE_PATH.touch()
 
-    _emit_stop_context(
-        "devcoach: no profile yet — use the devcoach skill to ask the user how to set up "
-        "their profile. Do not pick a setup mode for them."
+    print(
+        "devcoach: no coaching profile yet. Run onboarding now — ask the user how they want to "
+        "set up their profile: Automatic (detect this project's tech stack), Guided (a short "
+        "conversation to map topics and confidence levels), or Import (restore from a backup). "
+        "Do not pick for them. After they choose, build the profile and save it by calling the "
+        "devcoach `complete_onboarding` MCP tool (not a shell command) before ending your turn.",
+        file=sys.stderr,
     )
+    sys.exit(2)
 
 
 def cmd_lesson_ready(_args: argparse.Namespace) -> None:
@@ -911,10 +894,9 @@ def cmd_lesson_ready(_args: argparse.Namespace) -> None:
     when no profile is present, the rate limit is hit, or any error occurs.
     Cooldown is enforced by check_rate_limit via min_gap_minutes (last lesson timestamp).
 
-    Exit 0: always — the hook never errors. When no lesson is due it stays silent;
-            when one is ready it emits JSON `additionalContext` feedback on stdout that
-            cues Claude to deliver an AI-generated lesson via the devcoach skill,
-            without surfacing the instruction to the user.
+    Exit 0: no lesson due — hook stays completely silent.
+    Exit 2: lesson ready — prints the instruction to stderr, which Claude Code feeds to
+            Claude to deliver an AI-generated lesson this turn.
     """
     try:
         with db.connection() as conn:
@@ -927,11 +909,14 @@ def cmd_lesson_ready(_args: argparse.Namespace) -> None:
     if not rate_limit.allowed:
         sys.exit(0)
 
-    _emit_stop_context(
-        "Deliver a devcoach lesson based on the work in this conversation. "
-        "Use the devcoach skill: ignore the devcoach://rate-limit check because it is "
-        "already checked by this command"
+    print(
+        "Deliver a devcoach lesson based on the work in this conversation, then record it by "
+        "calling the devcoach `log_lesson` MCP tool (not a shell/CLI command — that is required, "
+        "or this hook will fire again). Ignore the devcoach://rate-limit check — it is already "
+        "verified by this hook.",
+        file=sys.stderr,
     )
+    sys.exit(2)
 
 
 def _print_welcome() -> None:
@@ -943,7 +928,7 @@ def _print_welcome() -> None:
         ("install", "Register the MCP server + Stop hook in Claude Code / Claude Desktop config"),
         (
             "onboard-hook",
-            "Claude Code Stop hook: silently seed profile on first run (always exit 0)",
+            "Claude Code Stop hook: cue onboarding on first run (exit 2 when a profile is needed)",
         ),
         ("lesson-ready", "Claude Code Stop hook: exit 2 when a lesson is due (triggers AI lesson)"),
         ("", ""),
@@ -1181,8 +1166,8 @@ def _build_parser() -> argparse.ArgumentParser:
     sub.add_parser(
         "onboard-hook",
         help=(
-            "Silently seed the knowledge profile on first run (Claude Code Stop hook). "
-            "Always exits 0. No-op once the profile is initialised."
+            "Prompt onboarding on first run (Claude Code Stop hook). Exit 0 = silent "
+            "(profile exists, session in progress, or error); exit 2 = run onboarding."
         ),
     )
 
