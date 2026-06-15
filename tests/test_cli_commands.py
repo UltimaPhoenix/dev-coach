@@ -681,19 +681,17 @@ class TestCmdOnboardHook:
     def test_feeds_onboarding_cue_when_profile_absent(self, capsys):
         with pytest.raises(SystemExit) as exc:
             commands.cmd_onboard_hook(_ns())
-        assert exc.value.code == 0
-        payload = json.loads(capsys.readouterr().out)
-        assert payload["hookSpecificOutput"]["hookEventName"] == "Stop"
-        context = payload["hookSpecificOutput"]["additionalContext"]
-        assert "devcoach skill" in context
-        assert "profile" in context
+        assert exc.value.code == 2
+        err = capsys.readouterr().err.lower()
+        assert "automatic" in err and "guided" in err and "import" in err
+        assert "profile" in err
 
-    def test_prompt_goes_to_stdout_as_json_not_stderr(self, capsys):
+    def test_onboarding_cue_goes_to_stderr(self, capsys):
         with pytest.raises(SystemExit):
             commands.cmd_onboard_hook(_ns())
         out = capsys.readouterr()
-        assert out.err == ""
-        assert json.loads(out.out)["hookSpecificOutput"]["additionalContext"]
+        assert out.out == ""
+        assert out.err.strip()
 
     def test_creates_notebook_stub_when_prompting(self, tmp_path):
         with pytest.raises(SystemExit):
@@ -718,8 +716,8 @@ class TestCmdOnboardHook:
         os.utime(nb, (past, past))
         with pytest.raises(SystemExit) as exc:
             commands.cmd_onboard_hook(_ns())
-        assert exc.value.code == 0
-        assert json.loads(capsys.readouterr().out)["hookSpecificOutput"]["additionalContext"]
+        assert exc.value.code == 2
+        assert capsys.readouterr().err.strip()
 
     def test_exits_0_silently_when_profile_exists(self, capsys):
         with db.connection() as conn:
@@ -768,7 +766,7 @@ class TestCmdLessonReady:
         out = capsys.readouterr()
         assert out.out == "" and out.err == ""
 
-    def test_feeds_context_when_profile_exists_and_allowed(self, capsys, monkeypatch):
+    def test_feeds_lesson_cue_to_stderr_when_allowed(self, capsys, monkeypatch):
         with db.connection() as conn:
             db.upsert_knowledge(conn, "python", 5)
         monkeypatch.setattr(
@@ -778,10 +776,10 @@ class TestCmdLessonReady:
         )
         with pytest.raises(SystemExit) as exc:
             commands.cmd_lesson_ready(_ns())
-        assert exc.value.code == 0
-        payload = json.loads(capsys.readouterr().out)
-        assert payload["hookSpecificOutput"]["hookEventName"] == "Stop"
-        assert "devcoach" in payload["hookSpecificOutput"]["additionalContext"].lower()
+        assert exc.value.code == 2
+        out = capsys.readouterr()
+        assert out.out == ""
+        assert "lesson" in out.err.lower()
 
     def test_exits_0_silently_on_db_error(self, capsys, monkeypatch):
         monkeypatch.setattr(
