@@ -92,9 +92,56 @@ function matchesGlob(folder: string, pattern: string): boolean {
   return entries.some((e) => re.test(e));
 }
 
+type AddTopic = (topic: string, confidence: number) => void;
+
+/** Read a file, returning null if it is missing or unreadable. */
+function readFileSafe(path: string): string | null {
+  try {
+    return existsSync(path) ? readFileSync(path, "utf8") : null;
+  } catch {
+    return null;
+  }
+}
+
+/** package.json dependencies → JS framework topics. */
+function addJsFrameworks(folder: string, add: AddTopic): void {
+  const raw = readFileSafe(join(folder, "package.json"));
+  if (!raw) return;
+  let pkg: { dependencies?: Record<string, unknown>; devDependencies?: Record<string, unknown> };
+  try {
+    pkg = JSON.parse(raw);
+  } catch {
+    return; // invalid package.json
+  }
+  const deps = new Set<string>([
+    ...Object.keys(pkg.dependencies ?? {}),
+    ...Object.keys(pkg.devDependencies ?? {}),
+  ]);
+  for (const [dep, topic] of Object.entries(JS_FRAMEWORK_MAP)) {
+    if (deps.has(dep)) add(topic, 6);
+  }
+}
+
+/** requirements*.txt / pyproject.toml text → Python framework topics. */
+function addPythonFrameworks(folder: string, add: AddTopic): void {
+  const files = [
+    "requirements.txt",
+    "requirements-dev.txt",
+    "requirements/base.txt",
+    "pyproject.toml",
+  ];
+  for (const file of files) {
+    const text = readFileSafe(join(folder, file))?.toLowerCase();
+    if (!text) continue;
+    for (const [pkgName, topic] of Object.entries(PYTHON_FRAMEWORK_MAP)) {
+      if (text.includes(pkgName)) add(topic, 6);
+    }
+  }
+}
+
 export function detectStack(folder: string): Record<string, number> {
   const result: Record<string, number> = {};
-  const add = (topic: string, confidence: number): void => {
+  const add: AddTopic = (topic, confidence) => {
     // keep the highest confidence seen for a topic
     if ((result[topic] ?? -1) < confidence) result[topic] = confidence;
   };
@@ -102,50 +149,8 @@ export function detectStack(folder: string): Record<string, number> {
   for (const [pattern, topic, confidence] of STACK_SIGNALS) {
     if (matchesGlob(folder, pattern)) add(topic, confidence);
   }
-
-  // Deeper inspection: package.json → JS frameworks
-  const pkgPath = join(folder, "package.json");
-  if (existsSync(pkgPath)) {
-    try {
-      const pkg = JSON.parse(readFileSync(pkgPath, "utf8"));
-      const deps = new Set<string>([
-        ...Object.keys(pkg.dependencies ?? {}),
-        ...Object.keys(pkg.devDependencies ?? {}),
-      ]);
-      for (const [dep, topic] of Object.entries(JS_FRAMEWORK_MAP)) {
-        if (deps.has(dep)) add(topic, 6);
-      }
-    } catch {
-      // unreadable / invalid package.json — skip
-    }
-  }
-
-  // Deeper inspection: requirements / pyproject → Python frameworks
-  for (const reqFile of ["requirements.txt", "requirements-dev.txt", "requirements/base.txt"]) {
-    const reqPath = join(folder, reqFile);
-    if (existsSync(reqPath)) {
-      try {
-        const text = readFileSync(reqPath, "utf8").toLowerCase();
-        for (const [pkgName, topic] of Object.entries(PYTHON_FRAMEWORK_MAP)) {
-          if (text.includes(pkgName)) add(topic, 6);
-        }
-      } catch {
-        // skip unreadable file
-      }
-    }
-  }
-
-  const pyprojectPath = join(folder, "pyproject.toml");
-  if (existsSync(pyprojectPath)) {
-    try {
-      const text = readFileSync(pyprojectPath, "utf8").toLowerCase();
-      for (const [pkgName, topic] of Object.entries(PYTHON_FRAMEWORK_MAP)) {
-        if (text.includes(pkgName)) add(topic, 6);
-      }
-    } catch {
-      // skip unreadable file
-    }
-  }
+  addJsFrameworks(folder, add);
+  addPythonFrameworks(folder, add);
 
   return result;
 }

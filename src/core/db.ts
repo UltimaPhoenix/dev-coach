@@ -227,67 +227,58 @@ export interface LessonFilters {
   date_to?: string | null;
 }
 
+type AddClause = (clause: string, ...vals: SqlParam[]) => void;
+
+// Substring (LIKE '%…%') filters that share the same shape: [filter key, column].
+const LIKE_COLUMNS: [keyof LessonFilters, string][] = [
+  ["project", "project"],
+  ["repository", "repository"],
+  ["branch", "branch"],
+  ["commit", "commit_hash"],
+];
+
+function addDateRange(f: LessonFilters, add: AddClause): void {
+  if (f.date_from == null && f.date_to == null) {
+    const cutoff = periodToCutoff(f.period ?? null);
+    if (cutoff != null) add("timestamp >= ?", cutoff);
+    return;
+  }
+  if (f.date_from != null) add("timestamp >= ?", f.date_from);
+  if (f.date_to != null) {
+    const hasTime = f.date_to.includes("T") || f.date_to.includes(" ");
+    add("timestamp <= ?", hasTime ? f.date_to : `${f.date_to}T23:59:59`);
+  }
+}
+
 function lessonWhere(f: LessonFilters): { where: string; params: SqlParam[] } {
   const conditions: string[] = [];
   const params: SqlParam[] = [];
+  const add: AddClause = (clause, ...vals) => {
+    conditions.push(clause);
+    params.push(...vals);
+  };
 
-  if (f.date_from != null || f.date_to != null) {
-    if (f.date_from != null) {
-      conditions.push("timestamp >= ?");
-      params.push(f.date_from);
-    }
-    if (f.date_to != null) {
-      conditions.push("timestamp <= ?");
-      const hasTime = f.date_to.includes("T") || f.date_to.includes(" ");
-      params.push(hasTime ? f.date_to : `${f.date_to}T23:59:59`);
-    }
-  } else {
-    const cutoff = periodToCutoff(f.period ?? null);
-    if (cutoff != null) {
-      conditions.push("timestamp >= ?");
-      params.push(cutoff);
-    }
-  }
+  addDateRange(f, add);
 
-  if (f.category != null) {
-    conditions.push("categories LIKE ?");
-    params.push(`%"${f.category}"%`);
+  if (f.category != null) add(`categories LIKE ?`, `%"${f.category}"%`);
+  if (f.level != null) add("level = ?", f.level);
+  for (const [key, col] of LIKE_COLUMNS) {
+    const v = f[key];
+    if (v != null) add(`${col} LIKE ?`, `%${v}%`);
   }
-  if (f.level != null) {
-    conditions.push("level = ?");
-    params.push(f.level);
-  }
-  if (f.project != null) {
-    conditions.push("project LIKE ?");
-    params.push(`%${f.project}%`);
-  }
-  if (f.repository != null) {
-    conditions.push("repository LIKE ?");
-    params.push(`%${f.repository}%`);
-  }
-  if (f.branch != null) {
-    conditions.push("branch LIKE ?");
-    params.push(`%${f.branch}%`);
-  }
-  if (f.commit != null) {
-    conditions.push("commit_hash LIKE ?");
-    params.push(`%${f.commit}%`);
-  }
-  if (f.starred != null) {
-    conditions.push("starred = ?");
-    params.push(f.starred ? 1 : 0);
-  }
+  if (f.starred != null) add("starred = ?", f.starred ? 1 : 0);
   if (f.search != null) {
-    conditions.push("(title LIKE ? OR topic_id LIKE ? OR summary LIKE ? OR body LIKE ?)");
     const like = `%${f.search}%`;
-    params.push(like, like, like, like);
+    add(
+      "(title LIKE ? OR topic_id LIKE ? OR summary LIKE ? OR body LIKE ?)",
+      like,
+      like,
+      like,
+      like,
+    );
   }
-  if (f.feedback === "none") {
-    conditions.push("feedback IS NULL");
-  } else if (f.feedback != null) {
-    conditions.push("feedback = ?");
-    params.push(f.feedback);
-  }
+  if (f.feedback === "none") add("feedback IS NULL");
+  else if (f.feedback != null) add("feedback = ?", f.feedback);
 
   const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
   return { where, params };
@@ -594,6 +585,66 @@ export interface RestoreResult {
   learning_state: number;
 }
 
+type Unzipped = Record<string, Uint8Array>;
+
+function restoreSettingsSection(db: DatabaseSync, unzipped: Unzipped, result: RestoreResult): void {
+  if (!(ZIP_SETTINGS in unzipped)) return;
+  const s = JSON.parse(strFromU8(unzipped[ZIP_SETTINGS]));
+  if ("max_per_day" in s) setSetting(db, "max_per_day", String(s.max_per_day));
+  if ("min_gap_minutes" in s) setSetting(db, "min_gap_minutes", String(s.min_gap_minutes));
+  if (s.ui_theme === "system" || s.ui_theme === "dark" || s.ui_theme === "light") {
+    setSetting(db, "ui_theme", s.ui_theme);
+  }
+  result.settings = 1;
+}
+
+function restoreKnowledgeSection(
+  db: DatabaseSync,
+  unzipped: Unzipped,
+  result: RestoreResult,
+): void {
+  if (!(ZIP_KNOWLEDGE in unzipped)) return;
+  const knowledge = JSON.parse(strFromU8(unzipped[ZIP_KNOWLEDGE]));
+  if (!(knowledge && typeof knowledge === "object" && Array.isArray(knowledge.topics))) {
+    // Legacy format: {topic: confidence, ...}
+    for (const [topic, confidence] of Object.entries(knowledge)) {
+      upsertKnowledge(db, topic, confidence as number);
+    }
+    result.topics = Object.keys(knowledge).length;
+    return;
+  }
+  let groupsAdded = 0;
+  for (const g of knowledge.groups ?? []) {
+    if (addGroup(db, g)) groupsAdded += 1;
+  }
+  for (const item of knowledge.topics) {
+    upsertKnowledge(db, item.topic, item.confidence);
+    const group = item.group;
+    if (group && group !== "Other") {
+      if (addGroup(db, group)) groupsAdded += 1;
+      assignTopicToGroup(db, item.topic, group);
+    }
+  }
+  result.topics = knowledge.topics.length;
+  result.groups = groupsAdded;
+}
+
+function restoreLessonsSection(db: DatabaseSync, unzipped: Unzipped, result: RestoreResult): void {
+  if (!(ZIP_LESSONS in unzipped)) return;
+  const lessonsData = JSON.parse(strFromU8(unzipped[ZIP_LESSONS]));
+  const { inserted, duplicated, invalid } = importLessons(db, lessonsData);
+  result.lessons = inserted;
+  result.skipped = duplicated;
+  result.invalid = invalid;
+}
+
+function restoreNotebookSection(unzipped: Unzipped, result: RestoreResult): void {
+  if (!(ZIP_NOTEBOOK in unzipped)) return;
+  mkdirSync(dirname(LEARNING_STATE_PATH), { recursive: true });
+  writeFileSync(LEARNING_STATE_PATH, strFromU8(unzipped[ZIP_NOTEBOOK]), "utf8");
+  result.learning_state = 1;
+}
+
 export function restoreBackupZip(db: DatabaseSync, data: Uint8Array): RestoreResult {
   const result: RestoreResult = {
     settings: 0,
@@ -605,57 +656,10 @@ export function restoreBackupZip(db: DatabaseSync, data: Uint8Array): RestoreRes
     learning_state: 0,
   };
   const unzipped = unzipSync(data);
-
-  if (ZIP_SETTINGS in unzipped) {
-    const s = JSON.parse(strFromU8(unzipped[ZIP_SETTINGS]));
-    if ("max_per_day" in s) setSetting(db, "max_per_day", String(s.max_per_day));
-    if ("min_gap_minutes" in s) setSetting(db, "min_gap_minutes", String(s.min_gap_minutes));
-    if (s.ui_theme === "system" || s.ui_theme === "dark" || s.ui_theme === "light") {
-      setSetting(db, "ui_theme", s.ui_theme);
-    }
-    result.settings = 1;
-  }
-
-  if (ZIP_KNOWLEDGE in unzipped) {
-    const knowledge = JSON.parse(strFromU8(unzipped[ZIP_KNOWLEDGE]));
-    if (knowledge && typeof knowledge === "object" && Array.isArray(knowledge.topics)) {
-      let groupsAdded = 0;
-      for (const g of knowledge.groups ?? []) {
-        if (addGroup(db, g)) groupsAdded += 1;
-      }
-      for (const item of knowledge.topics) {
-        upsertKnowledge(db, item.topic, item.confidence);
-        const group = item.group;
-        if (group && group !== "Other") {
-          if (addGroup(db, group)) groupsAdded += 1;
-          assignTopicToGroup(db, item.topic, group);
-        }
-      }
-      result.topics = knowledge.topics.length;
-      result.groups = groupsAdded;
-    } else {
-      // Legacy format: {topic: confidence, ...}
-      for (const [topic, confidence] of Object.entries(knowledge)) {
-        upsertKnowledge(db, topic, confidence as number);
-      }
-      result.topics = Object.keys(knowledge).length;
-    }
-  }
-
-  if (ZIP_LESSONS in unzipped) {
-    const lessonsData = JSON.parse(strFromU8(unzipped[ZIP_LESSONS]));
-    const { inserted, duplicated, invalid } = importLessons(db, lessonsData);
-    result.lessons = inserted;
-    result.skipped = duplicated;
-    result.invalid = invalid;
-  }
-
-  if (ZIP_NOTEBOOK in unzipped) {
-    mkdirSync(dirname(LEARNING_STATE_PATH), { recursive: true });
-    writeFileSync(LEARNING_STATE_PATH, strFromU8(unzipped[ZIP_NOTEBOOK]), "utf8");
-    result.learning_state = 1;
-  }
-
+  restoreSettingsSection(db, unzipped, result);
+  restoreKnowledgeSection(db, unzipped, result);
+  restoreLessonsSection(db, unzipped, result);
+  restoreNotebookSection(unzipped, result);
   return result;
 }
 
