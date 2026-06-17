@@ -1,16 +1,15 @@
 # devcoach
 
-[![PyPI](https://img.shields.io/github/v/release/UltimaPhoenix/dev-coach?label=PyPI)](https://pypi.org/project/devcoach/)
-[![Python](https://img.shields.io/badge/python-3.12%2B-blue)](https://pypi.org/project/devcoach/)
+[![npm](https://img.shields.io/npm/v/devcoach?logo=npm)](https://www.npmjs.com/package/devcoach)
 [![CI](https://github.com/UltimaPhoenix/dev-coach/actions/workflows/ci.yml/badge.svg)](https://github.com/UltimaPhoenix/dev-coach/actions/workflows/ci.yml)
-[![Quality Gate](https://sonarcloud.io/api/project_badges/measure?project=UltimaPhoenix_dev-coach&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=UltimaPhoenix_dev-coach)
-[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=UltimaPhoenix_dev-coach&metric=coverage)](https://sonarcloud.io/summary/new_code?id=UltimaPhoenix_dev-coach)
-[![Docs](https://img.shields.io/badge/docs-GitHub%20Pages-purple)](https://ultimaphoenix.github.io/dev-coach/)
+[![Node](https://img.shields.io/badge/node-%E2%89%A524-brightgreen?logo=node.js)](https://nodejs.org/)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
 
-**Progressive technical coaching that lives inside your AI agent.** devcoach connects to Claude Code, Cursor, Windsurf, and other MCP-compatible tools. After every task you complete, it delivers a short targeted lesson calibrated to what you already know — no generic tutorials, no repeated topics, nothing to open.
+**Progressive technical coaching that lives inside your AI agent.** devcoach connects to Claude Code, Claude Desktop, Cursor, Windsurf, and other MCP-compatible tools. After every task you complete, it delivers a short targeted lesson calibrated to what you already know — no generic tutorials, no repeated topics, nothing to open.
 
 Everything runs **locally**. No data leaves your machine. One SQLite file at `~/.devcoach/coaching.db`.
+
+> Built on the official [Model Context Protocol TypeScript SDK](https://github.com/modelcontextprotocol/typescript-sdk), Node's embedded `node:sqlite`, [Hono](https://hono.dev) (web dashboard), and [Commander](https://github.com/tj/commander.js) (CLI). Requires **Node.js ≥ 24**.
 
 ---
 
@@ -35,7 +34,7 @@ flowchart TD
     G -.->|prompts| U(["You: ✅ ❌ ⏭"])
 ```
 
-→ [Full decision flow: session startup · lesson selection · depth calibration](https://ultimaphoenix.github.io/dev-coach/how-it-works/)
+→ [Full decision flow: session startup · lesson selection · depth calibration](docs/how-it-works.md)
 
 ---
 
@@ -45,14 +44,32 @@ flowchart TD
 
 | Method | Command | Requirements |
 |--------|---------|--------------|
-| **Homebrew** (recommended) | `brew tap UltimaPhoenix/tap && brew install devcoach` | macOS / Linux |
-| **uv tool** | `uv tool install devcoach` | [uv](https://docs.astral.sh/uv/) + Python 3.12+ |
-| **uvx** (no install) | _(used directly in MCP config)_ | [uv](https://docs.astral.sh/uv/) + Python 3.12+ |
+| **npx** (no install) | _(used directly in the MCP config below)_ | Node.js ≥ 24 |
+| **npm** (global) | `npm install -g devcoach` | Node.js ≥ 24 |
+| **Desktop Extension** (`.mcpb`) | one-click — see below | Claude Desktop (bundles its own Node) |
+
+The recommended path is **npx** — no global install, always the latest version, used directly in your agent's MCP config.
+
+<details>
+<summary><strong>Claude Desktop one-click extension</strong> (<code>.mcpb</code>)</summary>
+
+Claude Desktop installs devcoach from a single bundle — no Node or terminal needed (it runs on Desktop's
+bundled runtime). Build the bundle and install it:
+
+```bash
+npm run mcpb        # → dist-mcpb/devcoach-<version>.mcpb
+# Claude Desktop → Settings → Extensions → Install Extension… → pick the .mcpb
+```
+
+`npm run mcpb:sign` self-signs it (installs as an *unverified publisher*; a real code-signing cert is
+needed for a verified signature). Prebuilt `.mcpb` releases and a Desktop directory listing are planned.
+
+</details>
 
 ### Step 2 — Connect to your AI agent
 
 ```bash
-devcoach install
+npx -y devcoach install
 ```
 
 This registers devcoach as an MCP server and sets up automatic lesson delivery. Restart your agent after running.
@@ -66,14 +83,12 @@ Add this to your agent's MCP config file:
 {
   "mcpServers": {
     "devcoach": {
-      "command": "devcoach",
-      "args": ["mcp"]
+      "command": "npx",
+      "args": ["-y", "devcoach", "mcp"]
     }
   }
 }
 ```
-
-Use `"command": "uvx", "args": ["devcoach", "mcp"]` if using uvx.
 
 | Agent | Config file |
 |-------|-------------|
@@ -92,27 +107,19 @@ Use `"command": "uvx", "args": ["devcoach", "mcp"]` if using uvx.
 
 #### Claude Code
 
-**Option A — via `claude mcp` CLI (recommended):**
+**Option A — via the `claude mcp` CLI (recommended):**
 
 ```bash
-# Homebrew or uv tool (devcoach on PATH)
-claude mcp add devcoach devcoach -- mcp
+claude mcp add devcoach npx -- -y devcoach mcp
 
-# uvx
-claude mcp add devcoach uvx -- devcoach mcp
-
-# global scope (all projects)
-claude mcp add --scope global devcoach devcoach -- mcp
+# all projects (user scope)
+claude mcp add --scope user devcoach npx -- -y devcoach mcp
 ```
 
 **Option B — edit `~/.claude.json` directly:**
 
 ```json
-// Homebrew or uv tool
-{ "mcpServers": { "devcoach": { "type": "stdio", "command": "devcoach", "args": ["mcp"] } } }
-
-// uvx
-{ "mcpServers": { "devcoach": { "type": "stdio", "command": "uvx", "args": ["devcoach", "mcp"] } } }
+{ "mcpServers": { "devcoach": { "type": "stdio", "command": "npx", "args": ["-y", "devcoach", "mcp"] } } }
 ```
 
 Then add the Stop hooks to `~/.claude/settings.json`:
@@ -121,14 +128,14 @@ Then add the Stop hooks to `~/.claude/settings.json`:
 {
   "hooks": {
     "Stop": [
-      { "hooks": [{ "type": "command", "command": "devcoach onboard-hook" }] },
-      { "hooks": [{ "type": "command", "command": "devcoach lesson-ready" }] }
+      { "hooks": [{ "type": "command", "command": "npx -y devcoach onboard-hook" }] },
+      { "hooks": [{ "type": "command", "command": "npx -y devcoach lesson-ready" }] }
     ]
   }
 }
 ```
 
-Replace `devcoach` with `uvx devcoach` in the hook commands if using uvx.
+> Tip: a global install (`npm i -g devcoach`) lets you drop the `npx -y` prefix and use `devcoach` directly in every command above.
 
 #### Claude Desktop
 
@@ -144,20 +151,18 @@ Edit the config file for your platform:
 {
   "mcpServers": {
     "devcoach": {
-      "command": "devcoach",
-      "args": ["mcp"]
+      "command": "npx",
+      "args": ["-y", "devcoach", "mcp"]
     }
   }
 }
 ```
 
-Use `"command": "uvx", "args": ["devcoach", "mcp"]` if using uvx.
-
 #### Claude.ai web (skill copy)
 
 Claude.ai does not support MCP servers. Install the coaching instructions as a skill instead:
 
-1. Copy the content of [`src/devcoach/SKILL.md`](src/devcoach/SKILL.md)
+1. Copy the content of [`assets/SKILL.md`](assets/SKILL.md)
 2. Go to **claude.ai → Settings → Custom instructions** (or Skills, depending on your plan)
 3. Paste the content and save
 
@@ -186,8 +191,6 @@ If yes, provide the file path — otherwise I'll help you build your profile fro
 
 **Option B — build from scratch:** Choose between automatic detection or a guided conversation.
 
----
-
 ### Phase 2 — Build your profile
 
 #### Automatic (recommended)
@@ -197,10 +200,10 @@ devcoach scans your project files and proposes your stack:
 ```
 I detected these technologies in your project:
 
-  python         → confidence 6  (keep? or enter 0–10 to adjust)
+  typescript     → confidence 6  (keep? or enter 0–10 to adjust)
   docker         → confidence 7  (keep? or enter 0–10 to adjust)
   github_actions → confidence 6  (keep? or enter 0–10 to adjust)
-  fastapi        → confidence 5  (keep? or enter 0–10 to adjust)
+  react          → confidence 5  (keep? or enter 0–10 to adjust)
 
 Anything I missed? List any tools, languages, or practices you work with regularly.
 ```
@@ -210,8 +213,8 @@ You confirm, adjust scores, or add topics the scan missed. Then devcoach propose
 ```
 Here's how I'd organise these:
 
-  Languages  → python, typescript
-  Backend    → fastapi, django
+  Languages  → typescript, javascript
+  Frontend   → react, html_css
   DevOps     → docker, github_actions
   Databases  → postgresql, redis
 
@@ -220,26 +223,7 @@ Does this look right? Any changes?
 
 #### Guided conversation
 
-If you prefer to describe your stack manually:
-
-```
-devcoach: Tell me about the technologies you work with day-to-day.
-          For each one I'll ask how confident you are:
-          1–3 = still learning · 4–6 = comfortable · 7–9 = strong · 10 = expert
-
-You: I mostly do Node.js and TypeScript backend, some React, PostgreSQL, Docker.
-     I've been doing this for about 3 years.
-
-devcoach: Got it. Let me go through each:
-
-  Node.js — you said you mostly work in it. I'd say 7. Sound right?
-  TypeScript — comfortable or strong?
-  React — how often do you use it?
-  PostgreSQL — do you write raw SQL or mostly ORM?
-  Docker — day-to-day or just deployment?
-```
-
----
+If you prefer to describe your stack manually, devcoach asks about each technology and your confidence level (1–3 still learning · 4–6 comfortable · 7–9 strong · 10 expert), then saves the profile.
 
 ### Phase 3 — Profile saved, coaching begins
 
@@ -256,35 +240,33 @@ That's it. You go back to work. Coaching happens silently in the background.
 
 ## Your first lesson
 
-You work on a task as normal. After Claude responds, devcoach appends a lesson:
+You work on a task as normal. After your agent responds, devcoach appends a lesson:
 
 ```
 You: Refactor this endpoint to handle concurrent requests properly.
 
-Claude: [refactors the code, explains the changes]
+Agent: [refactors the code, explains the changes]
 
 ---
-🎓 devcoach · Python · Level: Mid
+🎓 devcoach · TypeScript · Level: Mid
 
-**asyncio.TaskGroup — structured concurrency without gather() surprises**
+**Promise.allSettled vs Promise.all — don't let one failure sink the batch**
 
-asyncio.gather() swallows exceptions from sibling tasks by default. If one
-coroutine fails, the others keep running and the exception is only raised after
-all of them complete — or silently dropped if return_exceptions=True.
+Promise.all rejects the moment any promise rejects, and you lose the results of
+the ones that already succeeded. For independent work (fan-out fetches, batch
+writes) that's usually the wrong default.
 
-TaskGroup (Python 3.11+) is the fix: it cancels all sibling tasks the moment
-one raises, and re-raises immediately. No silent failures, no leaked coroutines.
+Promise.allSettled always resolves, giving you a status for every promise:
 
-    async with asyncio.TaskGroup() as tg:
-        task_a = tg.create_task(fetch_user(user_id))
-        task_b = tg.create_task(fetch_orders(user_id))
-    # Both completed or both cancelled — no in-between.
+    const results = await Promise.allSettled(ids.map(fetchUser));
+    const ok = results.filter(r => r.status === "fulfilled").map(r => r.value);
 
-Use gather() only when you explicitly want independent tasks that shouldn't
-cancel each other on failure. TaskGroup is the right default for coordinated work.
+Use Promise.all when the tasks are genuinely all-or-nothing; reach for
+allSettled when partial success is meaningful and you want to report failures.
 
-💡 Senior tip: TaskGroup also makes it trivial to collect results — just read
-   task.result() after the block, no zip() gymnastics needed.
+💡 Senior tip: for coordinated work that *should* cancel siblings on failure,
+   an AbortController shared across the requests gives you all-or-nothing with
+   prompt cancellation — the structured-concurrency middle ground.
 
 Did that land?  ✅ know · ❌ don't know · ⏭ skip
 ```
@@ -306,7 +288,7 @@ Responding adjusts your confidence on that topic and shapes future lessons.
 Open the dashboard at any time to review your progress, edit your profile, or manage settings:
 
 ```bash
-devcoach ui   # → http://localhost:7860
+npx -y devcoach ui   # → http://localhost:7860
 ```
 
 | Page | What you can do |
@@ -319,21 +301,9 @@ Full reference: [docs/web-ui.md](docs/web-ui.md)
 
 ---
 
-## Documentation
-
-| Document | Description |
-|----------|-------------|
-| [Getting started](docs/getting-started.md) | Installation, onboarding, first lesson |
-| [Web UI](docs/web-ui.md) | Dashboard pages and controls |
-| [CLI reference](docs/cli.md) | All commands with examples |
-| [MCP server reference](docs/mcp-server.md) | Tools, resources, data models |
-| [Configuration](docs/configuration.md) | Rate limits, data location, schema, backup |
-
----
-
 ## CLI reference
 
-The CLI is a secondary interface for querying and managing your coaching data. Everything is also available in the [web dashboard](#web-dashboard).
+The CLI is a secondary interface for querying and managing your coaching data. Everything is also available in the [web dashboard](#web-dashboard). Run `devcoach --help` or `devcoach <command> --help` for full usage.
 
 | Command | Description |
 |---------|-------------|
@@ -351,7 +321,7 @@ The CLI is a secondary interface for querying and managing your coaching data. E
 | `devcoach setup` | Run the onboarding wizard in the terminal |
 | `devcoach ui` | Open the web dashboard |
 
-Full reference: [docs/cli.md](docs/cli.md)
+(Prefix with `npx -y` if you haven't installed globally.) Full reference: [docs/cli.md](docs/cli.md)
 
 ---
 
@@ -368,48 +338,42 @@ Settings are stored in `~/.devcoach/coaching.db`. See [docs/configuration.md](do
 
 ## Uninstallation
 
-**1. Remove the binary**
-
 ```bash
-brew uninstall devcoach && brew untap UltimaPhoenix/tap   # Homebrew
-uv tool uninstall devcoach                                  # uv tool
-# uvx: nothing to remove
+npm uninstall -g devcoach          # if installed globally (npx: nothing to remove)
+claude mcp remove devcoach         # remove from Claude Code
+rm -rf ~/.devcoach                 # delete all coaching data (back up first: devcoach backup)
 ```
 
-**2. Remove from Claude Code**
-
-```bash
-claude mcp remove devcoach
-```
-
-Or manually remove the `devcoach` entry from `~/.claude.json` → `mcpServers` and the two hook entries from `~/.claude/settings.json` → `hooks.Stop`.
-
-**3. Remove from Claude Desktop**
-
-Edit the platform config file (paths in the [Manual setup](#manual-setup-if-devcoach-install-is-not-available) section above) and delete the `devcoach` key from `mcpServers`.
-
-**4. Delete all devcoach data**
-
-```bash
-rm -rf ~/.devcoach
-```
-
-This removes the coaching database, knowledge map, lessons, settings, and notebook. Take a backup first if needed (`devcoach backup`).
+For Claude Desktop, delete the `devcoach` key from the platform config file (paths in **Manual setup** above). Also remove the two hook entries from `~/.claude/settings.json` → `hooks.Stop`.
 
 ---
 
-## Publishing a new release
-
-Tag a commit with `v*` to trigger the CI/CD pipeline:
+## Development
 
 ```bash
-git tag v1.2.3
-git push origin v1.2.3
+git clone https://github.com/UltimaPhoenix/dev-coach && cd dev-coach
+npm install
+npm run dev -- mcp        # run the MCP server from source
+npm run dev -- ui         # run the web dashboard from source
+npm run lint && npm run typecheck && npm test
+npm run build             # tsup → dist/bin.js
+npm run mcpb              # build the Claude Desktop .mcpb (npm run mcpb:sign to self-sign)
 ```
 
-The pipeline will lint, test across Python 3.12–3.13, build, publish to PyPI via OIDC Trusted Publishing, and create a GitHub Release automatically.
+- **MCP Inspector:** `npx @modelcontextprotocol/inspector node dist/bin.js mcp`
+- **Stack:** `@modelcontextprotocol/sdk` · `node:sqlite` · Hono · Commander · Zod · Biome · Vitest · tsup
 
-> **First-time PyPI setup:** configure a Trusted Publisher on PyPI for `UltimaPhoenix/dev-coach` (environment: `pypi`, workflow: `ci.yml`). No API token required after that.
+### Publishing a release
+
+Tag a commit with `v*`:
+
+```bash
+git tag v1.2.3 && git push origin v1.2.3
+```
+
+CI lints, type-checks, tests (Node 24 & 26), builds, and publishes to npm via **OIDC provenance**
+(`npm publish --provenance`). First-time setup: configure a Trusted Publisher on npmjs.com for the
+`devcoach` package (GitHub Actions, repo `UltimaPhoenix/dev-coach`, workflow `ci.yml`).
 
 ---
 
@@ -417,16 +381,6 @@ The pipeline will lint, test across Python 3.12–3.13, build, publish to PyPI v
 
 Copyright 2026 [UltimaPhoenix](https://github.com/UltimaPhoenix)
 
-Licensed under the [Apache License, Version 2.0](LICENSE).
-
-**What this means for you:**
-
-- Free to use, modify, and distribute
-- **Commercial use and modifications must:**
-  - Include a copy of this license
-  - State any changes made to the files
-  - Retain all copyright and attribution notices
-  - Include the `NOTICE` file in any derivative distribution
-- You may **not** use the `devcoach` name or branding to endorse derived products without permission
-
-See [NOTICE](NOTICE) for third-party attributions.
+Licensed under the [Apache License, Version 2.0](LICENSE). Free to use, modify, and distribute;
+commercial use and modifications must retain the license, copyright, and attribution notices and state
+any changes. You may not use the `devcoach` name or branding to endorse derived products without permission.

@@ -1,0 +1,50 @@
+{
+  "$schema": "https://raw.githubusercontent.com/anthropics/mcpb/main/schemas/mcpb-manifest-v0.4.schema.json",
+  "manifest_version": "0.4",
+  "name": "devcoach",
+  "display_name": "DevCoach",
+  "version": "0.3.54",
+  "description": "Progressive technical coach that delivers personalized lessons based on your knowledge map.",
+  "long_description": "DevCoach is a local MCP server that acts as your personal technical mentor. It tracks your knowledge map across topics, respects a configurable rate limit, and delivers a contextually relevant lesson each time your agent completes a task. It runs on Claude Desktop's bundled Node runtime and stores everything locally in ~/.devcoach.",
+  "author": { "name": "UltimaPhoenix", "url": "https://github.com/UltimaPhoenix" },
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/UltimaPhoenix/dev-coach",
+  "repository": { "type": "git", "url": "https://github.com/UltimaPhoenix/dev-coach" },
+  "support": "https://github.com/UltimaPhoenix/dev-coach/issues",
+  "keywords": ["coaching", "learning", "mcp", "developer-tools"],
+  "icon": "icon.png",
+  "server": {
+    "type": "node",
+    "entry_point": "dist/bin.js",
+    "mcp_config": {
+      "command": "node",
+      "args": ["${__dirname}/dist/bin.js", "mcp"]
+    }
+  },
+  "tools": [
+    { "name": "log_lesson", "description": "Save a delivered lesson to the coaching log" },
+    { "name": "update_knowledge", "description": "Adjust confidence for a topic" },
+    { "name": "get_lessons", "description": "Query lesson history" },
+    { "name": "star_lesson", "description": "Mark a lesson as favourite" },
+    { "name": "delete_lesson", "description": "Delete a lesson" },
+    { "name": "submit_feedback", "description": "Record comprehension feedback" },
+    { "name": "add_topic", "description": "Add a topic to the knowledge map" },
+    { "name": "remove_topic", "description": "Remove a topic from the knowledge map" },
+    { "name": "add_group", "description": "Create a knowledge group" },
+    { "name": "remove_group", "description": "Delete a knowledge group" },
+    { "name": "update_settings", "description": "Change rate limits" },
+    { "name": "open_ui", "description": "Launch the web dashboard" },
+    { "name": "complete_onboarding", "description": "Save the initial profile" }
+  ],
+  "prompts": [
+    {
+      "name": "devcoach_instructions",
+      "description": "Coaching instructions (SKILL.md)",
+      "text": "Full devcoach coaching behaviour and lesson-delivery instructions (served at runtime from SKILL.md)."
+    }
+  ],
+  "compatibility": {
+    "claude_desktop": ">=1.0.0",
+    "platforms": ["darwin", "win32", "linux"]
+  }
+}
