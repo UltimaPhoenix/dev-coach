@@ -11,7 +11,8 @@
       "!coverage",
       "!mcpb/build",
       "!.claude",
-      "!node_modules"
+      "!node_modules",
+      "!website"
     ]
   },
   "formatter": {

@@ -1,0 +1,24 @@
+/* Global styles. Infima is bundled by the classic theme. devcoach brand = indigo/deep-purple. */
+
+:root {
+  --ifm-color-primary: #4f46e5;
+  --ifm-color-primary-dark: #4338ca;
+  --ifm-color-primary-darker: #3f33bf;
+  --ifm-color-primary-darkest: #342a9d;
+  --ifm-color-primary-light: #635bf0;
+  --ifm-color-primary-lighter: #6f67f1;
+  --ifm-color-primary-lightest: #8e89f4;
+  --ifm-code-font-size: 95%;
+  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="dark"] {
+  --ifm-color-primary: #818cf8;
+  --ifm-color-primary-dark: #6f7bf6;
+  --ifm-color-primary-darker: #6571f6;
+  --ifm-color-primary-darkest: #4a58f3;
+  --ifm-color-primary-light: #939dfa;
+  --ifm-color-primary-lighter: #9da7fb;
+  --ifm-color-primary-lightest: #bcc3fc;
+  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.3);
+}
