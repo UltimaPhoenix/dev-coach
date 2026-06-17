@@ -6,6 +6,7 @@ export default defineConfig({
     setupFiles: ["tests/setup.ts"],
     coverage: {
       provider: "v8",
+      reporter: ["text", "lcov"], // lcov → coverage/lcov.info for SonarQube Cloud
       include: ["src/**"],
       // bin shebang entry is the thin process wrapper; exercised end-to-end, not unit-counted.
       exclude: ["src/bin.ts"],

@@ -1,12 +1,36 @@
 name: ci
 
+run-name: >-
+  ${{ github.event_name == 'workflow_dispatch'
+      && format('Release ({0})', inputs.version != '' && inputs.version || inputs.bump)
+      || github.workflow }}
+
+# Three scenarios (mirrors the old pipeline):
+#  1. Push to main / pull request  → lint + typecheck + test + build + sonar
+#  2. Tag push (v*)                → … + publish (npm) + GitHub Release (.mcpb) + Homebrew bump
+#  3. workflow_dispatch (Release)  → bump version → tag → publish + Release + Homebrew
 on:
   push:
     branches: [main]
     tags: ["v*"]
   pull_request:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Semver bump"
+        type: choice
+        options: [patch, minor, major]
+        default: patch
+      version:
+        description: "Exact version (overrides bump), e.g. 0.4.0"
+        type: string
+        default: ""
+
+permissions:
+  contents: read
 
 jobs:
+  # ── Lint + typecheck + test + build (Node LTS floor + latest) ──────────────
   check:
     runs-on: ubuntu-latest
     strategy:
@@ -24,15 +48,73 @@ jobs:
       - run: npm run test:cov
       - run: npm run build
 
-  publish:
+  # ── SonarQube Cloud: code quality + coverage (skips when SONAR_TOKEN unset) ──
+  sonar:
     needs: check
-    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0 # full history for accurate blame / new-code detection
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .node-version
+          cache: npm
+      - run: npm ci
+      - run: npm run test:cov # writes coverage/lcov.info
+      - name: SonarQube Cloud scan
+        if: ${{ env.SONAR_TOKEN != '' }}
+        uses: SonarSource/sonarqube-scan-action@v5
+
+  # ── Version bump → commit → tag (workflow_dispatch only) ───────────────────
+  bump:
+    if: github.event_name == 'workflow_dispatch'
+    needs: check
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      tag: ${{ steps.bump.outputs.tag }}
+      version: ${{ steps.bump.outputs.version }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .node-version
+      - name: Bump, commit, tag, push
+        id: bump
+        run: |
+          set -euo pipefail
+          TARGET="${{ inputs.version != '' && inputs.version || inputs.bump }}"
+          NEW="$(npm version "$TARGET" --no-git-tag-version)"
+          NEW="${NEW#v}"
+          # keep the .mcpb manifest version in sync (the build also syncs it; commit it tidy)
+          NEW="$NEW" node -e 'const fs=require("fs"),f="mcpb/manifest.json";fs.writeFileSync(f,fs.readFileSync(f,"utf8").replace(/"version": "[^"]+"/,`"version": "${process.env.NEW}"`))'
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json mcpb/manifest.json
+          git commit -m "chore: release v${NEW}"
+          git tag "v${NEW}"
+          git push origin HEAD:main "v${NEW}"
+          echo "version=${NEW}" >> "$GITHUB_OUTPUT"
+          echo "tag=v${NEW}" >> "$GITHUB_OUTPUT"
+
+  # ── Publish to npm (OIDC provenance) ───────────────────────────────────────
+  publish:
+    needs: [check, bump]
+    if: >-
+      ${{ always() && needs.check.result == 'success'
+          && (startsWith(github.ref, 'refs/tags/v') || needs.bump.result == 'success') }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
       id-token: write # npm provenance / OIDC trusted publishing (tokenless)
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.bump.outputs.tag || github.ref }}
       - uses: actions/setup-node@v6
         with:
           node-version-file: .node-version
@@ -42,35 +124,69 @@ jobs:
       - run: npm run build
       - run: npm publish --provenance --access public
 
-  release-mcpb:
-    needs: check
-    if: startsWith(github.ref, 'refs/tags/v')
+  # ── GitHub Release with the signed .mcpb attached ──────────────────────────
+  release:
+    needs: [check, bump]
+    if: >-
+      ${{ always() && needs.check.result == 'success'
+          && (startsWith(github.ref, 'refs/tags/v') || needs.bump.result == 'success') }}
     runs-on: ubuntu-latest
     permissions:
-      contents: write # create/upload the GitHub Release asset
+      contents: write
+    env:
+      MCPB_CERT_PEM: ${{ secrets.MCPB_CERT }}
+      MCPB_KEY_PEM: ${{ secrets.MCPB_KEY }}
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.bump.outputs.tag || github.ref }}
       - uses: actions/setup-node@v6
         with:
           node-version-file: .node-version
           cache: npm
       - run: npm ci
       - name: Configure signing certificate (real cert if secrets set, else self-signed)
-        env:
-          MCPB_CERT_PEM: ${{ secrets.MCPB_CERT }}
-          MCPB_KEY_PEM: ${{ secrets.MCPB_KEY }}
         run: |
           if [ -n "$MCPB_CERT_PEM" ] && [ -n "$MCPB_KEY_PEM" ]; then
             printf '%s' "$MCPB_CERT_PEM" > "$RUNNER_TEMP/mcpb-cert.pem"
             printf '%s' "$MCPB_KEY_PEM"  > "$RUNNER_TEMP/mcpb-key.pem"
             echo "MCPB_CERT=$RUNNER_TEMP/mcpb-cert.pem" >> "$GITHUB_ENV"
             echo "MCPB_KEY=$RUNNER_TEMP/mcpb-key.pem"   >> "$GITHUB_ENV"
-            echo "Signing with the provided code-signing certificate."
-          else
-            echo "No MCPB_CERT/MCPB_KEY secrets — self-signing (unverified publisher)."
           fi
       - run: npm run mcpb:sign
-      - name: Attach the .mcpb to the GitHub Release
-        uses: softprops/action-gh-release@v3
+      - uses: softprops/action-gh-release@v3
         with:
+          tag_name: ${{ needs.bump.outputs.tag || github.ref_name }}
+          generate_release_notes: true
           files: dist-mcpb/*.mcpb
+
+  # ── Bump the Homebrew tap formula (skips when HOMEBREW_TAP_TOKEN unset) ─────
+  homebrew:
+    needs: [publish, bump]
+    if: ${{ always() && needs.publish.result == 'success' }}
+    runs-on: ubuntu-latest
+    env:
+      TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.bump.outputs.tag || github.ref }}
+      - name: Update devcoach.rb in UltimaPhoenix/homebrew-tap
+        if: ${{ env.TAP_TOKEN != '' }}
+        run: |
+          set -euo pipefail
+          VERSION="${{ needs.bump.outputs.version || github.ref_name }}"
+          VERSION="${VERSION#v}"
+          URL="https://registry.npmjs.org/devcoach/-/devcoach-${VERSION}.tgz"
+          # npm may take a moment to serve a freshly-published version
+          for _ in $(seq 1 12); do curl -fsSL "$URL" -o pkg.tgz && break || sleep 15; done
+          SHA="$(shasum -a 256 pkg.tgz | awk '{print $1}')"
+          git clone --depth 1 "https://x-access-token:${TAP_TOKEN}@github.com/UltimaPhoenix/homebrew-tap.git" tap
+          mkdir -p tap/Formula
+          node scripts/homebrew-formula.mjs "$VERSION" "$SHA" > tap/Formula/devcoach.rb
+          cd tap
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Formula/devcoach.rb
+          git diff --staged --quiet || git commit -m "devcoach ${VERSION}"
+          git push
