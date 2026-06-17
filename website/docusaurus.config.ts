@@ -44,9 +44,11 @@ const config: Config = {
   themeConfig: {
     image: "img/docusaurus-social-card.jpg",
     colorMode: { defaultMode: "dark", respectPrefersColorScheme: true },
+    // Cleaner mermaid presets (closer to the old Material look) instead of the harsh default.
+    mermaid: { theme: { light: "neutral", dark: "dark" } },
     navbar: {
       title: "devcoach",
-      logo: { alt: "devcoach", src: "img/logo.png" },
+      logo: { alt: "devcoach", src: "img/favicon.svg" },
       items: [
         { href: "https://www.npmjs.com/package/devcoach", label: "npm", position: "right" },
         { href: "https://github.com/UltimaPhoenix/dev-coach", label: "GitHub", position: "right" },

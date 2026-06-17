@@ -1,0 +1,78 @@
+.shot {
+  margin: 0 0 1.5rem;
+  border: 1px solid var(--ifm-toc-border-color);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding: 0.4rem 0.55rem;
+  background: var(--ifm-background-surface-color);
+  border-bottom: 1px solid var(--ifm-toc-border-color);
+}
+
+.btn {
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 0.18rem 0.75rem;
+  border: 1px solid var(--ifm-color-emphasis-300);
+  background: transparent;
+  color: var(--ifm-color-emphasis-700);
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.btnDark {
+  border-radius: 6px 0 0 6px;
+  border-right: none;
+}
+
+.btnLight {
+  border-radius: 0 6px 6px 0;
+}
+
+.reset {
+  font: inherit;
+  font-size: 0.74rem;
+  margin-left: auto;
+  padding: 0.18rem 0.55rem;
+  border: none;
+  background: transparent;
+  color: var(--ifm-color-primary);
+  cursor: pointer;
+}
+
+.img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* Default (data-override="auto"): show whichever matches the global docs theme. */
+:global([data-theme="light"]) .shot[data-override="auto"] .dark,
+:global([data-theme="dark"]) .shot[data-override="auto"] .light {
+  display: none;
+}
+
+/* Manual override wins regardless of the docs theme. */
+.shot[data-override="light"] .dark,
+.shot[data-override="dark"] .light {
+  display: none;
+}
+
+/* Highlight the button matching the image currently shown. */
+:global([data-theme="dark"]) .shot[data-override="auto"] .btnDark,
+:global([data-theme="light"]) .shot[data-override="auto"] .btnLight,
+.shot[data-override="dark"] .btnDark,
+.shot[data-override="light"] .btnLight {
+  background: var(--ifm-color-primary);
+  border-color: var(--ifm-color-primary);
+  color: #fff;
+}
