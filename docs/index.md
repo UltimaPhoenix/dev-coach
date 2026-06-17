@@ -70,8 +70,7 @@ flowchart TD
 ## Quick install
 
 ```bash
-uv tool install devcoach
-devcoach install   # registers with Claude Code / Claude Desktop
+npx -y devcoach install   # registers with Claude Code / Claude Desktop
 ```
 
-Restart Claude and you're ready. See [Getting started](getting-started.md) for the full onboarding walkthrough.
+Requires Node.js ≥ 24. Restart Claude and you're ready. See [Getting started](getting-started.md) for the full onboarding walkthrough.

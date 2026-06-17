@@ -1,0 +1,692 @@
+// SQLite schema, migrations, and pure query helpers (node:sqlite).
+// Uses Node's embedded node:sqlite (DatabaseSync, synchronous) so the port maps 1:1 onto the
+// Python sqlite3 code. The schema MUST stay byte-identical with db.py — both runtimes share
+// ~/.devcoach/coaching.db (idempotent CREATE TABLE IF NOT EXISTS / INSERT OR IGNORE).
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { createRequire } from "node:module";
+import { homedir } from "node:os";
+import { dirname, join } from "node:path";
+import type { DatabaseSync } from "node:sqlite";
+import { strFromU8, strToU8, unzipSync, zipSync } from "fflate";
+
+// Load node:sqlite via createRequire so the bundler can't rewrite the "node:" specifier
+// (esbuild's builtin list predates node:sqlite and emits a bare, unresolvable "sqlite" import).
+const { DatabaseSync: DatabaseSyncImpl } = createRequire(import.meta.url)(
+  "node:sqlite",
+) as typeof import("node:sqlite");
+
+import {
+  type KnowledgeEntry,
+  type KnowledgeGroup,
+  type Lesson,
+  parseLesson,
+  type Settings,
+  type UiTheme,
+} from "./models";
+
+// ── Constants ────────────────────────────────────────────────────────────────
+
+export const DEVCOACH_DIR = join(homedir(), ".devcoach");
+export const DB_PATH = join(DEVCOACH_DIR, "coaching.db");
+export const LEARNING_STATE_PATH = join(DEVCOACH_DIR, "learning-state.md");
+
+const ZIP_SETTINGS = "settings.json";
+const ZIP_LESSONS = "lessons.json";
+const ZIP_KNOWLEDGE = "knowledge.json";
+const ZIP_NOTEBOOK = "learning-state.md";
+
+export const DEFAULT_PROFILE: Record<string, number> = {
+  engineering: 8,
+  architecture: 8,
+  patterns: 7,
+  debugging: 8,
+  node: 7,
+  javascript: 7,
+  typescript: 6,
+  python: 4,
+  django: 3,
+  fastapi: 4,
+  docker: 8,
+  traefik: 7,
+  coolify: 7,
+  postgresql: 6,
+  redis: 6,
+  git: 7,
+  ci_cd: 6,
+  security: 5,
+  performance: 6,
+  testing: 5,
+  linux: 7,
+  networking: 6,
+  react: 5,
+  frontend: 5,
+};
+
+export const DEFAULT_SETTINGS: Record<string, string> = {
+  max_per_day: "2",
+  min_gap_minutes: "240",
+  ui_theme: "system",
+};
+
+// ── Low-level helpers ────────────────────────────────────────────────────────
+
+type SqlParam = string | number | bigint | Uint8Array | null;
+type Row = Record<string, string | number | bigint | Uint8Array | null>;
+
+function allRows(db: DatabaseSync, sql: string, ...params: SqlParam[]): Row[] {
+  return db.prepare(sql).all(...params) as Row[];
+}
+function getRow(db: DatabaseSync, sql: string, ...params: SqlParam[]): Row | undefined {
+  return db.prepare(sql).get(...params) as Row | undefined;
+}
+function runSql(db: DatabaseSync, sql: string, ...params: SqlParam[]): number {
+  return Number(db.prepare(sql).run(...params).changes);
+}
+
+// ── Connection ───────────────────────────────────────────────────────────────
+
+export function getConnection(dbPath: string = DB_PATH): DatabaseSync {
+  if (dbPath !== ":memory:") mkdirSync(dirname(dbPath), { recursive: true });
+  return new DatabaseSyncImpl(dbPath);
+}
+
+export function getInitializedConnection(dbPath: string = DB_PATH): DatabaseSync {
+  const db = getConnection(dbPath);
+  initSchema(db);
+  return db;
+}
+
+/** Open an initialized connection, run `fn`, and guarantee close (mirrors db.connection()). */
+export function withConnection<T>(fn: (db: DatabaseSync) => T, dbPath: string = DB_PATH): T {
+  const db = getInitializedConnection(dbPath);
+  try {
+    return fn(db);
+  } finally {
+    db.close();
+  }
+}
+
+// ── Schema init ──────────────────────────────────────────────────────────────
+
+export function initSchema(db: DatabaseSync): void {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS lessons (
+        id                  TEXT PRIMARY KEY,
+        timestamp           TEXT NOT NULL,
+        topic_id            TEXT NOT NULL,
+        categories          TEXT NOT NULL,
+        title               TEXT NOT NULL,
+        level               TEXT NOT NULL,
+        summary             TEXT NOT NULL,
+        body                TEXT,
+        task_context        TEXT,
+        project             TEXT,
+        repository          TEXT,
+        branch              TEXT,
+        commit_hash         TEXT,
+        folder              TEXT,
+        feedback            TEXT,
+        repository_platform TEXT,
+        starred             INTEGER NOT NULL DEFAULT 0
+    );
+
+    CREATE TABLE IF NOT EXISTS knowledge (
+        topic       TEXT PRIMARY KEY,
+        confidence  INTEGER NOT NULL DEFAULT 5,
+        updated_at  TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS settings (
+        key   TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS knowledge_group_names (
+        group_name TEXT PRIMARY KEY
+    );
+
+    CREATE TABLE IF NOT EXISTS knowledge_groups (
+        group_name TEXT NOT NULL,
+        topic      TEXT NOT NULL,
+        PRIMARY KEY (group_name, topic)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_lessons_timestamp ON lessons (timestamp);
+    CREATE INDEX IF NOT EXISTS idx_lessons_starred_ts ON lessons (starred, timestamp);
+    CREATE INDEX IF NOT EXISTS idx_lessons_feedback ON lessons (feedback);
+    CREATE INDEX IF NOT EXISTS idx_lessons_topic_id ON lessons (topic_id);
+  `);
+  migrate(db);
+  seedDefaults(db);
+}
+
+function migrate(db: DatabaseSync): void {
+  try {
+    db.exec("ALTER TABLE lessons ADD COLUMN body TEXT");
+  } catch {
+    // column already exists
+  }
+}
+
+function seedDefaults(db: DatabaseSync): void {
+  for (const [key, value] of Object.entries(DEFAULT_SETTINGS)) {
+    runSql(db, "INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)", key, value);
+  }
+}
+
+// ── Lessons ──────────────────────────────────────────────────────────────────
+
+const INSERT_COLUMNS =
+  "(id, timestamp, topic_id, categories, title, level, summary, body, " +
+  "task_context, project, repository, branch, commit_hash, folder, " +
+  "repository_platform, starred, feedback)";
+const INSERT_PLACEHOLDERS = "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+
+function lessonInsertParams(lesson: Lesson): SqlParam[] {
+  return [
+    lesson.id,
+    lesson.timestamp,
+    lesson.topic_id,
+    JSON.stringify(lesson.categories),
+    lesson.title,
+    lesson.level,
+    lesson.summary,
+    lesson.body,
+    lesson.task_context,
+    lesson.project,
+    lesson.repository,
+    lesson.branch,
+    lesson.commit_hash,
+    lesson.folder,
+    lesson.repository_platform,
+    lesson.starred ? 1 : 0,
+    lesson.feedback,
+  ];
+}
+
+export function insertLesson(db: DatabaseSync, lesson: Lesson): void {
+  runSql(
+    db,
+    `INSERT OR REPLACE INTO lessons ${INSERT_COLUMNS} VALUES ${INSERT_PLACEHOLDERS}`,
+    ...lessonInsertParams(lesson),
+  );
+}
+
+export interface LessonFilters {
+  period?: string | null;
+  category?: string | null;
+  level?: string | null;
+  project?: string | null;
+  repository?: string | null;
+  branch?: string | null;
+  commit?: string | null;
+  starred?: boolean | null;
+  search?: string | null;
+  feedback?: string | null;
+  date_from?: string | null;
+  date_to?: string | null;
+}
+
+function lessonWhere(f: LessonFilters): { where: string; params: SqlParam[] } {
+  const conditions: string[] = [];
+  const params: SqlParam[] = [];
+
+  if (f.date_from != null || f.date_to != null) {
+    if (f.date_from != null) {
+      conditions.push("timestamp >= ?");
+      params.push(f.date_from);
+    }
+    if (f.date_to != null) {
+      conditions.push("timestamp <= ?");
+      const hasTime = f.date_to.includes("T") || f.date_to.includes(" ");
+      params.push(hasTime ? f.date_to : `${f.date_to}T23:59:59`);
+    }
+  } else {
+    const cutoff = periodToCutoff(f.period ?? null);
+    if (cutoff != null) {
+      conditions.push("timestamp >= ?");
+      params.push(cutoff);
+    }
+  }
+
+  if (f.category != null) {
+    conditions.push("categories LIKE ?");
+    params.push(`%"${f.category}"%`);
+  }
+  if (f.level != null) {
+    conditions.push("level = ?");
+    params.push(f.level);
+  }
+  if (f.project != null) {
+    conditions.push("project LIKE ?");
+    params.push(`%${f.project}%`);
+  }
+  if (f.repository != null) {
+    conditions.push("repository LIKE ?");
+    params.push(`%${f.repository}%`);
+  }
+  if (f.branch != null) {
+    conditions.push("branch LIKE ?");
+    params.push(`%${f.branch}%`);
+  }
+  if (f.commit != null) {
+    conditions.push("commit_hash LIKE ?");
+    params.push(`%${f.commit}%`);
+  }
+  if (f.starred != null) {
+    conditions.push("starred = ?");
+    params.push(f.starred ? 1 : 0);
+  }
+  if (f.search != null) {
+    conditions.push("(title LIKE ? OR topic_id LIKE ? OR summary LIKE ? OR body LIKE ?)");
+    const like = `%${f.search}%`;
+    params.push(like, like, like, like);
+  }
+  if (f.feedback === "none") {
+    conditions.push("feedback IS NULL");
+  } else if (f.feedback != null) {
+    conditions.push("feedback = ?");
+    params.push(f.feedback);
+  }
+
+  const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+  return { where, params };
+}
+
+export function countFilteredLessons(db: DatabaseSync, f: LessonFilters = {}): number {
+  const { where, params } = lessonWhere(f);
+  const r = getRow(db, `SELECT COUNT(*) AS n FROM lessons ${where}`, ...params);
+  return Number(r?.n ?? 0);
+}
+
+const SORT_COLUMNS = new Set(["timestamp", "level", "topic_id", "title", "feedback"]);
+const METADATA_COLUMNS = new Set([
+  "project",
+  "repository",
+  "branch",
+  "commit_hash",
+  "repository_platform",
+]);
+
+export interface GetLessonsOptions extends LessonFilters {
+  sort?: string;
+  order?: string;
+  page?: number | null;
+  per_page?: number;
+}
+
+export function getLessons(db: DatabaseSync, opts: GetLessonsOptions = {}): Lesson[] {
+  const { where, params } = lessonWhere(opts);
+  const col = opts.sort && SORT_COLUMNS.has(opts.sort) ? opts.sort : "timestamp";
+  const direction = (opts.order ?? "desc").toLowerCase() === "asc" ? "ASC" : "DESC";
+  let query = `SELECT * FROM lessons ${where} ORDER BY ${col} ${direction}`;
+  const queryParams = [...params];
+  if (opts.page != null) {
+    const perPage = opts.per_page ?? 25;
+    query += " LIMIT ? OFFSET ?";
+    queryParams.push(perPage, (opts.page - 1) * perPage);
+  }
+  return allRows(db, query, ...queryParams).map(rowToLesson);
+}
+
+export function deleteLesson(db: DatabaseSync, lessonId: string): boolean {
+  return runSql(db, "DELETE FROM lessons WHERE id = ?", lessonId) > 0;
+}
+
+export function setStar(db: DatabaseSync, lessonId: string, starred: boolean): boolean {
+  return runSql(db, "UPDATE lessons SET starred = ? WHERE id = ?", starred ? 1 : 0, lessonId) > 0;
+}
+
+export function setFeedback(
+  db: DatabaseSync,
+  lessonId: string,
+  feedback: string | null,
+): string | null {
+  runSql(db, "UPDATE lessons SET feedback = ? WHERE id = ?", feedback || null, lessonId);
+  const r = getRow(db, "SELECT topic_id FROM lessons WHERE id = ?", lessonId);
+  return r ? (r.topic_id as string) : null;
+}
+
+export function exportLessons(db: DatabaseSync): Lesson[] {
+  return allRows(db, "SELECT * FROM lessons ORDER BY timestamp DESC").map(rowToLesson);
+}
+
+export function importLessons(
+  db: DatabaseSync,
+  records: unknown[],
+): { inserted: number; duplicated: number; invalid: number } {
+  let inserted = 0;
+  let duplicated = 0;
+  let invalid = 0;
+  for (const r of records) {
+    let lesson: Lesson;
+    try {
+      lesson = parseLesson(r);
+    } catch {
+      invalid += 1;
+      continue;
+    }
+    const changes = runSql(
+      db,
+      `INSERT OR IGNORE INTO lessons ${INSERT_COLUMNS} VALUES ${INSERT_PLACEHOLDERS}`,
+      ...lessonInsertParams(lesson),
+    );
+    if (changes > 0) inserted += 1;
+    else duplicated += 1;
+  }
+  return { inserted, duplicated, invalid };
+}
+
+export function getDistinctColumn(db: DatabaseSync, column: string): string[] {
+  if (!METADATA_COLUMNS.has(column))
+    throw new Error(`Column not allowed: ${JSON.stringify(column)}`);
+  const rows = allRows(
+    db,
+    `SELECT DISTINCT ${column} FROM lessons WHERE ${column} IS NOT NULL ORDER BY ${column}`,
+  );
+  return rows.map((r) => r[column] as string);
+}
+
+export function getLessonById(db: DatabaseSync, lessonId: string): Lesson | null {
+  const r = getRow(db, "SELECT * FROM lessons WHERE id = ?", lessonId);
+  return r ? rowToLesson(r) : null;
+}
+
+export function getAllCategories(db: DatabaseSync): string[] {
+  const rows = allRows(
+    db,
+    "SELECT DISTINCT value FROM lessons, json_each(lessons.categories) ORDER BY value",
+  );
+  return rows.map((r) => r.value as string);
+}
+
+export function getTaughtTopicIds(db: DatabaseSync): string[] {
+  return allRows(db, "SELECT DISTINCT topic_id FROM lessons").map((r) => r.topic_id as string);
+}
+
+export function countLessonsSince(db: DatabaseSync, since: string): number {
+  const r = getRow(db, "SELECT COUNT(*) AS n FROM lessons WHERE timestamp >= ?", since);
+  return Number(r?.n ?? 0);
+}
+
+export function getLastLessonTimestamp(db: DatabaseSync): string | null {
+  const r = getRow(db, "SELECT timestamp FROM lessons ORDER BY timestamp DESC LIMIT 1");
+  return r ? (r.timestamp as string) : null;
+}
+
+// ── Knowledge ────────────────────────────────────────────────────────────────
+
+export function getAllKnowledge(db: DatabaseSync): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const r of allRows(db, "SELECT topic, confidence FROM knowledge")) {
+    out[r.topic as string] = Number(r.confidence);
+  }
+  return out;
+}
+
+export function getKnowledgeEntries(db: DatabaseSync): KnowledgeEntry[] {
+  return allRows(db, "SELECT topic, confidence FROM knowledge ORDER BY topic").map((r) => ({
+    topic: r.topic as string,
+    confidence: Number(r.confidence),
+  }));
+}
+
+export function getKnowledgeGroupList(db: DatabaseSync): KnowledgeGroup[] {
+  const names = allRows(db, "SELECT group_name FROM knowledge_group_names ORDER BY group_name").map(
+    (r) => r.group_name as string,
+  );
+  const assignments = new Map<string, string[]>();
+  for (const r of allRows(
+    db,
+    "SELECT group_name, topic FROM knowledge_groups ORDER BY group_name, topic",
+  )) {
+    const g = r.group_name as string;
+    const list = assignments.get(g) ?? [];
+    list.push(r.topic as string);
+    assignments.set(g, list);
+  }
+  return names.map((n) => ({ name: n, topics: assignments.get(n) ?? [] }));
+}
+
+export function upsertKnowledge(db: DatabaseSync, topic: string, confidence: number): void {
+  const clamped = Math.max(0, Math.min(10, confidence));
+  const now = new Date().toISOString();
+  runSql(
+    db,
+    `INSERT INTO knowledge (topic, confidence, updated_at) VALUES (?, ?, ?)
+     ON CONFLICT(topic) DO UPDATE SET confidence = excluded.confidence, updated_at = excluded.updated_at`,
+    topic,
+    clamped,
+    now,
+  );
+}
+
+export function deleteKnowledge(db: DatabaseSync, topic: string): boolean {
+  const changes = runSql(db, "DELETE FROM knowledge WHERE topic = ?", topic);
+  runSql(db, "DELETE FROM knowledge_groups WHERE topic = ?", topic);
+  return changes > 0;
+}
+
+// ── Knowledge groups ─────────────────────────────────────────────────────────
+
+export function getKnowledgeGroups(db: DatabaseSync): Record<string, string[]> {
+  const out: Record<string, string[]> = {};
+  for (const g of getKnowledgeGroupList(db)) out[g.name] = g.topics;
+  return out;
+}
+
+export function addGroup(db: DatabaseSync, groupName: string): boolean {
+  const name = groupName.trim();
+  if (!name) throw new Error("Group name must not be empty");
+  return (
+    runSql(db, "INSERT OR IGNORE INTO knowledge_group_names (group_name) VALUES (?)", name) > 0
+  );
+}
+
+export function deleteGroup(db: DatabaseSync, groupName: string): boolean {
+  runSql(db, "DELETE FROM knowledge_groups WHERE group_name = ?", groupName);
+  return runSql(db, "DELETE FROM knowledge_group_names WHERE group_name = ?", groupName) > 0;
+}
+
+export function assignTopicToGroup(db: DatabaseSync, topic: string, groupName: string): void {
+  runSql(db, "INSERT OR IGNORE INTO knowledge_group_names (group_name) VALUES (?)", groupName);
+  runSql(db, "DELETE FROM knowledge_groups WHERE topic = ?", topic);
+  runSql(
+    db,
+    "INSERT OR IGNORE INTO knowledge_groups (group_name, topic) VALUES (?, ?)",
+    groupName,
+    topic,
+  );
+}
+
+export function unassignTopicFromGroup(db: DatabaseSync, topic: string): void {
+  runSql(db, "DELETE FROM knowledge_groups WHERE topic = ?", topic);
+}
+
+// ── Settings ─────────────────────────────────────────────────────────────────
+
+export function getSettings(db: DatabaseSync): Settings {
+  const data: Record<string, string> = {};
+  for (const r of allRows(db, "SELECT key, value FROM settings")) {
+    data[r.key as string] = r.value as string;
+  }
+  const mgm = data.min_gap_minutes;
+  const mhb = data.min_hours_between;
+  let gap: number;
+  if (mgm !== undefined) gap = Number.parseInt(mgm, 10);
+  else if (mhb !== undefined)
+    gap = Number.parseInt(mhb, 10) * 60; // migrate hours → minutes
+  else gap = 240;
+  const maxRaw = data.max_per_day;
+  const rawTheme = data.ui_theme ?? "system";
+  const theme: UiTheme =
+    rawTheme === "dark" || rawTheme === "light" || rawTheme === "system" ? rawTheme : "system";
+  return {
+    max_per_day: maxRaw !== undefined ? Number.parseInt(maxRaw, 10) : 2,
+    min_gap_minutes: gap,
+    ui_theme: theme,
+  };
+}
+
+export function setSetting(db: DatabaseSync, key: string, value: string): void {
+  runSql(
+    db,
+    "INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+    key,
+    value,
+  );
+}
+
+export function isOnboardingComplete(db: DatabaseSync): { knowledge_ready: boolean } {
+  const r = getRow(db, "SELECT COUNT(*) AS n FROM knowledge");
+  return { knowledge_ready: Number(r?.n ?? 0) > 0 };
+}
+
+export function getUsageDefaults(db: DatabaseSync): Record<string, string | null> {
+  const result: Record<string, string | null> = {};
+  for (const col of ["project", "repository", "branch", "repository_platform"]) {
+    const r = getRow(
+      db,
+      `SELECT ${col} AS v, COUNT(*) AS c FROM lessons WHERE ${col} IS NOT NULL GROUP BY ${col} ORDER BY c DESC LIMIT 1`,
+    );
+    result[col] = r ? (r.v as string) : null;
+  }
+  return result;
+}
+
+// ── Backup / restore (ZIP, byte-compatible with the Python .zip) ─────────────
+
+export function createBackupZip(db: DatabaseSync): Uint8Array {
+  const settings = getSettings(db);
+  const lessons = exportLessons(db);
+
+  const entries = getKnowledgeEntries(db);
+  const groups = getKnowledgeGroupList(db);
+  const topicGroup = new Map<string, string>();
+  for (const g of groups) for (const t of g.topics) topicGroup.set(t, g.name);
+  const knowledgeData = {
+    groups: groups.map((g) => g.name),
+    topics: entries.map((e) => ({
+      topic: e.topic,
+      confidence: e.confidence,
+      group: topicGroup.get(e.topic) ?? null,
+    })),
+  };
+
+  const files: Record<string, Uint8Array> = {
+    [ZIP_SETTINGS]: strToU8(JSON.stringify(settings, null, 2)),
+    [ZIP_LESSONS]: strToU8(JSON.stringify(lessons, null, 2)),
+    [ZIP_KNOWLEDGE]: strToU8(JSON.stringify(knowledgeData, null, 2)),
+  };
+  if (existsSync(LEARNING_STATE_PATH)) {
+    files[ZIP_NOTEBOOK] = strToU8(readFileSync(LEARNING_STATE_PATH, "utf8"));
+  }
+  return zipSync(files);
+}
+
+export interface RestoreResult {
+  settings: number;
+  topics: number;
+  groups: number;
+  lessons: number;
+  skipped: number;
+  invalid: number;
+  learning_state: number;
+}
+
+export function restoreBackupZip(db: DatabaseSync, data: Uint8Array): RestoreResult {
+  const result: RestoreResult = {
+    settings: 0,
+    topics: 0,
+    groups: 0,
+    lessons: 0,
+    skipped: 0,
+    invalid: 0,
+    learning_state: 0,
+  };
+  const unzipped = unzipSync(data);
+
+  if (ZIP_SETTINGS in unzipped) {
+    const s = JSON.parse(strFromU8(unzipped[ZIP_SETTINGS]));
+    if ("max_per_day" in s) setSetting(db, "max_per_day", String(s.max_per_day));
+    if ("min_gap_minutes" in s) setSetting(db, "min_gap_minutes", String(s.min_gap_minutes));
+    if (s.ui_theme === "system" || s.ui_theme === "dark" || s.ui_theme === "light") {
+      setSetting(db, "ui_theme", s.ui_theme);
+    }
+    result.settings = 1;
+  }
+
+  if (ZIP_KNOWLEDGE in unzipped) {
+    const knowledge = JSON.parse(strFromU8(unzipped[ZIP_KNOWLEDGE]));
+    if (knowledge && typeof knowledge === "object" && Array.isArray(knowledge.topics)) {
+      let groupsAdded = 0;
+      for (const g of knowledge.groups ?? []) {
+        if (addGroup(db, g)) groupsAdded += 1;
+      }
+      for (const item of knowledge.topics) {
+        upsertKnowledge(db, item.topic, item.confidence);
+        const group = item.group;
+        if (group && group !== "Other") {
+          if (addGroup(db, group)) groupsAdded += 1;
+          assignTopicToGroup(db, item.topic, group);
+        }
+      }
+      result.topics = knowledge.topics.length;
+      result.groups = groupsAdded;
+    } else {
+      // Legacy format: {topic: confidence, ...}
+      for (const [topic, confidence] of Object.entries(knowledge)) {
+        upsertKnowledge(db, topic, confidence as number);
+      }
+      result.topics = Object.keys(knowledge).length;
+    }
+  }
+
+  if (ZIP_LESSONS in unzipped) {
+    const lessonsData = JSON.parse(strFromU8(unzipped[ZIP_LESSONS]));
+    const { inserted, duplicated, invalid } = importLessons(db, lessonsData);
+    result.lessons = inserted;
+    result.skipped = duplicated;
+    result.invalid = invalid;
+  }
+
+  if (ZIP_NOTEBOOK in unzipped) {
+    mkdirSync(dirname(LEARNING_STATE_PATH), { recursive: true });
+    writeFileSync(LEARNING_STATE_PATH, strFromU8(unzipped[ZIP_NOTEBOOK]), "utf8");
+    result.learning_state = 1;
+  }
+
+  return result;
+}
+
+// ── Private helpers ──────────────────────────────────────────────────────────
+
+export function periodToCutoff(period: string | null | undefined): string | null {
+  const now = new Date();
+  let cutoff: Date;
+  if (period === "today") {
+    cutoff = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0),
+    );
+  } else if (period === "week") {
+    cutoff = new Date(now.getTime() - 7 * 86400_000);
+  } else if (period === "month") {
+    cutoff = new Date(now.getTime() - 30 * 86400_000);
+  } else if (period === "year") {
+    cutoff = new Date(now.getTime() - 365 * 86400_000);
+  } else {
+    return null;
+  }
+  return cutoff.toISOString();
+}
+
+function rowToLesson(row: Row): Lesson {
+  let categories: string[] = [];
+  try {
+    const parsed = JSON.parse(row.categories as string);
+    if (Array.isArray(parsed)) categories = parsed;
+  } catch {
+    categories = [];
+  }
+  return parseLesson({ ...row, categories, starred: Boolean(row.starred) });
+}

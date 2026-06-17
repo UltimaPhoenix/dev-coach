@@ -1,499 +1,76 @@
-name: CI
-
-run-name: >-
-  ${{ github.event_name == 'workflow_dispatch'
-    && format('CI — New release ({0})', inputs.version != '' && inputs.version || inputs.bump)
-    || (startsWith(github.ref, 'refs/tags/v')
-    && format('CI — New release ({0})', github.ref_name)
-    || (github.event_name == 'pull_request'
-    && format('CI - PR {0}', github.event.pull_request.title)
-    || format('CI — {0}', github.event.head_commit.message))) }}
-
-# Covers three scenarios:
-#
-#  1. Push to main / pull request  →  lint + test + build + sonar + pages
-#  2. Tag push (v*)                →  lint + test + build + publish + GitHub Release
-#  3. workflow_dispatch (Release)  →  bump version → tag → lint + test + build + publish + GitHub Release
-#
-# The bump job only runs on workflow_dispatch. Lint/test/build always run.
-# Publish and GitHub Release run whenever a tag is present.
+name: ci
 
 on:
   push:
     branches: [main]
     tags: ["v*"]
   pull_request:
-  workflow_dispatch:
-    inputs:
-      bump:
-        description: "Version bump type"
-        required: false
-        default: patch
-        type: choice
-        options: [patch, minor, major]
-      version:
-        description: "Exact version (overrides bump, e.g. 1.0.0)"
-        required: false
-        default: ""
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
-env:
-  # Python used by pipeline tooling (lint, build, docs, release scripts).
-  # The test job has its own matrix covering every supported version.
-  PYTHON_VERSION: "3.14"
 
 jobs:
-  # ── Bump ────────────────────────────────────────────────────────────────
-  # Only runs on workflow_dispatch. Bumps pyproject.toml, commits, tags, pushes.
-  bump:
-    name: Bump version and tag
-    if: github.event_name == 'workflow_dispatch'
+  check:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-    permissions:
-      contents: write
-    outputs:
-      version: ${{ steps.ver.outputs.version }}
-      tag:     ${{ steps.ver.outputs.tag }}
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-
-      - name: Configure git
-        run: |
-          git config user.name  "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
-      - name: Compute next version
-        id: ver
-        run: |
-          if [ -n "${{ inputs.version }}" ]; then
-            NEXT="${{ inputs.version }}"
-          else
-            CURRENT=$(grep '^version' pyproject.toml | head -1 | sed 's/.*"\(.*\)"/\1/')
-            IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
-            case "${{ inputs.bump }}" in
-              major) NEXT="$((MAJOR+1)).0.0" ;;
-              minor) NEXT="${MAJOR}.$((MINOR+1)).0" ;;
-              patch) NEXT="${MAJOR}.${MINOR}.$((PATCH+1))" ;;
-            esac
-          fi
-          echo "version=$NEXT" >> "$GITHUB_OUTPUT"
-          echo "tag=v$NEXT"    >> "$GITHUB_OUTPUT"
-
-      - name: Bump version in pyproject.toml and sonar-project.properties
-        run: |
-          sed -i 's/^version = ".*"/version = "${{ steps.ver.outputs.version }}"/' pyproject.toml
-          sed -i 's/^sonar.projectVersion=.*/sonar.projectVersion=${{ steps.ver.outputs.version }}/' sonar-project.properties
-
-      - name: Commit and tag
-        run: |
-          git add pyproject.toml sonar-project.properties
-          git commit -m "chore: bump version to ${{ steps.ver.outputs.version }}"
-          git tag "${{ steps.ver.outputs.tag }}"
-          git push --atomic origin main "${{ steps.ver.outputs.tag }}"
-
-  # ── Lint ────────────────────────────────────────────────────────────────
-  lint:
-    name: Lint (ruff)
-    needs: [bump]
-    if: always() && (needs.bump.result == 'success' || needs.bump.result == 'skipped')
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          ref: ${{ needs.bump.outputs.tag || github.ref }}
-      - uses: astral-sh/setup-uv@v7
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      - run: uv sync --group dev
-      - run: uv run ruff check src/ tests/
-      - run: uv run ruff format --check src/ tests/
-
-  # ── Tests ───────────────────────────────────────────────────────────────
-  test:
-    name: Test (Python ${{ matrix.python-version }})
-    needs: [bump]
-    if: always() && (needs.bump.result == 'success' || needs.bump.result == 'skipped')
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
     strategy:
-      fail-fast: false
       matrix:
-        python-version: ["3.12", "3.13", "3.14"]
+        node: ["24", "26"] # 24 = current LTS floor (node:sqlite); 26 = latest stable
     steps:
       - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
         with:
-          ref: ${{ needs.bump.outputs.tag || github.ref }}
-      - uses: astral-sh/setup-uv@v7
-        with:
-          python-version: ${{ matrix.python-version }}
-      - run: uv sync --group dev
-      - name: Run tests
-        run: uv run pytest tests/ -v --tb=short
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run test:cov
+      - run: npm run build
 
-  # ── Build ───────────────────────────────────────────────────────────────
-  build:
-    name: Build distribution
-    needs: [bump, lint, test]
-    if: always() && (needs.bump.result == 'success' || needs.bump.result == 'skipped') && needs.lint.result == 'success' && needs.test.result == 'success'
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          ref: ${{ needs.bump.outputs.tag || github.ref }}
-      - uses: astral-sh/setup-uv@v7
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      - run: uv build
-      - uses: actions/upload-artifact@v7
-        with:
-          name: dist
-          path: dist/
-          retention-days: 7
-
-  # ── Coverage comment on PR ──────────────────────────────────────────────
-  # Posts (and updates) a coverage summary comment on every PR push.
-  # Reads the .coverage file generated by pytest-cov — no extra deps needed.
-  coverage:
-    name: Coverage comment
-    needs: [bump]
-    if: >
-      github.event_name == 'pull_request'
-      && (needs.bump.result == 'success' || needs.bump.result == 'skipped')
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    permissions:
-      pull-requests: write
-    steps:
-      - uses: actions/checkout@v6
-      - uses: astral-sh/setup-uv@v7
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      - run: uv sync --group dev
-      - name: Run tests with coverage
-        run: uv run pytest tests/ --cov=src/devcoach --cov-report=xml
-      - uses: py-cov-action/python-coverage-comment-action@v3
-        with:
-          GITHUB_TOKEN: ${{ github.token }}
-          MINIMUM_GREEN: 90
-          MINIMUM_ORANGE: 80
-
-  # ── SonarCloud scan + quality gate ─────────────────────────────────────
-  # CI-based analysis: feeds coverage.xml to SonarCloud.
-  # Skipped on pull_request events — SONAR_TOKEN is not available to PR
-  # workflows (GitHub restricts secret access). Runs on main / tags / dispatch
-  # where the token is available.
-  # Requires Automatic Analysis to be DISABLED on sonarcloud.io
-  # (Administration → Analysis Method).
-  sonar:
-    name: SonarCloud scan
-    needs: [bump, test]
-    if: >
-      always()
-      && github.event_name != 'pull_request'
-      && (needs.bump.result == 'success' || needs.bump.result == 'skipped')
-      && needs.test.result == 'success'
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          ref: ${{ needs.bump.outputs.tag || github.ref }}
-          fetch-depth: 0
-      - uses: astral-sh/setup-uv@v7
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      - run: uv sync --group dev
-      - name: Run tests with coverage
-        run: uv run pytest tests/ -v --tb=short --cov=src/devcoach --cov-report=xml
-      - name: Cache SonarCloud scanner
-        uses: actions/cache@v5
-        with:
-          path: ~/.sonar/cache
-          key: ${{ runner.os }}-sonar
-          restore-keys: ${{ runner.os }}-sonar
-      - uses: sonarsource/sonarqube-scan-action@v8
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-
-  # ── GitHub Pages ────────────────────────────────────────────────────────
-  # Builds MkDocs site and deploys to GitHub Pages on every push to main.
-  pages:
-    name: Deploy docs to GitHub Pages
-    needs: [bump, build]
-    if: always() && needs.build.result == 'success' && github.ref == 'refs/heads/main' && github.event_name == 'push'
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    permissions:
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}
-    steps:
-      - uses: actions/checkout@v6
-      - uses: astral-sh/setup-uv@v7
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      - run: uv sync --group docs
-      - run: uv run mkdocs build
-      - uses: actions/upload-pages-artifact@v5
-        with:
-          path: site/
-      - name: Deploy to GitHub Pages
-        id: deploy
-        uses: actions/deploy-pages@v5
-
-  # ── Publish ─────────────────────────────────────────────────────────────
-  # Runs when a tag is present: either created by the bump job (workflow_dispatch)
-  # or pushed directly (git push origin v1.2.3).
-  # Uses PyPI Trusted Publishing (OIDC) — no API tokens needed.
-  #
-  # One-time setup on PyPI: project=devcoach, owner=UltimaPhoenix,
-  #   repo=dev-coach, workflow=ci.yml, environment=pypi
   publish:
-    name: Publish to PyPI
-    needs: [bump, build]
-    if: always() && needs.build.result == 'success' && (needs.bump.result == 'success' || startsWith(github.ref, 'refs/tags/v'))
+    needs: check
+    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-    environment:
-      name: pypi
-      url: https://pypi.org/p/devcoach
     permissions:
-      id-token: write
-    steps:
-      - uses: actions/download-artifact@v8
-        with:
-          name: dist
-          path: dist/
-      - uses: pypa/gh-action-pypi-publish@release/v1
-
-  # ── Build Homebrew bottles ───────────────────────────────────────────────
-  # Builds a pre-compiled Homebrew bottle on each platform so brew install
-  # users get an instant unpack rather than running pip themselves.
-  # Bottle tags are macOS-version-specific: the arm64 bottle tag follows
-  # whatever macOS version the macos-latest runner currently is; users on
-  # other macOS versions fall back to building from source.
-  # Linux runners need Homebrew installed first (not pre-installed on Ubuntu).
-  build-binaries:
-    name: Build bottle (${{ matrix.platform }})
-    needs: [bump, github-release]
-    if: >
-      always()
-      && needs.github-release.result == 'success'
-    timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - platform: darwin-arm64
-            runs-on: macos-latest
-          - platform: linux-amd64
-            runs-on: ubuntu-latest
-          # no ubuntu-latest-arm label exists (-latest is x64-only); pin the
-          # newest ARM image and bump it manually when a newer one ships
-          - platform: linux-arm64
-            runs-on: ubuntu-26.04-arm
-    runs-on: ${{ matrix.runs-on }}
+      contents: read
+      id-token: write # npm provenance / OIDC trusted publishing (tokenless)
     steps:
       - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
         with:
-          ref: ${{ needs.bump.outputs.tag || github.ref }}
-      - uses: astral-sh/setup-uv@v7
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      - name: Install Homebrew (Linux only)
-        if: runner.os == 'Linux'
-        run: |
-          NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-          echo "/home/linuxbrew/.linuxbrew/bin" >> "$GITHUB_PATH"
-          echo "/home/linuxbrew/.linuxbrew/sbin" >> "$GITHUB_PATH"
-          echo "HOMEBREW_PREFIX=/home/linuxbrew/.linuxbrew" >> "$GITHUB_ENV"
-          echo "HOMEBREW_CELLAR=/home/linuxbrew/.linuxbrew/Cellar" >> "$GITHUB_ENV"
-          echo "HOMEBREW_REPOSITORY=/home/linuxbrew/.linuxbrew/Homebrew" >> "$GITHUB_ENV"
-      - name: Generate formula and install
-        env:
-          TAG: ${{ needs.bump.outputs.tag || github.ref_name }}
-          HOMEBREW_NO_ENV_HINTS: "1"
-          HOMEBREW_NO_REQUIRE_TAP_TRUST: "1"
-          HOMEBREW_NO_SANDBOX_LINUX: "1"
-        run: |
-          # brew tap-new runs git commit internally; configure identity for Linux runners
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git config --global user.name "github-actions[bot]"
-          VERSION="${TAG#v}"
-          WAITED=0
-          until curl -sf "https://pypi.org/pypi/devcoach/${VERSION}/json" > /dev/null; do
-            [ $WAITED -ge 60 ] && echo "Timed out waiting for PyPI" && exit 1
-            echo "Waiting for devcoach==$VERSION on PyPI..."; sleep 5; WAITED=$((WAITED+5))
-          done
-          uv run python scripts/generate_homebrew_formula.py --version "$VERSION" > /tmp/devcoach.rb
-          # Homebrew 4.x requires formulae to be in a tap; local file paths are rejected
-          brew tap-new local/devcoach
-          cp /tmp/devcoach.rb "$(brew --repository local/devcoach)/Formula/devcoach.rb"
-          # --build-bottle is required for brew bottle to accept the result.
-          # uv venv + uv pip install are Rust-based, so they work in the
-          # --build-bottle environment (unlike python -m venv / pip).
-          # Pre-built binary wheels (watchfiles Rust extension) may lack
-          # header padding for dylib ID rewriting; Homebrew exits 1 for
-          # that warning even though the formula installed successfully.
-          # Verify actual install success before treating it as a failure.
-          brew install --build-bottle local/devcoach/devcoach \
-            || brew list local/devcoach/devcoach > /dev/null
-      - name: Generate bottle JSON
-        env:
-          TAG: ${{ needs.bump.outputs.tag || github.ref_name }}
-          HOMEBREW_NO_ENV_HINTS: "1"
-          HOMEBREW_NO_SANDBOX_LINUX: "1"
-        run: |
-          brew bottle --json \
-            --root-url "https://github.com/UltimaPhoenix/dev-coach/releases/download/$TAG" \
-            local/devcoach/devcoach
-      - uses: actions/upload-artifact@v7
-        with:
-          name: binary-${{ matrix.platform }}
-          path: "*.bottle.*"
-          retention-days: 7
+          node-version-file: .node-version
+          registry-url: https://registry.npmjs.org
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npm publish --provenance --access public
 
-  # ── GitHub Release ──────────────────────────────────────────────────────
-  github-release:
-    name: Create GitHub Release
-    needs: [bump, publish]
-    if: >
-      always()
-      && needs.publish.result == 'success'
-      && (needs.bump.result == 'success' || startsWith(github.ref, 'refs/tags/v'))
+  release-mcpb:
+    needs: check
+    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
-    timeout-minutes: 15
     permissions:
-      contents: write
+      contents: write # create/upload the GitHub Release asset
     steps:
       - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
         with:
-          ref: ${{ needs.bump.outputs.tag || github.ref }}
-      - uses: actions/download-artifact@v8
-        with:
-          name: dist
-          path: dist/
-      - uses: softprops/action-gh-release@v3
-        with:
-          tag_name: ${{ needs.bump.outputs.tag || github.ref_name }}
-          files: dist/*
-          generate_release_notes: true
-          fail_on_unmatched_files: true
-
-  # ── Bump Homebrew formula ────────────────────────────────────────────────
-  # After a successful release, regenerates Formula/devcoach.rb in homebrew-tap
-  # as a Language::Python::Virtualenv formula pointing to the PyPI sdist.
-  # Requires secret HOMEBREW_TAP_TOKEN (classic PAT, repo scope on homebrew-tap).
-  bump-homebrew-formula:
-    name: Bump Homebrew formula
-    needs: [bump, github-release]
-    if: >
-      always()
-      && needs.github-release.result == 'success'
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          ref: ${{ needs.bump.outputs.tag || github.ref }}
-      - uses: astral-sh/setup-uv@v7
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      - name: Clone homebrew-tap
+          node-version-file: .node-version
+          cache: npm
+      - run: npm ci
+      - name: Configure signing certificate (real cert if secrets set, else self-signed)
         env:
-          TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          MCPB_CERT_PEM: ${{ secrets.MCPB_CERT }}
+          MCPB_KEY_PEM: ${{ secrets.MCPB_KEY }}
         run: |
-          TOKEN=$(printf '%s' "$TAP_TOKEN" | tr -d '[:space:]')
-          git clone "https://x-access-token:${TOKEN}@github.com/UltimaPhoenix/homebrew-tap.git" tap
-      - name: Generate formula
-        env:
-          TAG: ${{ needs.bump.outputs.tag || github.ref_name }}
-        run: |
-          VERSION="${TAG#v}"
-          WAITED=0
-          until curl -sf "https://pypi.org/pypi/devcoach/${VERSION}/json" > /dev/null; do
-            [ $WAITED -ge 60 ] && echo "Timed out waiting for PyPI" && exit 1
-            echo "Waiting for devcoach==$VERSION on PyPI..."; sleep 5; WAITED=$((WAITED+5))
-          done
-          uv run python scripts/generate_homebrew_formula.py \
-            --version "$VERSION" \
-            > tap/Formula/devcoach.rb
-      - name: Commit and push
-        run: |
-          TAG="${{ needs.bump.outputs.tag || github.ref_name }}"
-          VERSION="${TAG#v}"
-          cd tap
-          git config user.name  "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add Formula/devcoach.rb
-          git diff --cached --quiet || git commit -m "devcoach $VERSION"
-          git push
-
-  # ── Merge bottles into formula ───────────────────────────────────────────────
-  # Combines bottle JSONs from all platforms, uploads .tar.gz to the GitHub
-  # release, and pushes the updated formula (with bottle do block) to the tap.
-  merge-bottles:
-    name: Merge bottles into formula
-    needs: [bump, github-release, bump-homebrew-formula, build-binaries]
-    if: >
-      always()
-      && needs.build-binaries.result == 'success'
-      && needs.bump-homebrew-formula.result == 'success'
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v6
+          if [ -n "$MCPB_CERT_PEM" ] && [ -n "$MCPB_KEY_PEM" ]; then
+            printf '%s' "$MCPB_CERT_PEM" > "$RUNNER_TEMP/mcpb-cert.pem"
+            printf '%s' "$MCPB_KEY_PEM"  > "$RUNNER_TEMP/mcpb-key.pem"
+            echo "MCPB_CERT=$RUNNER_TEMP/mcpb-cert.pem" >> "$GITHUB_ENV"
+            echo "MCPB_KEY=$RUNNER_TEMP/mcpb-key.pem"   >> "$GITHUB_ENV"
+            echo "Signing with the provided code-signing certificate."
+          else
+            echo "No MCPB_CERT/MCPB_KEY secrets — self-signing (unverified publisher)."
+          fi
+      - run: npm run mcpb:sign
+      - name: Attach the .mcpb to the GitHub Release
+        uses: softprops/action-gh-release@v3
         with:
-          ref: ${{ needs.bump.outputs.tag || github.ref }}
-      - name: Download bottle artifacts
-        uses: actions/download-artifact@v8
-        with:
-          pattern: binary-*
-          merge-multiple: true
-      - name: Clone homebrew-tap
-        env:
-          TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
-        run: |
-          TOKEN=$(printf '%s' "$TAP_TOKEN" | tr -d '[:space:]')
-          git clone "https://x-access-token:${TOKEN}@github.com/UltimaPhoenix/homebrew-tap.git" tap
-      - name: Upload bottles to GitHub release
-        env:
-          GH_TOKEN: ${{ github.token }}
-          TAG: ${{ needs.bump.outputs.tag || github.ref_name }}
-        run: |
-          # Homebrew's url_encode uses a single dash separator (name-version.platform.bottle.tar.gz)
-          # for non-GitHub-Packages root_url values (see utils/bottles.rb path_resolved_basename).
-          # brew bottle produces double-dash local filenames; rename before upload so the
-          # release asset name matches the URL Homebrew constructs at install time.
-          for f in *--*.bottle.tar.gz; do mv "$f" "${f//--/-}"; done
-          gh release upload "$TAG" *.bottle.tar.gz
-      - name: Inject bottle block into formula
-        env:
-          TAG: ${{ needs.bump.outputs.tag || github.ref_name }}
-        run: |
-          python3 scripts/inject_bottle_block.py \
-            --formula tap/Formula/devcoach.rb \
-            --root-url "https://github.com/UltimaPhoenix/dev-coach/releases/download/$TAG" \
-            *.bottle.json
-      - name: Commit and push formula
-        run: |
-          TAG="${{ needs.bump.outputs.tag || github.ref_name }}"
-          VERSION="${TAG#v}"
-          cd tap
-          git config user.name  "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add Formula/devcoach.rb
-          git diff --cached --quiet || git commit -m "devcoach $VERSION: add bottle hashes"
-          git push
+          files: dist-mcpb/*.mcpb

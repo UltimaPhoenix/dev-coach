@@ -1,279 +1,74 @@
 # MCP server reference
 
-devcoach implements the [MCP 2025-11-25 spec](https://modelcontextprotocol.io/specification/2025-11-25/server) via [FastMCP](https://github.com/jlowin/fastmcp).
+devcoach implements the [Model Context Protocol](https://modelcontextprotocol.io) via the official
+[TypeScript SDK](https://github.com/modelcontextprotocol/typescript-sdk), served over **stdio**.
 
-The server exposes **tools** (mutations), **resources** (read-only data), and a **prompt** (coaching instructions).
+The server exposes **tools** (actions), **resources** (read-only data), and a **prompt** (coaching
+instructions). Start it with `npx -y devcoach mcp`, or inspect it with:
 
----
-
-## Connection
-
-```json
-{
-  "mcpServers": {
-    "devcoach": {
-      "type": "stdio",
-      "command": "uvx",
-      "args": ["devcoach", "mcp"]
-    }
-  }
-}
+```bash
+npx @modelcontextprotocol/inspector npx -y devcoach mcp
 ```
 
-!!! note
-    The `mcp` subcommand is required. Running `devcoach` without it launches the CLI instead of the MCP server.
-
----
-
-## Tools (mutations)
-
-### `log_lesson`
-
-Save a delivered lesson to the coaching log. Git metadata is auto-detected from the workspace — you only need to supply the required fields.
-
-**Required:**
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `id` | string | Unique lesson ID (e.g. UUID or slug) |
-| `timestamp` | string | ISO 8601 datetime (UTC) |
-| `topic_id` | string | snake_case topic identifier |
-| `categories` | string[] | Category tags (e.g. `["python", "async"]`) |
-| `title` | string | Short lesson title |
-| `level` | `"junior" \| "mid" \| "senior"` | Difficulty level |
-| `summary` | string | One-line description of what was taught |
-
-**Optional (auto-detected if omitted):**
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `task_context` | string | Brief description of the triggering task |
-| `project` | string | Project name |
-| `repository` | string | `org/repo` for remote; absolute path for local |
-| `branch` | string | Current git branch |
-| `commit_hash` | string | Full commit SHA |
-| `folder` | string | Absolute path to cwd |
-| `repository_platform` | `"github" \| "gitlab" \| "bitbucket" \| "local"` | VCS platform |
-
-Returns the saved `Lesson` object with all resolved fields (including any auto-filled git context).
-
----
-
-### `update_knowledge`
-
-Adjust confidence for a topic by delta. Creates the topic at confidence 5 if it doesn't exist.
+## Configuration
 
 ```json
-{ "topic": "python_generators", "delta": 1 }
+{ "mcpServers": { "devcoach": { "command": "npx", "args": ["-y", "devcoach", "mcp"] } } }
 ```
 
-Returns the updated `Profile`.
+Claude Desktop config file: macOS `~/Library/Application Support/Claude/claude_desktop_config.json` ·
+Windows `%APPDATA%\Claude\claude_desktop_config.json` · Linux `~/.config/Claude/claude_desktop_config.json`.
 
----
+## Tools (13)
 
-### `complete_onboarding`
+| Tool | Purpose | Annotation |
+|---|---|---|
+| `log_lesson` | Save a delivered lesson (auto-fills git context; elicits inline feedback) | write |
+| `update_knowledge` | Adjust a topic's confidence by a delta (clamped 0–10) | write |
+| `get_lessons` | Query lesson history (period, category, level, git, starred, feedback, search, date range) | read-only |
+| `star_lesson` | Star / unstar a lesson | write |
+| `delete_lesson` | Permanently delete a lesson | **destructive** |
+| `submit_feedback` | Record `know` / `dont_know` / `clear`; adjusts confidence ±1 (idempotent) | write |
+| `add_topic` | Add/update a topic, optionally in a group | write |
+| `remove_topic` | Remove a topic from the knowledge map | **destructive** |
+| `add_group` | Create a knowledge group | write |
+| `remove_group` | Delete a group (topics move to Other) | **destructive** |
+| `update_settings` | Set `max_per_day` (1–20) or `min_gap_minutes` (0–1440) | write |
+| `open_ui` | Launch the web dashboard in the background | open-world |
+| `complete_onboarding` | Save the initial profile (topics + groups) and mark onboarding done | **destructive** |
 
-Save the user's initial knowledge profile and mark onboarding complete. Called at the end of the onboarding flow.
+Each tool declares a `title` and read-only/destructive hints, validates input with Zod, returns typed
+`structuredContent` where applicable, and reports failures as `{ isError: true, … }` with a recovery hint.
 
-```json
-{
-  "topics": {
-    "python": 7,
-    "docker": 8,
-    "git": 7,
-    "github_actions": 6
-  },
-  "groups": {
-    "Languages": ["python"],
-    "DevOps": ["docker", "github_actions"],
-    "Version Control": ["git"]
-  }
-}
-```
+## Resources (9)
 
-Wipes any default-seeded profile and saves the user's selections. Returns the updated `Profile`.
-
----
-
-### `get_lessons`
-
-Query the lesson history with filters.
-
-```json
-{
-  "period": "week",
-  "category": "python",
-  "level": "mid",
-  "starred": true,
-  "search": "generator"
-}
-```
-
-All parameters are optional and combinable. Returns `Lesson[]`.
-
----
-
-### `star_lesson`
-
-Set the starred (favourite) flag to an explicit value. Idempotent — calling with the same value twice is safe.
-
-```json
-{ "lesson_id": "lesson-python-generators-001", "starred": true }
-```
-
-Returns the new `starred` state as a boolean.
-
----
-
-### `submit_feedback`
-
-Record comprehension feedback. Adjusts knowledge confidence.
-
-```json
-{ "lesson_id": "lesson-python-generators-001", "feedback": "know" }
-```
-
-`feedback`: `"know"` (+1 confidence) | `"dont_know"` (-1) | `"clear"` (remove only)
-
-Returns the updated `Profile`.
-
----
-
-### `add_topic` / `remove_topic`
-
-Add or remove a topic from the knowledge map.
-
-```json
-{ "topic": "rust_lifetimes", "confidence": 3, "group": "Languages" }
-```
-
----
-
-### `add_group` / `remove_group`
-
-Create or delete a named group.
-
-```json
-{ "name": "Machine Learning" }
-```
-
----
-
-### `update_settings`
-
-Update a rate-limit setting.
-
-```json
-{ "key": "max_per_day", "value": "3" }
-```
-
-Valid keys: `max_per_day` (1–20), `min_gap_minutes` (0–1440).
-
----
-
-### `open_ui`
-
-Launch the web dashboard in the background.
-
-```json
-{ "port": 7860 }
-```
-
----
-
-## Resources (read-only)
-
-Resources are read by the AI without the user requesting it — they are app-controlled.
-
-| URI | Description |
-|-----|-------------|
-| `devcoach://profile` | Full knowledge map (topics, confidence, groups) |
-| `devcoach://stats` | Lesson counts, rate-limit state, weakest/strongest topics |
-| `devcoach://rate-limit` | `{allowed, reason}` — check before delivering a lesson |
-| `devcoach://taught-topics` | All topic_ids already taught |
-| `devcoach://context` | Current workspace git context + usage defaults |
-| `devcoach://onboarding` | Onboarding status + auto-detected stack for first run |
-| `devcoach://settings` | Current rate-limit settings |
-| `devcoach://lessons/recent` | Last 10 lessons from the current week |
-| `devcoach://lessons/{lesson_id}` | Single lesson by ID (resource template) |
-
-### `devcoach://onboarding`
-
-```json
-{
-  "needs_onboarding": true,
-  "detected_stack": {
-    "python": 6,
-    "docker": 7,
-    "github_actions": 6
-  },
-  "context_ready": true
-}
-```
-
-`detected_stack` is scanned from the server's `cwd`. Values are suggestions — the user confirms them during the onboarding conversation.
-
-### `devcoach://context`
-
-```json
-{
-  "git": {
-    "project": "dev-coach",
-    "repository": "UltimaPhoenix/dev-coach",
-    "branch": "main",
-    "commit_hash": "abc123...",
-    "folder": "/Users/phoenix/dev-coach",
-    "repository_platform": "github"
-  },
-  "usage_defaults": {
-    "project": "dev-coach",
-    "repository": "UltimaPhoenix/dev-coach",
-    "branch": "main",
-    "repository_platform": "github"
-  }
-}
-```
-
----
+`devcoach://profile` · `settings` · `lessons/recent` · `stats` · `taught-topics` · `rate-limit` ·
+`context` · `onboarding` · `lessons/{lesson_id}` (templated). All return `application/json` and never
+throw — on error they return `{ "error": … }`. Read `taught-topics` before selecting a lesson topic to
+avoid repetition; read `rate-limit` to decide whether to deliver.
 
 ## Prompt
 
-### `devcoach_instructions`
-
-Returns the full content of `SKILL.md` — the coaching behaviour guidelines loaded by Claude at session start. This is the single source of truth for how devcoach behaves.
-
----
+`devcoach_instructions` returns the full coaching instructions (`assets/SKILL.md`). Clients that support
+MCP prompts (Claude Code, Claude Desktop) load it automatically — no separate skill install needed.
 
 ## Data models
 
-### `Lesson`
+See [configuration.md](configuration.md) for the SQLite schema. The `Lesson` shape accepted by
+`log_lesson` (snake_case, validated by Zod):
 
-```typescript
+```jsonc
 {
-  id: string
-  timestamp: string          // ISO 8601 UTC
-  topic_id: string
-  categories: string[]
-  title: string
-  level: "junior" | "mid" | "senior"
-  summary: string
-  task_context?: string
-  project?: string
-  repository?: string
-  branch?: string
-  commit_hash?: string
-  folder?: string
-  repository_platform?: "github" | "gitlab" | "bitbucket" | "local"
-  starred: boolean
-  feedback?: "know" | "dont_know"
-}
-```
-
-### `Profile`
-
-```typescript
-{
-  knowledge: Array<{ topic: string, confidence: number }>   // confidence 0-10
-  groups: Array<{ name: string, topics: string[] }>
+  "id": "uuid-or-random",
+  "timestamp": "2026-01-15T20:30:00Z",   // ISO 8601; normalized to UTC, clamped to now
+  "topic_id": "typescript",
+  "categories": ["typescript", "performance"],
+  "title": "Promise.allSettled vs Promise.all",
+  "level": "mid",                          // junior | mid | senior
+  "summary": "…",                          // shown in the lesson card
+  "body": "…",                             // optional full markdown
+  "task_context": "…",                     // optional
+  "project": null, "repository": null, "branch": null,
+  "commit_hash": null, "folder": null, "repository_platform": null  // auto-detected from git when omitted
 }
 ```

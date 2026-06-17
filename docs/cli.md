@@ -1,269 +1,70 @@
 # CLI reference
 
-## Overview
+The CLI is a secondary interface for querying and managing your coaching data — everything is also in
+the [web dashboard](web-ui.md). It's built on [Commander](https://github.com/tj/commander.js), so every
+command supports `--help`.
 
-Running `devcoach` with no arguments prints a help panel listing every available command:
-
-```
-devcoach
-```
-
-All commands operate on `~/.devcoach/coaching.db`. No network access required.
-
----
-
-## MCP server
-
-### `devcoach mcp`
-
-Start the stdio MCP server for Claude Code or Claude Desktop. This is what you put in your MCP config:
-
-```json
-{
-  "mcpServers": {
-    "devcoach": {
-      "command": "uvx",
-      "args": ["devcoach", "mcp"]
-    }
-  }
-}
+```bash
+devcoach --help              # list all commands
+devcoach <command> --help    # usage for one command
+devcoach --version
 ```
 
----
+> Prefix any command with `npx -y` if you haven't installed globally (`npm i -g devcoach`).
+> Mutating commands write to `~/.devcoach/coaching.db`; sandbox them with `HOME=$(mktemp -d) devcoach …`.
 
----
+## Setup & integration
+
+| Command | Description |
+|---|---|
+| `devcoach mcp` | Start the MCP server (stdio) — used by your agent's MCP config |
+| `devcoach install [--claude-code] [--claude-desktop] [--force] [--skip-hook]` | Register the MCP server (user scope) + Stop hooks |
+| `devcoach setup` | Interactive onboarding wizard (import a backup or build a profile) |
+| `devcoach ui [--port <n>]` | Launch the web dashboard (default port 7860) |
+| `devcoach onboard-hook` / `lesson-ready` | Claude Code Stop hooks (exit 0 silent / exit 2 acts) |
 
 ## Knowledge map
 
-### `devcoach profile`
-
-Display your full knowledge map grouped by category, sorted by confidence.
-
-```
-┌─────────────────────────────────────────────────────────┐
-│                     Knowledge Map                       │
-├───────────────────┬────────────┬────────────┬───────────┤
-│ Topic             │ Group      │ Confidence │ Bar       │
-├───────────────────┼────────────┼────────────┼───────────┤
-│ docker            │ DevOps     │ 8/10       │ ████████░░│
-│ python            │ Languages  │ 7/10       │ ███████░░░│
-│ fastapi           │ Backend    │ 5/10       │ █████░░░░░│
-└───────────────────┴────────────┴────────────┴───────────┘
-```
-
-### `devcoach knowledge-add <topic>`
-
-Add a topic or update its confidence.
-
-```bash
-devcoach knowledge-add rust --confidence 3
-devcoach knowledge-add kubernetes --confidence 5 --group DevOps
-```
-
-Options:
-- `--confidence N` — 0-10, default 5
-- `--group NAME` — assign to a named group (creates the group if needed)
-
-### `devcoach knowledge-remove <topic>`
-
-Remove a topic from the knowledge map.
-
-```bash
-devcoach knowledge-remove old_framework
-```
-
-### `devcoach group-add <name>`
-
-Register a new group.
-
-```bash
-devcoach group-add "Machine Learning"
-```
-
-### `devcoach group-remove <name>`
-
-Delete a group. Topics in the group move to Other.
-
-```bash
-devcoach group-remove "Machine Learning"
-```
-
-### `devcoach group-assign <topic> <group>`
-
-Move a topic to a group. Use `Other` to ungroup.
-
-```bash
-devcoach group-assign pytorch "Machine Learning"
-devcoach group-assign deprecated_lib Other
-```
-
----
+| Command | Description |
+|---|---|
+| `devcoach profile` | Show the knowledge map with confidence bars |
+| `devcoach knowledge-add <topic> [--confidence <0-10>] [--group <name>]` | Add or update a topic |
+| `devcoach knowledge-remove <topic>` | Remove a topic |
+| `devcoach group-add <name>` / `group-remove <name>` | Create / delete a group |
+| `devcoach group-assign <topic> <group>` | Move a topic to a group (`Other` to ungroup) |
 
 ## Lessons
 
-### `devcoach lessons`
+| Command | Description |
+|---|---|
+| `devcoach lessons [--period <p>] [--level <l>] [--category <c>] [--project/--repository/--branch/--commit <…>] [--starred] [--feedback <f>] [--date-from/--date-to <YYYY-MM-DD>] [--sort <col>] [--order <asc\|desc>]` | List lessons with filters |
+| `devcoach lesson <id>` | Show a single lesson in full |
+| `devcoach star <id>` / `unstar <id>` | Star / unstar |
+| `devcoach delete <id>` | Permanently delete a lesson |
+| `devcoach feedback <id> <know\|dont_know\|clear>` | Record comprehension (adjusts confidence) |
 
-List lessons with optional filters.
+## Stats & settings
 
-```bash
-devcoach lessons                              # all lessons, newest first
-devcoach lessons --period today               # last 24h
-devcoach lessons --period week                # last 7 days
-devcoach lessons --period month               # last 30 days
-devcoach lessons --period year                # last 365 days
-devcoach lessons --category docker            # by category tag
-devcoach lessons --level senior               # junior | mid | senior
-devcoach lessons --project dev-coach          # fuzzy match on project name
-devcoach lessons --repository UltimaPhoenix/dev-coach
-devcoach lessons --branch feature/auth        # fuzzy match
-devcoach lessons --commit abc123              # fuzzy match on hash prefix
-devcoach lessons --starred                    # favourites only
-devcoach lessons --feedback dont_know         # need to revisit
-devcoach lessons --feedback know              # already mastered
-devcoach lessons --feedback none              # no response given yet
-devcoach lessons --search "generator"         # full-text search
-devcoach lessons --date-from 2026-04-01
-devcoach lessons --date-to 2026-04-30
-devcoach lessons --date-from 2026-04-25T09:00 --date-to 2026-04-25T18:00
-devcoach lessons --sort level --order asc     # sort by difficulty ascending
-```
-
-All filters can be combined.
-
-### `devcoach lesson <id>`
-
-Show a single lesson in full detail.
-
-```bash
-devcoach lesson lesson-python-generators-001
-```
-
-### `devcoach star <id>`
-
-Mark a lesson as starred (favourite).
-
-```bash
-devcoach star lesson-python-generators-001
-# → Lesson lesson-python-generators-001 → ★ starred
-```
-
-### `devcoach unstar <id>`
-
-Remove the starred mark from a lesson.
-
-```bash
-devcoach unstar lesson-python-generators-001
-# → Lesson lesson-python-generators-001 → ☆ unstarred
-```
-
-Both commands are idempotent — calling them when the lesson is already in the target state is safe.
-
-### `devcoach feedback <id> <value>`
-
-Record whether you understood a lesson. Adjusts knowledge confidence.
-
-```bash
-devcoach feedback lesson-python-generators-001 know       # +1 confidence
-devcoach feedback lesson-python-generators-001 dont_know  # -1 confidence
-devcoach feedback lesson-python-generators-001 clear      # remove feedback
-```
-
----
-
-## Stats
-
-### `devcoach stats`
-
-Overview: lesson counts, rate-limit status, top 5 weakest and strongest topics.
-
-```
-┌──────────────────────────────┐
-│        Coaching Stats        │
-├─────────────────────┬────────┤
-│ Total lessons       │     42 │
-│ Lessons today (24h) │  1 / 2 │
-│ Lessons this week   │      7 │
-│ Next lesson         │ Available now │
-└─────────────────────┴────────┘
-
- Weakest topics          Strongest topics
- testing         (3)     docker           (8)
- rust            (3)     git              (7)
- kubernetes      (4)     debugging_mindset(8)
-```
-
----
-
-## Settings
-
-### `devcoach settings`
-
-Show current rate-limit settings.
-
-### `devcoach set <key> <value>`
-
-Update a setting.
-
-```bash
-devcoach set max_per_day 3        # 1-20, default 2
-devcoach set min_gap_minutes 120  # 0-1440, default 240
-```
-
----
-
-## Setup
-
-### `devcoach setup`
-
-Interactive first-run wizard. Presents three paths:
-
-1. Restore from backup zip
-2. Automatic (detect stack from project files)
-3. Manual (free-form topic entry)
-
-Followed by optional group assignment and rate-limit settings.
-
-### `devcoach install`
-
-Register the devcoach MCP server (`devcoach mcp`) in Claude's config files.
-
-```bash
-devcoach install                  # both Claude Code + Claude Desktop
-devcoach install --claude-code    # ~/.claude.json only
-devcoach install --claude-desktop # claude_desktop_config.json only
-devcoach install --force          # overwrite existing entry
-```
-
----
+| Command | Description |
+|---|---|
+| `devcoach stats` | Lesson counts, rate-limit status, weakest/strongest topics |
+| `devcoach settings` | Show current settings |
+| `devcoach set max_per_day <n>` | Max lessons per 24h (1–20, default 2) |
+| `devcoach set min_gap_minutes <n>` | Minimum minutes between lessons (0–1440, default 240) |
 
 ## Backup & restore
 
-### `devcoach backup [output]`
+| Command | Description |
+|---|---|
+| `devcoach backup [file.zip]` | Export settings + knowledge map + lessons + notebook (default `devcoach-backup.zip`) |
+| `devcoach restore <file.zip>` | Restore from a backup (settings overwritten, knowledge upserted, duplicate lessons skipped) |
 
-Export settings + knowledge map + all lessons as a zip archive.
-
-```bash
-devcoach backup                          # → devcoach-backup.zip
-devcoach backup ~/backups/devcoach.zip   # custom path
-```
-
-### `devcoach restore <input>`
-
-Restore from a backup zip. Settings are overwritten; duplicate lessons are skipped.
+## Examples
 
 ```bash
-devcoach restore devcoach-backup.zip
-```
-
----
-
-## Web UI
-
-### `devcoach ui`
-
-Launch the web dashboard (see [Web UI](web-ui.md)).
-
-```bash
-devcoach ui              # http://localhost:7860
-devcoach ui --port 8080  # custom port
+devcoach lessons --period week --level senior --starred
+devcoach lessons --category docker --sort timestamp --order asc
+devcoach feedback 9f3a know
+devcoach set min_gap_minutes 120
+devcoach backup ~/devcoach-$(date +%F).zip
 ```
