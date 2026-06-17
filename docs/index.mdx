@@ -4,8 +4,7 @@ title: devcoach
 description: Progressive technical coaching, directly in your AI agent.
 ---
 
-import Tabs from "@theme/Tabs";
-import TabItem from "@theme/TabItem";
+import ThemedShot from "@site/src/components/ThemedShot";
 
 # devcoach
 
@@ -44,49 +43,40 @@ flowchart TD
 
 ## Screenshots
 
+_Screenshots follow the site theme. Toggle ☀️/🌙 in the top bar and they switch with it — or use the
+Dark/Light buttons on a shot to override just that image._
+
 ### Knowledge map
 
-<Tabs groupId="theme">
-  <TabItem value="dark" label="Dark" default>
-    ![Knowledge map – dark theme](./screenshots/knowledge-map-dark.png)
-  </TabItem>
-  <TabItem value="light" label="Light">
-    ![Knowledge map – light theme](./screenshots/knowledge-map-light.png)
-  </TabItem>
-</Tabs>
+<ThemedShot
+  alt="Knowledge map"
+  light={require("./screenshots/knowledge-map-light.png").default}
+  dark={require("./screenshots/knowledge-map-dark.png").default}
+/>
 
 ### Lesson history
 
-<Tabs groupId="theme">
-  <TabItem value="dark" label="Dark" default>
-    ![Lessons – dark theme](./screenshots/lessons-dark.png)
-  </TabItem>
-  <TabItem value="light" label="Light">
-    ![Lessons – light theme](./screenshots/lessons-light.png)
-  </TabItem>
-</Tabs>
+<ThemedShot
+  alt="Lesson history"
+  light={require("./screenshots/lessons-light.png").default}
+  dark={require("./screenshots/lessons-dark.png").default}
+/>
 
 ### Settings
 
-<Tabs groupId="theme">
-  <TabItem value="dark" label="Dark" default>
-    ![Settings – dark theme](./screenshots/settings-dark.png)
-  </TabItem>
-  <TabItem value="light" label="Light">
-    ![Settings – light theme](./screenshots/settings-light.png)
-  </TabItem>
-</Tabs>
+<ThemedShot
+  alt="Settings"
+  light={require("./screenshots/settings-light.png").default}
+  dark={require("./screenshots/settings-dark.png").default}
+/>
 
 ### Lesson detail
 
-<Tabs groupId="theme">
-  <TabItem value="dark" label="Dark" default>
-    ![Lesson detail – dark theme](./screenshots/lesson-redis-cache-stampede-dark.png)
-  </TabItem>
-  <TabItem value="light" label="Light">
-    ![Lesson detail – light theme](./screenshots/lesson-redis-cache-stampede-light.png)
-  </TabItem>
-</Tabs>
+<ThemedShot
+  alt="Lesson detail"
+  light={require("./screenshots/lesson-redis-cache-stampede-light.png").default}
+  dark={require("./screenshots/lesson-redis-cache-stampede-dark.png").default}
+/>
 
 ---
 
