@@ -27,7 +27,7 @@ export function formatIsoZ(dt: Date): string {
  *  matching Python's `datetime.fromisoformat(...).replace(tzinfo=UTC)`. */
 function parseToUtc(value: string | Date): Date {
   if (value instanceof Date) {
-    if (Number.isNaN(value.getTime())) throw new Error("Invalid Date");
+    if (Number.isNaN(value.getTime())) throw new TypeError("Invalid Date");
     return value;
   }
   let s = value.trim();
@@ -37,7 +37,7 @@ function parseToUtc(value: string | Date): Date {
   }
   const dt = new Date(s);
   if (Number.isNaN(dt.getTime())) {
-    throw new Error(`Cannot parse timestamp ${JSON.stringify(value)} — expected ISO 8601`);
+    throw new TypeError(`Cannot parse timestamp ${JSON.stringify(value)} — expected ISO 8601`);
   }
   return dt;
 }

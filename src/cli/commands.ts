@@ -11,7 +11,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { homedir, platform } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { createInterface } from "node:readline/promises";
 import { Command } from "commander";
 import * as coach from "../core/coach";
@@ -371,12 +371,19 @@ function cmdGroupAssign(topic: string, group: string): void {
 }
 
 function cmdBackup(output: string): void {
+  // Normalize and validate the user-supplied destination before writing.
+  const target = resolve(output);
+  if (existsSync(target) && statSync(target).isDirectory()) {
+    log(c.red(`Refusing to write backup: ${output} is a directory`));
+    process.exit(1);
+  }
+  mkdirSync(dirname(target), { recursive: true });
   const { lessonsCount, knowledgeCount, data } = db.withConnection((conn) => ({
     lessonsCount: db.exportLessons(conn).length,
     knowledgeCount: db.getKnowledgeEntries(conn).length,
     data: db.createBackupZip(conn),
   }));
-  writeFileSync(output, data);
+  writeFileSync(target, data);
   const notebookNote = existsSync(db.LEARNING_STATE_PATH) ? " + notebook" : "";
   log(
     `${c.green("Backup saved:")} ${output}  (${c.cyan(String(lessonsCount))} lessons, ${c.cyan(String(knowledgeCount))} topics${notebookNote})`,
@@ -525,10 +532,12 @@ function installHook(force: boolean): string {
     if (!force) {
       return `${c.yellow("Stop hooks already installed")} in ${path} (use --force to overwrite)`;
     }
-    for (const i of existing.reverse()) stop.splice(i, 1);
+    for (const i of existing.toReversed()) stop.splice(i, 1);
   }
-  stop.push({ hooks: [{ type: "command", command: `${prefix} onboard-hook` }] });
-  stop.push({ hooks: [{ type: "command", command: `${prefix} lesson-ready` }] });
+  stop.push(
+    { hooks: [{ type: "command", command: `${prefix} onboard-hook` }] },
+    { hooks: [{ type: "command", command: `${prefix} lesson-ready` }] },
+  );
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, `${JSON.stringify(data, null, 2)}\n`);
   return `${c.green("✓")} Stop hooks installed into ${path}`;
@@ -629,7 +638,7 @@ async function cmdSetup(): Promise<void> {
       const git = detectGitContext();
       const cwd = git.folder ?? process.cwd();
       const detected = detectStack(cwd);
-      const keys = Object.keys(detected).sort();
+      const keys = Object.keys(detected).sort((a, b) => a.localeCompare(b));
       if (keys.length) {
         log(`\n${c.dim(`Detected from ${c.cyan(cwd)}:`)}`);
         for (const topic of keys) {
@@ -672,7 +681,7 @@ async function cmdSetup(): Promise<void> {
       const doGroups = (await ask("Organise topics into groups? [y/N]", "n")).toLowerCase();
       if (doGroups.startsWith("y")) {
         const existingGroups: string[] = [];
-        for (const t of Object.keys(topics).sort()) {
+        for (const t of Object.keys(topics).sort((a, b) => a.localeCompare(b))) {
           const suggestion = existingGroups.length ? existingGroups.join(", ") : "(none yet)";
           const g = await ask(
             `  Group for ${c.cyan(t)}  existing: ${c.dim(suggestion)}  (Enter=Other)`,
@@ -742,7 +751,7 @@ const ONBOARD_SESSION_TIMEOUT_HOURS = 24;
 function onboardSessionActive(knowledgeReady: boolean): boolean {
   if (knowledgeReady) return true;
   if (!existsSync(db.LEARNING_STATE_PATH)) return false;
-  const ageHours = (Date.now() - statSync(db.LEARNING_STATE_PATH).mtimeMs) / 3600_000;
+  const ageHours = (Date.now() - statSync(db.LEARNING_STATE_PATH).mtimeMs) / 3_600_000;
   return ageHours < ONBOARD_SESSION_TIMEOUT_HOURS;
 }
 
