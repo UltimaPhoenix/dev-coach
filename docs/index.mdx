@@ -1,0 +1,100 @@
+---
+slug: /
+title: devcoach
+description: Progressive technical coaching, directly in your AI agent.
+---
+
+import Tabs from "@theme/Tabs";
+import TabItem from "@theme/TabItem";
+
+# devcoach
+
+**Progressive technical coaching, directly in your AI agent.** After every task you complete with
+Claude Code, Claude Desktop, or another MCP-compatible agent, devcoach delivers a short, targeted
+lesson based on what you already know — no generic tutorials, no repeated topics.
+
+Everything runs **locally**. No data leaves your machine. One SQLite file at `~/.devcoach/coaching.db`.
+
+---
+
+## How it works
+
+```mermaid
+flowchart TD
+    A([Task completed]) --> B[Check rate limit]
+    B -->|denied| Z([Silent])
+    B -->|allowed| D
+
+    subgraph loop["coaching loop"]
+        D[Select topic & depth]
+        E[Compose & deliver]
+        G[log_lesson]
+    end
+
+    D -->|nothing| Z
+    D -->|found| E
+    E --> G
+    G --> F([Done])
+    G -.->|prompts| U(["You: ✅ ❌ ⏭"])
+```
+
+→ [Full decision flow: session startup · lesson selection · depth calibration](./how-it-works.md)
+
+---
+
+## Screenshots
+
+### Knowledge map
+
+<Tabs groupId="theme">
+  <TabItem value="dark" label="Dark" default>
+    ![Knowledge map – dark theme](./screenshots/knowledge-map-dark.png)
+  </TabItem>
+  <TabItem value="light" label="Light">
+    ![Knowledge map – light theme](./screenshots/knowledge-map-light.png)
+  </TabItem>
+</Tabs>
+
+### Lesson history
+
+<Tabs groupId="theme">
+  <TabItem value="dark" label="Dark" default>
+    ![Lessons – dark theme](./screenshots/lessons-dark.png)
+  </TabItem>
+  <TabItem value="light" label="Light">
+    ![Lessons – light theme](./screenshots/lessons-light.png)
+  </TabItem>
+</Tabs>
+
+### Settings
+
+<Tabs groupId="theme">
+  <TabItem value="dark" label="Dark" default>
+    ![Settings – dark theme](./screenshots/settings-dark.png)
+  </TabItem>
+  <TabItem value="light" label="Light">
+    ![Settings – light theme](./screenshots/settings-light.png)
+  </TabItem>
+</Tabs>
+
+### Lesson detail
+
+<Tabs groupId="theme">
+  <TabItem value="dark" label="Dark" default>
+    ![Lesson detail – dark theme](./screenshots/lesson-redis-cache-stampede-dark.png)
+  </TabItem>
+  <TabItem value="light" label="Light">
+    ![Lesson detail – light theme](./screenshots/lesson-redis-cache-stampede-light.png)
+  </TabItem>
+</Tabs>
+
+---
+
+## Quick install
+
+```bash
+npx -y devcoach install   # registers with Claude Code / Claude Desktop
+```
+
+Requires Node.js ≥ 24. Restart Claude and you're ready. See [Getting started](./getting-started.md)
+for the full onboarding walkthrough.

@@ -1,0 +1,32 @@
+name: Update documentation screenshots
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  screenshots:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .node-version
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      # Playwright is a maintenance-only tool — installed ad hoc so it stays out of package.json.
+      - run: npm install --no-save playwright
+      - run: npx playwright install --with-deps chromium
+      - run: node scripts/screenshots.mjs
+      - name: Commit refreshed screenshots
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/screenshots/
+          git diff --staged --quiet && echo "No screenshot changes." || (
+            git commit -m "docs: update screenshots [skip ci]" &&
+            git push
+          )
