@@ -74,10 +74,10 @@ type SqlParam = string | number | bigint | Uint8Array | null;
 type Row = Record<string, string | number | bigint | Uint8Array | null>;
 
 function allRows(db: DatabaseSync, sql: string, ...params: SqlParam[]): Row[] {
-  return db.prepare(sql).all(...params) as Row[];
+  return db.prepare(sql).all(...params);
 }
 function getRow(db: DatabaseSync, sql: string, ...params: SqlParam[]): Row | undefined {
-  return db.prepare(sql).get(...params) as Row | undefined;
+  return db.prepare(sql).get(...params);
 }
 function runSql(db: DatabaseSync, sql: string, ...params: SqlParam[]): number {
   return Number(db.prepare(sql).run(...params).changes);
@@ -669,11 +669,11 @@ export function periodToCutoff(period: string | null | undefined): string | null
       Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0),
     );
   } else if (period === "week") {
-    cutoff = new Date(now.getTime() - 7 * 86400_000);
+    cutoff = new Date(now.getTime() - 7 * 86_400_000);
   } else if (period === "month") {
-    cutoff = new Date(now.getTime() - 30 * 86400_000);
+    cutoff = new Date(now.getTime() - 30 * 86_400_000);
   } else if (period === "year") {
-    cutoff = new Date(now.getTime() - 365 * 86400_000);
+    cutoff = new Date(now.getTime() - 365 * 86_400_000);
   } else {
     return null;
   }

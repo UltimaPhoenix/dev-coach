@@ -72,7 +72,7 @@ function globToRegex(glob: string): RegExp {
   for (const ch of glob) {
     if (ch === "*") re += "[^/]*";
     else if (ch === "?") re += "[^/]";
-    else re += ch.replace(/[.+^${}()|[\]\\]/g, "\\$&");
+    else re += ch.replace(/[.+^${}()|[\]\\]/g, String.raw`\$&`);
   }
   return new RegExp(`^${re}$`);
 }

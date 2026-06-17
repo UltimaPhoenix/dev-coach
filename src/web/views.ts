@@ -11,7 +11,7 @@ type Html = HtmlEscapedString | Promise<HtmlEscapedString>;
 function jsonForScript(v: unknown): string {
   return JSON.stringify(v ?? "").replace(
     /[<>&\u2028\u2029]/g,
-    (ch) => `\\u${ch.charCodeAt(0).toString(16).padStart(4, "0")}`,
+    (ch) => String.raw`\u` + (ch.codePointAt(0) ?? 0).toString(16).padStart(4, "0"),
   );
 }
 

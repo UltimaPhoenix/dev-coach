@@ -23,6 +23,15 @@ function safeRedirect(url: string | undefined, fallback = "/lessons"): string {
   return fallback;
 }
 
+/**
+ * Read a parsed-form field as a string. A missing field or a File upload yields the
+ * fallback rather than `String(file)` → "[object Object]".
+ */
+function textField(body: Record<string, unknown>, key: string, fallback = ""): string {
+  const v = body[key];
+  return typeof v === "string" ? v : fallback;
+}
+
 // ── Static assets ────────────────────────────────────────────────────────────
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -102,10 +111,10 @@ export function createApp(): Hono {
 
   app.post("/knowledge", async (c) => {
     const body = await c.req.parseBody();
-    const topic = String(body.topic ?? "").trim();
+    const topic = textField(body, "topic").trim();
     if (topic) {
-      const confidence = Number.parseInt(String(body.confidence ?? "5"), 10) || 5;
-      const group = String(body.group ?? "").trim();
+      const confidence = Number.parseInt(textField(body, "confidence", "5"), 10) || 5;
+      const group = textField(body, "group").trim();
       db.withConnection((conn) => {
         db.upsertKnowledge(conn, topic, confidence);
         if (group && group !== "Other") db.assignTopicToGroup(conn, topic, group);
@@ -120,7 +129,7 @@ export function createApp(): Hono {
   });
 
   app.post("/knowledge/:topic/group", async (c) => {
-    const group = String((await c.req.parseBody()).group ?? "").trim();
+    const group = textField(await c.req.parseBody(), "group").trim();
     const topic = c.req.param("topic");
     db.withConnection((conn) => {
       if (group && group !== "Other") db.assignTopicToGroup(conn, topic, group);
@@ -130,13 +139,13 @@ export function createApp(): Hono {
   });
 
   app.post("/knowledge/:topic", async (c) => {
-    const delta = Number.parseInt(String((await c.req.parseBody()).delta ?? "0"), 10) || 0;
+    const delta = Number.parseInt(textField(await c.req.parseBody(), "delta", "0"), 10) || 0;
     db.withConnection((conn) => coach.applyKnowledgeDelta(conn, c.req.param("topic"), delta));
     return c.redirect("/", 303);
   });
 
   app.post("/groups", async (c) => {
-    const name = String((await c.req.parseBody()).group_name ?? "").trim();
+    const name = textField(await c.req.parseBody(), "group_name").trim();
     if (name && name !== "Other") db.withConnection((conn) => db.addGroup(conn, name));
     return c.redirect("/", 303);
   });
@@ -255,15 +264,15 @@ export function createApp(): Hono {
   app.post("/lessons/:lesson_id/star", async (c) => {
     const body = await c.req.parseBody();
     db.withConnection((conn) => db.setStar(conn, c.req.param("lesson_id"), body.starred === "1"));
-    return c.redirect(safeRedirect(body.next ? String(body.next) : undefined), 303);
+    return c.redirect(safeRedirect(textField(body, "next") || undefined), 303);
   });
 
   app.post("/lessons/:lesson_id/feedback", async (c) => {
     const body = await c.req.parseBody();
-    const fb = String(body.feedback ?? "");
+    const fb = textField(body, "feedback");
     const value = fb === "" || fb === "clear" ? null : fb;
     db.withConnection((conn) => coach.recordFeedback(conn, c.req.param("lesson_id"), value));
-    return c.redirect(safeRedirect(body.next ? String(body.next) : undefined), 303);
+    return c.redirect(safeRedirect(textField(body, "next") || undefined), 303);
   });
 
   app.get("/lessons/:lesson_id", (c) => {
@@ -309,18 +318,18 @@ export function createApp(): Hono {
   app.post("/settings/notebook", async (c) => {
     const body = await c.req.parseBody();
     mkdirSync(dirname(db.LEARNING_STATE_PATH), { recursive: true });
-    writeFileSync(db.LEARNING_STATE_PATH, String(body.content ?? ""), "utf8");
+    writeFileSync(db.LEARNING_STATE_PATH, textField(body, "content"), "utf8");
     return c.redirect(
-      safeRedirect(body.next ? String(body.next) : undefined, "/settings?notebook_saved=1"),
+      safeRedirect(textField(body, "next") || undefined, "/settings?notebook_saved=1"),
       303,
     );
   });
 
   app.post("/settings", async (c) => {
     const body = await c.req.parseBody();
-    const maxPerDay = Number.parseInt(String(body.max_per_day ?? "2"), 10) || 2;
-    const minGap = Number.parseInt(String(body.min_gap_minutes ?? "240"), 10);
-    let theme = String(body.ui_theme ?? "system");
+    const maxPerDay = Number.parseInt(textField(body, "max_per_day", "2"), 10) || 2;
+    const minGap = Number.parseInt(textField(body, "min_gap_minutes", "240"), 10);
+    let theme = textField(body, "ui_theme", "system");
     if (!["system", "dark", "light"].includes(theme)) theme = "system";
     db.withConnection((conn) => {
       db.setSetting(conn, "max_per_day", String(maxPerDay));

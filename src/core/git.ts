@@ -35,14 +35,14 @@ function parseRemote(remote: string | null): [string | null, string | null] {
   if (!remote) return [null, null];
 
   // SSH: git@host:org/repo.git
-  const ssh = remote.match(/^git@([^:]+):(.+?)(?:\.git)?$/);
+  const ssh = /^git@([^:]+):(.+?)(?:\.git)?$/.exec(remote);
   if (ssh) {
     const host = (ssh[1] ?? "").toLowerCase();
     return [ssh[2] ?? remote, PLATFORM_MAP[host] ?? "local"];
   }
 
   // HTTPS: https://host/org/repo[.git]
-  const https = remote.match(/^https?:\/\/([^/]+)\/(.+?)(?:\.git)?$/);
+  const https = /^https?:\/\/([^/]+)\/(.+?)(?:\.git)?$/.exec(remote);
   if (https) {
     const host = (https[1] ?? "").toLowerCase();
     return [https[2] ?? remote, PLATFORM_MAP[host] ?? "local"];

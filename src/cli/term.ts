@@ -61,8 +61,7 @@ export function renderTable(
   if (title) out.push(pad(c.bold(title), total, "center"));
   out.push(sep("╭", "┬", "╮"));
   if (showHeader) {
-    out.push(rowLine(columns.map((col) => c.bold(col.header))));
-    out.push(sep("├", "┼", "┤"));
+    out.push(rowLine(columns.map((col) => c.bold(col.header))), sep("├", "┼", "┤"));
   }
   for (const r of rows) out.push(rowLine(r));
   out.push(sep("╰", "┴", "╯"));

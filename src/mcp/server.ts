@@ -188,9 +188,9 @@ export function createServer(): McpServer {
         } catch {
           // elicitation not supported by this client — lesson is already saved
         }
-        return structured(lesson as unknown as Record<string, unknown>);
-      } catch (exc) {
-        return errResult(`log_lesson failed: ${exc}`);
+        return structured(lesson);
+      } catch (err) {
+        return errResult(`log_lesson failed: ${err}`);
       }
     },
   );
@@ -217,8 +217,8 @@ export function createServer(): McpServer {
       try {
         const v = db.withConnection((c) => coach.applyKnowledgeDelta(c, args.topic, args.delta));
         return { content: [txt(String(v))] };
-      } catch (exc) {
-        return errResult(`update_knowledge failed for '${args.topic}': ${exc}`);
+      } catch (err) {
+        return errResult(`update_knowledge failed for '${args.topic}': ${err}`);
       }
     },
   );
@@ -310,8 +310,8 @@ export function createServer(): McpServer {
       try {
         const found = db.withConnection((c) => db.setStar(c, args.lesson_id, args.starred));
         return { content: [txt(String(found))] };
-      } catch (exc) {
-        return errResult(`star_lesson failed for '${args.lesson_id}': ${exc}`);
+      } catch (err) {
+        return errResult(`star_lesson failed for '${args.lesson_id}': ${err}`);
       }
     },
   );
@@ -333,8 +333,8 @@ export function createServer(): McpServer {
       try {
         const found = db.withConnection((c) => db.deleteLesson(c, args.lesson_id));
         return { content: [txt(String(found))] };
-      } catch (exc) {
-        return errResult(`delete_lesson failed for '${args.lesson_id}': ${exc}`);
+      } catch (err) {
+        return errResult(`delete_lesson failed for '${args.lesson_id}': ${err}`);
       }
     },
   );
@@ -374,8 +374,8 @@ export function createServer(): McpServer {
           return true;
         });
         return { content: [txt(String(ok))] };
-      } catch (exc) {
-        return errResult(`submit_feedback failed for '${args.lesson_id}': ${exc}`);
+      } catch (err) {
+        return errResult(`submit_feedback failed for '${args.lesson_id}': ${err}`);
       }
     },
   );
@@ -409,8 +409,8 @@ export function createServer(): McpServer {
             db.assignTopicToGroup(c, args.topic, args.group);
         });
         return { content: [txt("true")] };
-      } catch (exc) {
-        return errResult(`add_topic failed for '${args.topic}': ${exc}`);
+      } catch (err) {
+        return errResult(`add_topic failed for '${args.topic}': ${err}`);
       }
     },
   );
@@ -432,8 +432,8 @@ export function createServer(): McpServer {
       try {
         const found = db.withConnection((c) => db.deleteKnowledge(c, args.topic));
         return { content: [txt(String(found))] };
-      } catch (exc) {
-        return errResult(`remove_topic failed for '${args.topic}': ${exc}`);
+      } catch (err) {
+        return errResult(`remove_topic failed for '${args.topic}': ${err}`);
       }
     },
   );
@@ -456,8 +456,8 @@ export function createServer(): McpServer {
       try {
         db.withConnection((c) => db.addGroup(c, args.name.trim()));
         return { content: [txt("true")] };
-      } catch (exc) {
-        return errResult(`add_group failed for '${args.name}': ${exc}`);
+      } catch (err) {
+        return errResult(`add_group failed for '${args.name}': ${err}`);
       }
     },
   );
@@ -480,8 +480,8 @@ export function createServer(): McpServer {
       try {
         const found = db.withConnection((c) => db.deleteGroup(c, args.name));
         return { content: [txt(String(found))] };
-      } catch (exc) {
-        return errResult(`remove_group failed for '${args.name}': ${exc}`);
+      } catch (err) {
+        return errResult(`remove_group failed for '${args.name}': ${err}`);
       }
     },
   );
@@ -518,7 +518,7 @@ export function createServer(): McpServer {
         db.setSetting(c, args.key, String(intVal));
         return db.getSettings(c);
       });
-      return structured(settings as unknown as Record<string, unknown>);
+      return structured(settings);
     },
   );
 
@@ -590,9 +590,9 @@ export function createServer(): McpServer {
           }
           return coach.getProfile(c);
         });
-        return structured(profile as unknown as Record<string, unknown>);
-      } catch (exc) {
-        return errResult(`complete_onboarding failed: ${exc}`);
+        return structured(profile);
+      } catch (err) {
+        return errResult(`complete_onboarding failed: ${err}`);
       }
     },
   );
@@ -615,8 +615,8 @@ export function createServer(): McpServer {
           uri,
           db.withConnection((c) => coach.getProfile(c)),
         );
-      } catch (exc) {
-        return jsonResource(uri, { error: String(exc) });
+      } catch (err) {
+        return jsonResource(uri, { error: String(err) });
       }
     },
   );
@@ -631,8 +631,8 @@ export function createServer(): McpServer {
           uri,
           db.withConnection((c) => db.getSettings(c)),
         );
-      } catch (exc) {
-        return jsonResource(uri, { error: String(exc) });
+      } catch (err) {
+        return jsonResource(uri, { error: String(err) });
       }
     },
   );
@@ -647,8 +647,8 @@ export function createServer(): McpServer {
           uri,
           db.withConnection((c) => db.getLessons(c, { period: "week", page: 1, per_page: 10 })),
         );
-      } catch (exc) {
-        return jsonResource(uri, [{ error: String(exc) }]);
+      } catch (err) {
+        return jsonResource(uri, [{ error: String(err) }]);
       }
     },
   );
@@ -663,8 +663,8 @@ export function createServer(): McpServer {
           uri,
           db.withConnection((c) => coach.getStats(c)),
         );
-      } catch (exc) {
-        return jsonResource(uri, { error: String(exc) });
+      } catch (err) {
+        return jsonResource(uri, { error: String(err) });
       }
     },
   );
@@ -701,10 +701,10 @@ export function createServer(): McpServer {
         const payload: Record<string, unknown> = { allowed: r.allowed, total_lessons: total };
         if (r.reason != null) payload.reason = r.reason;
         return jsonResource(uri, payload);
-      } catch (exc) {
+      } catch (err) {
         return jsonResource(uri, {
           allowed: false,
-          reason: `Rate limit check unavailable: ${exc}`,
+          reason: `Rate limit check unavailable: ${err}`,
         });
       }
     },
@@ -719,8 +719,8 @@ export function createServer(): McpServer {
         const git = detectGitContext();
         const usage = db.withConnection((c) => db.getUsageDefaults(c));
         return jsonResource(uri, { git, usage_defaults: usage });
-      } catch (exc) {
-        return jsonResource(uri, { error: String(exc) });
+      } catch (err) {
+        return jsonResource(uri, { error: String(err) });
       }
     },
   );
@@ -745,8 +745,8 @@ export function createServer(): McpServer {
           default_topics: db.DEFAULT_PROFILE,
           context_ready: git.branch !== null,
         });
-      } catch (exc) {
-        return jsonResource(uri, { error: String(exc) });
+      } catch (err) {
+        return jsonResource(uri, { error: String(err) });
       }
     },
   );
@@ -761,8 +761,8 @@ export function createServer(): McpServer {
         const lesson = db.withConnection((c) => db.getLessonById(c, lessonId));
         if (!lesson) return jsonResource(uri, { error: `Lesson '${lessonId}' not found` });
         return jsonResource(uri, lesson);
-      } catch (exc) {
-        return jsonResource(uri, { error: String(exc) });
+      } catch (err) {
+        return jsonResource(uri, { error: String(err) });
       }
     },
   );

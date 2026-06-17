@@ -19,7 +19,7 @@ export function checkRateLimit(db: DatabaseSync): RateLimitResult {
     const settings = getSettings(db);
     const now = new Date();
 
-    const since24h = new Date(now.getTime() - 24 * 3600_000).toISOString();
+    const since24h = new Date(now.getTime() - 24 * 3_600_000).toISOString();
     const count = countLessonsSince(db, since24h);
     if (count >= settings.max_per_day) {
       return {
@@ -53,8 +53,8 @@ export function checkRateLimit(db: DatabaseSync): RateLimitResult {
     }
 
     return { allowed: true };
-  } catch (exc) {
-    return { allowed: true, reason: `Rate limit check failed: ${exc}` };
+  } catch (err) {
+    return { allowed: true, reason: `Rate limit check failed: ${err}` };
   }
 }
 
@@ -89,8 +89,8 @@ export function getStats(db: DatabaseSync): Record<string, unknown> {
   try {
     const now = new Date();
     const total = countFilteredLessons(db);
-    const todayCutoff = new Date(now.getTime() - 24 * 3600_000).toISOString();
-    const weekCutoff = new Date(now.getTime() - 7 * 86400_000).toISOString();
+    const todayCutoff = new Date(now.getTime() - 24 * 3_600_000).toISOString();
+    const weekCutoff = new Date(now.getTime() - 7 * 86_400_000).toISOString();
     const lessonsToday = countLessonsSince(db, todayCutoff);
     const lessonsWeek = countLessonsSince(db, weekCutoff);
     const knowledge = getAllKnowledge(db);
@@ -107,8 +107,8 @@ export function getStats(db: DatabaseSync): Record<string, unknown> {
       weakest_topics: weakest,
       strongest_topics: strongest,
     };
-  } catch (exc) {
-    return { error: String(exc) };
+  } catch (err) {
+    return { error: String(err) };
   }
 }
 
