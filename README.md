@@ -16,6 +16,14 @@ Everything runs **locally**. No data leaves your machine. One SQLite file at `~/
 
 ---
 
+## Why devcoach?
+
+AI agents now write much of our code — which makes it easy to ship more while understanding less. devcoach turns each task your agent finishes into one short, in-context lesson, so you keep learning as you go. The deeper bet: as AI grows more capable, the scarce skill becomes *validating* what it produces — and that ability only survives if you keep practicing it.
+
+→ [Why devcoach exists](docs/why.md)
+
+---
+
 ## How it works
 
 ```mermaid

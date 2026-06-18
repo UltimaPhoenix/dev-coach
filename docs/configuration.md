@@ -98,12 +98,13 @@ devcoach backup ~/Dropbox/devcoach-$(date +%Y%m%d).zip
 devcoach backup devcoach-before-reset.zip
 ```
 
-The backup zip contains three files:
+The backup zip contains four files:
 - `settings.json` — rate-limit settings
 - `knowledge.json` — topics, confidence scores, and group assignments
 - `lessons.json` — full lesson history
+- `learning-state.md` — the coaching notebook (when present)
 
-All three are restored by `devcoach restore <zip>`.
+All of them are restored by `devcoach restore <zip>`.
 
 ---
 
