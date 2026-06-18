@@ -24,6 +24,27 @@ hooks for automatic lesson delivery. Restart your agent afterward.
 
 Prefer a global install? `npm install -g devcoach`, then drop the `npx -y` prefix everywhere.
 
+### Other install methods
+
+**Homebrew** (macOS / Linux) — add and trust the tap once, then install:
+
+```bash
+brew tap UltimaPhoenix/tap
+brew trust --tap UltimaPhoenix/tap   # required when Homebrew enforces HOMEBREW_REQUIRE_TAP_TRUST
+brew install devcoach
+```
+
+The formula declares `depends_on "node"`, so Homebrew pulls in Node automatically and puts `devcoach`
+on your `PATH`. One-liner: `brew install UltimaPhoenix/tap/devcoach`.
+
+**Claude Desktop extension** (`.mcpb`) — a single bundle that runs on Desktop's built-in runtime, no Node
+or terminal required:
+
+```bash
+npm run mcpb   # → dist-mcpb/devcoach-<version>.mcpb
+# Claude Desktop → Settings → Extensions → Install Extension… → pick the .mcpb
+```
+
 ### Manual MCP config
 
 If `devcoach install` isn't available for your agent, add this to its MCP config file:

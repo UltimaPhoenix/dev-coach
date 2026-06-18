@@ -1,5 +1,9 @@
 # Web UI
 
+import ThemedShot from "@site/src/components/ThemedShot";
+import Tabs from "@theme/Tabs";
+import TabItem from "@theme/TabItem";
+
 The devcoach web dashboard provides a visual interface for everything the CLI does.
 
 ## Launch
@@ -39,11 +43,11 @@ Displays your full knowledge map with colour-coded confidence bars:
 
 **Stats bar** (top of page): total lessons, today's count vs. daily limit, this week's count, and current rate-limit status.
 
-=== "Dark"
-    ![Knowledge map – dark theme](screenshots/knowledge-map-dark.png)
-
-=== "Light"
-    ![Knowledge map – light theme](screenshots/knowledge-map-light.png)
+<ThemedShot
+  alt="Knowledge map"
+  light={require("./screenshots/knowledge-map-light.png").default}
+  dark={require("./screenshots/knowledge-map-dark.png").default}
+/>
 
 ---
 
@@ -70,11 +74,11 @@ Filterable, sortable table of all delivered lessons.
 - Feedback buttons (✓ / ✗ / clear) — record comprehension, adjusts knowledge confidence
 - Lesson ID link — opens the detail page
 
-=== "Dark"
-    ![Lessons – dark theme](screenshots/lessons-dark.png)
-
-=== "Light"
-    ![Lessons – light theme](screenshots/lessons-light.png)
+<ThemedShot
+  alt="Lessons"
+  light={require("./screenshots/lessons-light.png").default}
+  dark={require("./screenshots/lessons-dark.png").default}
+/>
 
 ---
 
@@ -90,35 +94,43 @@ Full lesson content laid out in reading order:
 - **Git metadata** — project, repository (with platform icon + link), branch, commit hash, folder (VSCode deep-link)
 - **Feedback buttons** — ✓ I know this / ✗ I don't know this (hidden once feedback is recorded)
 
-=== "Docker layer caching (Junior)"
-    === "Dark"
-        ![Docker layer caching – dark](screenshots/lesson-docker-layer-cache-dark.png)
-    === "Light"
-        ![Docker layer caching – light](screenshots/lesson-docker-layer-cache-light.png)
-
-=== "PostgreSQL EXPLAIN ANALYZE (Mid)"
-    === "Dark"
-        ![PostgreSQL EXPLAIN ANALYZE – dark](screenshots/lesson-postgresql-explain-analyze-dark.png)
-    === "Light"
-        ![PostgreSQL EXPLAIN ANALYZE – light](screenshots/lesson-postgresql-explain-analyze-light.png)
-
-=== "Git interactive rebase (Mid)"
-    === "Dark"
-        ![Git interactive rebase – dark](screenshots/lesson-git-interactive-rebase-dark.png)
-    === "Light"
-        ![Git interactive rebase – light](screenshots/lesson-git-interactive-rebase-light.png)
-
-=== "CI/CD pipeline stages (Senior)"
-    === "Dark"
-        ![CI/CD pipeline stages – dark](screenshots/lesson-ci-cd-pipeline-stages-dark.png)
-    === "Light"
-        ![CI/CD pipeline stages – light](screenshots/lesson-ci-cd-pipeline-stages-light.png)
-
-=== "Cache stampede (Senior)"
-    === "Dark"
-        ![Cache stampede – dark](screenshots/lesson-redis-cache-stampede-dark.png)
-    === "Light"
-        ![Cache stampede – light](screenshots/lesson-redis-cache-stampede-light.png)
+<Tabs>
+  <TabItem value="docker" label="Docker layer caching (Junior)" default>
+    <ThemedShot
+      alt="Docker layer caching"
+      light={require("./screenshots/lesson-docker-layer-cache-light.png").default}
+      dark={require("./screenshots/lesson-docker-layer-cache-dark.png").default}
+    />
+  </TabItem>
+  <TabItem value="postgres" label="PostgreSQL EXPLAIN ANALYZE (Mid)">
+    <ThemedShot
+      alt="PostgreSQL EXPLAIN ANALYZE"
+      light={require("./screenshots/lesson-postgresql-explain-analyze-light.png").default}
+      dark={require("./screenshots/lesson-postgresql-explain-analyze-dark.png").default}
+    />
+  </TabItem>
+  <TabItem value="rebase" label="Git interactive rebase (Mid)">
+    <ThemedShot
+      alt="Git interactive rebase"
+      light={require("./screenshots/lesson-git-interactive-rebase-light.png").default}
+      dark={require("./screenshots/lesson-git-interactive-rebase-dark.png").default}
+    />
+  </TabItem>
+  <TabItem value="cicd" label="CI/CD pipeline stages (Senior)">
+    <ThemedShot
+      alt="CI/CD pipeline stages"
+      light={require("./screenshots/lesson-ci-cd-pipeline-stages-light.png").default}
+      dark={require("./screenshots/lesson-ci-cd-pipeline-stages-dark.png").default}
+    />
+  </TabItem>
+  <TabItem value="stampede" label="Cache stampede (Senior)">
+    <ThemedShot
+      alt="Cache stampede"
+      light={require("./screenshots/lesson-redis-cache-stampede-light.png").default}
+      dark={require("./screenshots/lesson-redis-cache-stampede-dark.png").default}
+    />
+  </TabItem>
+</Tabs>
 
 ---
 
@@ -128,14 +140,14 @@ Full lesson content laid out in reading order:
 - **Min gap** — minimum minutes between lessons (0–1440), input as hours + minutes
 - **Export lessons** — download all lessons as JSON
 - **Import lessons** — upload a previously exported JSON file
-- **Export backup** — full zip (settings + knowledge + lessons)
+- **Export backup** — full zip (settings + knowledge + lessons + notebook)
 - **Import backup** — restore from a backup zip
 
-=== "Dark"
-    ![Settings – dark theme](screenshots/settings-dark.png)
-
-=== "Light"
-    ![Settings – light theme](screenshots/settings-light.png)
+<ThemedShot
+  alt="Settings"
+  light={require("./screenshots/settings-light.png").default}
+  dark={require("./screenshots/settings-dark.png").default}
+/>
 
 ---
 
