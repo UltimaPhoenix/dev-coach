@@ -3,7 +3,7 @@
   "manifest_version": "0.4",
   "name": "devcoach",
   "display_name": "DevCoach",
-  "version": "0.3.56",
+  "version": "0.3.57",
   "description": "Progressive technical coach that delivers personalized lessons based on your knowledge map.",
   "long_description": "DevCoach is a local MCP server that acts as your personal technical mentor. It tracks your knowledge map across topics, respects a configurable rate limit, and delivers a contextually relevant lesson each time your agent completes a task. It runs on Claude Desktop's bundled Node runtime and stores everything locally in ~/.devcoach.",
   "author": { "name": "UltimaPhoenix", "url": "https://github.com/UltimaPhoenix" },
