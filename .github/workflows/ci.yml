@@ -66,7 +66,7 @@ jobs:
       - run: npm run test:cov # writes coverage/lcov.info
       - name: SonarQube Cloud scan
         if: ${{ env.SONAR_TOKEN != '' }}
-        uses: SonarSource/sonarqube-scan-action@v5
+        uses: SonarSource/sonarqube-scan-action@v8
 
   # ── Version bump → commit → tag (workflow_dispatch only) ───────────────────
   bump:
