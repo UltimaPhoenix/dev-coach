@@ -1,5 +1,6 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
+import { ElicitRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import { describe, expect, it } from "vitest";
 import { createServer } from "../src/mcp/server";
 
@@ -109,9 +110,44 @@ describe("mcp server", () => {
     });
     expect(bad2.isError).toBe(true);
 
+    const ui: any = await client.callTool({ name: "open_ui", arguments: { port: 80 } });
+    expect(text(ui)).toContain("out of valid range");
+
     expect(
       text(await client.callTool({ name: "delete_lesson", arguments: { lesson_id: "t1" } })),
     ).toBe("true");
+    await client.close();
+    await server.close();
+  });
+
+  it("log_lesson collects inline feedback via elicitation when the client supports it", async () => {
+    const [ct, st] = InMemoryTransport.createLinkedPair();
+    const server = createServer();
+    await server.connect(st);
+    const client = new Client(
+      { name: "t", version: "1.0.0" },
+      { capabilities: { elicitation: {} } },
+    );
+    client.setRequestHandler(ElicitRequestSchema, async () => ({
+      action: "accept",
+      content: { feedback: "know" },
+    }));
+    await client.connect(ct);
+    await client.callTool({ name: "complete_onboarding", arguments: { topics: { python: 4 } } });
+
+    const log: any = await client.callTool({
+      name: "log_lesson",
+      arguments: {
+        id: "e1",
+        timestamp: "2026-06-16T10:00:00Z",
+        topic_id: "python",
+        categories: ["python"],
+        title: "Elicited",
+        level: "mid",
+        summary: "s",
+      },
+    });
+    expect(log.structuredContent.feedback).toBe("know"); // feedback applied inline
     await client.close();
     await server.close();
   });

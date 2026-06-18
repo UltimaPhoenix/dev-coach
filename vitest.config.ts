@@ -10,10 +10,10 @@ export default defineConfig({
       include: ["src/**"],
       // bin shebang entry is the thin process wrapper; exercised end-to-end, not unit-counted.
       exclude: ["src/bin.ts"],
-      // Python's gate is line-based (--cov-fail-under=80) — mirror that with lines/statements/functions
-      // at 80 (actuals ~86/86/95). Branches kept lower: many remaining branches are defensive
-      // catch/null-fallback paths and git-detection branches that vary by environment/CI.
-      thresholds: { lines: 80, functions: 80, statements: 80, branches: 60 },
+      // Gate near the achieved coverage (actuals ~95 lines / 94 statements / 98 functions) with a
+      // small margin. Branches kept lower: many remaining branches are defensive catch/null-fallback
+      // paths and git-detection branches that vary by environment/CI.
+      thresholds: { lines: 90, functions: 90, statements: 90, branches: 70 },
     },
   },
 });
