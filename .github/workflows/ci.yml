@@ -57,7 +57,7 @@ jobs:
       - run: npm run test:cov
       - run: npm run build
       # Hand the lcov report to the sonar job so it doesn't re-install + re-test.
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: matrix.node == '24'
         with:
           name: coverage-lcov
@@ -80,7 +80,7 @@ jobs:
           cache: npm
       - run: npm ci # node_modules → type-aware analysis (resolves dependency types)
       # Reuse the check job's coverage instead of re-running the whole test suite.
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: coverage-lcov
           path: coverage
