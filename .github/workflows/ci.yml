@@ -122,7 +122,11 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
-      - run: npm publish --provenance --access public
+      # Tokenless: trusted publishing exchanges the OIDC token for publish
+      # rights, and provenance is generated automatically (no --provenance,
+      # no NODE_AUTH_TOKEN). Requires the GitHub trusted publisher registered
+      # on npmjs.com for this repo + workflow file (environment left blank).
+      - run: npm publish --access public
 
   # ── GitHub Release with the signed .mcpb attached ──────────────────────────
   release:
