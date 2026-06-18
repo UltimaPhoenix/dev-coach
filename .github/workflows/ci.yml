@@ -1,9 +1,18 @@
 name: ci
 
+# Label each run so builds are identifiable at a glance (ported from the old Python pipeline):
+#   • workflow_dispatch → "CI — New release (<version|bump>)"
+#   • tag push (v*)      → "CI — New release (<tag>)"
+#   • pull request       → "CI - PR <title>"
+#   • push               → "CI — <commit message>"
 run-name: >-
   ${{ github.event_name == 'workflow_dispatch'
-      && format('Release ({0})', inputs.version != '' && inputs.version || inputs.bump)
-      || github.workflow }}
+    && format('CI — New release ({0})', inputs.version != '' && inputs.version || inputs.bump)
+    || (startsWith(github.ref, 'refs/tags/v')
+    && format('CI — New release ({0})', github.ref_name)
+    || (github.event_name == 'pull_request'
+    && format('CI - PR {0}', github.event.pull_request.title)
+    || format('CI — {0}', github.event.head_commit.message))) }}
 
 # Three scenarios (mirrors the old pipeline):
 #  1. Push to main / pull request  → lint + typecheck + test + build + sonar
