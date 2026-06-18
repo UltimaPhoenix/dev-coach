@@ -210,3 +210,123 @@ describe("web view branches (rich rendering)", () => {
     expect(html).toContain("Next");
   });
 });
+
+describe("web view branches — exhaustive", () => {
+  it("lesson detail: gitlab / bitbucket / local platforms, senior level, dont_know, task_context", async () => {
+    db.withConnection((c) => {
+      const mk = (o: Record<string, unknown>) =>
+        db.insertLesson(
+          c,
+          parseLesson({
+            timestamp: "2026-06-16T10:00:00Z",
+            topic_id: "t",
+            categories: ["c"],
+            title: String(o.id),
+            level: "mid",
+            summary: "s",
+            body: "b",
+            ...o,
+          }),
+        );
+      mk({
+        id: "gl",
+        level: "senior",
+        feedback: "dont_know",
+        task_context: "why this",
+        project: "P",
+        repository: "grp/proj",
+        repository_platform: "gitlab",
+        branch: "dev",
+        commit_hash: "deadbeef1234",
+        folder: "/f",
+      });
+      mk({
+        id: "bb",
+        project: "P",
+        repository: "grp/proj",
+        repository_platform: "bitbucket",
+        commit_hash: "cafe1234567",
+      });
+      mk({ id: "loc", project: "P", repository: "/Users/me/proj", repository_platform: "local" });
+      mk({ id: "nometa" }); // hasMeta false
+      mk({ id: "projonly", project: "OnlyProj" }); // project present, repoUrl null
+    });
+    const gl = await (await get("/lessons/gl")).text();
+    expect(gl).toContain("/-/commit/deadbeef1234"); // gitlab commit URL form
+    expect(gl).toContain("I don't know this"); // dont_know branch
+    expect(gl).toContain("Context:"); // task_context branch
+    const bb = await (await get("/lessons/bb")).text();
+    expect(bb).toContain("/commits/cafe123"); // bitbucket commit URL form
+    const loc = await (await get("/lessons/loc")).text();
+    expect(loc).toContain("vscode://file//Users/me/proj"); // local repoUrl
+    expect(await (await get("/lessons/nometa")).text()).toContain("nometa");
+    expect(await (await get("/lessons/projonly")).text()).toContain("OnlyProj");
+  });
+
+  it("lessons list: project/repository/branch/commit filter chips + sort asc/desc", async () => {
+    const html = await (
+      await get(
+        "/lessons?project=P&repository=grp/proj&branch=dev&commit=deadbeef&sort=title&order=asc",
+      )
+    ).text();
+    expect(html).toContain("📁 P"); // project chip
+    expect(html).toContain("Clear all");
+    const desc = await (await get("/lessons?sort=title&order=desc")).text();
+    expect(desc).toContain("Lessons"); // renders with desc sort active
+  });
+
+  it("lessons list: empty state with active filter shows clear-all", async () => {
+    const html = await (await get("/lessons?search=zzz-no-such-lesson")).text();
+    expect(html).toContain("No lessons match");
+    expect(html).toContain("Clear all filters");
+  });
+
+  it("profile: low/mid/high confidence tiers + ungrouped Other section", async () => {
+    await post("/knowledge", { topic: "lowconf", confidence: "2" }); // red tier, Other group
+    await post("/knowledge", { topic: "midconf", confidence: "5" }); // yellow tier
+    const html = await (await get("/")).text();
+    expect(html).toContain("lowconf");
+    expect(html).toContain("midconf");
+    expect(html).toContain("Other"); // ungrouped section header
+  });
+
+  it("settings: import flash with all counters (plural, skipped, invalid, groups, notebook)", async () => {
+    const html = await (
+      await get("/settings?imported=2&skipped=1&invalid=1&groups=2&notebook=1")
+    ).text();
+    expect(html).toContain("2 lessons imported");
+    expect(html).toContain("skipped");
+    expect(html).toContain("rejected");
+    expect(html).toContain("groups added");
+    expect(html).toContain("Notebook restored");
+  });
+
+  it("settings: import flash singular with zero secondary counters", async () => {
+    const html = await (await get("/settings?imported=1")).text();
+    expect(html).toContain("1 lesson imported."); // singular, no extra clauses
+  });
+
+  it("profile: rate-limit denied state renders the reason", async () => {
+    await post("/settings", { max_per_day: "1", min_gap_minutes: "240", ui_theme: "system" });
+    const now = new Date().toISOString();
+    db.withConnection((c) => {
+      for (let i = 0; i < 2; i++) {
+        db.insertLesson(
+          c,
+          parseLesson({
+            id: `rl${i}`,
+            timestamp: now,
+            topic_id: "python",
+            categories: ["python"],
+            title: `RL${i}`,
+            level: "mid",
+            summary: "s",
+          }),
+        );
+      }
+    });
+    const html = await (await get("/")).text();
+    // rateLimit.allowed === false → yellow reason branch instead of "Available now"
+    expect(html).not.toContain("Available now");
+  });
+});
