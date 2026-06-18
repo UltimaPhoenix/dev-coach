@@ -69,4 +69,33 @@ describe("setup wizard", () => {
     const out = await runSetup([file]); // Step1 backup path provided
     expect(out).toContain("Setup complete");
   });
+
+  it("automatic mode detects the project stack, overrides, skips, and adds extras", async () => {
+    const proj = mkdtempSync(join(tmpdir(), "dc-auto-"));
+    writeFileSync(join(proj, "go.mod"), "module example.com/x\n");
+    writeFileSync(join(proj, "Cargo.toml"), '[package]\nname = "x"\n');
+    const cwd = process.cwd();
+    process.chdir(proj);
+    try {
+      const out = await runSetup([
+        "", // Step1: skip backup
+        "a", // Step2: automatic detection
+        "8", // detected `go` → override to 8
+        "s", // detected `rust` → skip
+        "elixir", // extra topics
+        "7", // confidence for elixir (askInt)
+        "n", // Step3: don't organise into groups
+        "50", // Step4 max: out of range → retry (exercises askInt validation)
+        "2", // max per day
+        "240", // min gap
+      ]);
+      expect(out).toContain("Setup complete");
+      const know = db.withConnection((c) => db.getAllKnowledge(c));
+      expect(know.go).toBe(8);
+      expect(know.elixir).toBe(7);
+      expect(know.rust).toBeUndefined(); // skipped
+    } finally {
+      process.chdir(cwd);
+    }
+  });
 });

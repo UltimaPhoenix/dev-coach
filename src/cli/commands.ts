@@ -53,8 +53,8 @@ const feedbackLabel = (fb: string | null): string =>
 
 // ── Display commands ─────────────────────────────────────────────────────────
 
-function cmdProfile(): void {
-  const profile = db.withConnection((conn) => coach.getProfile(conn));
+/** Render the knowledge map as a Topic/Group/Confidence/Bar table (shared by `profile` + `setup`). */
+function renderProfileTable(profile: ReturnType<typeof coach.getProfile>, title: string): string {
   const topicGroup = new Map<string, string>();
   for (const g of profile.groups) for (const t of g.topics) topicGroup.set(t, g.name);
   const rows = [...profile.knowledge]
@@ -68,18 +68,21 @@ function cmdProfile(): void {
         colorize(color, confidenceBar(e.confidence)),
       ];
     });
-  log(
-    renderTable(
-      "Knowledge Map",
-      [
-        { header: "Topic" },
-        { header: "Group" },
-        { header: "Confidence", justify: "right" },
-        { header: "Bar" },
-      ],
-      rows,
-    ),
+  return renderTable(
+    title,
+    [
+      { header: "Topic" },
+      { header: "Group" },
+      { header: "Confidence", justify: "right" },
+      { header: "Bar" },
+    ],
+    rows,
   );
+}
+
+function cmdProfile(): void {
+  const profile = db.withConnection((conn) => coach.getProfile(conn));
+  log(renderProfileTable(profile, "Knowledge Map"));
 }
 
 interface LessonsOpts {
@@ -713,31 +716,7 @@ async function cmdSetup(): Promise<void> {
       return coach.getProfile(conn);
     });
 
-    const topicGroup = new Map<string, string>();
-    for (const g of profile.groups) for (const t of g.topics) topicGroup.set(t, g.name);
-    const rows = [...profile.knowledge]
-      .sort((a, b) => b.confidence - a.confidence)
-      .map((e) => {
-        const color = confidenceColor(e.confidence);
-        return [
-          e.topic,
-          topicGroup.get(e.topic) ?? "Other",
-          colorize(color, `${e.confidence}/10`),
-          colorize(color, confidenceBar(e.confidence)),
-        ];
-      });
-    log(
-      renderTable(
-        "Knowledge Profile",
-        [
-          { header: "Topic" },
-          { header: "Group" },
-          { header: "Confidence", justify: "right" },
-          { header: "Bar" },
-        ],
-        rows,
-      ),
-    );
+    log(renderProfileTable(profile, "Knowledge Profile"));
     log(`\n${c.green("Setup complete!")} ${Object.keys(topics).length} topics saved.`);
   } finally {
     rl.close();

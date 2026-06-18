@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
@@ -6,6 +6,19 @@ import { runCli } from "../src/cli/commands";
 import * as db from "../src/core/db";
 import { parseLesson } from "../src/core/models";
 import { VERSION } from "../src/version";
+
+// Drop a fake executable on a throwaway PATH dir so install can exercise the `claude` CLI branch.
+function fakeBin(name: string, script: string): string {
+  const dir = mkdtempSync(join(tmpdir(), "dc-bin-"));
+  writeFileSync(join(dir, name), script, { mode: 0o755 });
+  return dir;
+}
+const cleanClaudeSettings = (): string => {
+  const p = join(process.env.HOME as string, ".claude", "settings.json");
+  mkdirSync(dirname(p), { recursive: true });
+  writeFileSync(p, "{}");
+  return p;
+};
 
 async function run(args: string[]): Promise<{ out: string; code: number | null }> {
   const lines: string[] = [];
@@ -139,6 +152,79 @@ describe("cli", () => {
     } finally {
       process.env.PATH = savedPath;
     }
+  });
+
+  it("install via a present `claude` CLI registers + writes/overwrites Stop hooks", async () => {
+    const settings = cleanClaudeSettings();
+    const binDir = fakeBin("claude", "#!/bin/sh\nexit 0\n");
+    const savedPath = process.env.PATH;
+    process.env.PATH = binDir;
+    try {
+      const r = await run(["install", "--claude-code", "--force"]);
+      expect(r.out).toContain("Registered via");
+      expect(r.out).toContain("Stop hooks installed");
+      const saved = JSON.parse(readFileSync(settings, "utf8"));
+      const cmds = saved.hooks.Stop.flatMap((e: any) => e.hooks.map((h: any) => h.command));
+      expect(cmds.some((cmd: string) => cmd.includes("onboard-hook"))).toBe(true);
+      expect(cmds.some((cmd: string) => cmd.includes("lesson-ready"))).toBe(true);
+
+      // re-run without --force → hooks already present, left alone
+      expect((await run(["install", "--claude-code"])).out).toContain(
+        "Stop hooks already installed",
+      );
+      // re-run with --force → existing devcoach hooks removed and re-added
+      expect((await run(["install", "--claude-code", "--force"])).out).toContain(
+        "Stop hooks installed",
+      );
+    } finally {
+      process.env.PATH = savedPath;
+    }
+  });
+
+  it("install surfaces an existing/failed `claude mcp add`", async () => {
+    const savedPath = process.env.PATH;
+    try {
+      process.env.PATH = fakeBin("claude", '#!/bin/sh\necho "already exists" >&2\nexit 1\n');
+      expect((await run(["install", "--claude-code", "--skip-hook"])).out).toContain(
+        "Already registered",
+      );
+      process.env.PATH = fakeBin("claude", "#!/bin/sh\necho boom >&2\nexit 1\n");
+      expect((await run(["install", "--claude-code", "--skip-hook"])).out).toContain(
+        "claude mcp add failed",
+      );
+    } finally {
+      process.env.PATH = savedPath;
+    }
+  });
+
+  it("install into Claude Desktop reports an already-registered server", async () => {
+    expect((await run(["install", "--claude-desktop", "--force"])).out).toContain("Installed into");
+    expect((await run(["install", "--claude-desktop"])).out).toContain("Already registered");
+  });
+
+  it("onboard-hook stays silent while an onboarding session is active", async () => {
+    db.withConnection((c) =>
+      c.exec(
+        "DELETE FROM knowledge; DELETE FROM knowledge_groups; DELETE FROM knowledge_group_names;",
+      ),
+    );
+    rmSync(db.LEARNING_STATE_PATH, { force: true }); // no profile, no prior session
+    expect((await run(["onboard-hook"])).code).toBe(2); // no profile → cue + create state file
+    expect((await run(["onboard-hook"])).code).toBe(0); // state fresh (<24h) → session active
+  });
+
+  it("onboard-hook re-cues when the session state file is stale", async () => {
+    db.withConnection((c) =>
+      c.exec(
+        "DELETE FROM knowledge; DELETE FROM knowledge_groups; DELETE FROM knowledge_group_names;",
+      ),
+    );
+    const state = db.LEARNING_STATE_PATH;
+    mkdirSync(dirname(state), { recursive: true });
+    writeFileSync(state, "# stale\n");
+    const old = Date.now() / 1000 - 48 * 3600; // 48h ago
+    utimesSync(state, old, old);
+    expect((await run(["onboard-hook"])).code).toBe(2); // stale → cue again (touch branch)
   });
 
   it("usage errors exit 2", async () => {
