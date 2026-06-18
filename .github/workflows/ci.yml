@@ -191,11 +191,21 @@ jobs:
             echo "MCPB_KEY=$RUNNER_TEMP/mcpb-key.pem"   >> "$GITHUB_ENV"
           fi
       - run: npm run mcpb:sign
+      - name: Generate SBOM + checksums for release assets
+        run: |
+          set -euo pipefail
+          # CycloneDX SBOM of production deps (npm sbom is built into npm >= 10.7 — no extra dep).
+          npm sbom --sbom-format cyclonedx --omit dev > dist-mcpb/devcoach.cdx.json
+          # Checksums over every release asset (.mcpb + SBOM); run inside the dir so paths are bare.
+          (cd dist-mcpb && shasum -a 256 *.mcpb *.cdx.json > SHASUMS256.txt)
       - uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ needs.bump.outputs.tag || github.ref_name }}
           generate_release_notes: true
-          files: dist-mcpb/*.mcpb
+          files: |
+            dist-mcpb/*.mcpb
+            dist-mcpb/devcoach.cdx.json
+            dist-mcpb/SHASUMS256.txt
 
   # ── Bump the Homebrew tap formula (skips when HOMEBREW_TAP_TOKEN unset) ─────
   homebrew:
