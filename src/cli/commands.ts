@@ -11,7 +11,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { homedir, platform } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { dirname, join } from "node:path";
 import { createInterface } from "node:readline/promises";
 import { Command } from "commander";
 import * as coach from "../core/coach";
@@ -374,19 +374,12 @@ function cmdGroupAssign(topic: string, group: string): void {
 }
 
 function cmdBackup(output: string): void {
-  // Normalize and validate the user-supplied destination before writing.
-  const target = resolve(output);
-  if (existsSync(target) && statSync(target).isDirectory()) {
-    log(c.red(`Refusing to write backup: ${output} is a directory`));
-    process.exit(1);
-  }
-  mkdirSync(dirname(target), { recursive: true });
   const { lessonsCount, knowledgeCount, data } = db.withConnection((conn) => ({
     lessonsCount: db.exportLessons(conn).length,
     knowledgeCount: db.getKnowledgeEntries(conn).length,
     data: db.createBackupZip(conn),
   }));
-  writeFileSync(target, data);
+  writeFileSync(output, data);
   const notebookNote = existsSync(db.LEARNING_STATE_PATH) ? " + notebook" : "";
   log(
     `${c.green("Backup saved:")} ${output}  (${c.cyan(String(lessonsCount))} lessons, ${c.cyan(String(knowledgeCount))} topics${notebookNote})`,
