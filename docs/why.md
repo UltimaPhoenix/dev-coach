@@ -15,6 +15,16 @@ the lesson arrives at the exact moment the concept is concrete, then gets out of
 That is the everyday value. But there is a larger reason the project exists, and it gets more important
 with every model release.
 
+## We're learning differently now
+
+There is a behavioural shift underneath all of this. We used to learn a thing *before* we used it — skim
+the docs, work an example, build the mental model first. Increasingly we don't: if the agent can already
+do it, studying it up front feels like wasted effort. It is the same trade we made when search engines
+replaced the trip to the library — why hold in your head what you can look up on demand?
+
+And most days that is fine. You skip the deep dive, the task ships, the tests pass, you move on. The
+problem is not any single skipped dive; it is what their accumulation quietly costs you.
+
 ## The thing we quietly stand to lose
 
 The headline worry about AI is that it will be *wrong*. The deeper worry is that we will gradually lose the
@@ -29,12 +39,37 @@ the model's confidence — it's a human who still understands the fundamentals w
 back, and override. Keeping that human sharp is not nostalgia for doing things by hand; it is the control
 that makes delegation trustworthy in the first place.
 
+## You can't cram competence
+
+Skipping the deep dive works right up until the day it doesn't. Sooner or later you hit the thing the model
+can't carry for you — a correctness bug hiding behind passing tests, a 2 a.m. outage, an architectural call
+the AI gets confidently wrong — and you have to go deep yourself. In that moment the competence either
+exists or it doesn't, and it is not something you can summon on demand.
+
+Real understanding is built slowly: time spent on the problem, mistakes made and felt, the work of figuring
+out *why* they were mistakes, and the small growth that follows. You can't compress that into the hour you
+suddenly need it. That is the case for learning a little continuously now — so the depth is already there
+when the stakes are high, instead of missing exactly when it counts most.
+
+## The why, and the wrong answers too
+
+This is also why devcoach teaches more than the right answer. Knowing *what* to do is brittle; knowing
+*why* is what carries over to the next problem — so the lessons explain the reasoning, not just the fix.
+
+It covers the wrong answers on purpose, too. One quiet effect of capable AI is that it spares you mistakes
+you never even see — it simply doesn't write the race condition, the N+1 query, the insecure default. That
+feels like a gift, but you also never learn why those are wrong, so you can't recognize them when one does
+slip through. Having understood a failure mode — ideally by having met it — is what lets you catch it
+later. devcoach surfaces the anti-patterns deliberately, because the mistakes you understand are the ones
+you can prevent.
+
 ## Teacher today, hedge for tomorrow
 
 devcoach plays both roles at once. Day to day it is a teacher — a patient maestro that grows your
-competence a little with every task, so you understand more of what you ship rather than less. Over the
-long run it is a hedge: a steady, low-friction way to keep developers fluent enough to validate AI output,
-precisely as that ability becomes harder to maintain and more valuable to have.
+competence a little with every task, the *why* behind the fix and the failure modes to watch for, so you
+understand more of what you ship rather than less. Over the long run it is a hedge: a steady, low-friction
+way to keep developers fluent enough to validate AI output, precisely as that ability becomes harder to
+maintain and more valuable to have.
 
 It is deliberately small and unobtrusive — one lesson at a time, rate-limited, entirely local, nothing to
 open. The bet is simple: a few minutes of genuine learning, delivered in context and spaced out over the
