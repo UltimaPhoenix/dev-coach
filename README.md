@@ -46,6 +46,7 @@ flowchart TD
 |--------|---------|--------------|
 | **npx** (no install) | _(used directly in the MCP config below)_ | Node.js ≥ 24 |
 | **npm** (global) | `npm install -g devcoach` | Node.js ≥ 24 |
+| **Homebrew** (macOS/Linux) | `brew install UltimaPhoenix/tap/devcoach` | Homebrew (pulls Node in automatically) |
 | **Desktop Extension** (`.mcpb`) | one-click — see below | Claude Desktop (bundles its own Node) |
 
 The recommended path is **npx** — no global install, always the latest version, used directly in your agent's MCP config.
@@ -63,6 +64,21 @@ npm run mcpb        # → dist-mcpb/devcoach-<version>.mcpb
 
 `npm run mcpb:sign` self-signs it (installs as an *unverified publisher*; a real code-signing cert is
 needed for a verified signature). Prebuilt `.mcpb` releases and a Desktop directory listing are planned.
+
+</details>
+
+<details>
+<summary><strong>Homebrew tap</strong> (macOS / Linux)</summary>
+
+```bash
+brew install UltimaPhoenix/tap/devcoach
+# or, in two steps:
+brew tap UltimaPhoenix/tap && brew install devcoach
+```
+
+The formula declares `depends_on "node"`, so Homebrew pulls in a recent Node automatically. It puts
+`devcoach` on your `PATH` — so `devcoach install` registers everything with the bare `devcoach`
+command (no `npx -y` prefix), and you can use `devcoach` directly in every command below.
 
 </details>
 
@@ -135,7 +151,7 @@ Then add the Stop hooks to `~/.claude/settings.json`:
 }
 ```
 
-> Tip: a global install (`npm i -g devcoach`) lets you drop the `npx -y` prefix and use `devcoach` directly in every command above.
+> Tip: a global install (`npm i -g devcoach` or `brew install UltimaPhoenix/tap/devcoach`) puts `devcoach` on your `PATH`, so you can drop the `npx -y` prefix and use `devcoach` directly in every command above. `devcoach install` detects this automatically and registers the bare command.
 
 #### Claude Desktop
 
@@ -340,7 +356,8 @@ Settings are stored in `~/.devcoach/coaching.db`. See [docs/configuration.md](do
 
 ```bash
 npm uninstall -g devcoach          # if installed globally (npx: nothing to remove)
-claude mcp remove devcoach         # remove from Claude Code
+brew uninstall devcoach            # if installed via Homebrew (brew untap UltimaPhoenix/tap to drop the tap)
+claude mcp remove --scope user devcoach   # remove from Claude Code (install uses user scope)
 rm -rf ~/.devcoach                 # delete all coaching data (back up first: devcoach backup)
 ```
 
