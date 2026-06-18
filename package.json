@@ -1,6 +1,6 @@
 {
   "name": "devcoach",
-  "version": "0.3.58",
+  "version": "0.3.59",
   "description": "A local MCP server that acts as a progressive technical coach for Claude Code and Claude Desktop",
   "license": "Apache-2.0",
   "keywords": [
