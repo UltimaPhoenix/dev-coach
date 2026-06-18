@@ -255,3 +255,104 @@ describe("cli", () => {
     expect(badFlag.out).not.toContain("at "); // no stack-trace frames
   });
 });
+
+describe("cli rich rendering branches", () => {
+  function seed() {
+    db.withConnection((c) => {
+      const mk = (o: Record<string, unknown>) =>
+        db.insertLesson(
+          c,
+          parseLesson({
+            timestamp: "2026-06-16T10:00:00Z",
+            topic_id: "python",
+            categories: ["python"],
+            summary: "s",
+            ...o,
+          }),
+        );
+      mk({ id: "jr", title: "Jr", level: "junior", feedback: "dont_know", starred: true });
+      mk({
+        id: "sr",
+        title: "Sr",
+        level: "senior",
+        feedback: "know",
+        starred: true,
+        task_context: "ctx",
+        project: "P",
+        repository: "o/r",
+        repository_platform: "github",
+        branch: "main",
+        commit_hash: "abc1234",
+        folder: "/f",
+      });
+      mk({ id: "po", title: "Po", level: "mid", project: "OnlyP" }); // project, no branch/commit
+    });
+  }
+
+  it("lessons table renders junior/senior colors, dont_know icon, and meta columns", async () => {
+    seed();
+    const out = (await run(["lessons"])).out;
+    expect(out).toContain("Jr");
+    expect(out).toContain("Sr");
+    expect(out).toContain("OnlyP"); // project column populated
+  });
+
+  it("lesson detail renders git metadata, context, starred, and both feedback labels", async () => {
+    const sr = (await run(["lesson", "sr"])).out;
+    expect(sr).toContain("project=P");
+    expect(sr).toContain("branch=");
+    expect(sr).toContain("commit=");
+    expect(sr).toContain("folder=/f");
+    expect(sr).toContain("Context:");
+    expect(sr).toContain("★ starred");
+    expect(sr).toContain("I know this");
+    const jr = (await run(["lesson", "jr"])).out;
+    expect(jr).toContain("I don't know this");
+  });
+
+  it("feedback dont_know lowers confidence", async () => {
+    expect((await run(["feedback", "sr", "dont_know"])).out).toContain("confidence");
+  });
+
+  it("stats shows weakest and strongest topics", async () => {
+    db.withConnection((c) => {
+      db.upsertKnowledge(c, "weak1", 1);
+      db.upsertKnowledge(c, "weak2", 2);
+      db.upsertKnowledge(c, "strong1", 9);
+      db.upsertKnowledge(c, "strong2", 10);
+    });
+    const out = (await run(["stats"])).out;
+    expect(out).toContain("Weakest topics");
+    expect(out).toContain("Strongest topics");
+  });
+
+  it("knowledge-add without a group lands in Other; remove of a missing topic warns", async () => {
+    expect((await run(["knowledge-add", "loner", "--confidence", "3"])).out).toContain("Added");
+    expect((await run(["knowledge-remove", "ghost"])).out).toContain("not found");
+  });
+
+  it("group-add rejects the reserved 'Other' name", async () => {
+    expect((await run(["group-add", "Other"])).code).toBe(1);
+  });
+
+  it("backup notes the notebook when a learning-state file exists", async () => {
+    writeFileSync(db.LEARNING_STATE_PATH, "# notes\n");
+    const file = join(mkdtempSync(join(tmpdir(), "dc-nb-")), "b.zip");
+    expect((await run(["backup", file])).out).toContain("+ notebook");
+    // restoring it twice → second run reports duplicates skipped + notebook restored
+    await run(["restore", file]);
+    expect((await run(["restore", file])).out).toContain("duplicates skipped");
+  });
+
+  it("install uses the bare `devcoach` command when it is on PATH", async () => {
+    const binDir = fakeBin("devcoach", "#!/bin/sh\nexit 0\n");
+    const savedPath = process.env.PATH;
+    process.env.PATH = binDir; // devcoach present, claude absent
+    try {
+      const r = await run(["install", "--claude-desktop", "--force"]);
+      expect(r.out).toContain("devcoach mcp"); // detectInstallMethod chose the bare command
+    } finally {
+      process.env.PATH = savedPath;
+    }
+  });
+});

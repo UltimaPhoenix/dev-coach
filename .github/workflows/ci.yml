@@ -91,9 +91,15 @@ jobs:
           path: ~/.sonar/cache
           key: ${{ runner.os }}-sonar
           restore-keys: ${{ runner.os }}-sonar
+      # Tag the analysis with the package version (single source of truth);
+      # not hardcoded in sonar-project.properties so it can't drift.
+      - name: Read version for Sonar
+        run: echo "PKG_VERSION=$(node -p "require('./package.json').version")" >> "$GITHUB_ENV"
       - name: SonarQube Cloud scan
         if: ${{ env.SONAR_TOKEN != '' }}
         uses: SonarSource/sonarqube-scan-action@v8
+        with:
+          args: -Dsonar.projectVersion=${{ env.PKG_VERSION }}
 
   # ── Version bump → commit → tag (workflow_dispatch only) ───────────────────
   bump:

@@ -1,7 +1,8 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { ElicitRequestSchema } from "@modelcontextprotocol/sdk/types.js";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import * as db from "../src/core/db";
 import { createServer } from "../src/mcp/server";
 
 async function connect() {
@@ -172,6 +173,133 @@ describe("mcp server", () => {
     expect(JSON.parse(byId.contents[0].text).error).toContain("not found");
     const pr: any = await client.getPrompt({ name: "devcoach_instructions" });
     expect(pr.messages[0].content.text.length).toBeGreaterThan(100);
+    await client.close();
+    await server.close();
+  });
+});
+
+describe("mcp server error paths", () => {
+  // Every DB-backed tool/resource wraps its work in try/catch; force the DB layer
+  // to throw and assert the failure branch is taken.
+  const dbBackedTools: [string, Record<string, unknown>][] = [
+    ["complete_onboarding", { topics: { python: 4 } }],
+    [
+      "log_lesson",
+      {
+        id: "x",
+        timestamp: "2026-01-01T00:00:00Z",
+        topic_id: "python",
+        categories: ["python"],
+        title: "t",
+        level: "mid",
+        summary: "s",
+      },
+    ],
+    ["update_knowledge", { topic: "python", delta: 1 }],
+    ["star_lesson", { lesson_id: "x", starred: true }],
+    ["delete_lesson", { lesson_id: "x" }],
+    ["submit_feedback", { lesson_id: "x", feedback: "know" }],
+    ["add_topic", { topic: "go", confidence: 5 }],
+    ["remove_topic", { topic: "go" }],
+    ["add_group", { name: "G" }],
+    ["remove_group", { name: "G" }],
+    ["update_settings", { key: "max_per_day", value: "5" }],
+  ];
+
+  it("DB-backed tools return isError when the DB throws", async () => {
+    const { client, server } = await connect();
+    const spy = vi.spyOn(db, "withConnection").mockImplementation(() => {
+      throw new Error("boom");
+    });
+    for (const [name, args] of dbBackedTools) {
+      const r: any = await client.callTool({ name, arguments: args });
+      expect(r.isError, `${name} should be isError`).toBe(true);
+    }
+    // get_lessons degrades to an empty list rather than erroring.
+    const lessons: any = await client.callTool({ name: "get_lessons", arguments: { limit: 5 } });
+    expect(text(lessons)).toBe("[]");
+    spy.mockRestore();
+    await client.close();
+    await server.close();
+  });
+
+  it("log_lesson uses explicit git args over auto-detection", async () => {
+    const { client, server } = await connect();
+    const log: any = await client.callTool({
+      name: "log_lesson",
+      arguments: {
+        id: "full",
+        timestamp: "2026-01-01T00:00:00Z",
+        topic_id: "python",
+        categories: ["python"],
+        title: "Full",
+        level: "mid",
+        summary: "s",
+        project: "explicitP",
+        repository: "o/r",
+        repository_platform: "gitlab",
+        branch: "feat",
+        commit_hash: "c0ffee",
+        folder: "/explicit",
+      },
+    });
+    expect(log.structuredContent.project).toBe("explicitP");
+    expect(log.structuredContent.repository_platform).toBe("gitlab");
+    expect(log.structuredContent.folder).toBe("/explicit");
+    await client.close();
+    await server.close();
+  });
+
+  it("log_lesson still saves when the user declines the feedback elicitation", async () => {
+    const [ct, st] = InMemoryTransport.createLinkedPair();
+    const server = createServer();
+    await server.connect(st);
+    const client = new Client(
+      { name: "t", version: "1.0.0" },
+      { capabilities: { elicitation: {} } },
+    );
+    client.setRequestHandler(ElicitRequestSchema, async () => ({ action: "decline" }));
+    await client.connect(ct);
+    const log: any = await client.callTool({
+      name: "log_lesson",
+      arguments: {
+        id: "d1",
+        timestamp: "2026-01-01T00:00:00Z",
+        topic_id: "python",
+        categories: ["python"],
+        title: "Declined",
+        level: "mid",
+        summary: "s",
+      },
+    });
+    expect(log.structuredContent.feedback).toBeNull(); // declined → no feedback applied, lesson saved
+    await client.close();
+    await server.close();
+  });
+
+  it("resources degrade safely when the DB throws", async () => {
+    const { client, server } = await connect();
+    const spy = vi.spyOn(db, "withConnection").mockImplementation(() => {
+      throw new Error("boom");
+    });
+    for (const uri of [
+      "devcoach://profile",
+      "devcoach://settings",
+      "devcoach://lessons/recent",
+      "devcoach://stats",
+      "devcoach://taught-topics",
+      "devcoach://rate-limit",
+      "devcoach://context",
+      "devcoach://onboarding",
+      "devcoach://lessons/some-id",
+    ]) {
+      const r: any = await client.readResource({ uri });
+      // The catch path must run and yield safe, parseable JSON (an {error} object
+      // or an empty collection) — never a thrown exception.
+      const parsed = JSON.parse(r.contents[0].text);
+      expect(parsed === null || typeof parsed === "object", uri).toBe(true);
+    }
+    spy.mockRestore();
     await client.close();
     await server.close();
   });

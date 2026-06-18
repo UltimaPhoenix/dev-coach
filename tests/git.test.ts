@@ -24,6 +24,13 @@ describe("detectGitContext", () => {
     expect(ctx.repository_platform).toBe("github");
   });
 
+  it("treats an unknown SSH host as a local platform", () => {
+    process.chdir(gitRepo("git@git.example.com:team/proj.git"));
+    const ctx = detectGitContext();
+    expect(ctx.repository).toBe("team/proj");
+    expect(ctx.repository_platform).toBe("local");
+  });
+
   it("parses an HTTPS remote → gitlab platform", () => {
     process.chdir(gitRepo("https://gitlab.com/acme/widgets.git"));
     const ctx = detectGitContext();
