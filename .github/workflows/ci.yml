@@ -47,6 +47,13 @@ jobs:
       - run: npm run typecheck
       - run: npm run test:cov
       - run: npm run build
+      # Hand the lcov report to the sonar job so it doesn't re-install + re-test.
+      - uses: actions/upload-artifact@v4
+        if: matrix.node == '24'
+        with:
+          name: coverage-lcov
+          path: coverage/lcov.info
+          retention-days: 1
 
   # ── SonarQube Cloud: code quality + coverage (skips when SONAR_TOKEN unset) ──
   sonar:
@@ -62,8 +69,19 @@ jobs:
         with:
           node-version-file: .node-version
           cache: npm
-      - run: npm ci
-      - run: npm run test:cov # writes coverage/lcov.info
+      - run: npm ci # node_modules → type-aware analysis (resolves dependency types)
+      # Reuse the check job's coverage instead of re-running the whole test suite.
+      - uses: actions/download-artifact@v4
+        with:
+          name: coverage-lcov
+          path: coverage
+      # Cache the scanner CLI + analyzer/JRE so it isn't re-downloaded each run.
+      - name: Cache SonarQube scanner
+        uses: actions/cache@v5
+        with:
+          path: ~/.sonar/cache
+          key: ${{ runner.os }}-sonar
+          restore-keys: ${{ runner.os }}-sonar
       - name: SonarQube Cloud scan
         if: ${{ env.SONAR_TOKEN != '' }}
         uses: SonarSource/sonarqube-scan-action@v8
