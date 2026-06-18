@@ -73,11 +73,25 @@ needed for a verified signature). Prebuilt `.mcpb` releases and a Desktop direct
 <details>
 <summary><strong>Homebrew tap</strong> (macOS / Linux)</summary>
 
+devcoach ships from its own tap, so add and trust the repository once, then install:
+
 ```bash
-brew install UltimaPhoenix/tap/devcoach
-# or, in two steps:
-brew tap UltimaPhoenix/tap && brew install devcoach
+# 1. Add the tap — registers github.com/UltimaPhoenix/homebrew-tap with Homebrew
+brew tap UltimaPhoenix/tap
+
+# 2. Trust the whole tap — required when Homebrew enforces HOMEBREW_REQUIRE_TAP_TRUST
+brew trust --tap UltimaPhoenix/tap
+
+# 3. Install
+brew install devcoach
 ```
+
+`brew tap` registers the third-party repository; `brew trust --tap` marks it trusted so Homebrew
+will load its formulae when `HOMEBREW_REQUIRE_TAP_TRUST` is set (the trust list lives in
+`~/.homebrew/trust.json`). Both are one-time. To update later: `brew upgrade devcoach`.
+
+Prefer a one-liner? `brew install UltimaPhoenix/tap/devcoach` taps and installs in a single
+command — but if your Homebrew enforces tap trust, run `brew trust --tap UltimaPhoenix/tap` first.
 
 The formula declares `depends_on "node"`, so Homebrew pulls in a recent Node automatically. It puts
 `devcoach` on your `PATH` — so `devcoach install` registers everything with the bare `devcoach`
