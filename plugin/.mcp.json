@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "devcoach": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "devcoach", "mcp"]
+    }
+  }
+}

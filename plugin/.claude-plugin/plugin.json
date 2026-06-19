@@ -1,0 +1,16 @@
+{
+  "name": "devcoach",
+  "description": "Progressive technical coach: auto-delivers personalized lessons as you work, tracks your knowledge map, all local. Bundles the devcoach MCP server + Stop hooks + coaching skill.",
+  "version": "0.3.62",
+  "author": {
+    "name": "UltimaPhoenix",
+    "url": "https://github.com/UltimaPhoenix"
+  },
+  "homepage": "https://ultimaphoenix.github.io/dev-coach/",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/UltimaPhoenix/dev-coach.git"
+  },
+  "license": "Apache-2.0",
+  "keywords": ["coaching", "learning", "mcp", "developer-tools"]
+}

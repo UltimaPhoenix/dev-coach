@@ -59,8 +59,11 @@ flowchart TD
 | **npm** (global) | `npm install -g devcoach` | Node.js ≥ 24 |
 | **Homebrew** (macOS/Linux) | `brew install UltimaPhoenix/tap/devcoach` | Homebrew (pulls Node in automatically) |
 | **Desktop Extension** (`.mcpb`) | one-click — see below | Claude Desktop (bundles its own Node) |
+| **Claude Code plugin** | `/plugin marketplace add …` + `/plugin install …` — see below | Claude Code (Node.js ≥ 24) |
 
 The recommended path is **npx** — no global install, always the latest version, used directly in your agent's MCP config.
+
+> **Runs locally only.** devcoach is a local stdio MCP server that stores everything in `~/.devcoach/coaching.db` on the machine where your agent runs. It works in **Claude Code** and **Claude Desktop**, but **not** on claude.ai web (which only supports hosted/remote connectors).
 
 <details>
 <summary><strong>Claude Desktop one-click extension</strong> (<code>.mcpb</code>)</summary>
@@ -75,6 +78,33 @@ npm run mcpb        # → dist-mcpb/devcoach-<version>.mcpb
 
 `npm run mcpb:sign` self-signs it (installs as an *unverified publisher*; a real code-signing cert is
 needed for a verified signature). Prebuilt `.mcpb` releases and a Desktop directory listing are planned.
+
+</details>
+
+<details>
+<summary><strong>Claude Code plugin</strong> (MCP server + Stop hooks + skill in one install)</summary>
+
+The plugin bundles everything — the MCP server, the automatic-coaching Stop hooks, and the coaching
+skill — so there's nothing to wire up by hand and **no need to run `devcoach install`** (avoid running
+both, or the Stop hooks get registered twice). Three ways to install:
+
+```bash
+# A — straight from this repo
+/plugin marketplace add UltimaPhoenix/dev-coach
+/plugin install devcoach@devcoach
+
+# B — from the marketplace (add once, then install any UltimaPhoenix plugin)
+/plugin marketplace add UltimaPhoenix/claude-plugins-marketplace
+/plugin install devcoach@ultimaphoenix
+
+# C — offline: download devcoach-plugin-<version>.zip from the GitHub Release, unzip, then
+/plugin marketplace add /path/to/unzipped-folder
+/plugin install devcoach@devcoach
+```
+
+The plugin still runs the published `devcoach` npm package via `npx`, so it needs **Node.js ≥ 24** and
+runs **locally only** (Claude Code / Claude Desktop, not claude.ai web). See
+[Claude Code plugin](docs/claude-code-plugin.md) for how it works and the local-only details.
 
 </details>
 
@@ -114,6 +144,8 @@ npx -y devcoach install
 ```
 
 This registers devcoach as an MCP server and sets up automatic lesson delivery. Restart your agent after running.
+
+> **Claude Code users:** you can skip this step entirely by installing the [Claude Code plugin](docs/claude-code-plugin.md) instead (see the install table above) — it bundles the MCP server, Stop hooks, and skill. Use one or the other, not both.
 
 <details>
 <summary><strong>Connect to other agents</strong> (Cursor, Windsurf, Cline, Continue, Zed…)</summary>

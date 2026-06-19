@@ -1,0 +1,8 @@
+{
+  "hooks": {
+    "Stop": [
+      { "hooks": [{ "type": "command", "command": "npx -y devcoach onboard-hook" }] },
+      { "hooks": [{ "type": "command", "command": "npx -y devcoach lesson-ready" }] }
+    ]
+  }
+}

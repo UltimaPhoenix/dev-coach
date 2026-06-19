@@ -45,6 +45,16 @@ npm run mcpb   # → dist-mcpb/devcoach-<version>.mcpb
 # Claude Desktop → Settings → Extensions → Install Extension… → pick the .mcpb
 ```
 
+**Claude Code plugin** — bundles the MCP server, the Stop hooks, and the skill in a single install, so
+you can skip `devcoach install` (don't run both):
+
+```bash
+/plugin marketplace add UltimaPhoenix/claude-plugins-marketplace
+/plugin install devcoach@ultimaphoenix
+```
+
+See [Claude Code plugin](claude-code-plugin.md) for all three install paths and the local-only details.
+
 ### Manual MCP config
 
 If `devcoach install` isn't available for your agent, add this to its MCP config file:

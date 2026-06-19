@@ -47,6 +47,8 @@
     "test:cov": "vitest run --coverage",
     "mcpb": "npm run build && node scripts/build-mcpb.mjs",
     "mcpb:sign": "npm run build && node scripts/build-mcpb.mjs --sign",
+    "plugin:sync": "node scripts/sync-plugin.mjs",
+    "plugin:zip": "node scripts/sync-plugin.mjs && node scripts/build-plugin-zip.mjs",
     "prepack": "npm run build"
   },
   "dependencies": {

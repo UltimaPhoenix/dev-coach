@@ -125,9 +125,12 @@ jobs:
           NEW="${NEW#v}"
           # keep the .mcpb manifest version in sync (the build also syncs it; commit it tidy)
           NEW="$NEW" node -e 'const fs=require("fs"),f="mcpb/manifest.json";fs.writeFileSync(f,fs.readFileSync(f,"utf8").replace(/"version": "[^"]+"/,`"version": "${process.env.NEW}"`))'
+          # keep the Claude Code plugin manifest + bundled SKILL.md in sync with package.json
+          node scripts/sync-plugin.mjs
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add package.json package-lock.json mcpb/manifest.json
+          git add package.json package-lock.json mcpb/manifest.json \
+            plugin/.claude-plugin/plugin.json plugin/skills/devcoach/SKILL.md
           git commit -m "chore: release v${NEW}"
           git tag "v${NEW}"
           git push origin HEAD:main "v${NEW}"
@@ -191,19 +194,25 @@ jobs:
             echo "MCPB_KEY=$RUNNER_TEMP/mcpb-key.pem"   >> "$GITHUB_ENV"
           fi
       - run: npm run mcpb:sign
+      # Claude Code plugin zip (offline-installable marketplace; vector C). build-mcpb already ran
+      # `npm run build`, and plugin:zip re-syncs the plugin before packing.
+      - run: npm run plugin:zip
       - name: Generate SBOM + checksums for release assets
         run: |
           set -euo pipefail
           # CycloneDX SBOM of production deps (npm sbom is built into npm >= 10.7 — no extra dep).
           npm sbom --sbom-format cyclonedx --omit dev > dist-mcpb/devcoach.cdx.json
-          # Checksums over every release asset (.mcpb + SBOM); run inside the dir so paths are bare.
-          (cd dist-mcpb && shasum -a 256 *.mcpb *.cdx.json > SHASUMS256.txt)
+          # Stage the plugin zip next to the .mcpb so one checksum file covers every release asset.
+          cp dist-plugin/devcoach-plugin-*.zip dist-mcpb/
+          # Checksums over every release asset (.mcpb + zip + SBOM); run inside the dir so paths are bare.
+          (cd dist-mcpb && shasum -a 256 *.mcpb *.zip *.cdx.json > SHASUMS256.txt)
       - uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ needs.bump.outputs.tag || github.ref_name }}
           generate_release_notes: true
           files: |
             dist-mcpb/*.mcpb
+            dist-mcpb/*.zip
             dist-mcpb/devcoach.cdx.json
             dist-mcpb/SHASUMS256.txt
 
@@ -235,5 +244,35 @@ jobs:
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add Formula/devcoach.rb
+          git diff --staged --quiet || git commit -m "devcoach ${VERSION}"
+          git push
+
+  # ── Sync the devcoach entry in the plugin marketplace tap (skips when token unset) ──
+  marketplace:
+    needs: [publish, bump]
+    if: ${{ always() && needs.publish.result == 'success' }}
+    runs-on: ubuntu-latest
+    env:
+      MARKETPLACE_TOKEN: ${{ secrets.CLAUDE_PLUGIN_MARKETPLACE }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.bump.outputs.tag || github.ref }}
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .node-version
+      - name: Pin devcoach in UltimaPhoenix/claude-plugins-marketplace
+        if: ${{ env.MARKETPLACE_TOKEN != '' }}
+        run: |
+          set -euo pipefail
+          VERSION="${{ needs.bump.outputs.version || github.ref_name }}"
+          VERSION="${VERSION#v}"
+          git clone --depth 1 "https://x-access-token:${MARKETPLACE_TOKEN}@github.com/UltimaPhoenix/claude-plugins-marketplace.git" mkt
+          # Surgical merge: updates only the devcoach entry, leaving other plugins untouched.
+          node scripts/update-marketplace.mjs "$VERSION" "v${VERSION}" mkt/.claude-plugin/marketplace.json
+          cd mkt
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .claude-plugin/marketplace.json
           git diff --staged --quiet || git commit -m "devcoach ${VERSION}"
           git push
