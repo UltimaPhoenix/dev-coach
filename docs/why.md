@@ -77,5 +77,5 @@ open. The bet is simple: a few minutes of genuine learning, delivered in context
 work you already do, compounds. The developers who keep learning while the tools get stronger are the ones
 who stay in control of the result.
 
-→ See [How it works](./how-it-works.md) for the decision flow, or [Get started](./getting-started.md) to
-connect devcoach to your agent.
+→ See [How it works](./how-it-works.md) for the decision flow, or [install devcoach](./install/index.md)
+to connect it to your agent.

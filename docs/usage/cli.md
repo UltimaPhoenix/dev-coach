@@ -1,8 +1,16 @@
-# CLI reference
+---
+title: Command line (CLI)
+sidebar_label: Command line (CLI)
+---
 
-The CLI is a secondary interface for querying and managing your coaching data — everything is also in
-the [web dashboard](web-ui.md). It's built on [Commander](https://github.com/tj/commander.js), so every
-command supports `--help`.
+# Command line (CLI)
+
+**What it's for:** querying and managing your coaching data from the terminal — quick lookups, scripting,
+backups, and tuning settings without leaving the shell. It's a power-user companion to the automatic
+[coaching in your agent](./coaching.md); everything here is also available in the
+[web dashboard](./web-ui.md).
+
+Built on [Commander](https://github.com/tj/commander.js), so every command supports `--help`.
 
 ```bash
 devcoach --help              # list all commands
@@ -52,12 +60,27 @@ devcoach --version
 | `devcoach set max_per_day <n>` | Max lessons per 24h (1–20, default 2) |
 | `devcoach set min_gap_minutes <n>` | Minimum minutes between lessons (0–1440, default 240) |
 
-## Backup & restore
+## Backup, export & import
+
+Your whole profile lives in one place, so moving it between machines is a single command each way.
+
+```bash
+# Export everything → a portable zip (settings + knowledge map + lessons + notebook)
+devcoach backup ~/devcoach-$(date +%F).zip   # default file: devcoach-backup.zip
+
+# Import on another machine (or restore after a reset)
+devcoach restore ~/devcoach-2026-06-19.zip
+```
 
 | Command | Description |
 |---|---|
 | `devcoach backup [file.zip]` | Export settings + knowledge map + lessons + notebook (default `devcoach-backup.zip`) |
-| `devcoach restore <file.zip>` | Restore from a backup (settings overwritten, knowledge upserted, duplicate lessons skipped) |
+| `devcoach restore <file.zip>` | Import a backup — settings overwritten, knowledge upserted, duplicate lessons skipped |
+
+On restore, your profile and full lesson history are merged in; you can also point the
+[onboarding wizard](./coaching.md#onboarding) at a backup. The same export/import is available in the
+[web dashboard's Settings page](./web-ui.md#settings-settings). For the zip's internal format, see
+[Configuration & data](../reference/configuration.md#backup-strategy).
 
 ## Examples
 

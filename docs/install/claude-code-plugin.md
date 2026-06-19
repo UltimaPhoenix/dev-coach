@@ -51,6 +51,21 @@ When you enable the plugin, Claude Code wires in its three component files:
 3. **`skills/devcoach/SKILL.md`** → the coaching playbook, auto-loaded so the agent knows *how* to
    teach when a hook fires.
 
+## Running the CLI & web dashboard
+
+The plugin gives Claude Code everything it needs to coach you, but it does **not** put the `devcoach`
+**CLI** on your `PATH` — it runs the MCP server internally via `npx`. So to open the
+[web dashboard](../usage/web-ui.md) or use any [CLI command](../usage/cli.md), prefix it with `npx -y`:
+
+```bash
+npx -y devcoach ui        # open the web dashboard
+npx -y devcoach stats     # any other command works the same way
+```
+
+Prefer a bare `devcoach` command? Install the npm package globally (`npm install -g devcoach`) or via
+[Homebrew](./homebrew.md) — running it alongside the plugin is fine. The plugin owns the coaching hooks;
+the global binary just adds the CLI.
+
 ## Runs locally only
 
 devcoach is a single-user, local-first tool. All three pieces are local processes that share one
@@ -61,8 +76,10 @@ machine's home directory:
 - ❌ **claude.ai web / hosted "remote MCP" connectors** — those require an HTTP/OAuth multi-tenant
   server. devcoach writes to a local home directory, so it cannot be a remote connector.
 - ⚠️ **Ephemeral / cloud sandboxes** — coaching works while the session runs, but `~/.devcoach` is not
-  persisted across runs. Use [`devcoach backup`](cli.md) / `restore` to carry your profile between
-  machines.
+  persisted across runs. Use [`devcoach backup`](../usage/cli.md#backup-export--import) / `restore` to
+  carry your profile between machines.
 
 It needs **Node.js ≥ 24** (for Node's embedded `node:sqlite`), since the plugin runs the published
 `devcoach` npm package via `npx`.
+
+→ Next: **[Coaching in your agent](../usage/coaching.md)**.

@@ -90,7 +90,7 @@ The MCP server, hooks, and skill activate on install — no restart needed.
 
 </details>
 
-The plugin runs the published `devcoach` npm package via `npx`, so it needs **Node.js ≥ 24** and runs **locally only**. See [Claude Code plugin](docs/claude-code-plugin.md) for how it works.
+The plugin runs the published `devcoach` npm package via `npx`, so it needs **Node.js ≥ 24** and runs **locally only**. See [Claude Code plugin](docs/install/claude-code-plugin.md) for how it works.
 
 ### 2. npx CLI (any MCP agent)
 
@@ -334,7 +334,7 @@ npx -y devcoach ui   # → http://localhost:7860
 | **Lessons** | Browse and filter your full lesson history; star lessons to revisit |
 | **Settings** | Change rate limits, import/export your profile, take a backup |
 
-Full reference: [docs/web-ui.md](docs/web-ui.md)
+Full reference: [docs/usage/web-ui.md](docs/usage/web-ui.md)
 
 ---
 
@@ -358,7 +358,7 @@ The CLI is a secondary interface for querying and managing your coaching data. E
 | `devcoach setup` | Run the onboarding wizard in the terminal |
 | `devcoach ui` | Open the web dashboard |
 
-(Prefix with `npx -y` if you haven't installed globally.) Full reference: [docs/cli.md](docs/cli.md)
+(Prefix with `npx -y` if you haven't installed globally.) Full reference: [docs/cli.md](docs/usage/cli.md)
 
 ---
 
@@ -369,7 +369,7 @@ devcoach set max_per_day 3        # up to 3 lessons per day
 devcoach set min_gap_minutes 120  # at least 2 hours between lessons
 ```
 
-Settings are stored in `~/.devcoach/coaching.db`. See [docs/configuration.md](docs/configuration.md) for all options.
+Settings are stored in `~/.devcoach/coaching.db`. See [docs/configuration.md](docs/reference/configuration.md) for all options.
 
 ---
 

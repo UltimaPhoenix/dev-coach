@@ -1,19 +1,28 @@
-# Web UI
+---
+title: Web dashboard
+sidebar_label: Web dashboard
+---
+
+# Web dashboard
 
 import ThemedShot from "@site/src/components/ThemedShot";
 import Tabs from "@theme/Tabs";
 import TabItem from "@theme/TabItem";
 
-The devcoach web dashboard provides a visual interface for everything the CLI does.
+**What it's for:** a visual interface for everything the [CLI](./cli.md) does — browse and filter your
+lesson history at a glance, adjust your knowledge map by clicking, and import/export backups. It's a
+companion to the automatic [coaching in your agent](./coaching.md), reading and writing the same local
+database.
 
 ## Launch
 
 ```bash
-devcoach ui              # http://localhost:7860
-devcoach ui --port 8080  # custom port
+npx -y devcoach ui              # http://localhost:7860
+npx -y devcoach ui --port 8080  # custom port
 ```
 
-Or via the MCP tool (Claude can launch it for you):
+Installed devcoach globally or via Homebrew? Drop the `npx -y` and just run `devcoach ui`. Or let Claude
+open it for you via the MCP tool:
 
 ```
 open_ui({ port: 7860 })
@@ -45,8 +54,8 @@ Displays your full knowledge map with colour-coded confidence bars:
 
 <ThemedShot
   alt="Knowledge map"
-  light={require("./screenshots/knowledge-map-light.png").default}
-  dark={require("./screenshots/knowledge-map-dark.png").default}
+  light={require("../screenshots/knowledge-map-light.png").default}
+  dark={require("../screenshots/knowledge-map-dark.png").default}
 />
 
 ---
@@ -76,8 +85,8 @@ Filterable, sortable table of all delivered lessons.
 
 <ThemedShot
   alt="Lessons"
-  light={require("./screenshots/lessons-light.png").default}
-  dark={require("./screenshots/lessons-dark.png").default}
+  light={require("../screenshots/lessons-light.png").default}
+  dark={require("../screenshots/lessons-dark.png").default}
 />
 
 ---
@@ -98,36 +107,36 @@ Full lesson content laid out in reading order:
   <TabItem value="docker" label="Docker layer caching (Junior)" default>
     <ThemedShot
       alt="Docker layer caching"
-      light={require("./screenshots/lesson-docker-layer-cache-light.png").default}
-      dark={require("./screenshots/lesson-docker-layer-cache-dark.png").default}
+      light={require("../screenshots/lesson-docker-layer-cache-light.png").default}
+      dark={require("../screenshots/lesson-docker-layer-cache-dark.png").default}
     />
   </TabItem>
   <TabItem value="postgres" label="PostgreSQL EXPLAIN ANALYZE (Mid)">
     <ThemedShot
       alt="PostgreSQL EXPLAIN ANALYZE"
-      light={require("./screenshots/lesson-postgresql-explain-analyze-light.png").default}
-      dark={require("./screenshots/lesson-postgresql-explain-analyze-dark.png").default}
+      light={require("../screenshots/lesson-postgresql-explain-analyze-light.png").default}
+      dark={require("../screenshots/lesson-postgresql-explain-analyze-dark.png").default}
     />
   </TabItem>
   <TabItem value="rebase" label="Git interactive rebase (Mid)">
     <ThemedShot
       alt="Git interactive rebase"
-      light={require("./screenshots/lesson-git-interactive-rebase-light.png").default}
-      dark={require("./screenshots/lesson-git-interactive-rebase-dark.png").default}
+      light={require("../screenshots/lesson-git-interactive-rebase-light.png").default}
+      dark={require("../screenshots/lesson-git-interactive-rebase-dark.png").default}
     />
   </TabItem>
   <TabItem value="cicd" label="CI/CD pipeline stages (Senior)">
     <ThemedShot
       alt="CI/CD pipeline stages"
-      light={require("./screenshots/lesson-ci-cd-pipeline-stages-light.png").default}
-      dark={require("./screenshots/lesson-ci-cd-pipeline-stages-dark.png").default}
+      light={require("../screenshots/lesson-ci-cd-pipeline-stages-light.png").default}
+      dark={require("../screenshots/lesson-ci-cd-pipeline-stages-dark.png").default}
     />
   </TabItem>
   <TabItem value="stampede" label="Cache stampede (Senior)">
     <ThemedShot
       alt="Cache stampede"
-      light={require("./screenshots/lesson-redis-cache-stampede-light.png").default}
-      dark={require("./screenshots/lesson-redis-cache-stampede-dark.png").default}
+      light={require("../screenshots/lesson-redis-cache-stampede-light.png").default}
+      dark={require("../screenshots/lesson-redis-cache-stampede-dark.png").default}
     />
   </TabItem>
 </Tabs>
@@ -140,13 +149,18 @@ Full lesson content laid out in reading order:
 - **Min gap** — minimum minutes between lessons (0–1440), input as hours + minutes
 - **Export lessons** — download all lessons as JSON
 - **Import lessons** — upload a previously exported JSON file
-- **Export backup** — full zip (settings + knowledge + lessons + notebook)
-- **Import backup** — restore from a backup zip
+- **Export backup** — download a full zip (settings + knowledge map + lessons + notebook)
+- **Import backup** — restore everything from a backup zip
+
+**Export / import** here is the dashboard equivalent of the CLI's
+[`devcoach backup` / `restore`](./cli.md#backup-export--import) — use it to move your profile to another
+machine or take a snapshot before a big change. (The smaller *Export/Import lessons* buttons handle just
+the lesson history as JSON.)
 
 <ThemedShot
   alt="Settings"
-  light={require("./screenshots/settings-light.png").default}
-  dark={require("./screenshots/settings-dark.png").default}
+  light={require("../screenshots/settings-light.png").default}
+  dark={require("../screenshots/settings-dark.png").default}
 />
 
 ---

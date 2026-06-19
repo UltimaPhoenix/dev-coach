@@ -6,12 +6,31 @@ const sidebars: SidebarsConfig = {
     "index",
     "why",
     "how-it-works",
-    "getting-started",
-    "claude-code-plugin",
-    "cli",
-    "mcp-server",
-    "web-ui",
-    "configuration",
+    {
+      type: "category",
+      label: "Installation",
+      collapsed: false,
+      link: { type: "doc", id: "install/index" },
+      items: [
+        "install/claude-code-plugin",
+        "install/npx",
+        "install/homebrew",
+        "install/claude-desktop",
+        "install/claude-ai",
+        "install/other-agents",
+      ],
+    },
+    {
+      type: "category",
+      label: "Using devcoach",
+      collapsed: false,
+      items: ["usage/coaching", "usage/cli", "usage/web-ui"],
+    },
+    {
+      type: "category",
+      label: "Reference",
+      items: ["reference/mcp-server", "reference/configuration", "reference/privacy"],
+    },
   ],
 };
 

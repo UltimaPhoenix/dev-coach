@@ -60,9 +60,10 @@ const config: Config = {
         {
           title: "Docs",
           items: [
-            { label: "Getting started", to: "/getting-started" },
-            { label: "CLI reference", to: "/cli" },
-            { label: "MCP server", to: "/mcp-server" },
+            { label: "Installation", to: "/install" },
+            { label: "Coaching in your agent", to: "/usage/coaching" },
+            { label: "CLI reference", to: "/usage/cli" },
+            { label: "MCP server", to: "/reference/mcp-server" },
           ],
         },
         {
