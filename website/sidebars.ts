@@ -7,6 +7,7 @@ const sidebars: SidebarsConfig = {
     "why",
     "how-it-works",
     "getting-started",
+    "claude-code-plugin",
     "cli",
     "mcp-server",
     "web-ui",

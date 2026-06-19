@@ -4,6 +4,7 @@ node_modules/
 # Build output
 dist/
 dist-mcpb/
+dist-plugin/
 mcpb/build/
 *.tsbuildinfo
 
@@ -25,6 +26,9 @@ coverage/
 
 # Local scratch
 todo
+
+# Local-only docs (e.g. the plugin release runbook) — never committed
+*.local.md
 
 # Secrets
 .env

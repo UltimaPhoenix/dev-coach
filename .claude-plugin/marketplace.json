@@ -1,0 +1,11 @@
+{
+  "name": "devcoach",
+  "owner": { "name": "UltimaPhoenix", "url": "https://github.com/UltimaPhoenix" },
+  "plugins": [
+    {
+      "name": "devcoach",
+      "source": "./plugin",
+      "description": "Progressive technical coach: auto lessons, knowledge map, Stop hooks."
+    }
+  ]
+}
