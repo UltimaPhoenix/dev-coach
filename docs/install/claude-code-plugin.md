@@ -1,5 +1,10 @@
 # Claude Code plugin
 
+:::tip Recommended if you'd rather not use a terminal
+This is the simplest way to add devcoach to Claude Code — one click, nothing to configure. (Prefer the
+terminal and want the `devcoach` CLI too? Use [Homebrew](./homebrew.md) instead.)
+:::
+
 devcoach ships as a **Claude Code plugin** that bundles everything in one install:
 
 - the **MCP server** (13 tools, 9 resources, the `devcoach_instructions` prompt),

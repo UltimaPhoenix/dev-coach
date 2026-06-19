@@ -53,19 +53,35 @@ flowchart TD
 
 devcoach runs **locally** — a stdio MCP server that stores everything in `~/.devcoach/coaching.db` on the machine where your agent runs. It works in **Claude Code** and **Claude Desktop**, but **not** on claude.ai web (which only supports hosted/remote connectors). Requires **Node.js ≥ 24**.
 
-Pick the method that matches your setup — each section below is self-contained (install **and** connect):
+**Pick by how you like to work** — each section is self-contained (install **and** connect):
 
-| Your setup | Method |
-|------------|--------|
-| **Claude Code** | **1. Plugin** — bundles the MCP server, hooks & skill in one install *(recommended)* |
-| **Claude Code, Cursor, Windsurf, Cline, …** | **2. npx CLI** — `npx -y devcoach install` |
-| **macOS / Linux** | **3. Homebrew** |
-| **Claude Desktop** | **4. One-click extension** (`.mcpb`) |
-| **claude.ai web** | **5. Skill copy** |
+- **Developer, comfortable in a terminal → [Homebrew](#homebrew-recommended-for-developers)** — one `brew install`, and you get the `devcoach` CLI too.
+- **Prefer a one-click, no-terminal setup → the [Claude Code plugin](#claude-code-plugin-recommended-for-claude-code) or the [`.mcpb` extension](#claude-desktop-extension-mcpb-recommended-for-claude-desktop)**.
+- Anything else (npx, manual config, other agents, claude.ai web) is under **[Other install methods](#other-install-methods)**.
 
-### 1. Claude Code plugin (recommended)
+### Homebrew (recommended for developers)
 
-The plugin bundles **everything** — the MCP server, the automatic-coaching Stop hooks, and the coaching skill — so there's nothing else to wire up and **no need to run `devcoach install`** (don't do both, or the Stop hooks get registered twice).
+macOS / Linux. Add and trust the tap once, install, then connect — you also get the **`devcoach` CLI** (so [`devcoach ui`](#web-dashboard) and the [CLI](docs/usage/cli.md) work without an `npx` prefix):
+
+```bash
+# 1. Add the tap — registers github.com/UltimaPhoenix/homebrew-tap with Homebrew
+brew tap UltimaPhoenix/tap
+
+# 2. Trust the whole tap — required when Homebrew enforces HOMEBREW_REQUIRE_TAP_TRUST
+brew trust --tap UltimaPhoenix/tap
+
+# 3. Install
+brew install devcoach
+
+# 4. Connect (Homebrew puts `devcoach` on your PATH — no `npx -y` prefix needed)
+devcoach install
+```
+
+`brew tap` registers the third-party repository; `brew trust --tap` marks it trusted so Homebrew will load its formulae when `HOMEBREW_REQUIRE_TAP_TRUST` is set. Both are one-time. To update later: `brew upgrade devcoach`. One-liner: `brew install UltimaPhoenix/tap/devcoach` (run `brew trust --tap UltimaPhoenix/tap` first if your Homebrew enforces tap trust). The formula declares `depends_on "node"`, so Homebrew pulls in a recent Node automatically.
+
+### Claude Code plugin (recommended for Claude Code)
+
+The simplest way to add devcoach to **Claude Code** — one click, nothing to configure. It bundles **everything** (MCP server + automatic-coaching Stop hooks + skill), so **don't also run `devcoach install`** (or the Stop hooks get registered twice).
 
 ```bash
 # Add the marketplace once, then install (you can install any UltimaPhoenix plugin from it later)
@@ -73,7 +89,7 @@ The plugin bundles **everything** — the MCP server, the automatic-coaching Sto
 /plugin install devcoach@ultimaphoenix
 ```
 
-The MCP server, hooks, and skill activate on install — no restart needed.
+The MCP server, hooks, and skill activate on install — no restart needed. The plugin **does not** add the `devcoach` CLI, so run the dashboard or CLI with `npx -y devcoach ui` (or use Homebrew / `npm i -g devcoach` for a bare `devcoach`).
 
 <details>
 <summary><strong>Other ways to install the plugin</strong> (straight from the repo · offline zip)</summary>
@@ -90,9 +106,23 @@ The MCP server, hooks, and skill activate on install — no restart needed.
 
 </details>
 
-The plugin runs the published `devcoach` npm package via `npx`, so it needs **Node.js ≥ 24** and runs **locally only**. See [Claude Code plugin](docs/install/claude-code-plugin.md) for how it works.
+See [Claude Code plugin](docs/install/claude-code-plugin.md) for how it works.
 
-### 2. npx CLI (any MCP agent)
+### Claude Desktop extension (`.mcpb`) (recommended for Claude Desktop)
+
+A single bundle that runs on Claude Desktop's built-in runtime — no Node or terminal needed:
+
+```bash
+npm run mcpb        # → dist-mcpb/devcoach-<version>.mcpb
+# Claude Desktop → Settings → Extensions → Install Extension… → pick the .mcpb
+```
+
+`npm run mcpb:sign` self-signs it (installs as an *unverified publisher*; a real code-signing cert is needed for a verified signature). Prebuilt `.mcpb` releases and a Desktop directory listing are planned.
+
+### Other install methods
+
+<details>
+<summary><strong>npx / npm CLI</strong> (any MCP agent — no install)</summary>
 
 No install required — `npx` runs devcoach on demand. For **Claude Code** and **Claude Desktop**, one command registers the MCP server and wires up automatic lesson delivery:
 
@@ -101,6 +131,8 @@ npx -y devcoach install
 ```
 
 Restart your agent afterward. Prefer a global binary? `npm install -g devcoach`, then run `devcoach install` (and drop the `npx -y` prefix everywhere).
+
+</details>
 
 <details>
 <summary><strong>Manual MCP config for Claude Code</strong> (if <code>devcoach install</code> isn't available)</summary>
@@ -134,12 +166,12 @@ Then add the Stop hooks to `~/.claude/settings.json` for automatic lesson delive
 ```
 
 > Tip: a global install puts `devcoach` on your `PATH`, so you can drop the `npx -y` prefix. `devcoach install` detects this automatically.
-> **Using the [Claude Code plugin](#1-claude-code-plugin-recommended)?** Skip the hooks above — the plugin already provides them.
+> **Using the Claude Code plugin (above)?** Skip the hooks here — the plugin already provides them.
 
 </details>
 
 <details>
-<summary><strong>Other agents</strong> (Cursor, Windsurf, Cline, Continue, Zed…)</summary>
+<summary><strong>Other MCP agents</strong> (Cursor, Windsurf, Cline, Continue, Zed…)</summary>
 
 Add this to your agent's MCP config file:
 
@@ -166,38 +198,8 @@ Add this to your agent's MCP config file:
 
 </details>
 
-### 3. Homebrew (macOS / Linux)
-
-devcoach ships from its own tap. Add and trust the repository once, install, then connect:
-
-```bash
-# 1. Add the tap — registers github.com/UltimaPhoenix/homebrew-tap with Homebrew
-brew tap UltimaPhoenix/tap
-
-# 2. Trust the whole tap — required when Homebrew enforces HOMEBREW_REQUIRE_TAP_TRUST
-brew trust --tap UltimaPhoenix/tap
-
-# 3. Install
-brew install devcoach
-
-# 4. Connect (Homebrew puts `devcoach` on your PATH — no `npx -y` prefix needed)
-devcoach install
-```
-
-`brew tap` registers the third-party repository; `brew trust --tap` marks it trusted so Homebrew will load its formulae when `HOMEBREW_REQUIRE_TAP_TRUST` is set. Both are one-time. To update later: `brew upgrade devcoach`. One-liner: `brew install UltimaPhoenix/tap/devcoach` (run `brew trust --tap UltimaPhoenix/tap` first if your Homebrew enforces tap trust). The formula declares `depends_on "node"`, so Homebrew pulls in a recent Node automatically.
-
-### 4. Claude Desktop extension (`.mcpb`)
-
-A single bundle that runs on Claude Desktop's built-in runtime — no Node or terminal needed:
-
-```bash
-npm run mcpb        # → dist-mcpb/devcoach-<version>.mcpb
-# Claude Desktop → Settings → Extensions → Install Extension… → pick the .mcpb
-```
-
-`npm run mcpb:sign` self-signs it (installs as an *unverified publisher*; a real code-signing cert is needed for a verified signature). Prebuilt `.mcpb` releases and a Desktop directory listing are planned.
-
-### 5. claude.ai web (skill copy)
+<details>
+<summary><strong>claude.ai web</strong> (skill copy — no MCP)</summary>
 
 Claude.ai does not support MCP servers. Install the coaching instructions as a skill instead:
 
@@ -208,6 +210,8 @@ Claude.ai does not support MCP servers. Install the coaching instructions as a s
 This gives claude.ai the coaching behaviour without the MCP tools (lesson logging and profile tracking will not work).
 
 > **Keep the skill up to date.** For Claude Code / Claude Desktop, the skill is served automatically (via the MCP prompt or the plugin) and is always current. If you copied it manually to claude.ai, re-paste the latest `SKILL.md` after each devcoach update.
+
+</details>
 
 ---
 

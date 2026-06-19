@@ -4,6 +4,11 @@ title: Homebrew
 
 # Homebrew (macOS / Linux)
 
+:::tip Recommended for developers
+If you work in a terminal, this is the best fit: a single `brew install` sets up devcoach **and** the
+`devcoach` CLI, so the [command line](../usage/cli.md) and `devcoach ui` work directly (no `npx` prefix).
+:::
+
 devcoach ships from its own tap. Add and trust the repository once, install, then connect:
 
 ```bash

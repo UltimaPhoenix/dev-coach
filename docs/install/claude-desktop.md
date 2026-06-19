@@ -5,6 +5,11 @@ sidebar_label: Claude Desktop (.mcpb)
 
 # Claude Desktop extension (`.mcpb`)
 
+:::tip Recommended for Claude Desktop
+The simplest, no-terminal way to add devcoach to Claude Desktop — one click, runs on Desktop's built-in
+runtime.
+:::
+
 A single bundle that runs on Claude Desktop's built-in runtime — no Node or terminal required:
 
 ```bash

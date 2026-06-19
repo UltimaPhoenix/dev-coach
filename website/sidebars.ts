@@ -12,12 +12,12 @@ const sidebars: SidebarsConfig = {
       collapsed: false,
       link: { type: "doc", id: "install/index" },
       items: [
-        "install/claude-code-plugin",
-        "install/npx",
         "install/homebrew",
+        "install/claude-code-plugin",
         "install/claude-desktop",
-        "install/claude-ai",
+        "install/npx",
         "install/other-agents",
+        "install/claude-ai",
       ],
     },
     {
