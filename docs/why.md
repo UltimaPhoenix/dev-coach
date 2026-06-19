@@ -34,7 +34,8 @@ decay when they go unused. As more work is delegated, fewer people exercise the 
 mistakes. The failure mode isn't a dramatic one; it's a slow erosion where the human in the loop is still
 *present* but no longer actually *able* to evaluate what they're approving.
 
-A field that stops learning loses its safety net. The thing that makes AI-assisted development safe is not
+The expertise we stop maintaining is exactly the safety net that catches what the machine gets wrong. The
+thing that makes AI-assisted development safe is not
 the model's confidence — it's a human who still understands the fundamentals well enough to review, push
 back, and override. Keeping that human sharp is not nostalgia for doing things by hand; it is the control
 that makes delegation trustworthy in the first place.
