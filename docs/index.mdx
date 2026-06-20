@@ -40,6 +40,27 @@ Did that land?  ✅ know · ❌ don't know · ⏭ skip
 
 ---
 
+## Context & personalization
+
+Every lesson is tied to **where it happened**: your project folder, repository, branch, commit hash, and which editor you're using (VS Code, etc.). devcoach stores all of this locally, so lessons are tied to their context.
+
+You can also personalize your coaching with a **learning notebook** at `~/.devcoach/learning-state.md`. This file is yours to edit and annotate:
+
+- **Note what you understand** — mark concepts that have sunk in after a lesson.
+- **Flag areas for deeper work** — if something didn't click, write it down.
+- **Track patterns you see** — if you notice recurring mistakes or gaps, devcoach learns from your notes.
+
+The notebook affects your coaching directly:
+
+- Lessons prioritise topics you've flagged as needing work
+- Depth is calibrated based on your written notes, not just your emoji feedback
+- devcoach avoids re-teaching angles you've marked as understood
+- It surfaces related concepts when it detects gaps in your notes
+
+Everything stays private and local. The notebook is optional — devcoach works without it — but it transforms coaching from generic to genuinely personal to your learning journey.
+
+---
+
 ## How to get started
 
 1. **[Install](./install)** — choose your method (Homebrew, Claude Code plugin, npx, or Claude Desktop)
