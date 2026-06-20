@@ -5,6 +5,12 @@ sidebar_label: Claude Desktop (.mcpb)
 
 # Claude Desktop extension (`.mcpb`)
 
+:::warning Beta
+The `.mcpb` extension format is currently in beta. It works well for most users, but report any issues
+to [GitHub Issues](https://github.com/UltimaPhoenix/dev-coach/issues). For the most stable experience,
+use [Homebrew](./homebrew.md) or [npm/npx](./npx.md).
+:::
+
 :::tip Recommended for Claude Desktop
 The simplest, no-terminal way to add devcoach to Claude Desktop — one click, runs on Desktop's built-in
 runtime.

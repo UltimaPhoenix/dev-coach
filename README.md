@@ -91,7 +91,7 @@ devcoach install
 
 `brew tap` registers the third-party repository; `brew trust --tap` marks it trusted so Homebrew will load its formulae when `HOMEBREW_REQUIRE_TAP_TRUST` is set. Both are one-time. To update later: `brew upgrade devcoach`. One-liner: `brew install UltimaPhoenix/tap/devcoach` (run `brew trust --tap UltimaPhoenix/tap` first if your Homebrew enforces tap trust). The formula declares `depends_on "node"`, so Homebrew pulls in a recent Node automatically.
 
-### Claude Code plugin (recommended for Claude Code)
+### Claude Code plugin (recommended for Claude Code) — **Beta**
 
 The simplest way to add devcoach to **Claude Code** — one click, nothing to configure. It bundles **everything** (MCP server + automatic-coaching Stop hooks + skill), so **don't also run `devcoach install`** (or the Stop hooks get registered twice).
 
@@ -120,7 +120,7 @@ The MCP server, hooks, and skill activate on install — no restart needed. The 
 
 See [Claude Code plugin](docs/install/claude-code-plugin.md) for how it works.
 
-### Claude Desktop extension (`.mcpb`) (recommended for Claude Desktop)
+### Claude Desktop extension (`.mcpb`) (recommended for Claude Desktop) — **Beta**
 
 A single bundle that runs on Claude Desktop's built-in runtime — no Node or terminal needed:
 
@@ -131,7 +131,7 @@ npm run mcpb        # → dist-mcpb/devcoach-<version>.mcpb
 
 `npm run mcpb:sign` self-signs it (installs as an *unverified publisher*; a real code-signing cert is needed for a verified signature). Prebuilt `.mcpb` releases and a Desktop directory listing are planned.
 
-### Other install methods
+### Other install methods — **Beta**
 
 <details>
 <summary><strong>npx / npm CLI</strong> (any MCP agent — no install)</summary>

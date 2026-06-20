@@ -18,21 +18,21 @@ devcoach works the same whichever way you install it — pick by how you like to
   `brew install` sets up devcoach **and** the `devcoach` CLI, so you also get the
   [command line](../usage/cli.md) and can launch the [dashboard](../usage/web-ui.md) with a bare
   `devcoach ui`. *(On Windows, or if you prefer npm, [npx / npm](./npx.md) is the equivalent.)*
-- **Prefer the simplest, no-terminal setup → the [Claude Code plugin](./claude-code-plugin.md)**
-  (one-click from the marketplace) or, on Claude Desktop, the **[`.mcpb` extension](./claude-desktop.md)**.
+- **Prefer the simplest, no-terminal setup → the [Claude Code plugin](./claude-code-plugin.md)** *(Beta)*
+  (one-click from the marketplace) or, on Claude Desktop, the **[`.mcpb` extension](./claude-desktop.md)** *(Beta)*.
   Nothing to configure — install and go. *(These don't add the `devcoach` CLI; run CLI commands with
-  `npx -y devcoach …` if you ever need them.)*
+  `npx -y devcoach …` if you ever need them. For the most stable experience, use Homebrew or npm.)*
 
 ## All methods
 
-| Method | Best for | Terminal? |
-|---|---|---|
-| **[Homebrew](./homebrew.md)** | **Developers on macOS / Linux who use the CLI** (recommended) | Yes |
-| **[Claude Code plugin](./claude-code-plugin.md)** | **Non-expert Claude Code users — one-click setup** (recommended) | No |
-| **[Claude Desktop (`.mcpb`)](./claude-desktop.md)** | **Non-expert Claude Desktop users — one-click setup** (recommended) | No |
-| **[npx / npm CLI](./npx.md)** | Any MCP agent · Windows · npm workflows | Yes |
-| **[Other MCP agents](./other-agents.md)** | Cursor, Windsurf, Cline, Continue, Zed | Yes |
-| **[claude.ai web](./claude-ai.md)** | claude.ai (skill-only, no MCP) | — |
+| Method | Best for | Terminal? | Status |
+|---|---|---|---|
+| **[Homebrew](./homebrew.md)** | **Developers on macOS / Linux who use the CLI** | Yes | Stable |
+| **[npx / npm CLI](./npx.md)** | Any MCP agent · Windows · npm workflows | Yes | Stable |
+| **[Claude Code plugin](./claude-code-plugin.md)** | **Non-expert Claude Code users — one-click setup** | No | Beta |
+| **[Claude Desktop (`.mcpb`)](./claude-desktop.md)** | **Non-expert Claude Desktop users — one-click setup** | No | Beta |
+| **[Other MCP agents](./other-agents.md)** | Cursor, Windsurf, Cline, Continue, Zed | Yes | Beta |
+| **[claude.ai web](./claude-ai.md)** | claude.ai (skill-only, no MCP) | — | Beta |
 
 Each page below is self-contained: it covers **install *and* connect**.
 

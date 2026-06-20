@@ -1,5 +1,11 @@
 # Claude Code plugin
 
+:::warning Beta
+The Claude Code plugin and marketplace are currently in beta. They work well for most users, but report
+any issues to [GitHub Issues](https://github.com/UltimaPhoenix/dev-coach/issues). For the most stable
+experience, use [Homebrew](./homebrew.md) or [npm/npx](./npx.md).
+:::
+
 :::tip Recommended if you'd rather not use a terminal
 This is the simplest way to add devcoach to Claude Code — one click, nothing to configure. (Prefer the
 terminal and want the `devcoach` CLI too? Use [Homebrew](./homebrew.md) instead.)
