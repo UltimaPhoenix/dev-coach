@@ -231,6 +231,8 @@ This gives claude.ai the coaching behaviour without the MCP tools (lesson loggin
 
 The first time your agent connects to devcoach it detects that your profile isn't set up and walks you through it inline — no separate command needed.
 
+→ [Full onboarding walkthrough](docs/usage/coaching.md)
+
 ### Phase 1 — Choose how to set up your profile
 
 ```
@@ -330,9 +332,17 @@ Responding adjusts your confidence on that topic and shapes future lessons.
 
 ## Screenshots
 
-|                       Knowledge map                       | Lesson history | Settings |
+|                       Knowledge map (personalize here)                       | Lesson history | Settings |
 |:---------------------------------------------------------:|:---:|:---:|
 | ![Knowledge map](docs/screenshots/knowledge-map-dark.png) | ![Lessons](docs/screenshots/lessons-dark.png) | ![Settings](docs/screenshots/settings-dark.png) |
+
+---
+
+## Context & personalization
+
+Every lesson stores **where it happened** — your project folder, repository, branch, commit hash, editor. You can also personalize your coaching with a **learning notebook** at `~/.devcoach/learning-state.md` that shapes which topics devcoach prioritises and how deep the lessons go.
+
+→ [How to use context & personalization](docs/index.mdx#context--personalization) · [Web dashboard guide](docs/usage/web-ui.md)
 
 ---
 
@@ -443,11 +453,25 @@ For Claude Desktop, delete the `devcoach` key from the platform config file (pat
 
 ---
 
+## Learn more
+
+**Full documentation:** The README is a quick start. For detailed guides, visit the **[official docs](https://ultimaphoenix.github.io/dev-coach/)**:
+
+- **[Why devcoach exists](docs/why.md)** — the philosophy and market opportunity
+- **[How it works](docs/how-it-works.md)** — session startup, coaching loop, lesson selection
+- **[Using the web dashboard](docs/usage/web-ui.md)** — personalise your knowledge map, filter lessons, jump to code context
+- **[CLI reference](docs/usage/cli.md)** — all commands for querying and managing data
+- **[Configuration](docs/reference/configuration.md)** — rate limits, data location, schema
+- **[Privacy & security](docs/reference/privacy.md)** — local-first architecture, what we collect
+- **[Vision & roadmap](docs/vision.md)** — free tier today, courses and team SaaS planned
+- **[Plugin marketplace](docs/install/claude-code-plugin.md#about-the-personal-marketplace)** — UltimaPhoenix plugin collection
+
+---
+
 ## Community
 
 - **Star the repo** — help others discover it
 - **[GitHub Discussions](https://github.com/UltimaPhoenix/dev-coach/discussions)** — feature requests, feedback, and ideas
-- **[Roadmap](docs/vision.md)** — what's planned next
 
 ---
 
