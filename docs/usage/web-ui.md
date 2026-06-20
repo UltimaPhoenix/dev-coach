@@ -40,15 +40,18 @@ Displays your full knowledge map with colour-coded confidence bars:
 - **Yellow** — confidence 4–6 (intermediate)
 - **Red** — confidence ≤ 3 (learning)
 
-**Edit mode** (click `✎ Edit`):
-- `+` / `−` buttons beside each bar to adjust confidence by 1
-- `⇄` button to move a topic to a different group
-- `×` button to delete a topic
-- `+ topic` button in each group header to add a topic directly to that group
-- `+ Add group` / `+ Add topic` buttons in the page header
-- `×` beside group names to delete a group (topics move to Other)
+**Personalizing your profile** — click `✎ Edit` to enter edit mode:
 
-**View mode**: topic names are clickable links that filter the lessons page to that topic.
+- **Adjust confidence** — `+` / `−` buttons beside each bar to tune your self-assessment by 1 point
+- **Reorganise topics** — `⇄` button moves a topic to a different group
+- **Remove topics** — `×` button deletes a topic you no longer care about
+- **Add topics** — `+ topic` in a group header adds directly to that group; `+ Add topic` at the top adds to Other
+- **Create groups** — `+ Add group` at the top to organise new categories (Languages, DevOps, Frontend, etc.)
+- **Delete groups** — `×` beside group names; topics move to Other if deleted
+
+Changes save immediately as you edit.
+
+**View mode**: topic names are clickable links that filter the lessons page to show only lessons for that topic.
 
 **Stats bar** (top of page): total lessons, today's count vs. daily limit, this week's count, and current rate-limit status.
 
@@ -100,7 +103,12 @@ Full lesson content laid out in reading order:
 - **TL;DR callout** — one-sentence summary in a highlighted indigo box, always visible above the body
 - **Lesson body** — full markdown content with syntax-highlighted code blocks
 - **Task context** — the coding task that triggered the lesson (when available)
-- **Git metadata** — project, repository (with platform icon + link), branch, commit hash, folder (VSCode deep-link)
+- **Git metadata** — clickable context links to jump back to where the lesson came from:
+  - **Project** — the folder name where you were working
+  - **Repository** — clickable link with platform icon (GitHub, GitLab, Bitbucket, or local). Click to open the remote repository in your browser or view local details
+  - **Branch** — the git branch you were on when the lesson was taught
+  - **Commit hash** — the exact commit (clickable to view on GitHub/GitLab/Bitbucket or as a local hash)
+  - **Folder** — clickable `🔗 Open` link that opens the project folder in VS Code, so you can immediately review the code that triggered the lesson
 - **Feedback buttons** — ✓ I know this / ✗ I don't know this (hidden once feedback is recorded)
 
 <Tabs>
@@ -162,6 +170,26 @@ the lesson history as JSON.)
   light={require("../screenshots/settings-light.png").default}
   dark={require("../screenshots/settings-dark.png").default}
 />
+
+---
+
+---
+
+## How personalization works
+
+The dashboard is where you actively shape your coaching:
+
+1. **Adjust confidence on the Knowledge map** — if you feel stronger in TypeScript than you rated yourself, bump it up. This tunes which topics devcoach prioritises.
+
+2. **Edit groups and topics** — add topics you care about, delete ones you don't. Your knowledge map is your learning intent statement.
+
+3. **Record feedback on lessons** — when you click ✓ or ✗ on a lesson, you're telling devcoach whether that angle landed. This adjusts both your confidence on that topic and future lesson depth.
+
+4. **Star lessons to revisit** — use the `★` button to mark lessons worth reading again. You can filter by "starred only" on the Lessons page.
+
+5. **Jump to context** — click repository, commit, or folder links on lesson details to immediately review the code that triggered the lesson. This helps you understand *why* the lesson was taught and *where* to apply it.
+
+The knowledge map, feedback history, and git context together create a feedback loop: your edits guide lesson selection, lesson feedback adjusts your confidence, and the ability to jump back to context lets you learn in the exact place it happened.
 
 ---
 
