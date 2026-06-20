@@ -29,8 +29,8 @@ writes) that's usually the wrong default.
 
 Promise.allSettled always resolves, giving you a status for every promise:
 
-`const results = await Promise.allSettled(ids.map(fetchUser));`
-`const ok = results.filter(r => r.status === "fulfilled").map(r => r.value);`
+    const results = await Promise.allSettled(ids.map(fetchUser));
+    const ok = results.filter(r => r.status === "fulfilled").map(r => r.value);
 
 Use Promise.all when the tasks are genuinely all-or-nothing; reach for
 allSettled when partial success is meaningful and you want to report failures.
