@@ -395,6 +395,8 @@ Or use the [web dashboard](docs/usage/web-ui.md) Settings page. See [docs/config
 
 Over a typical work week with 1–2 tasks per day, you'll receive **2–4 lessons aligned to your stack and confidence level.** Each lesson takes 30 seconds to read. After a month of normal AI-assisted development, you'll have built a coaching notebook specific to your gaps — exact patterns you struggle with, edge cases you tend to miss, the reasoning behind tools you reach for instinctively.
 
+**Too intense?** Dial back the frequency: `devcoach set max_per_day 1`. **Want more coaching?** Crank it up: `devcoach set max_per_day 5`. Everything is tunable.
+
 The compounding effect: developers who keep learning while tools get stronger stay in control of the result.
 
 ---
