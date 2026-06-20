@@ -41,6 +41,10 @@
           "style": { "noNonNullAssertion": "off" }
         }
       }
+    },
+    {
+      "includes": ["plugin/hooks/hooks.json"],
+      "formatter": { "enabled": false }
     }
   ]
 }
