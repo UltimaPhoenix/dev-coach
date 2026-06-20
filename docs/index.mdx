@@ -18,10 +18,10 @@ You're shipping more than ever and understanding less. devcoach fixes that with 
 
 You work on a task with your AI agent as usual. When it finishes, devcoach appends a lesson:
 
-```
+```markdown
 🎓 devcoach · TypeScript · Level: Mid
 
-Promise.allSettled vs Promise.all — don't let one failure sink the batch
+**Promise.allSettled vs Promise.all — don't let one failure sink the batch**
 
 Promise.all rejects the moment any promise rejects, and you lose the results of
 the ones that already succeeded. For independent work (fan-out fetches, batch
@@ -31,6 +31,9 @@ Promise.allSettled always resolves, giving you a status for every promise:
 
     const results = await Promise.allSettled(ids.map(fetchUser));
     const ok = results.filter(r => r.status === "fulfilled").map(r => r.value);
+
+Use Promise.all when the tasks are genuinely all-or-nothing; reach for
+allSettled when partial success is meaningful and you want to report failures.
 
 Did that land?  ✅ know · ❌ don't know · ⏭ skip
 ```
