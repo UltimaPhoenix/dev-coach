@@ -38,7 +38,7 @@ For engineering organisations, a hosted version will offer:
 
 - **Per-developer knowledge profiles** — each developer's knowledge map, calibrated to their
   actual stack and experience level
-- **Personalized learning paths** — structured progression tailored to the individual, not a
+- **Personalised learning paths** — structured progression tailored to the individual, not a
   generic curriculum
 - **Team-level visibility** — which topics the team is collectively strong or weak on; where
   coverage is thin; what skills are concentrated in one person

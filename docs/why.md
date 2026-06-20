@@ -59,7 +59,7 @@ This is also why devcoach teaches more than the right answer. Knowing *what* to 
 
 It covers the wrong answers on purpose, too. One quiet effect of capable AI is that it spares you mistakes
 you never even see — it simply doesn't write the race condition, the N+1 query, the insecure default. That
-feels like a gift, but you also never learn why those are wrong, so you can't recognize them when one does
+feels like a gift, but you also never learn why those are wrong, so you can't recognise them when one does
 slip through. Having understood a failure mode — ideally by having met it — is what lets you catch it
 later. devcoach surfaces the anti-patterns deliberately, because the mistakes you understand are the ones
 you can prevent.
