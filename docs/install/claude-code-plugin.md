@@ -33,6 +33,31 @@ Stop hooks twice. Pick one.
 Adding the marketplace once gives you every UltimaPhoenix plugin; update later with
 `/plugin marketplace update`.
 
+## About the personal marketplace
+
+The **UltimaPhoenix marketplace** (`UltimaPhoenix/claude-plugins-marketplace`) is a curated collection of plugins maintained by the devcoach author. It includes:
+
+- **devcoach** — the primary tool (what you're installing)
+- **Other plugins** — additional utilities and tools (available as they're added)
+
+**Why use it?** If you plan to use multiple plugins from this source, add the marketplace once and you can install any of them without needing to add each repo individually. When a new plugin is released, it's immediately available in your Claude Code plugin menu.
+
+**How to update:** If you've already added the marketplace, get the latest versions of all plugins:
+
+```bash
+/plugin marketplace update
+```
+
+This updates your local plugin registry without reinstalling — only new versions are fetched if they've been updated since you last added the marketplace.
+
+**Switching methods:** If you added devcoach straight from the repo (`UltimaPhoenix/dev-coach`) and later want to switch to the marketplace, remove the old one and add the marketplace:
+
+```bash
+/plugin marketplace remove UltimaPhoenix/dev-coach
+/plugin marketplace add UltimaPhoenix/claude-plugins-marketplace
+/plugin install devcoach@ultimaphoenix
+```
+
 ### C — offline (download from a release)
 
 Download `devcoach-plugin-<version>.zip` from the [GitHub Releases](https://github.com/UltimaPhoenix/dev-coach/releases),
