@@ -1,34 +1,116 @@
 ---
-slug: /docs
-title: Documentation
-description: Full devcoach documentation — guides, reference, and concepts.
+title: devcoach
+hide_table_of_contents: true
 ---
 
-# Documentation
+import ThemedShot from "@site/src/components/ThemedShot";
 
-Start with the [landing page](/), then return here for detailed guides.
+# Stay sharp while your AI does the work.
 
-→ [← Back to homepage](/)
+You're shipping more than ever and understanding less. devcoach fixes that with one lesson at a time, delivered right after your agent completes a task.
 
-## Getting started
+- **[Install in 30 seconds](./install)** — get started now
+- **[Why it matters](./why)** — read the philosophy
 
-- **[Why devcoach](./why.md)** — the philosophy and long-term vision
-- **[How it works](./how-it-works.md)** — the coaching loop and decision flow
-- **[Installation](./install/index.md)** — six ways to set it up
-- **[Coaching in your agent](./usage/coaching.md)** — your first lesson and the feedback loop
+---
 
-## Using devcoach
+## What happens
 
-- **[Web dashboard](./usage/web-ui.md)** — review progress, manage your knowledge map
-- **[CLI reference](./usage/cli.md)** — all commands for querying and managing coaching data
+You work on a task with your AI agent as usual. When it finishes, devcoach appends a lesson:
 
-## Configuration & technical reference
+```
+🎓 devcoach · TypeScript · Level: Mid
 
-- **[Configuration](./reference/configuration.md)** — rate limits, data location, schema
-- **[MCP server reference](./reference/mcp-server.md)** — all tools, resources, and the coaching prompt
-- **[Privacy & security](./reference/privacy.md)** — local-first architecture, what we collect
+Promise.allSettled vs Promise.all — don't let one failure sink the batch
 
-## Roadmap & contributing
+Promise.all rejects the moment any promise rejects, and you lose the results of
+the ones that already succeeded. For independent work (fan-out fetches, batch
+writes) that's usually the wrong default.
 
-- **[Vision & roadmap](./vision.md)** — free now, teams and courses planned
-- **[CONTRIBUTING](https://github.com/UltimaPhoenix/dev-coach/blob/main/CONTRIBUTING.md)** — fork, develop, submit a PR
+Promise.allSettled always resolves, giving you a status for every promise:
+
+    const results = await Promise.allSettled(ids.map(fetchUser));
+    const ok = results.filter(r => r.status === "fulfilled").map(r => r.value);
+
+Did that land?  ✅ know · ❌ don't know · ⏭ skip
+```
+
+---
+
+## How to get started
+
+1. **[Install](./install)** — choose your method (Homebrew, Claude Code plugin, npx, or Claude Desktop)
+2. **[Run onboarding](./usage/coaching.md)** — build your knowledge profile
+3. **Start working** — coaching happens automatically
+
+Everything's local. No data leaves your machine. One SQLite file.
+
+---
+
+## The three install methods
+
+- **[Homebrew](./install/homebrew)** — macOS/Linux. Get the CLI too.
+- **[Claude Code plugin](./install/claude-code-plugin)** — one-click, bundles everything.
+- **[npx](./install/npx)** — no install, runs immediately.
+
+See **[all install methods](./install)** for other options.
+
+---
+
+## Why devcoach exists
+
+AI agents now write much of our code. Velocity is up. So is a quieter cost: when the machine does the thinking, it's easy to accept the result and learn nothing from it.
+
+Competence is built slowly. You can't cram it on demand. The moment you need it most — a correctness bug the model missed, a 2 a.m. outage, an architectural call the AI got wrong — the depth either exists or it doesn't.
+
+devcoach's bet is simple: a few minutes of genuine learning, delivered in context and spaced across the work you already do, compounds. It's learning on the job, automated.
+
+**[Read the full story →](./why)**
+
+---
+
+## Privacy by design
+
+Everything stays on your machine. No telemetry, no accounts, no calls home. Just one SQLite file.
+
+**[Privacy & security →](./reference/privacy)**
+
+---
+
+## Screenshots
+
+### Knowledge map
+
+<ThemedShot
+  alt="Knowledge map"
+  light={require("./screenshots/knowledge-map-light.png").default}
+  dark={require("./screenshots/knowledge-map-dark.png").default}
+/>
+
+### Lesson history
+
+<ThemedShot
+  alt="Lessons"
+  light={require("./screenshots/lessons-light.png").default}
+  dark={require("./screenshots/lessons-dark.png").default}
+/>
+
+---
+
+## Roadmap & community
+
+- **[Vision & roadmap](./vision)** — free now, teams and courses planned
+- **[GitHub Discussions](https://github.com/UltimaPhoenix/dev-coach/discussions)** — feature requests, feedback, questions
+- **[Star on GitHub](https://github.com/UltimaPhoenix/dev-coach)** ⭐
+
+---
+
+## All guides
+
+- **[How it works](./how-it-works)** — the coaching loop and decision flow
+- **[Coaching in your agent](./usage/coaching)** — your first lesson and the feedback loop
+- **[Web dashboard](./usage/web-ui)** — manage your knowledge map
+- **[CLI reference](./usage/cli)** — all commands
+- **[Configuration](./reference/configuration)** — rate limits, data location
+- **[MCP server reference](./reference/mcp-server)** — all tools and resources
+- **[Contributing](https://github.com/UltimaPhoenix/dev-coach/blob/main/CONTRIBUTING.md)** — fork, develop, submit a PR
