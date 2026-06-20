@@ -28,12 +28,12 @@ describe("claude code plugin packaging", () => {
     expect(entry.source).toBe("./plugin");
   });
 
-  it("registers the devcoach MCP server over stdio via npx", () => {
+  it("registers the devcoach MCP server over stdio via pinned node install", () => {
     const mcp = readJson("plugin", ".mcp.json");
     const server = mcp.mcpServers.devcoach;
     expect(server.type).toBe("stdio");
-    expect(server.command).toBe("npx");
-    expect(server.args).toEqual(["-y", "devcoach", "mcp"]);
+    expect(server.command).toBe("node");
+    expect(server.args).toEqual(["${CLAUDE_PLUGIN_ROOT}/scripts/launch.mjs", "mcp"]);
   });
 
   it("ships both Stop hooks (onboard-hook + lesson-ready)", () => {
