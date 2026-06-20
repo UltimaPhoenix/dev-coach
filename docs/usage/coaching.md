@@ -74,9 +74,16 @@ Your response tunes future coaching:
 
 ## Staying unobtrusive
 
-Rate limits keep coaching from getting noisy — by default **≤ 2 lessons/day, ≥ 4 hours apart**. Tune them
-any time with `devcoach set …` or from the [dashboard](./web-ui.md); see
-[Configuration](../reference/configuration.md).
+Rate limits keep coaching from getting noisy — by default **≤ 2 lessons/day, ≥ 4 hours apart**. Not what you want?
+Customize immediately — more aggressive if you want to learn faster, looser if you prefer fewer interruptions.
+
+Adjust with the terminal:
+```bash
+devcoach set max_per_day 5           # up to 5 lessons per day
+devcoach set min_gap_minutes 60      # as little as 1 hour between lessons
+```
+
+Or use the [web dashboard](./web-ui.md) Settings page. Full reference: [Configuration](../reference/configuration.md).
 
 → Review your progress in the **[CLI](./cli.md)** or the **[web dashboard](./web-ui.md)** — they show the
 same data.

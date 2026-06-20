@@ -1,7 +1,7 @@
 {
   "name": "devcoach",
   "version": "0.3.66",
-  "description": "A local MCP server that acts as a progressive technical coach for Claude Code and Claude Desktop",
+  "description": "Stay sharp while your AI does the work — learn from every task with in-context coaching, all local, all free",
   "license": "Apache-2.0",
   "keywords": [
     "mcp",

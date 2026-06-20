@@ -8,7 +8,9 @@
 [![Docs](https://img.shields.io/badge/docs-GitHub%20Pages-purple)](https://ultimaphoenix.github.io/dev-coach/)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
 
-**Progressive technical coaching that lives inside your AI agent.** devcoach connects to Claude Code, Claude Desktop, Cursor, Windsurf, and other MCP-compatible tools. After every task you complete, it delivers a short targeted lesson calibrated to what you already know — no generic tutorials, no repeated topics, nothing to open.
+**Stay sharp while your AI does the work.**
+
+devcoach connects to Claude Code, Claude Desktop, Cursor, Windsurf, and other MCP-compatible tools. After every task you complete, it delivers a short targeted lesson calibrated to what you already know — no generic tutorials, no repeated topics, nothing to open.
 
 Everything runs **locally**. No data leaves your machine. One SQLite file at `~/.devcoach/coaching.db`.
 
@@ -49,9 +51,19 @@ flowchart TD
 
 ---
 
+## Privacy by design
+
+Everything stays on your machine. No telemetry, no accounts, no calls home. Just one SQLite file.
+
+→ [Privacy & security](docs/reference/privacy.md)
+
+---
+
 ## Installation
 
-devcoach runs **locally** — a stdio MCP server that stores everything in `~/.devcoach/coaching.db` on the machine where your agent runs. It works in **Claude Code** and **Claude Desktop**, but **not** on claude.ai web (which only supports hosted/remote connectors). Requires **Node.js ≥ 24**.
+devcoach runs **locally** — a stdio MCP server that stores everything in `~/.devcoach/coaching.db` on the machine where your agent runs. It works in **Claude Code** and **Claude Desktop**, but **not** on claude.ai web (which only supports hosted/remote connectors).
+
+**Requires Node.js ≥ 24** (devcoach uses the embedded `node:sqlite` module, available only from Node 24 onward).
 
 **Pick by how you like to work** — each section is self-contained (install **and** connect):
 
@@ -368,12 +380,51 @@ The CLI is a secondary interface for querying and managing your coaching data. E
 
 ## Configuration
 
+By default: **up to 2 lessons/day, at least 4 hours apart.** Want more coaching? Want less? Change it.
+
 ```bash
-devcoach set max_per_day 3        # up to 3 lessons per day
-devcoach set min_gap_minutes 120  # at least 2 hours between lessons
+devcoach set max_per_day 5           # more lessons per day
+devcoach set min_gap_minutes 60      # lessons closer together
 ```
 
-Settings are stored in `~/.devcoach/coaching.db`. See [docs/configuration.md](docs/reference/configuration.md) for all options.
+Or use the [web dashboard](docs/usage/web-ui.md) Settings page. See [docs/configuration.md](docs/reference/configuration.md) for all options.
+
+---
+
+## Expected outcomes
+
+Over a typical work week with 1–2 tasks per day, you'll receive **2–4 lessons aligned to your stack and confidence level.** Each lesson takes 30 seconds to read. After a month of normal AI-assisted development, you'll have built a coaching notebook specific to your gaps — exact patterns you struggle with, edge cases you tend to miss, the reasoning behind tools you reach for instinctively.
+
+The compounding effect: developers who keep learning while tools get stronger stay in control of the result.
+
+---
+
+## Troubleshooting
+
+**"Node version error"**
+
+devcoach requires Node.js ≥ 24. Check your version: `node --version`. If you're below 24, upgrade: `brew upgrade node` (Homebrew) or `nvm install 24` (if using nvm).
+
+**"MCP server not connecting"**
+
+Run `devcoach install` to re-register the server with Claude Code or Claude Desktop, then restart the agent. If the issue persists, check `~/.claude.json` (Claude Code) and confirm the `devcoach` entry is present and the command is correct.
+
+**"Stop hooks not firing"**
+
+Stop hooks (automatic lesson delivery after each task) are Claude Code-specific and require `~/.claude/settings.json` to have the two devcoach hook entries (automatic if you ran `devcoach install`, manual if you did it yourself). Other agents (Cursor, Windsurf, Cline) don't support hooks — coaching is available on demand via MCP tools or manual prompting.
+
+**"SQLite permission error"**
+
+devcoach writes to `~/.devcoach/coaching.db`. If you get a permission error, check the directory exists and you have write access: `ls -ld ~/.devcoach`. If missing, run `devcoach install` or `devcoach setup` to initialize it.
+
+---
+
+## Known limitations
+
+- **claude.ai web:** MCP servers are not supported. You can use the [skill copy](docs/install/claude-ai.md) (coaching behaviour only, no data storage).
+- **Ephemeral sandboxes:** If your agent runs in a fresh sandbox on each restart (like GitHub Codespaces), devcoach cannot persist data across sessions. It works fine for the current session, but lessons won't carry over.
+- **Windows:** devcoach is tested on macOS and Linux. Windows support depends on Node.js ≥ 24 and `node:sqlite` availability (generally solid, but report issues).
+- **Multi-user machines:** devcoach writes to `~/.devcoach/`, so each user gets their own coaching database. Profiles are not shared.
 
 ---
 
@@ -387,6 +438,20 @@ rm -rf ~/.devcoach                 # delete all coaching data (back up first: de
 ```
 
 For Claude Desktop, delete the `devcoach` key from the platform config file (paths in **Manual setup** above). Also remove the two hook entries from `~/.claude/settings.json` → `hooks.Stop`.
+
+---
+
+## Community
+
+- **Star the repo** — help others discover it
+- **[GitHub Discussions](https://github.com/UltimaPhoenix/dev-coach/discussions)** — feature requests, feedback, and ideas
+- **[Roadmap](docs/vision.md)** — what's planned next
+
+---
+
+## Contributing
+
+Help welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) to get started.
 
 ---
 

@@ -1,0 +1,138 @@
+---
+title: devcoach — Stay sharp while your AI does the work
+hide_table_of_contents: true
+---
+
+import ThemedShot from "@site/src/components/ThemedShot";
+
+<div style={{ textAlign: "center", paddingTop: "2rem", paddingBottom: "2rem" }}>
+  <h1 style={{ fontSize: "3rem", marginBottom: "0.5rem", fontWeight: 700 }}>Stay sharp while your AI does the work.</h1>
+  <p style={{ fontSize: "1.25rem", color: "var(--ifm-color-emphasis-700)", marginBottom: "2rem", maxWidth: "600px", marginLeft: "auto", marginRight: "auto" }}>
+    You're shipping more than ever and understanding less. devcoach fixes that with one lesson at a time, delivered right after your agent completes a task.
+  </p>
+  <div style={{ display: "flex", gap: "1rem", justifyContent: "center", flexWrap: "wrap" }}>
+    <a href="/install/index.md" style={{ padding: "0.75rem 1.5rem", backgroundColor: "var(--ifm-button-background-color)", color: "white", borderRadius: "0.5rem", textDecoration: "none", fontWeight: 600 }}>Install in 30 seconds</a>
+    <a href="/why.md" style={{ padding: "0.75rem 1.5rem", backgroundColor: "var(--ifm-button-background-color-secondary)", borderRadius: "0.5rem", textDecoration: "none", fontWeight: 600 }}>Why it matters</a>
+  </div>
+</div>
+
+---
+
+## What happens
+
+You work on a task with your AI agent as usual. When it finishes, devcoach appends a lesson:
+
+```
+🎓 devcoach · TypeScript · Level: Mid
+
+Promise.allSettled vs Promise.all — don't let one failure sink the batch
+
+Promise.all rejects the moment any promise rejects, and you lose the results of
+the ones that already succeeded. For independent work (fan-out fetches, batch
+writes) that's usually the wrong default.
+
+Promise.allSettled always resolves, giving you a status for every promise:
+
+    const results = await Promise.allSettled(ids.map(fetchUser));
+    const ok = results.filter(r => r.status === "fulfilled").map(r => r.value);
+
+Did that land?  ✅ know · ❌ don't know · ⏭ skip
+```
+
+Your feedback tunes future coaching. Confidence goes up, you see fewer lessons there. Down, it revisits the area sooner. Simple as that.
+
+---
+
+## The three install paths
+
+Pick what fits your workflow:
+
+<div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "1.5rem", marginTop: "1.5rem", marginBottom: "2rem" }}>
+  <div style={{ padding: "1.5rem", border: "1px solid var(--ifm-color-emphasis-300)", borderRadius: "0.5rem" }}>
+    <h4 style={{ marginTop: 0 }}>Homebrew (Recommended for developers)</h4>
+    <p>macOS/Linux. Get the CLI too.</p>
+    <code>brew tap UltimaPhoenix/tap && brew install devcoach</code>
+    <p style={{ fontSize: "0.9rem", color: "var(--ifm-color-emphasis-700)" }}><a href="/install/homebrew.md">Full instructions</a></p>
+  </div>
+  <div style={{ padding: "1.5rem", border: "1px solid var(--ifm-color-emphasis-300)", borderRadius: "0.5rem" }}>
+    <h4 style={{ marginTop: 0 }}>Claude Code plugin (One-click)</h4>
+    <p>Bundles everything — MCP server, hooks, coaching.</p>
+    <code>/plugin install devcoach@ultimaphoenix</code>
+    <p style={{ fontSize: "0.9rem", color: "var(--ifm-color-emphasis-700)" }}><a href="/install/claude-code-plugin.md">Full instructions</a></p>
+  </div>
+  <div style={{ padding: "1.5rem", border: "1px solid var(--ifm-color-emphasis-300)", borderRadius: "0.5rem" }}>
+    <h4 style={{ marginTop: 0 }}>npx (No install)</h4>
+    <p>Works immediately, no permanent footprint.</p>
+    <code>npx -y devcoach install</code>
+    <p style={{ fontSize: "0.9rem", color: "var(--ifm-color-emphasis-700)" }}><a href="/install/index.md">All methods</a></p>
+  </div>
+</div>
+
+---
+
+## Who it's for
+
+<div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "2rem", marginTop: "1.5rem", marginBottom: "2rem" }}>
+  <div>
+    <h4>Solo developers</h4>
+    <p>Using Claude or another AI agent for real work? You're already producing the curriculum. devcoach just turns it into a learning loop.</p>
+  </div>
+  <div>
+    <h4>Team leads & architects</h4>
+    <p>When teams ship faster with AI but understand less, you lose the ability to review. devcoach keeps your team sharp enough to actually validate what ships.</p>
+  </div>
+  <div>
+    <h4>Privacy-first orgs</h4>
+    <p>No telemetry, no accounts, no cloud. One SQLite file on your machine. Perfect for companies that can't send code to a SaaS coaching service.</p>
+  </div>
+</div>
+
+---
+
+## Screenshots
+
+<div style={{ marginTop: "2rem", marginBottom: "2rem" }}>
+  <h4>Knowledge map</h4>
+  <ThemedShot
+    alt="Knowledge map"
+    light={require("@site/../docs/screenshots/knowledge-map-light.png").default}
+    dark={require("@site/../docs/screenshots/knowledge-map-dark.png").default}
+  />
+</div>
+
+<div style={{ marginTop: "2rem", marginBottom: "2rem" }}>
+  <h4>Lesson history & detail view</h4>
+  <ThemedShot
+    alt="Lessons"
+    light={require("@site/../docs/screenshots/lessons-light.png").default}
+    dark={require("@site/../docs/screenshots/lessons-dark.png").default}
+  />
+</div>
+
+---
+
+## Why this exists
+
+AI agents now write much of our code. Velocity is up. So is a quieter cost: when the machine does the thinking, it's easy to accept the result and learn nothing from it.
+
+Competence is built slowly. You can't cram it on demand. The moment you need it most — a correctness bug the model missed, a 2 a.m. outage, an architectural call the AI got wrong — the depth either exists or it doesn't.
+
+devcoach's bet is simple: a few minutes of genuine learning, delivered in context and spaced across the work you already do, compounds. It's learning on the job, automated.
+
+**[Read the full story →](./why.md)**
+
+---
+
+## Roadmap
+
+Free now. Future plans for team/enterprise features: integrated courses, personalised learning paths for teams, team-level visibility into knowledge gaps.
+
+**[Vision & roadmap →](./vision.md)**
+
+---
+
+## Community & support
+
+- **[GitHub Discussions](https://github.com/UltimaPhoenix/dev-coach/discussions)** — feature requests, feedback, questions
+- **[GitHub Issues](https://github.com/UltimaPhoenix/dev-coach/issues)** — bug reports
+- **[Star on GitHub](https://github.com/UltimaPhoenix/dev-coach)** ⭐

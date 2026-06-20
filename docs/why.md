@@ -77,5 +77,22 @@ open. The bet is simple: a few minutes of genuine learning, delivered in context
 work you already do, compounds. The developers who keep learning while the tools get stronger are the ones
 who stay in control of the result.
 
+---
+
+## devcoach vs. other approaches
+
+| Approach | Pros | Cons |
+|----------|------|------|
+| **devcoach** | On-demand, in-context, zero friction, local, calibrated to your stack | Requires AI agent with MCP support |
+| **Online courses** | Comprehensive, structured, often free | Deferred, generic, easy to procrastinate on |
+| **Reading docs / StackOverflow** | Fast lookup | Surface-level, no learning architecture, no retention |
+| **AI explanations (Copilot inline)** | Immediate, contextual | Often just answers the question, not the "why" or anti-patterns |
+| **Books & deep dives** | Deep, thorough, timeless | Require sustained time you don't have; easy to skip |
+| **Doing nothing** | No friction | Skill erosion; can't validate what ships |
+
+devcoach targets the gap: sustained learning at low friction, spaced and calibrated, without opening another tab.
+
+---
+
 → See [How it works](./how-it-works.md) for the decision flow, or [install devcoach](./install/index.md)
 to connect it to your agent.

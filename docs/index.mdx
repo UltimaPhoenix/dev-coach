@@ -1,105 +1,34 @@
 ---
-slug: /
-title: devcoach
-description: Progressive technical coaching, directly in your AI agent.
+slug: /docs
+title: Documentation
+description: Full devcoach documentation — guides, reference, and concepts.
 ---
 
-import ThemedShot from "@site/src/components/ThemedShot";
+# Documentation
 
-# devcoach
+Start with the [landing page](/), then return here for detailed guides.
 
-**Progressive technical coaching, directly in your AI agent.** After every task you complete with
-Claude Code, Claude Desktop, or another MCP-compatible agent, devcoach delivers a short, targeted
-lesson based on what you already know — no generic tutorials, no repeated topics.
+→ [← Back to homepage](/)
 
-Everything runs **locally**. No data leaves your machine. One SQLite file at `~/.devcoach/coaching.db`.
+## Getting started
 
----
+- **[Why devcoach](./why.md)** — the philosophy and long-term vision
+- **[How it works](./how-it-works.md)** — the coaching loop and decision flow
+- **[Installation](./install/index.md)** — six ways to set it up
+- **[Coaching in your agent](./usage/coaching.md)** — your first lesson and the feedback loop
 
-## Why devcoach?
+## Using devcoach
 
-AI agents now write much of our code — which makes it easy to ship more while understanding less. devcoach
-turns each task your agent finishes into one short, in-context lesson, so you keep learning as you go. The
-deeper bet: as AI grows more capable, the scarce skill becomes _validating_ what it produces — and that
-ability only survives if you keep practicing it.
+- **[Web dashboard](./usage/web-ui.md)** — review progress, manage your knowledge map
+- **[CLI reference](./usage/cli.md)** — all commands for querying and managing coaching data
 
-→ [Why devcoach exists](./why.md)
+## Configuration & technical reference
 
----
+- **[Configuration](./reference/configuration.md)** — rate limits, data location, schema
+- **[MCP server reference](./reference/mcp-server.md)** — all tools, resources, and the coaching prompt
+- **[Privacy & security](./reference/privacy.md)** — local-first architecture, what we collect
 
-## How it works
+## Roadmap & contributing
 
-```mermaid
-flowchart TD
-    A([Task completed]) --> B[Check rate limit]
-    B -->|denied| Z([Silent])
-    B -->|allowed| D
-
-    subgraph loop["coaching loop"]
-        D[Select topic & depth]
-        E[Compose & deliver]
-        G[log_lesson]
-    end
-
-    D -->|nothing| Z
-    D -->|found| E
-    E --> G
-    G --> F([Done])
-    G -.->|prompts| U(["You: ✅ ❌ ⏭"])
-```
-
-→ [Full decision flow: session startup · lesson selection · depth calibration](./how-it-works.md)
-
----
-
-## Screenshots
-
-_Screenshots follow the site theme. Toggle ☀️/🌙 in the top bar and they switch with it — or use the
-Dark/Light buttons on a shot to override just that image._
-
-### Knowledge map
-
-<ThemedShot
-  alt="Knowledge map"
-  light={require("./screenshots/knowledge-map-light.png").default}
-  dark={require("./screenshots/knowledge-map-dark.png").default}
-/>
-
-### Lesson history
-
-<ThemedShot
-  alt="Lesson history"
-  light={require("./screenshots/lessons-light.png").default}
-  dark={require("./screenshots/lessons-dark.png").default}
-/>
-
-### Settings
-
-<ThemedShot
-  alt="Settings"
-  light={require("./screenshots/settings-light.png").default}
-  dark={require("./screenshots/settings-dark.png").default}
-/>
-
-### Lesson detail
-
-<ThemedShot
-  alt="Lesson detail"
-  light={require("./screenshots/lesson-redis-cache-stampede-light.png").default}
-  dark={require("./screenshots/lesson-redis-cache-stampede-dark.png").default}
-/>
-
----
-
-## Quick install
-
-```bash
-npx -y devcoach install   # registers with Claude Code / Claude Desktop
-```
-
-Requires Node.js ≥ 24. Restart Claude and you're ready.
-
-Other ways to install: `npm install -g devcoach` · Homebrew (`brew tap UltimaPhoenix/tap` →
-`brew trust --tap UltimaPhoenix/tap` → `brew install devcoach`) · or a one-click Claude Desktop `.mcpb`
-extension. See **[Installation](./install/index.md)** for every method, then
-**[Coaching in your agent](./usage/coaching.md)** for the onboarding walkthrough.
+- **[Vision & roadmap](./vision.md)** — free now, teams and courses planned
+- **[CONTRIBUTING](../CONTRIBUTING.md)** — fork, develop, submit a PR
