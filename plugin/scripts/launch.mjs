@@ -23,12 +23,18 @@ const have = existsSync(dstManifest) ? readFileSync(dstManifest, "utf8") : "";
 if (!existsSync(binJs) || have !== want) {
   copyFileSync(srcManifest, dstManifest);
   // stdio "ignore": npm output must not touch the MCP server's stdout (protocol) or a hook's stderr (cue).
-  const r = spawnSync("npm", ["install", "--omit=dev", "--no-audit", "--no-fund", "--no-progress"], {
-    cwd: data,
-    stdio: "ignore",
-  });
+  const r = spawnSync(
+    "npm",
+    ["install", "--omit=dev", "--no-audit", "--no-fund", "--no-progress"],
+    {
+      cwd: data,
+      stdio: "ignore",
+    },
+  );
   if (r.status !== 0 || !existsSync(binJs)) {
-    console.error("devcoach plugin: could not install the devcoach package (needs Node ≥24 + network on first run).");
+    console.error(
+      "devcoach plugin: could not install the devcoach package (needs Node ≥24 + network on first run).",
+    );
     process.exit(0); // stay silent rather than break the agent's turn
   }
 }
