@@ -1,8 +1,8 @@
 {
   "hooks": {
     "Stop": [
-      { "hooks": [{ "type": "command", "command": "npx -y devcoach onboard-hook" }] },
-      { "hooks": [{ "type": "command", "command": "npx -y devcoach lesson-ready" }] }
+      { "hooks": [{ "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/launch.mjs\" onboard-hook" }] },
+      { "hooks": [{ "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/launch.mjs\" lesson-ready" }] }
     ]
   }
 }

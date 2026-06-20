@@ -21,4 +21,10 @@ const skillDest = join(root, "plugin", "skills", "devcoach", "SKILL.md");
 mkdirSync(dirname(skillDest), { recursive: true });
 cpSync(join(root, "assets", "SKILL.md"), skillDest);
 
-console.log(`synced plugin → version ${version}, SKILL.md copied`);
+// 3. Pin the published devcoach version the plugin installs at runtime (scripts/launch.mjs) to this
+//    release — same in-place regex approach, so a version bump re-triggers the launcher's npm install.
+const pluginPkgPath = join(root, "plugin", "package.json");
+const pluginPkg = readFileSync(pluginPkgPath, "utf8");
+writeFileSync(pluginPkgPath, pluginPkg.replace(/"devcoach": "[^"]+"/, `"devcoach": "${version}"`));
+
+console.log(`synced plugin → version ${version}, SKILL.md copied, devcoach pinned`);

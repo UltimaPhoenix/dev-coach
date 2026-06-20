@@ -130,7 +130,7 @@ jobs:
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add package.json package-lock.json mcpb/manifest.json \
-            plugin/.claude-plugin/plugin.json plugin/skills/devcoach/SKILL.md
+            plugin/.claude-plugin/plugin.json plugin/skills/devcoach/SKILL.md plugin/package.json
           git commit -m "chore: release v${NEW}"
           git tag "v${NEW}"
           git push origin HEAD:main "v${NEW}"

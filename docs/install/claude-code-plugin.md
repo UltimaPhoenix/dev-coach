@@ -45,21 +45,25 @@ unzip it, then point Claude Code at the unzipped folder:
 
 ## How it works
 
-When you enable the plugin, Claude Code wires in its three component files:
+When you enable the plugin, Claude Code wires in its component files. The plugin ships only config plus a
+small bootstrap (`scripts/launch.mjs`) — **no bundled binary and no per-call `npx`**. On first use the
+launcher installs the *pinned* `devcoach` version (from `plugin/package.json`) **once** into the plugin's
+persistent data dir, then runs it directly with `node`; later calls (every hook fire, every server start)
+skip straight to `node` — and it only re-installs when a plugin update bumps the pinned version.
 
-1. **`.mcp.json`** → Claude Code launches the MCP server locally as a stdio process
-   (`npx -y devcoach mcp`). It opens `~/.devcoach/coaching.db` (SQLite), derived from your home
-   directory.
-2. **`hooks/hooks.json`** → after every turn, Claude Code runs the two `Stop` hooks (also local
-   `npx -y devcoach` processes). They read the same database and either stay silent or nudge the agent
-   to run onboarding / deliver a lesson. This is what makes coaching automatic.
+1. **`.mcp.json`** → Claude Code launches the MCP server as a local stdio process
+   (`node ${CLAUDE_PLUGIN_ROOT}/scripts/launch.mjs mcp`). It opens `~/.devcoach/coaching.db` (SQLite),
+   derived from your home directory.
+2. **`hooks/hooks.json`** → after every turn, Claude Code runs the two `Stop` hooks through the same
+   launcher. They read the same database and either stay silent or nudge the agent to run onboarding /
+   deliver a lesson. This is what makes coaching automatic — and with no `npx` per fire, it's snappy.
 3. **`skills/devcoach/SKILL.md`** → the coaching playbook, auto-loaded so the agent knows *how* to
    teach when a hook fires.
 
 ## Running the CLI & web dashboard
 
-The plugin gives Claude Code everything it needs to coach you, but it does **not** put the `devcoach`
-**CLI** on your `PATH` — it runs the MCP server internally via `npx`. So to open the
+The plugin gives Claude Code everything it needs to coach you, but it keeps devcoach inside its own data
+dir — it does **not** put the `devcoach` **CLI** on your `PATH`. So to open the
 [web dashboard](../usage/web-ui.md) or use any [CLI command](../usage/cli.md), prefix it with `npx -y`:
 
 ```bash
@@ -84,7 +88,7 @@ machine's home directory:
   persisted across runs. Use [`devcoach backup`](../usage/cli.md#backup-export--import) / `restore` to
   carry your profile between machines.
 
-It needs **Node.js ≥ 24** (for Node's embedded `node:sqlite`), since the plugin runs the published
-`devcoach` npm package via `npx`.
+It needs **Node.js ≥ 24** (for Node's embedded `node:sqlite`) and a one-time network connection on first
+use (to install the pinned `devcoach` package into the plugin's data dir); after that it runs offline.
 
 → Next: **[Coaching in your agent](../usage/coaching.md)**.

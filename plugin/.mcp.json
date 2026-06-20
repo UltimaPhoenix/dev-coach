@@ -2,8 +2,8 @@
   "mcpServers": {
     "devcoach": {
       "type": "stdio",
-      "command": "npx",
-      "args": ["-y", "devcoach", "mcp"]
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/launch.mjs", "mcp"]
     }
   }
 }
