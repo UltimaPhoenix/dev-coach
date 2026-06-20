@@ -73,7 +73,7 @@ describe("cli", () => {
     expect((await run(["onboard-hook"])).code).toBe(0); // profile exists → silent
     const lr = await run(["lesson-ready"]);
     expect(lr.code).toBe(2);
-    expect(lr.out).toContain("Deliver a devcoach lesson");
+    expect(lr.out).toContain("devcoach_instructions");
   });
 
   it("knowledge + group + settings commands", async () => {

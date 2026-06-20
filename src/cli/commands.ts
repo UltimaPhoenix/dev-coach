@@ -767,10 +767,11 @@ function cmdLessonReady(): void {
   if (!allowed) process.exit(0);
 
   process.stderr.write(
-    "Deliver a devcoach lesson based on the work in this conversation, then record it by " +
-      "calling the devcoach `log_lesson` MCP tool (not a shell/CLI command — that is required, " +
-      "or this hook will fire again). Ignore the devcoach://rate-limit check — it is already " +
-      "verified by this hook.\n",
+    "devcoach: rate limit is clear. Read the `devcoach_instructions` MCP prompt and execute " +
+      'the coaching skill exactly as it defines — including its "When to activate" filter. ' +
+      "Only deliver a lesson if the devcoach skill says to; if it says to stay silent, stay " +
+      "silent. The rate-limit check is already done by this hook — skip it. If you already " +
+      "have `devcoach_instructions` in context, follow it directly without re-reading.\n",
   );
   process.exit(2);
 }
