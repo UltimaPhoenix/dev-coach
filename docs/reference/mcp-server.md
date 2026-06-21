@@ -49,8 +49,10 @@ avoid repetition; read `rate-limit` to decide whether to deliver.
 
 ## Prompt
 
-`devcoach_instructions` returns the full coaching instructions (`assets/SKILL.md`). Clients that support
-MCP prompts (Claude Code, Claude Desktop) load it automatically — no separate skill install needed.
+`devcoach_instructions` returns the full coaching instructions (`assets/SKILL.md`). MCP prompts are
+surfaced as user-invocable slash commands (Claude Code, Claude Desktop) — they are **not** auto-injected
+into context. Coaching is driven by the `lesson-ready` Stop hook, which carries a self-contained lesson
+directive, so no separate skill install is needed.
 
 ## Data models
 

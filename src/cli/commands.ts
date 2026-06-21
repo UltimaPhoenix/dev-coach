@@ -767,11 +767,24 @@ function cmdLessonReady(): void {
   if (!allowed) process.exit(0);
 
   process.stderr.write(
-    "devcoach: rate limit is clear. Read the `devcoach_instructions` MCP prompt and execute " +
-      'the coaching skill exactly as it defines — including its "When to activate" filter. ' +
-      "Only deliver a lesson if the devcoach skill says to; if it says to stay silent, stay " +
-      "silent. The rate-limit check is already done by this hook — skip it. If you already " +
-      "have `devcoach_instructions` in context, follow it directly without re-reading.\n",
+    "devcoach: a lesson is due for the technical work just completed. Act now — do not " +
+      "acknowledge this message and do not explain what you are about to do.\n\n" +
+      "1. Read the MCP resources devcoach://profile and devcoach://taught-topics.\n" +
+      "2. Decide whether the work just completed warrants ONE lesson: writing or reviewing " +
+      "code, commits, debugging, config, queries, or infra = yes; pure questions, chat, or " +
+      "non-technical replies = no. If no, output nothing further and stop.\n" +
+      "3. If yes, append exactly ONE lesson on a devcoach://profile topic that is NOT already " +
+      "in devcoach://taught-topics, pitched at or above the user's confidence band, formatted " +
+      "as this card:\n\n" +
+      "### ──────── 🎓 devcoach ────────\n" +
+      "> [Category] · Level: [Junior|Mid|Senior]\n" +
+      "> **[Title]**\n" +
+      "> [3–6 short paragraphs: explain the why, tie it to the task just completed]\n" +
+      "> 💡 *Senior tip:* [one line]\n" +
+      "### ──────── [topic] · [level] ────────\n\n" +
+      "4. Immediately call the log_lesson MCP tool with the lesson you delivered.\n\n" +
+      "The rate-limit check is already done by this hook — skip it. Output only the lesson " +
+      "card (or nothing). No preamble, no meta-commentary.\n",
   );
   process.exit(2);
 }

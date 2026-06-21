@@ -74,7 +74,9 @@ Every tool registers a `title` + read-only/destructive annotations, a tight Zod 
 ## MCP prompt
 
 `devcoach_instructions` returns the bundled `assets/SKILL.md` (the single source of truth; read at
-runtime by `src/skill.ts`). Clients that support MCP prompts load it automatically.
+runtime by `src/skill.ts`). MCP prompts are surfaced as user-invocable slash commands, **not**
+auto-injected into context — so coaching is driven by the Stop hooks, which carry self-contained
+instructions (`onboard-hook` cues onboarding; `lesson-ready` delivers the full lesson directive).
 
 ---
 
