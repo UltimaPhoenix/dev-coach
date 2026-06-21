@@ -816,7 +816,8 @@ function cmdLessonReady(): void {
       "> [3–6 short paragraphs: explain the why, tie it to the task just completed]\n" +
       "> 💡 *Senior tip:* [one line]\n" +
       "### ──────── [topic] · [level] ────────\n\n" +
-      "4. Immediately call the log_lesson MCP tool with the lesson you delivered.\n\n" +
+      "4. Immediately call the log_lesson MCP tool, passing the full lesson markdown as the " +
+      "`body` field (not just the summary).\n\n" +
       "The rate-limit check is already done by this hook — skip it. Output only the lesson " +
       "card (or nothing). No preamble, no meta-commentary.\n",
   );

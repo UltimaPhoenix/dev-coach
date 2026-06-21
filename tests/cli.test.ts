@@ -75,6 +75,7 @@ describe("cli", () => {
     expect(lr.code).toBe(2);
     expect(lr.out).toContain("log_lesson");
     expect(lr.out).toContain("devcoach://profile");
+    expect(lr.out).toContain("`body` field");
   });
 
   it("parseStopHookActive: only a payload with stop_hook_active=true short-circuits", () => {
