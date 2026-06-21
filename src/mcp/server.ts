@@ -22,7 +22,7 @@ import {
   RepositoryPlatformSchema,
   UiThemeSchema,
 } from "../core/models";
-import { readSkill } from "../skill";
+import { readLessonFormat, readSkill } from "../skill";
 import { VERSION } from "../version";
 
 // ── Result helpers ───────────────────────────────────────────────────────────
@@ -110,7 +110,9 @@ export function createServer(): McpServer {
           .string()
           .min(1)
           .describe(
-            "Full lesson markdown — the exact card text shown to the user (required, non-empty)",
+            "Clean lesson markdown: the prose + 💡 Senior tip only — NO card bands, NO '>' " +
+              "blockquote, and do not repeat title/category/level (own fields). See " +
+              "devcoach://lesson-format. Required, non-empty.",
           ),
         task_context: z.string().nullish().describe("What the user was doing when taught"),
         project: z.string().nullish().describe("Project name (auto-detected from git if omitted)"),
@@ -648,6 +650,19 @@ export function createServer(): McpServer {
         return jsonResource(uri, { error: String(err) });
       }
     },
+  );
+
+  server.registerResource(
+    "lesson-format",
+    "devcoach://lesson-format",
+    {
+      title: "Lesson Format",
+      description: "How to render a lesson card in chat and how to save it via log_lesson.",
+      mimeType: "text/markdown",
+    },
+    (uri) => ({
+      contents: [{ uri: uri.href, mimeType: "text/markdown", text: readLessonFormat() }],
+    }),
   );
 
   server.registerResource(

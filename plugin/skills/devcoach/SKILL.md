@@ -379,13 +379,13 @@ Card rules:
 - Every content line is prefixed with `> ` (blank separators become a bare `>`).
 - Leave **one blank line before the bottom band** so the blockquote closes cleanly.
 
-If `AskUserQuestion` is **not** available (Claude Desktop / claude.ai web), append
-this block — plain list format so the interface renders it as clickable buttons:
+**Display vs storage:** the card above is for chat only. When you call `log_lesson`,
+the `body` is **clean markdown** — no bands, no `> ` blockquote, and no title/`Category ·
+Level` line (those go in their own fields). See `devcoach://lesson-format` and Step 1 below.
 
-Did that land?
-- ✅ know — got it
-- ❌ don't know — need to revisit
-- ⏭️ skip
+**Feedback is handled by the MCP protocol** — `log_lesson` runs an elicitation
+(*"Did that land?"* → know / dont_know / skip) when the client supports it. Do **not**
+render a feedback question yourself; just deliver the card and call `log_lesson`.
 
 **Tone:** direct, like a senior colleague explaining during a code review.
 Not academic, not verbose. Gets straight to the point.
@@ -407,7 +407,7 @@ Call `log_lesson` right after delivering the lesson, without waiting for feedbac
   "title": "Lesson title",
   "level": "junior|mid|senior",
   "summary": "One line — what was taught",
-  "body": "The full lesson text exactly as delivered — all paragraphs, code blocks, and the senior tip. This is what the web UI displays on the lesson detail page.",
+  "body": "ONLY the lesson prose + the 💡 Senior tip, as CLEAN markdown — no card bands, no '>' blockquote, and do NOT repeat the title or the 'Category · Level' line (those are their own fields). See devcoach://lesson-format.",
   "task_context": "Brief description of the task that triggered it"
 }
 ```

@@ -84,7 +84,7 @@ describe("cli", () => {
     expect(lr.out).toContain('"decision":"block"');
     expect(lr.out).toContain("log_lesson");
     expect(lr.out).toContain("devcoach://profile");
-    expect(lr.out).toContain("`body` field");
+    expect(lr.out).toContain("devcoach://lesson-format");
   });
 
   it("parseStopHookActive: only a payload with stop_hook_active=true short-circuits", () => {

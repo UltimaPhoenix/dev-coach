@@ -17,12 +17,22 @@ async function connect() {
 const text = (r: any): string => r.content[0].text;
 
 describe("mcp server", () => {
-  it("lists 13 tools, 8 resources + 1 template, 1 prompt", async () => {
+  it("lists 13 tools, 9 resources + 1 template, 1 prompt", async () => {
     const { client, server } = await connect();
     expect((await client.listTools()).tools.length).toBe(13);
-    expect((await client.listResources()).resources.length).toBe(8);
+    expect((await client.listResources()).resources.length).toBe(9);
     expect((await client.listResourceTemplates()).resourceTemplates.length).toBe(1);
     expect((await client.listPrompts()).prompts[0].name).toBe("devcoach_instructions");
+    await client.close();
+    await server.close();
+  });
+
+  it("devcoach://lesson-format serves the rendering + save rules", async () => {
+    const { client, server } = await connect();
+    const r: any = await client.readResource({ uri: "devcoach://lesson-format" });
+    expect(r.contents[0].mimeType).toBe("text/markdown");
+    expect(r.contents[0].text).toContain("log_lesson");
+    expect(r.contents[0].text).toContain("clean markdown");
     await client.close();
     await server.close();
   });

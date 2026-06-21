@@ -44,7 +44,7 @@ dev-coach/
 │   │   ├── db.ts           # node:sqlite schema + migrations + query helpers + DEFAULT_PROFILE
 │   │   ├── coach.ts        # rate limit, profile, knowledge deltas, stats
 │   │   ├── git.ts  detect.ts  prompts.ts
-│   ├── mcp/server.ts       # McpServer: 13 tools + 9 resources + devcoach_instructions prompt
+│   ├── mcp/server.ts       # McpServer: 13 tools + 10 resources + devcoach_instructions prompt
 │   ├── cli/commands.ts     # Commander dispatcher (23 subcommands) + term.ts (styled output)
 │   └── web/app.ts          # Hono app (19 routes) + views.ts (hono/html pages)
 ├── tests/                  # Vitest (core, mcp, web, cli, setup-wizard)
@@ -65,10 +65,12 @@ Every tool registers a `title` + read-only/destructive annotations, a tight Zod 
 (`Lesson`/`Profile`/`Settings`), and returns `{ isError: true, … }` with a recovery hint on failure.
 `log_lesson` elicits inline feedback, capability-gated on `getClientCapabilities()?.elicitation`.
 
-## MCP resources (9)
+## MCP resources (10)
 
-`devcoach://profile`, `settings`, `lessons/recent`, `stats`, `taught-topics`, `rate-limit`, `context`,
-`onboarding`, and the templated `lessons/{lesson_id}`. Each returns JSON and never throws (returns
+`devcoach://profile`, `lesson-format` (text/markdown — card rendering + clean-body save rules),
+`settings`, `lessons/recent`, `stats`, `taught-topics`, `rate-limit`, `context`,
+`onboarding`, and the templated `lessons/{lesson_id}`. Each returns JSON (except `lesson-format`)
+and never throws (returns
 `{ error }` on failure).
 
 ## MCP prompt
