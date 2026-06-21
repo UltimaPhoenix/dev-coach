@@ -61,10 +61,28 @@ describe("mcp server", () => {
         title: "X",
         level: "mid",
         summary: "s",
+        body: "Full lesson body.",
       },
     });
     expect(log.structuredContent.id).toBe("t1");
+    expect(log.structuredContent.body).toBe("Full lesson body.");
     expect(log.structuredContent.feedback).toBeNull();
+
+    // An empty body is rejected — a lesson with no content is useless in the UI.
+    const emptyBody: any = await client.callTool({
+      name: "log_lesson",
+      arguments: {
+        id: "t-empty",
+        timestamp: "2026-06-16T10:00:00Z",
+        topic_id: "python",
+        categories: ["python"],
+        title: "X",
+        level: "mid",
+        summary: "s",
+        body: "",
+      },
+    });
+    expect(emptyBody.isError).toBe(true);
     expect(
       JSON.parse(text(await client.callTool({ name: "get_lessons", arguments: { limit: 5 } })))
         .length,
@@ -146,6 +164,7 @@ describe("mcp server", () => {
         title: "Elicited",
         level: "mid",
         summary: "s",
+        body: "b",
       },
     });
     expect(log.structuredContent.feedback).toBe("know"); // feedback applied inline
@@ -235,6 +254,7 @@ describe("mcp server error paths", () => {
         title: "Full",
         level: "mid",
         summary: "s",
+        body: "b",
         project: "explicitP",
         repository: "o/r",
         repository_platform: "gitlab",
@@ -270,6 +290,7 @@ describe("mcp server error paths", () => {
         title: "Declined",
         level: "mid",
         summary: "s",
+        body: "b",
       },
     });
     expect(log.structuredContent.feedback).toBeNull(); // declined → no feedback applied, lesson saved

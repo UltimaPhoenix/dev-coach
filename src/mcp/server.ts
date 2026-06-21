@@ -105,7 +105,12 @@ export function createServer(): McpServer {
         title: z.string().describe("Short lesson title"),
         level: LevelSchema.describe("Difficulty level: junior | mid | senior"),
         summary: z.string().describe("1-3 sentence summary shown in the lesson card"),
-        body: z.string().nullish().describe("Optional full lesson markdown"),
+        body: z
+          .string()
+          .min(1)
+          .describe(
+            "Full lesson markdown — the exact card text shown to the user (required, non-empty)",
+          ),
         task_context: z.string().nullish().describe("What the user was doing when taught"),
         project: z.string().nullish().describe("Project name (auto-detected from git if omitted)"),
         repository: z.string().nullish().describe("org/repo or path (auto-detected if omitted)"),
@@ -141,7 +146,7 @@ export function createServer(): McpServer {
           title: args.title,
           level: args.level,
           summary: args.summary,
-          body: args.body ?? null,
+          body: args.body,
           task_context: args.task_context ?? null,
           project: args.project ?? git.project ?? usage.project ?? null,
           repository: args.repository ?? git.repository ?? usage.repository ?? null,
