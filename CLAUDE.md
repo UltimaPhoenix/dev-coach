@@ -44,7 +44,7 @@ dev-coach/
 │   │   ├── db.ts           # node:sqlite schema + migrations + query helpers + DEFAULT_PROFILE
 │   │   ├── coach.ts        # rate limit, profile, knowledge deltas, stats
 │   │   ├── git.ts  detect.ts  prompts.ts
-│   ├── mcp/server.ts       # McpServer: 13 tools + 10 resources + devcoach_instructions prompt
+│   ├── mcp/server.ts       # McpServer: 14 tools + 10 resources + devcoach_instructions prompt
 │   ├── cli/commands.ts     # Commander dispatcher (23 subcommands) + term.ts (styled output)
 │   └── web/app.ts          # Hono app (19 routes) + views.ts (hono/html pages)
 ├── tests/                  # Vitest (core, mcp, web, cli, setup-wizard)
@@ -55,10 +55,11 @@ dev-coach/
 
 ---
 
-## Exposed MCP tools (13)
+## Exposed MCP tools (14)
 
 `log_lesson`, `update_knowledge`, `get_lessons`, `star_lesson`, `delete_lesson`, `submit_feedback`,
-`add_topic`, `remove_topic`, `add_group`, `remove_group`, `update_settings`, `open_ui`, `complete_onboarding`.
+`add_topic`, `remove_topic`, `add_group`, `remove_group`, `update_settings`, `open_ui`,
+`complete_onboarding`, `update_notebook`.
 
 Every tool registers a `title` + read-only/destructive annotations, a tight Zod `inputSchema` with
 `.describe()` on each param, `outputSchema`/`structuredContent` for model-shaped returns
@@ -67,9 +68,9 @@ Every tool registers a `title` + read-only/destructive annotations, a tight Zod 
 
 ## MCP resources (10)
 
-`devcoach://profile`, `lesson-format` (text/markdown — card rendering + clean-body save rules),
+`devcoach://profile`, `notebook` (text/markdown — the coaching notebook, read to choose what to teach),
 `settings`, `lessons/recent`, `stats`, `taught-topics`, `rate-limit`, `context`,
-`onboarding`, and the templated `lessons/{lesson_id}`. Each returns JSON (except `lesson-format`)
+`onboarding`, and the templated `lessons/{lesson_id}`. Each returns JSON (except `notebook`)
 and never throws (returns
 `{ error }` on failure).
 

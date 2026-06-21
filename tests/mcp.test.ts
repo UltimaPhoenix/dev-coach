@@ -17,9 +17,9 @@ async function connect() {
 const text = (r: any): string => r.content[0].text;
 
 describe("mcp server", () => {
-  it("lists 13 tools, 9 resources + 1 template, 1 prompt", async () => {
+  it("lists 14 tools, 9 resources + 1 template, 1 prompt", async () => {
     const { client, server } = await connect();
-    expect((await client.listTools()).tools.length).toBe(13);
+    expect((await client.listTools()).tools.length).toBe(14);
     expect((await client.listResources()).resources.length).toBe(9);
     expect((await client.listResourceTemplates()).resourceTemplates.length).toBe(1);
     expect((await client.listPrompts()).prompts[0].name).toBe("devcoach_instructions");
@@ -27,12 +27,15 @@ describe("mcp server", () => {
     await server.close();
   });
 
-  it("devcoach://lesson-format serves the rendering + save rules", async () => {
+  it("update_notebook writes the notebook and devcoach://notebook serves it", async () => {
     const { client, server } = await connect();
-    const r: any = await client.readResource({ uri: "devcoach://lesson-format" });
+    await client.callTool({
+      name: "update_notebook",
+      arguments: { notebook: "# Notebook\n\n## Observations\nUser absorbed sockets." },
+    });
+    const r: any = await client.readResource({ uri: "devcoach://notebook" });
     expect(r.contents[0].mimeType).toBe("text/markdown");
-    expect(r.contents[0].text).toContain("log_lesson");
-    expect(r.contents[0].text).toContain("clean markdown");
+    expect(r.contents[0].text).toContain("User absorbed sockets.");
     await client.close();
     await server.close();
   });

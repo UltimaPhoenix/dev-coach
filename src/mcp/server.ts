@@ -3,7 +3,7 @@
 // review: title + hint annotations, tight Zod schemas with .describe(), outputSchema/structuredContent
 // for model returns, isError on failure, and an elicitation capability-check in log_lesson.
 import { spawn } from "node:child_process";
-import { existsSync, mkdirSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
@@ -22,7 +22,7 @@ import {
   RepositoryPlatformSchema,
   UiThemeSchema,
 } from "../core/models";
-import { readLessonFormat, readSkill } from "../skill";
+import { readSkill } from "../skill";
 import { VERSION } from "../version";
 
 // ── Result helpers ───────────────────────────────────────────────────────────
@@ -111,8 +111,8 @@ export function createServer(): McpServer {
           .min(1)
           .describe(
             "Clean lesson markdown: the prose + 💡 Senior tip only — NO card bands, NO '>' " +
-              "blockquote, and do not repeat title/category/level (own fields). See " +
-              "devcoach://lesson-format. Required, non-empty.",
+              "blockquote, and do not repeat title/category/level (those are their own fields). " +
+              "Required, non-empty.",
           ),
         task_context: z.string().nullish().describe("What the user was doing when taught"),
         project: z.string().nullish().describe("Project name (auto-detected from git if omitted)"),
@@ -628,6 +628,41 @@ export function createServer(): McpServer {
     },
   );
 
+  server.registerTool(
+    "update_notebook",
+    {
+      title: "Update Coaching Notebook",
+      description:
+        "Overwrite the coaching notebook (~/.devcoach/learning-state.md) with revised markdown. " +
+        "Use it after a lesson to fold in what the user absorbed or struggled with, new recurring " +
+        "patterns, and updated hypotheses — keeping the prior notes. Pass the full notebook content.",
+      inputSchema: {
+        notebook: z
+          .string()
+          .min(1)
+          .describe("Full notebook markdown saved verbatim to learning-state.md (overwrites)."),
+      },
+      annotations: {
+        title: "Update Coaching Notebook",
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (args) => {
+      try {
+        mkdirSync(dirname(db.LEARNING_STATE_PATH), { recursive: true });
+        writeFileSync(
+          db.LEARNING_STATE_PATH,
+          args.notebook.endsWith("\n") ? args.notebook : `${args.notebook}\n`,
+        );
+        return { content: [txt("notebook updated")] };
+      } catch (err) {
+        return errResult(`update_notebook failed: ${err}`);
+      }
+    },
+  );
+
   // ── Resources ────────────────────────────────────────────────────────────
 
   const meta = (title: string, description: string) => ({
@@ -653,16 +688,24 @@ export function createServer(): McpServer {
   );
 
   server.registerResource(
-    "lesson-format",
-    "devcoach://lesson-format",
+    "notebook",
+    "devcoach://notebook",
     {
-      title: "Lesson Format",
-      description: "How to render a lesson card in chat and how to save it via log_lesson.",
+      title: "Coaching Notebook",
+      description:
+        "The coaching notebook (learning-state.md): observations, recurring patterns, " +
+        "recommended focus, and open hypotheses about the user. Read it to decide what to teach.",
       mimeType: "text/markdown",
     },
-    (uri) => ({
-      contents: [{ uri: uri.href, mimeType: "text/markdown", text: readLessonFormat() }],
-    }),
+    (uri) => {
+      let text = "";
+      try {
+        if (existsSync(db.LEARNING_STATE_PATH)) text = readFileSync(db.LEARNING_STATE_PATH, "utf8");
+      } catch {
+        // notebook not readable yet — return empty
+      }
+      return { contents: [{ uri: uri.href, mimeType: "text/markdown", text }] };
+    },
   );
 
   server.registerResource(

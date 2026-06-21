@@ -806,16 +806,28 @@ function cmdLessonReady(): void {
     "devcoach: a lesson is due for the technical work just completed. Do it now — do not " +
       "acknowledge this message and do not explain what you are about to do.\n\n" +
       "1. Read the MCP resources devcoach://profile, devcoach://taught-topics, and " +
-      "devcoach://lesson-format.\n" +
+      "devcoach://notebook.\n" +
       "2. Decide whether the work just completed warrants ONE lesson: writing or reviewing " +
       "code, commits, debugging, config, queries, or infra = yes; pure questions, chat, or " +
       "non-technical replies = no. If no, output nothing further and stop.\n" +
-      "3. If yes, FIRST write the lesson card as your visible reply — rendered per " +
-      "devcoach://lesson-format — on a devcoach://profile topic NOT already in " +
-      "devcoach://taught-topics, pitched at or above the user's confidence band.\n" +
-      "4. ONLY AFTER the card is written, call log_lesson with a CLEAN body (per " +
-      "devcoach://lesson-format). log_lesson then asks the user 'Did that land?', so the card " +
-      "MUST be printed first — never call log_lesson before the lesson is visible.\n\n" +
+      "3. Use the notebook to choose WHAT to teach: skip topics it marks as absorbed, prefer " +
+      "its 'Recommended focus', calibrate depth from 'Recurring patterns', and watch its 'Open " +
+      "hypotheses'. Pick ONE devcoach://profile topic NOT already in devcoach://taught-topics, " +
+      "pitched at or above the user's confidence band.\n" +
+      "4. FIRST write the lesson as your visible reply — a card in EXACTLY this format:\n\n" +
+      "### ──────── 🎓 devcoach ────────\n" +
+      "> [Category] · Level: [Junior|Mid|Senior]\n" +
+      "> **[Title]**\n" +
+      "> [3–6 short paragraphs: explain the why, tie it to the task; fenced code if useful]\n" +
+      "> 💡 *Senior tip:* [one line]\n" +
+      "### ──────── [topic] · [level] ────────\n\n" +
+      "5. ONLY AFTER the card is written, call log_lesson. Put title/topic_id/categories/level/" +
+      "summary in their own fields; body = ONLY the prose + the 💡 tip as CLEAN markdown (no " +
+      "bands, no '>' quote, no title or 'Category · Level' line). log_lesson then asks the user " +
+      "'Did that land?', so the card MUST be printed first.\n" +
+      "6. After log_lesson returns the feedback, call update_notebook with the revised notebook " +
+      "markdown: fold in what the user absorbed or struggled with and any new pattern, keeping " +
+      "the existing notes.\n\n" +
       "The rate-limit check is already done by this hook — skip it. Output only the lesson " +
       "card (or nothing). No preamble, no meta-commentary.",
   );

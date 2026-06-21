@@ -22,9 +22,3 @@ export const readSkill = (): string =>
     "SKILL.md",
     "devcoach: coaching instructions unavailable (SKILL.md not found in package).",
   );
-
-export const readLessonFormat = (): string =>
-  readAsset(
-    "lesson-format.md",
-    "devcoach: lesson format unavailable (lesson-format.md not found in package).",
-  );

@@ -381,7 +381,7 @@ Card rules:
 
 **Display vs storage:** the card above is for chat only. When you call `log_lesson`,
 the `body` is **clean markdown** — no bands, no `> ` blockquote, and no title/`Category ·
-Level` line (those go in their own fields). See `devcoach://lesson-format` and Step 1 below.
+Level` line (those go in their own fields). See Step 1 below.
 
 **Feedback is handled by the MCP protocol** — `log_lesson` runs an elicitation
 (*"Did that land?"* → know / dont_know / skip) when the client supports it. Do **not**
@@ -407,7 +407,7 @@ Call `log_lesson` right after delivering the lesson, without waiting for feedbac
   "title": "Lesson title",
   "level": "junior|mid|senior",
   "summary": "One line — what was taught",
-  "body": "ONLY the lesson prose + the 💡 Senior tip, as CLEAN markdown — no card bands, no '>' blockquote, and do NOT repeat the title or the 'Category · Level' line (those are their own fields). See devcoach://lesson-format.",
+  "body": "ONLY the lesson prose + the 💡 Senior tip, as CLEAN markdown — no card bands, no '>' blockquote, and do NOT repeat the title or the 'Category · Level' line (those are their own fields).",
   "task_context": "Brief description of the task that triggered it"
 }
 ```
@@ -443,6 +443,16 @@ Did that land?
 - ✅ know — got it
 - ❌ don't know — need to revisit
 - ⏭️ skip
+
+---
+
+### Step 1c — Update the coaching notebook
+
+After feedback is known, fold it into the notebook: call `update_notebook` with the full
+revised `learning-state.md` markdown — note what the user absorbed (`know`) or should
+revisit (`dont_know`), any new recurring pattern, and updated open hypotheses, keeping the
+prior notes. This is what makes the notebook (read from `devcoach://notebook`) drive future
+lesson selection.
 
 ---
 
