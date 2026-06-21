@@ -742,7 +742,10 @@ export function parseStopHookActive(raw: string): boolean {
 function stopHookContinuation(): boolean {
   try {
     const st = fstatSync(0);
-    if (!st.isFIFO() && !st.isFile()) return false;
+    // Claude Code delivers the Stop-hook payload over a SOCKET; a piped FIFO or a
+    // redirected file carry it too. Read all three. Skip only a TTY/character device,
+    // where a blocking read would hang an interactive run or a test.
+    if (!st.isFIFO() && !st.isFile() && !st.isSocket()) return false;
     return parseStopHookActive(readFileSync(0, "utf8"));
   } catch {
     return false;
