@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import { runCli } from "../src/cli/commands";
+import { parseStopHookActive, runCli } from "../src/cli/commands";
 import * as db from "../src/core/db";
 import { parseLesson } from "../src/core/models";
 import { VERSION } from "../src/version";
@@ -75,6 +75,14 @@ describe("cli", () => {
     expect(lr.code).toBe(2);
     expect(lr.out).toContain("log_lesson");
     expect(lr.out).toContain("devcoach://profile");
+  });
+
+  it("parseStopHookActive: only a payload with stop_hook_active=true short-circuits", () => {
+    expect(parseStopHookActive(JSON.stringify({ stop_hook_active: true }))).toBe(true);
+    expect(parseStopHookActive(JSON.stringify({ stop_hook_active: false }))).toBe(false);
+    expect(parseStopHookActive(JSON.stringify({ hook_event_name: "Stop" }))).toBe(false);
+    expect(parseStopHookActive("")).toBe(false);
+    expect(parseStopHookActive("not json")).toBe(false);
   });
 
   it("knowledge + group + settings commands", async () => {

@@ -5,6 +5,7 @@ import {
   accessSync,
   constants,
   existsSync,
+  fstatSync,
   mkdirSync,
   readFileSync,
   statSync,
@@ -718,6 +719,37 @@ async function cmdSetup(): Promise<void> {
 
 // ── Stop hooks ───────────────────────────────────────────────────────────────
 
+/**
+ * Claude Code passes the Stop-hook payload as JSON on stdin. `stop_hook_active`
+ * is true when the current stop is itself the result of a Stop hook forcing the
+ * agent to continue — re-blocking then would loop forever. Returns true only for
+ * a well-formed payload with the flag set; empty/garbage input is treated as a
+ * fresh stop.
+ */
+export function parseStopHookActive(raw: string): boolean {
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed?.stop_hook_active === true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Read the Stop-hook payload from stdin, but only when it is actually piped
+ * (a FIFO or a redirected file). On a TTY or any other source we skip the read
+ * entirely so an interactive run — or a test — never blocks waiting for EOF.
+ */
+function stopHookContinuation(): boolean {
+  try {
+    const st = fstatSync(0);
+    if (!st.isFIFO() && !st.isFile()) return false;
+    return parseStopHookActive(readFileSync(0, "utf8"));
+  } catch {
+    return false;
+  }
+}
+
 const ONBOARD_SESSION_TIMEOUT_HOURS = 24;
 
 function onboardSessionActive(knowledgeReady: boolean): boolean {
@@ -728,6 +760,7 @@ function onboardSessionActive(knowledgeReady: boolean): boolean {
 }
 
 function cmdOnboardHook(): void {
+  if (stopHookContinuation()) process.exit(0);
   let ready: boolean;
   try {
     ready = db.withConnection((conn) => db.isOnboardingComplete(conn).knowledge_ready);
@@ -755,6 +788,7 @@ function cmdOnboardHook(): void {
 }
 
 function cmdLessonReady(): void {
+  if (stopHookContinuation()) process.exit(0);
   let allowed: boolean;
   try {
     allowed = db.withConnection((conn) => {
