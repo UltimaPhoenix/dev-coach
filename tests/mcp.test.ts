@@ -1,3 +1,4 @@
+import { existsSync, readFileSync } from "node:fs";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { ElicitRequestSchema } from "@modelcontextprotocol/sdk/types.js";
@@ -30,9 +31,16 @@ describe("mcp server", () => {
     const { client, server } = await connect();
     const onb: any = await client.callTool({
       name: "complete_onboarding",
-      arguments: { topics: { python: 4 }, groups: { Languages: ["python"] } },
+      arguments: {
+        topics: { python: 4 },
+        groups: { Languages: ["python"] },
+        notebook: "# devcoach — Coaching Notebook\n\n## Observations\nPrefers type safety.\n",
+      },
     });
     expect(onb.structuredContent.knowledge[0].topic).toBe("python");
+    // The personalized notebook the model passes is saved verbatim to learning-state.md.
+    expect(existsSync(db.LEARNING_STATE_PATH)).toBe(true);
+    expect(readFileSync(db.LEARNING_STATE_PATH, "utf8")).toContain("Prefers type safety.");
 
     await client.callTool({
       name: "add_topic",

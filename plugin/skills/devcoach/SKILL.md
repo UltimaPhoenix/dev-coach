@@ -94,15 +94,17 @@ Once the full topic list is agreed:
   These names emerge from the conversation — there is no fixed list.
 - Show the proposed grouping: *"Here's how I'd organise these — does this look
   right? Any changes?"*
-- When confirmed, call the MCP tool `complete_onboarding`:
+- When confirmed, call the MCP tool `complete_onboarding`, including the personalized
+  `notebook` markdown you compose in Step 4 (so the profile and notebook are saved
+  together):
   ```json
   {
     "topics": { "lang_a": 7, "tool_b": 8, "practice_c": 7 },
-    "groups": { "Languages": ["lang_a"], "DevOps": ["tool_b"], "Version Control": ["practice_c"] }
+    "groups": { "Languages": ["lang_a"], "DevOps": ["tool_b"], "Version Control": ["practice_c"] },
+    "notebook": "# devcoach — Coaching Notebook\n_Last updated: …_\n\n## Observations\n…"
   }
   ```
-- Continue to Step 4. Do not deliver a lesson in this turn — the rate-limit clock
-  starts after onboarding.
+- Do not deliver a lesson in this turn — the rate-limit clock starts after onboarding.
 
 **Rule:** Never ask about groups during topic collection. Propose them only in
 Step 3 after all topics are known.
@@ -121,29 +123,38 @@ Then tell the user **how to change any of it later**, across all three surfaces:
 - **UI** — `devcoach ui` (web dashboard at http://localhost:7860), or ask me to open
   it (the `open_ui` tool).
 
-### Step 4 — Initialise the coaching notebook
+### Step 4 — Compose the coaching notebook (pass it to `complete_onboarding`)
 
-Write `~/.devcoach/learning-state.md` with observations from this conversation.
-If the file already exists (returning user or post-restore), integrate new
-observations without overwriting prior entries.
+Do **not** write `learning-state.md` yourself — compose its full markdown and pass it
+as the `notebook` field of the `complete_onboarding` call in Step 3. The tool saves it
+to `~/.devcoach/learning-state.md` atomically with the profile (so it is never empty
+and never created before the user finishes).
+
+Make it **personalized**: draw on everything you know about *this* user — not only this
+onboarding conversation, but how they work across **all their projects** (languages and
+tools they reach for, recurring habits, strengths, and gaps you have observed elsewhere).
+Generic boilerplate is a failure; write specific, real notes. Use this structure:
 
 ```markdown
 # devcoach — Coaching Notebook
 _Last updated: [ISO timestamp]_
 
 ## Observations
-[User background, confidence style, or gaps noted during onboarding.
-Leave empty if nothing notable was observed.]
+[Specific, real notes about this user: background, how they work across their
+projects, confidence style, gaps. Personalized — never generic.]
 
 ## Recurring patterns
-[Leave empty — nothing observed yet.]
+[Patterns you have noticed in how they build, debug, or structure work.]
 
 ## Recommended focus
 [Topics the user flagged as priorities or areas of uncertainty.]
 
 ## Open hypotheses
-[Leave empty — nothing to track yet.]
+[Things to watch for and confirm in future sessions.]
 ```
+
+If re-onboarding or returning, fold prior notes into the markdown you pass —
+`complete_onboarding` overwrites the file with exactly what you provide.
 
 ---
 

@@ -3,7 +3,8 @@
 // review: title + hint annotations, tight Zod schemas with .describe(), outputSchema/structuredContent
 // for model returns, isError on failure, and an elicitation capability-check in log_lesson.
 import { spawn } from "node:child_process";
-import { existsSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, statSync, writeFileSync } from "node:fs";
+import { dirname } from "node:path";
 import { McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
@@ -561,13 +562,23 @@ export function createServer(): McpServer {
       description:
         "Save the user's initial knowledge profile and mark onboarding complete. Wipes any " +
         "default-seeded profile. topics: {topic_id: confidence_0_to_10}. groups: {group_name: [topic_id,...]} " +
-        "(topics not in any group go to 'Other'). Returns the updated Profile.",
+        "(topics not in any group go to 'Other'). Pass the personalized coaching notebook as " +
+        "`notebook`; it is saved to learning-state.md atomically with the profile. Returns the updated Profile.",
       inputSchema: {
         topics: z.record(z.string(), confidenceInputSchema).describe("{topic_id: confidence 0-10}"),
         groups: z
           .record(z.string(), z.array(z.string()))
           .optional()
           .describe("{group_name: [topic_id, ...]}"),
+        notebook: z
+          .string()
+          .optional()
+          .describe(
+            "Full personalized coaching notebook (markdown) saved verbatim to learning-state.md. " +
+              "Write real observations about THIS user — background, strengths, gaps, and how they " +
+              "work across ALL their projects (not just this one), per the template in the devcoach " +
+              "skill. If omitted, a minimal placeholder is written so the file is never empty.",
+          ),
       },
       outputSchema: profileOutputShape,
       annotations: {
@@ -595,6 +606,19 @@ export function createServer(): McpServer {
           }
           return coach.getProfile(c);
         });
+        // Save the coaching notebook now that onboarding is complete — never before,
+        // so an abandoned onboarding leaves no trace. Prefer the model's personalized
+        // markdown; fall back to a minimal placeholder so the file is never empty.
+        const notebook = args.notebook?.trim();
+        mkdirSync(dirname(db.LEARNING_STATE_PATH), { recursive: true });
+        if (notebook) {
+          writeFileSync(
+            db.LEARNING_STATE_PATH,
+            notebook.endsWith("\n") ? notebook : `${notebook}\n`,
+          );
+        } else if (!existsSync(db.LEARNING_STATE_PATH)) {
+          writeFileSync(db.LEARNING_STATE_PATH, "# devcoach — Coaching Notebook\n");
+        }
         return structured(profile);
       } catch (err) {
         return errResult(`complete_onboarding failed: ${err}`);
