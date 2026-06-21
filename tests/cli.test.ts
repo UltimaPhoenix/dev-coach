@@ -68,11 +68,20 @@ describe("cli", () => {
         "DELETE FROM knowledge; DELETE FROM knowledge_groups; DELETE FROM knowledge_group_names;",
       ),
     );
-    expect((await run(["onboard-hook"])).code).toBe(2); // no profile → run onboarding
+    // No profile → emit a {decision:block} onboarding cue on stdout, exit 0 (not an error).
+    const onb = await run(["onboard-hook"]);
+    expect(onb.code).toBe(0);
+    expect(onb.out).toContain('"decision":"block"');
+    expect(onb.out).toContain("complete_onboarding");
     db.withConnection((c) => db.upsertKnowledge(c, "python", 4));
-    expect((await run(["onboard-hook"])).code).toBe(0); // profile exists → silent
+    // Profile exists → silent: exit 0 with no decision payload.
+    const silent = await run(["onboard-hook"]);
+    expect(silent.code).toBe(0);
+    expect(silent.out).not.toContain("decision");
+    // Lesson due → {decision:block} cue carrying the self-contained directive.
     const lr = await run(["lesson-ready"]);
-    expect(lr.code).toBe(2);
+    expect(lr.code).toBe(0);
+    expect(lr.out).toContain('"decision":"block"');
     expect(lr.out).toContain("log_lesson");
     expect(lr.out).toContain("devcoach://profile");
     expect(lr.out).toContain("`body` field");
@@ -219,8 +228,12 @@ describe("cli", () => {
       ),
     );
     rmSync(db.LEARNING_STATE_PATH, { force: true }); // no profile, no prior session
-    expect((await run(["onboard-hook"])).code).toBe(2); // no profile → cue + create state file
-    expect((await run(["onboard-hook"])).code).toBe(0); // state fresh (<24h) → session active
+    const cue = await run(["onboard-hook"]); // no profile → cue + create state file
+    expect(cue.code).toBe(0);
+    expect(cue.out).toContain('"decision":"block"');
+    const active = await run(["onboard-hook"]); // state fresh (<24h) → session active
+    expect(active.code).toBe(0);
+    expect(active.out).not.toContain("decision");
   });
 
   it("onboard-hook re-cues when the session state file is stale", async () => {
@@ -234,7 +247,9 @@ describe("cli", () => {
     writeFileSync(state, "# stale\n");
     const old = Date.now() / 1000 - 48 * 3600; // 48h ago
     utimesSync(state, old, old);
-    expect((await run(["onboard-hook"])).code).toBe(2); // stale → cue again (touch branch)
+    const recue = await run(["onboard-hook"]); // stale → cue again (touch branch)
+    expect(recue.code).toBe(0);
+    expect(recue.out).toContain('"decision":"block"');
   });
 
   it("usage errors exit 2", async () => {

@@ -1,5 +1,5 @@
 // CLI subcommands — Commander dispatcher,
-// zero-dependency styled output (term.ts), Stop hooks (exit 0 silent / exit 2 + stderr cue).
+// zero-dependency styled output (term.ts), Stop hooks (exit 0; silent, or a {decision:block} cue).
 import { spawnSync } from "node:child_process";
 import {
   accessSync,
@@ -750,6 +750,17 @@ function stopHookContinuation(): boolean {
   }
 }
 
+/**
+ * Block the stop without the non-zero "Stop hook error" framing. Claude Code reads
+ * `{decision:"block", reason}` from stdout (exit 0), blocks the stop, and feeds
+ * `reason` to the model as the reason it must keep working — same compulsion as an
+ * exit-2 stderr cue, but Claude Code no longer labels it an error.
+ */
+function emitBlock(reason: string): never {
+  process.stdout.write(`${JSON.stringify({ decision: "block", reason })}\n`);
+  process.exit(0);
+}
+
 const ONBOARD_SESSION_TIMEOUT_HOURS = 24;
 
 function onboardSessionActive(knowledgeReady: boolean): boolean {
@@ -777,14 +788,13 @@ function cmdOnboardHook(): void {
     writeFileSync(db.LEARNING_STATE_PATH, readFileSync(db.LEARNING_STATE_PATH));
   }
 
-  process.stderr.write(
-    "devcoach: no coaching profile yet. Run onboarding now — ask the user how they want to " +
-      "set up their profile: Automatic (detect this project's tech stack), Guided (a short " +
-      "conversation to map topics and confidence levels), or Import (restore from a backup). " +
-      "Do not pick for them. After they choose, build the profile and save it by calling the " +
-      "devcoach `complete_onboarding` MCP tool (not a shell command) before ending your turn.\n",
+  emitBlock(
+    "devcoach: the user has no coaching profile yet. Ask them how they want to set it up — " +
+      "Automatic (detect this project's tech stack), Guided (a short conversation to map topics " +
+      "and confidence levels), or Import (restore from a backup) — and do not pick for them. " +
+      "After they choose, build the profile and save it by calling the devcoach " +
+      "`complete_onboarding` MCP tool (not a shell command) before ending your turn.",
   );
-  process.exit(2);
 }
 
 function cmdLessonReady(): void {
@@ -800,7 +810,7 @@ function cmdLessonReady(): void {
   }
   if (!allowed) process.exit(0);
 
-  process.stderr.write(
+  emitBlock(
     "devcoach: a lesson is due for the technical work just completed. Act now — do not " +
       "acknowledge this message and do not explain what you are about to do.\n\n" +
       "1. Read the MCP resources devcoach://profile and devcoach://taught-topics.\n" +
@@ -819,9 +829,8 @@ function cmdLessonReady(): void {
       "4. Immediately call the log_lesson MCP tool, passing the full lesson markdown as the " +
       "`body` field (not just the summary).\n\n" +
       "The rate-limit check is already done by this hook — skip it. Output only the lesson " +
-      "card (or nothing). No preamble, no meta-commentary.\n",
+      "card (or nothing). No preamble, no meta-commentary.",
   );
-  process.exit(2);
 }
 
 // ── Welcome ──────────────────────────────────────────────────────────────────
@@ -832,8 +841,8 @@ function printWelcome(): void {
     ["ui [--port N]", "Launch the web dashboard  (default port: 7860)"],
     ["setup", "First-run wizard: import backup or build your knowledge profile"],
     ["install", "Register the MCP server + Stop hook in Claude Code / Claude Desktop"],
-    ["onboard-hook", "Claude Code Stop hook: cue onboarding (exit 2 when profile needed)"],
-    ["lesson-ready", "Claude Code Stop hook: exit 2 when a lesson is due"],
+    ["onboard-hook", "Claude Code Stop hook: cue onboarding when no profile exists"],
+    ["lesson-ready", "Claude Code Stop hook: cue a lesson when one is due"],
     ["profile", "Show the knowledge map"],
     ["stats", "Coaching statistics and rate-limit status"],
     ["settings / set", "Show / update settings (max_per_day | min_gap_minutes)"],
@@ -1055,7 +1064,7 @@ function buildProgram(): Command {
     .description("First-run wizard: import backup or build your knowledge profile")
     .action(cmdSetup);
 
-  // Stop hooks — hidden from help; their actions exit 0 (silent) or 2 (+ stderr cue).
+  // Stop hooks — hidden from help; exit 0 always (silent, or a {decision:block} cue on stdout).
   program
     .command("onboard-hook", { hidden: true })
     .description("Claude Code Stop hook: cue onboarding")

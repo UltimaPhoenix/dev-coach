@@ -29,7 +29,7 @@ devcoach --version
 | `devcoach install [--claude-code] [--claude-desktop] [--force] [--skip-hook]` | Register the MCP server (user scope) + Stop hooks |
 | `devcoach setup` | Interactive onboarding wizard (import a backup or build a profile) |
 | `devcoach ui [--port <n>]` | Launch the web dashboard (default port 7860) |
-| `devcoach onboard-hook` / `lesson-ready` | Claude Code Stop hooks (exit 0 silent / exit 2 acts) |
+| `devcoach onboard-hook` / `lesson-ready` | Claude Code Stop hooks (exit 0; silent, or a `{decision:block}` cue on stdout) |
 
 ## Knowledge map
 
