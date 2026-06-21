@@ -8,7 +8,6 @@ import {
   fstatSync,
   mkdirSync,
   readFileSync,
-  statSync,
   writeFileSync,
 } from "node:fs";
 import { homedir, platform } from "node:os";
@@ -761,31 +760,19 @@ function emitBlock(reason: string): never {
   process.exit(0);
 }
 
-const ONBOARD_SESSION_TIMEOUT_HOURS = 24;
-
-function onboardSessionActive(knowledgeReady: boolean): boolean {
-  if (knowledgeReady) return true;
-  if (!existsSync(db.LEARNING_STATE_PATH)) return false;
-  const ageHours = (Date.now() - statSync(db.LEARNING_STATE_PATH).mtimeMs) / 3_600_000;
-  return ageHours < ONBOARD_SESSION_TIMEOUT_HOURS;
-}
-
 function cmdOnboardHook(): void {
   if (stopHookContinuation()) process.exit(0);
-  let ready: boolean;
-  try {
-    ready = db.withConnection((conn) => db.isOnboardingComplete(conn).knowledge_ready);
-  } catch {
-    process.exit(0);
-  }
-  if (onboardSessionActive(ready)) process.exit(0);
-
-  mkdirSync(dirname(db.LEARNING_STATE_PATH), { recursive: true });
-  if (!existsSync(db.LEARNING_STATE_PATH)) {
-    writeFileSync(db.LEARNING_STATE_PATH, "# devcoach — Coaching Notebook\n");
-  } else {
-    // touch (update mtime)
-    writeFileSync(db.LEARNING_STATE_PATH, readFileSync(db.LEARNING_STATE_PATH));
+  // No DB yet → onboarding has not run. Cue WITHOUT creating coaching.db or any
+  // marker file, so an interrupted onboarding leaves nothing behind and re-cues on
+  // the next task. The artifacts appear only when complete_onboarding actually runs.
+  if (existsSync(db.DB_PATH)) {
+    let ready: boolean;
+    try {
+      ready = db.withConnection((conn) => db.isOnboardingComplete(conn).knowledge_ready);
+    } catch {
+      process.exit(0);
+    }
+    if (ready) process.exit(0);
   }
 
   emitBlock(
@@ -799,6 +786,8 @@ function cmdOnboardHook(): void {
 
 function cmdLessonReady(): void {
   if (stopHookContinuation()) process.exit(0);
+  // No DB → no profile yet. Stay silent without creating coaching.db.
+  if (!existsSync(db.DB_PATH)) process.exit(0);
   let allowed: boolean;
   try {
     allowed = db.withConnection((conn) => {

@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
@@ -221,35 +221,29 @@ describe("cli", () => {
     expect((await run(["install", "--claude-desktop"])).out).toContain("Already registered");
   });
 
-  it("onboard-hook stays silent while an onboarding session is active", async () => {
+  it("onboard-hook re-cues every stop until a profile exists (no debounce)", async () => {
     db.withConnection((c) =>
       c.exec(
         "DELETE FROM knowledge; DELETE FROM knowledge_groups; DELETE FROM knowledge_group_names;",
       ),
     );
-    rmSync(db.LEARNING_STATE_PATH, { force: true }); // no profile, no prior session
-    const cue = await run(["onboard-hook"]); // no profile → cue + create state file
-    expect(cue.code).toBe(0);
-    expect(cue.out).toContain('"decision":"block"');
-    const active = await run(["onboard-hook"]); // state fresh (<24h) → session active
-    expect(active.code).toBe(0);
-    expect(active.out).not.toContain("decision");
+    // No 24h session window any more: an unanswered cue must fire again next stop,
+    // so an interrupted onboarding is never silently suppressed.
+    const first = await run(["onboard-hook"]);
+    expect(first.out).toContain('"decision":"block"');
+    const second = await run(["onboard-hook"]);
+    expect(second.out).toContain('"decision":"block"');
   });
 
-  it("onboard-hook re-cues when the session state file is stale", async () => {
-    db.withConnection((c) =>
-      c.exec(
-        "DELETE FROM knowledge; DELETE FROM knowledge_groups; DELETE FROM knowledge_group_names;",
-      ),
-    );
-    const state = db.LEARNING_STATE_PATH;
-    mkdirSync(dirname(state), { recursive: true });
-    writeFileSync(state, "# stale\n");
-    const old = Date.now() / 1000 - 48 * 3600; // 48h ago
-    utimesSync(state, old, old);
-    const recue = await run(["onboard-hook"]); // stale → cue again (touch branch)
-    expect(recue.code).toBe(0);
-    expect(recue.out).toContain('"decision":"block"');
+  it("hooks never create coaching.db when there is no profile", async () => {
+    rmSync(db.DB_PATH, { force: true });
+    // onboard-hook cues, lesson-ready stays silent — neither opens (creates) the DB.
+    const onb = await run(["onboard-hook"]);
+    expect(onb.out).toContain('"decision":"block"');
+    expect(existsSync(db.DB_PATH)).toBe(false);
+    const lr = await run(["lesson-ready"]);
+    expect(lr.out).not.toContain("decision");
+    expect(existsSync(db.DB_PATH)).toBe(false);
   });
 
   it("usage errors exit 2", async () => {
