@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import { parseStopHookActive, runCli } from "../src/cli/commands";
+import { parseHookPayload, runCli } from "../src/cli/commands";
 import * as db from "../src/core/db";
 import { parseLesson } from "../src/core/models";
 import { VERSION } from "../src/version";
@@ -116,12 +116,22 @@ describe("cli", () => {
     expect(due.out).toContain("call update_notebook");
   });
 
-  it("parseStopHookActive: only a payload with stop_hook_active=true short-circuits", () => {
-    expect(parseStopHookActive(JSON.stringify({ stop_hook_active: true }))).toBe(true);
-    expect(parseStopHookActive(JSON.stringify({ stop_hook_active: false }))).toBe(false);
-    expect(parseStopHookActive(JSON.stringify({ hook_event_name: "Stop" }))).toBe(false);
-    expect(parseStopHookActive("")).toBe(false);
-    expect(parseStopHookActive("not json")).toBe(false);
+  it("parseHookPayload: extracts stop_hook_active and permission_mode", () => {
+    expect(parseHookPayload(JSON.stringify({ stop_hook_active: true })).stop_hook_active).toBe(
+      true,
+    );
+    expect(parseHookPayload(JSON.stringify({ stop_hook_active: false })).stop_hook_active).toBe(
+      false,
+    );
+    expect(parseHookPayload(JSON.stringify({ permission_mode: "plan" })).permission_mode).toBe(
+      "plan",
+    );
+    expect(parseHookPayload(JSON.stringify({ permission_mode: "default" })).permission_mode).toBe(
+      "default",
+    );
+    const empty = parseHookPayload("not json");
+    expect(empty.stop_hook_active).toBe(false);
+    expect(empty.permission_mode).toBe(null);
   });
 
   it("knowledge + group + settings commands", async () => {

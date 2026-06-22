@@ -22,14 +22,6 @@ by teaching one thing at a time, at the right moment, based on what they actuall
 
 ---
 
-## Plan-mode suppression
-
-If you are currently in **plan mode** (plan mode is active and `ExitPlanMode` has not
-yet been called in this session), **exit this skill immediately** — do not read any
-devcoach MCP resources, do not run onboarding, do not deliver or log any lesson.
-
----
-
 ## Onboarding flow
 
 The onboarding flow runs inline, immediately before delivering a lesson, whenever
@@ -353,21 +345,17 @@ it is central to the task and no applicable profile topic exists.
 
 ## 4. Lesson format
 
-Append the lesson **at the bottom of the response**, rendered as a card: a titled
-top band, the content **indented as a blockquote**, and a bottom band echoing the
-topic and level.
+Append the lesson **at the bottom of the response**, rendered as a card: a titled top
+band, the lesson as **plain markdown**, and a bottom band echoing the topic and level.
 
 ```
 ### ──────── 🎓 devcoach ────────
-> [Category] · Level: [Junior|Mid|Senior]
->
-> **[Lesson title]**
->
-> [Body: 3–6 paragraphs. Concise, practical, with a code example if useful.
-> Explain the WHY, not just the what. Connect it to the task just completed.]
->
-> 💡 *Senior tip:* [One sentence a senior would say to a junior on this topic]
+**[Lesson title]** · [Category] · [Junior|Mid|Senior]
 
+[Body: 3–6 paragraphs. Concise, practical, with a code example if useful.
+Explain the WHY, not just the what. Connect it to the task just completed.]
+
+💡 *Senior tip:* [One sentence a senior would say to a junior on this topic]
 ### ──────── [topic] · [level] ────────
 ```
 
@@ -376,8 +364,8 @@ Card rules:
   U+2500) around a centered title — the heading makes Claude Code colour the whole
   line. Do **not** use `---` (a real rule can't carry a title). Aim for a band
   width of ~34 characters and keep the top and bottom bands the same width.
-- Every content line is prefixed with `> ` (blank separators become a bare `>`).
-- Leave **one blank line before the bottom band** so the blockquote closes cleanly.
+- The body is **plain markdown** between the bands — do **not** prefix lines with `> `
+  (a per-line blockquote breaks on multi-paragraph bodies and fenced code blocks).
 
 **Display vs storage:** the card above is for chat only. When you call `log_lesson`,
 the `body` is **clean markdown** — no bands, no `> ` blockquote, and no title/`Category ·

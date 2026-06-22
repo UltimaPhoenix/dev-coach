@@ -719,37 +719,48 @@ async function cmdSetup(): Promise<void> {
 // ── Stop hooks ───────────────────────────────────────────────────────────────
 
 /**
- * Claude Code passes the Stop-hook payload as JSON on stdin. `stop_hook_active`
- * is true when the current stop is itself the result of a Stop hook forcing the
- * agent to continue — re-blocking then would loop forever. Returns true only for
- * a well-formed payload with the flag set; empty/garbage input is treated as a
- * fresh stop.
+ * Claude Code passes the Stop-hook payload as JSON on stdin. We use two fields:
+ * `stop_hook_active` (true when this stop is itself a hook-forced continuation —
+ * re-blocking then would loop forever) and `permission_mode` (`"plan"` while the user
+ * is planning, when the model cannot deliver or save a lesson). Empty/garbage input is
+ * treated as a fresh, non-plan stop.
  */
-export function parseStopHookActive(raw: string): boolean {
+export interface HookPayload {
+  stop_hook_active: boolean;
+  permission_mode: string | null;
+}
+
+export function parseHookPayload(raw: string): HookPayload {
   try {
-    const parsed = JSON.parse(raw);
-    return parsed?.stop_hook_active === true;
+    const p = JSON.parse(raw);
+    return {
+      stop_hook_active: p?.stop_hook_active === true,
+      permission_mode: typeof p?.permission_mode === "string" ? p.permission_mode : null,
+    };
   } catch {
-    return false;
+    return { stop_hook_active: false, permission_mode: null };
   }
 }
 
 /**
- * Read the Stop-hook payload from stdin, but only when it is actually piped
- * (a FIFO or a redirected file). On a TTY or any other source we skip the read
- * entirely so an interactive run — or a test — never blocks waiting for EOF.
+ * Read the Stop-hook payload from stdin, but only when it is actually piped (Claude
+ * Code delivers it over a SOCKET; a FIFO or a redirected file carry it too). Skip a
+ * TTY/character device, where a blocking read would hang an interactive run or a test.
  */
-function stopHookContinuation(): boolean {
+function readHookPayload(): HookPayload {
+  const empty: HookPayload = { stop_hook_active: false, permission_mode: null };
   try {
     const st = fstatSync(0);
-    // Claude Code delivers the Stop-hook payload over a SOCKET; a piped FIFO or a
-    // redirected file carry it too. Read all three. Skip only a TTY/character device,
-    // where a blocking read would hang an interactive run or a test.
-    if (!st.isFIFO() && !st.isFile() && !st.isSocket()) return false;
-    return parseStopHookActive(readFileSync(0, "utf8"));
+    if (!st.isFIFO() && !st.isFile() && !st.isSocket()) return empty;
+    return parseHookPayload(readFileSync(0, "utf8"));
   } catch {
-    return false;
+    return empty;
   }
+}
+
+/** A Stop hook stays silent on a hook-forced continuation, or while in plan mode. */
+function shouldSuppressHook(p: HookPayload): boolean {
+  return p.stop_hook_active || p.permission_mode === "plan";
 }
 
 /**
@@ -764,7 +775,7 @@ function emitBlock(reason: string): never {
 }
 
 function cmdOnboardHook(): void {
-  if (stopHookContinuation()) process.exit(0);
+  if (shouldSuppressHook(readHookPayload())) process.exit(0);
   // No DB yet → onboarding has not run. Cue WITHOUT creating coaching.db or any
   // marker file, so an interrupted onboarding leaves nothing behind and re-cues on
   // the next task. The artifacts appear only when complete_onboarding actually runs.
@@ -793,7 +804,7 @@ function cmdOnboardHook(): void {
 const NOTEBOOK_UPDATE_EVERY = 10;
 
 function cmdLessonReady(): void {
-  if (stopHookContinuation()) process.exit(0);
+  if (shouldSuppressHook(readHookPayload())) process.exit(0);
   // No DB → no profile yet. Stay silent without creating coaching.db.
   if (!existsSync(db.DB_PATH)) process.exit(0);
   let result: { allowed: boolean; nextLessonNumber: number };
@@ -837,12 +848,12 @@ function cmdLessonReady(): void {
       "its 'Recommended focus', calibrate depth from 'Recurring patterns', and watch its 'Open " +
       "hypotheses'. Pick ONE devcoach://profile topic NOT already in devcoach://taught-topics, " +
       "pitched at or above the user's confidence band.\n" +
-      "4. FIRST write the lesson as your visible reply — a card in EXACTLY this format:\n\n" +
+      "4. FIRST write the lesson as your visible reply — in EXACTLY this format. It is plain " +
+      "markdown between two band headings; do NOT prefix lines with '>' (no blockquote):\n\n" +
       "### ──────── 🎓 devcoach ────────\n" +
-      "> [Category] · Level: [Junior|Mid|Senior]\n" +
-      "> **[Title]**\n" +
-      "> [3–6 short paragraphs: explain the why, tie it to the task; fenced code if useful]\n" +
-      "> 💡 *Senior tip:* [one line]\n" +
+      "**[Title]** · [Category] · [Junior|Mid|Senior]\n\n" +
+      "[3–6 short paragraphs: explain the why, tie it to the task; fenced code if useful]\n\n" +
+      "💡 *Senior tip:* [one line]\n" +
       "### ──────── [topic] · [level] ────────\n\n" +
       "5. ONLY AFTER the card is written, call log_lesson. Put title/topic_id/categories/level/" +
       "summary in their own fields; body = ONLY the prose + the 💡 tip as CLEAN markdown (no " +
