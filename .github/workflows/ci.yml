@@ -46,7 +46,7 @@ jobs:
       matrix:
         node: ["24", "26"] # 24 = current LTS floor (node:sqlite); 26 = latest stable
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v6
         with:
           node-version: ${{ matrix.node }}
@@ -71,7 +71,7 @@ jobs:
     env:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0 # full history for accurate blame / new-code detection
       - uses: actions/setup-node@v6
@@ -112,7 +112,7 @@ jobs:
       tag: ${{ steps.bump.outputs.tag }}
       version: ${{ steps.bump.outputs.version }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v6
         with:
           node-version-file: .node-version
@@ -148,7 +148,7 @@ jobs:
       contents: read
       id-token: write # npm provenance / OIDC trusted publishing (tokenless)
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           ref: ${{ needs.bump.outputs.tag || github.ref }}
       - uses: actions/setup-node@v6
@@ -177,7 +177,7 @@ jobs:
       MCPB_CERT_PEM: ${{ secrets.MCPB_CERT }}
       MCPB_KEY_PEM: ${{ secrets.MCPB_KEY }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           ref: ${{ needs.bump.outputs.tag || github.ref }}
       - uses: actions/setup-node@v6
@@ -224,7 +224,7 @@ jobs:
     env:
       TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           ref: ${{ needs.bump.outputs.tag || github.ref }}
       - name: Update devcoach.rb in UltimaPhoenix/homebrew-tap
@@ -255,7 +255,7 @@ jobs:
     env:
       MARKETPLACE_TOKEN: ${{ secrets.CLAUDE_PLUGIN_MARKETPLACE }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           ref: ${{ needs.bump.outputs.tag || github.ref }}
       - uses: actions/setup-node@v6
