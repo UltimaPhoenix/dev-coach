@@ -787,20 +787,43 @@ function cmdOnboardHook(): void {
   );
 }
 
+// The notebook's observations are refreshed only every Nth delivered lesson, not after
+// each one. The hook owns the count (the DB is the source of truth) so the model never
+// has to count.
+const NOTEBOOK_UPDATE_EVERY = 10;
+
 function cmdLessonReady(): void {
   if (stopHookContinuation()) process.exit(0);
   // No DB → no profile yet. Stay silent without creating coaching.db.
   if (!existsSync(db.DB_PATH)) process.exit(0);
-  let allowed: boolean;
+  let result: { allowed: boolean; nextLessonNumber: number };
   try {
-    allowed = db.withConnection((conn) => {
-      if (!db.isOnboardingComplete(conn).knowledge_ready) return false;
-      return coach.checkRateLimit(conn).allowed;
+    result = db.withConnection((conn) => {
+      if (!db.isOnboardingComplete(conn).knowledge_ready) {
+        return { allowed: false, nextLessonNumber: 0 };
+      }
+      return {
+        allowed: coach.checkRateLimit(conn).allowed,
+        nextLessonNumber: Number(coach.getStats(conn).total_lessons ?? 0) + 1,
+      };
     });
   } catch {
     process.exit(0);
   }
-  if (!allowed) process.exit(0);
+  if (!result.allowed) process.exit(0);
+
+  const { nextLessonNumber } = result;
+  const updateDue = nextLessonNumber % NOTEBOOK_UPDATE_EVERY === 0;
+  const nextCheckpoint =
+    Math.ceil(nextLessonNumber / NOTEBOOK_UPDATE_EVERY) * NOTEBOOK_UPDATE_EVERY;
+  const notebookStep = updateDue
+    ? `6. This is lesson #${nextLessonNumber} — a notebook checkpoint (every ${NOTEBOOK_UPDATE_EVERY} ` +
+      "lessons). After log_lesson returns the feedback, call update_notebook with the revised " +
+      "notebook markdown: fold in what the user absorbed or struggled with and any new pattern, " +
+      `keep the prior notes, and record "(updated after ${nextLessonNumber} lessons)".`
+    : `6. Do NOT call update_notebook this time — the notebook is refreshed only every ` +
+      `${NOTEBOOK_UPDATE_EVERY} lessons (next checkpoint at lesson #${nextCheckpoint}). Just ` +
+      "deliver the card and call log_lesson.";
 
   emitBlock(
     "devcoach: a lesson is due for the technical work just completed. Do it now — do not " +
@@ -825,9 +848,7 @@ function cmdLessonReady(): void {
       "summary in their own fields; body = ONLY the prose + the 💡 tip as CLEAN markdown (no " +
       "bands, no '>' quote, no title or 'Category · Level' line). log_lesson then asks the user " +
       "'Did that land?', so the card MUST be printed first.\n" +
-      "6. After log_lesson returns the feedback, call update_notebook with the revised notebook " +
-      "markdown: fold in what the user absorbed or struggled with and any new pattern, keeping " +
-      "the existing notes.\n\n" +
+      `${notebookStep}\n\n` +
       "The rate-limit check is already done by this hook — skip it. Output only the lesson " +
       "card (or nothing). No preamble, no meta-commentary.",
   );

@@ -88,6 +88,34 @@ describe("cli", () => {
     expect(lr.out).toContain("update_notebook");
   });
 
+  it("lesson-ready gates the notebook update to every 10 lessons", async () => {
+    const seed = (n: number) =>
+      db.withConnection((c) => {
+        c.exec("DELETE FROM lessons");
+        for (let i = 0; i < n; i++) {
+          db.insertLesson(
+            c,
+            parseLesson({
+              id: `seed-${i}`,
+              timestamp: "2026-01-01T00:00:00Z",
+              topic_id: "python",
+              categories: [],
+              title: "T",
+              level: "mid",
+              summary: "s",
+            }),
+          );
+        }
+        db.upsertKnowledge(c, "python", 4);
+      });
+    seed(5); // next lesson is #6 → not a checkpoint → skip the notebook update
+    expect((await run(["lesson-ready"])).out).toContain("Do NOT call update_notebook");
+    seed(9); // next lesson is #10 → checkpoint → update the notebook
+    const due = await run(["lesson-ready"]);
+    expect(due.out).toContain("notebook checkpoint");
+    expect(due.out).toContain("call update_notebook");
+  });
+
   it("parseStopHookActive: only a payload with stop_hook_active=true short-circuits", () => {
     expect(parseStopHookActive(JSON.stringify({ stop_hook_active: true }))).toBe(true);
     expect(parseStopHookActive(JSON.stringify({ stop_hook_active: false }))).toBe(false);

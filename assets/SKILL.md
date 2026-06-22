@@ -446,13 +446,16 @@ Did that land?
 
 ---
 
-### Step 1c — Update the coaching notebook
+### Step 1c — Update the coaching notebook (only at every-10-lesson checkpoints)
 
-After feedback is known, fold it into the notebook: call `update_notebook` with the full
-revised `learning-state.md` markdown — note what the user absorbed (`know`) or should
-revisit (`dont_know`), any new recurring pattern, and updated open hypotheses, keeping the
-prior notes. This is what makes the notebook (read from `devcoach://notebook`) drive future
-lesson selection.
+The notebook's observations are refreshed only at **checkpoints — every 10 delivered
+lessons**. The `lesson-ready` hook owns the count and tells you whether the current lesson
+is a checkpoint; do not count yourself. **At a checkpoint**, after feedback is known, call
+`update_notebook` with the full revised `learning-state.md` markdown — note what the user
+absorbed (`know`) or should revisit (`dont_know`), any new recurring pattern, and updated
+open hypotheses, keep the prior notes, and record `(updated after N lessons)`. **Between
+checkpoints, do not touch the notebook.** This keeps `devcoach://notebook` driving future
+lesson selection without churning it on every lesson.
 
 ---
 
