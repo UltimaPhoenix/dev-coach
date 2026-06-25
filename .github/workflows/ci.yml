@@ -106,6 +106,11 @@ jobs:
     if: github.event_name == 'workflow_dispatch'
     needs: check
     runs-on: ubuntu-latest
+    # Serialize releases: a second dispatch queues behind the first instead of racing it
+    # (rapid re-triggers were stacking version bumps).
+    concurrency:
+      group: release
+      cancel-in-progress: false
     permissions:
       contents: write
     outputs:
@@ -114,6 +119,8 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          # Full history + tags so the preflight guards (last tag, "nothing to release") work.
+          fetch-depth: 0
           # Admin PAT (fine-grained, dev-coach only, Contents: RW) so the push to the
           # protected main branch bypasses branch protection (enforce_admins is off).
           # The default GITHUB_TOKEN runs as github-actions[bot], which is not an admin
@@ -122,6 +129,15 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version-file: .node-version
+      - name: Preflight — refuse an empty release
+        run: |
+          set -euo pipefail
+          git fetch --tags --force --quiet origin
+          LAST="$(git describe --tags --abbrev=0 --match 'v*' 2>/dev/null || true)"
+          if [ -n "$LAST" ]; then
+            N="$(git log "${LAST}..HEAD" --invert-grep --grep='^chore: release' --oneline | wc -l | tr -d ' ')"
+            [ "$N" != "0" ] || { echo "::error::Nothing to release since ${LAST} (only release commits) — aborting empty bump."; exit 1; }
+          fi
       - name: Bump, commit, tag, push
         id: bump
         run: |
@@ -129,6 +145,12 @@ jobs:
           TARGET="${{ inputs.version != '' && inputs.version || inputs.bump }}"
           NEW="$(npm version "$TARGET" --no-git-tag-version)"
           NEW="${NEW#v}"
+          # Fail fast if the tag already exists — prevents the stray-tag cascade / version skew.
+          if git rev-parse -q --verify "refs/tags/v${NEW}" >/dev/null \
+             || git ls-remote --exit-code --tags origin "v${NEW}" >/dev/null 2>&1; then
+            echo "::error::Tag v${NEW} already exists — delete it first: git push origin :refs/tags/v${NEW}"
+            exit 1
+          fi
           # keep the .mcpb manifest version in sync (the build also syncs it; commit it tidy)
           NEW="$NEW" node -e 'const fs=require("fs"),f="mcpb/manifest.json";fs.writeFileSync(f,fs.readFileSync(f,"utf8").replace(/"version": "[^"]+"/,`"version": "${process.env.NEW}"`))'
           # keep the Claude Code plugin manifest + bundled SKILL.md in sync with package.json
@@ -142,7 +164,9 @@ jobs:
           # double-publish. Publish/release still run in THIS workflow_dispatch run via needs.bump.
           git commit -m "chore: release v${NEW} [skip ci]"
           git tag "v${NEW}"
-          git push origin HEAD:main "v${NEW}"
+          # --atomic: main commit and tag land together or not at all — no half-state where
+          # main got the bump but the tag push failed (which silently skips a version).
+          git push --atomic origin HEAD:main "v${NEW}"
           echo "version=${NEW}" >> "$GITHUB_OUTPUT"
           echo "tag=v${NEW}" >> "$GITHUB_OUTPUT"
 
