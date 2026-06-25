@@ -1,0 +1,33 @@
+name: 💡 Feature request
+description: Suggest an idea or improvement for devcoach.
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: Describe the need or pain point. "I'm always frustrated when …"
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: What would you like devcoach to do?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Any other approaches or workarounds you've thought about.
+    validations:
+      required: false
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Confirmation
+      options:
+        - label: This fits devcoach's scope (a local, progressive technical coach), and I searched existing issues first.
+          required: true

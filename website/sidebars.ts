@@ -30,7 +30,7 @@ const sidebars: SidebarsConfig = {
     {
       type: "category",
       label: "Reference",
-      items: ["reference/mcp-server", "reference/configuration", "reference/privacy"],
+      items: ["reference/mcp-server", "reference/configuration", "reference/privacy", "reference/license"],
     },
   ],
 };

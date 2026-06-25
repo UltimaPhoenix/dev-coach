@@ -32,9 +32,22 @@ See [CLAUDE.md](CLAUDE.md) for the full project structure, stack, and convention
 
 1. Fork the repo and create a branch from `main`
 2. Make your changes and confirm all checks pass
-3. Open a PR against `main` with a clear description of *what* and *why*
+3. Open a PR against `main` with a clear description of *what* and *why* — and **state any change you
+   made to existing behaviour**
+4. Sign the **[Contributor License Agreement](CLA.md)** — the CLA Assistant bot comments on your PR
+   with a one-line phrase to post; signing is required before merge
 
 Keep PRs focused. A change that fixes a bug and adds a feature should be two PRs.
+
+## Licensing & the CLA
+
+devcoach is licensed under **AGPL-3.0** and is also offered under a separate commercial license. So
+that contributions can ship under both, every contributor signs a lightweight
+[Contributor License Agreement](CLA.md): you confirm you have the right to contribute and you grant
+the maintainer the right to license your contribution under **both** AGPL and commercial terms. The
+[CLA Assistant](.github/workflows/cla.yml) bot handles this automatically on your first PR.
+
+See also: [Code of Conduct](CODE_OF_CONDUCT.md) · [Security policy](SECURITY.md) · [License](LICENSE).
 
 ## Testing with the MCP inspector
 

@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 📚 Documentation
+    url: https://ultimaphoenix.github.io/dev-coach/
+    about: Check the docs first — installation, usage, and reference guides.
+  - name: 💬 Questions & ideas
+    url: https://github.com/UltimaPhoenix/dev-coach/discussions
+    about: Ask a question or float an idea in Discussions instead of opening an issue.
+  - name: 🔒 Report a security vulnerability
+    url: https://github.com/UltimaPhoenix/dev-coach/security/advisories/new
+    about: Please report vulnerabilities privately, not as a public issue.

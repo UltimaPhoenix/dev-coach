@@ -71,10 +71,11 @@ const config: Config = {
           items: [
             { label: "npm", href: "https://www.npmjs.com/package/devcoach" },
             { label: "GitHub", href: "https://github.com/UltimaPhoenix/dev-coach" },
+            { label: "License", to: "/reference/license" },
           ],
         },
       ],
-      copyright: `Copyright © ${new Date().getFullYear()} UltimaPhoenix · Apache-2.0`,
+      copyright: `Copyright © ${new Date().getFullYear()} UltimaPhoenix · AGPL-3.0`,
     },
     prism: {
       theme: prismThemes.github,
