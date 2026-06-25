@@ -3,6 +3,6 @@
   "private": true,
   "description": "Pins the published devcoach version the plugin installs once into its data dir (see scripts/launch.mjs).",
   "dependencies": {
-    "devcoach": "0.5.0"
+    "devcoach": "0.6.0"
   }
 }
