@@ -11,6 +11,6 @@
     "type": "git",
     "url": "https://github.com/UltimaPhoenix/dev-coach.git"
   },
-  "license": "Apache-2.0",
+  "license": "AGPL-3.0-only",
   "keywords": ["coaching", "learning", "mcp", "developer-tools"]
 }

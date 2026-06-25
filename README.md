@@ -6,7 +6,7 @@
 [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=UltimaPhoenix_dev-coach&metric=coverage)](https://sonarcloud.io/summary/new_code?id=UltimaPhoenix_dev-coach)
 [![Node](https://img.shields.io/badge/node-%E2%89%A524-brightgreen?logo=node.js)](https://nodejs.org/)
 [![Docs](https://img.shields.io/badge/docs-GitHub%20Pages-purple)](https://ultimaphoenix.github.io/dev-coach/)
-[![License](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
+[![License](https://img.shields.io/badge/license-AGPL%203.0-blue)](LICENSE)
 
 **Stay sharp while your AI does the work.**
 
@@ -512,8 +512,27 @@ CI lints, type-checks, tests (Node 24 & 26), builds, and publishes to npm via **
 
 ## License
 
-Copyright 2026 [UltimaPhoenix](https://github.com/UltimaPhoenix)
+Copyright (C) 2026 [UltimaPhoenix](https://github.com/UltimaPhoenix)
 
-Licensed under the [Apache License, Version 2.0](LICENSE). Free to use, modify, and distribute;
-commercial use and modifications must retain the license, copyright, and attribution notices and state
-any changes. You may not use the `devcoach` name or branding to endorse derived products without permission.
+devcoach is licensed under the [GNU Affero General Public License v3.0](LICENSE) (`AGPL-3.0-only`).
+You may use, modify, and distribute it — **provided that any modified version you distribute, or run
+as a network service, is also released as open source under the AGPL**. A separate **commercial
+license** is available for proprietary/closed use without AGPL's copyleft obligations —
+[open an issue](https://github.com/UltimaPhoenix/dev-coach/issues) to enquire.
+
+### Licensing FAQ
+
+> **devcoach is and stays 100% free** to download, install, and use — for everyone, forever, including
+> at work and on commercial projects. AGPL is *not* a price tag: you only ever pay if you want to ship
+> a **proprietary/closed derivative of devcoach itself** without complying with the AGPL.
+
+**Using devcoach does not put your code under the AGPL.** It runs as a separate process over
+stdio/MCP (`npx -y devcoach mcp`); talking to it at arm's length is not a derivative work — exactly
+like querying an AGPL-licensed database. Your own projects keep whatever license you choose.
+
+- ✅ *"I use devcoach inside Claude Code while building my closed-source startup app."* — Free. Your app stays proprietary, zero obligations.
+- ✅ *"My whole team installs devcoach to get coaching on our internal/commercial repos."* — Free. Using the unmodified tool at a company is fine.
+- ⚠️ *"I fork devcoach, add a feature, and publish the package or host its dashboard as a public service."* — You must release **your modified devcoach** source under the AGPL.
+- 💼 *"I want to embed devcoach in my paid product and keep my changes closed."* — You need a commercial license.
+
+Keep using devcoach as a tool/executable (not as an imported library) and the AGPL never reaches your own code.

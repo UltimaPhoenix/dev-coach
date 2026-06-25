@@ -4,6 +4,21 @@ Notable changes to devcoach. Versions follow [Semantic Versioning](https://semve
 
 ---
 
+## [Unreleased]
+
+### Changed
+- **License**: relicensed from **Apache-2.0** to **AGPL-3.0-only** (`LICENSE`). devcoach stays free and
+  open source; a separate commercial license is available for proprietary/closed use. Versions
+  published before this change remain under Apache-2.0.
+
+### Added
+- **Contributor License Agreement** (`CLA.md`) enforced by a CLA Assistant workflow, enabling the
+  AGPL + commercial dual-licensing model
+- **Community health files**: `CODE_OF_CONDUCT.md`, `SECURITY.md`, issue & pull-request templates,
+  `CODEOWNERS`, and a **License & commercial use** docs page
+
+---
+
 ## [0.3.66] — unreleased
 
 ### Changed

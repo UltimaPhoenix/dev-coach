@@ -1,0 +1,63 @@
+name: 🐞 Bug report
+description: Something in devcoach isn't working as expected.
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for taking the time to report a bug. Please fill in the details below.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: A clear description of the bug, and what you expected instead.
+      placeholder: When I run `devcoach …`, I expected … but got …
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: Minimal steps so we can reproduce it.
+      placeholder: |
+        1. Run `npx -y devcoach …`
+        2. …
+        3. See error
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: devcoach version
+      description: Output of `npx devcoach --version`.
+      placeholder: 0.5.0
+    validations:
+      required: true
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Where did it happen?
+      options:
+        - MCP server (Claude Code / Desktop / other agent)
+        - CLI
+        - Web dashboard (UI)
+        - Claude Desktop extension (.mcpb)
+        - Other / not sure
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: OS and Node version (`node --version`).
+      placeholder: macOS 15 · Node 24.3.0
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / screenshots
+      description: Any relevant error output. This will be rendered as code, so no backticks needed.
+      render: shell
+    validations:
+      required: false

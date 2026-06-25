@@ -14,7 +14,7 @@ process.stdout.write(`class Devcoach < Formula
   homepage "https://github.com/UltimaPhoenix/dev-coach"
   url "${url}"
   sha256 "${sha}"
-  license "Apache-2.0"
+  license "AGPL-3.0-only"
 
   depends_on "node"
 
