@@ -4,6 +4,11 @@ Notable changes to devcoach. Versions follow [Semantic Versioning](https://semve
 
 ---
 
+## [0.7.0] — 2026-06-25
+
+No functional changes. A re-release published while hardening the release pipeline; identical in
+content to 0.6.0. Use **0.7.0** (the current `latest` on npm).
+
 ## [0.6.0] — 2026-06-25
 
 ### Changed
