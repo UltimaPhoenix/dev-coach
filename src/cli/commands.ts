@@ -256,6 +256,8 @@ function cmdSettings(): void {
       [
         ["max_per_day", String(s.max_per_day)],
         ["min_gap_minutes", `${s.min_gap_minutes} (${gapLabel})`],
+        ["nudge_every", s.nudge_every === 0 ? "0 (off)" : String(s.nudge_every)],
+        ["nudge_scope", s.nudge_scope],
       ],
     ),
   );
@@ -302,9 +304,21 @@ function cmdStats(): void {
 }
 
 function cmdSet(key: string, value: string): void {
-  if (!["max_per_day", "min_gap_minutes"].includes(key)) {
-    log(c.red(`Unknown key '${key}'. Valid keys: max_per_day, min_gap_minutes`));
+  const validKeys = ["max_per_day", "min_gap_minutes", "nudge_every", "nudge_scope"];
+  if (!validKeys.includes(key)) {
+    log(c.red(`Unknown key '${key}'. Valid keys: ${validKeys.join(", ")}`));
     process.exit(1);
+  }
+  if (key === "nudge_scope" && value !== "session" && value !== "global") {
+    log(c.red(`Invalid nudge_scope '${value}'. Use: session | global`));
+    process.exit(1);
+  }
+  if (key === "nudge_every") {
+    const n = Number.parseInt(value, 10);
+    if (!Number.isInteger(n) || n < 0) {
+      log(c.red(`Invalid nudge_every '${value}'. Use a non-negative integer (0 = off).`));
+      process.exit(1);
+    }
   }
   db.withConnection((conn) => db.setSetting(conn, key, value));
   log(c.green(`Set ${key} = ${value}`));
@@ -728,6 +742,7 @@ async function cmdSetup(): Promise<void> {
 export interface HookPayload {
   stop_hook_active: boolean;
   permission_mode: string | null;
+  session_id: string | null;
 }
 
 export function parseHookPayload(raw: string): HookPayload {
@@ -736,9 +751,10 @@ export function parseHookPayload(raw: string): HookPayload {
     return {
       stop_hook_active: p?.stop_hook_active === true,
       permission_mode: typeof p?.permission_mode === "string" ? p.permission_mode : null,
+      session_id: typeof p?.session_id === "string" ? p.session_id : null,
     };
   } catch {
-    return { stop_hook_active: false, permission_mode: null };
+    return { stop_hook_active: false, permission_mode: null, session_id: null };
   }
 }
 
@@ -748,7 +764,7 @@ export function parseHookPayload(raw: string): HookPayload {
  * TTY/character device, where a blocking read would hang an interactive run or a test.
  */
 function readHookPayload(): HookPayload {
-  const empty: HookPayload = { stop_hook_active: false, permission_mode: null };
+  const empty: HookPayload = { stop_hook_active: false, permission_mode: null, session_id: null };
   try {
     const st = fstatSync(0);
     if (!st.isFIFO() && !st.isFile() && !st.isSocket()) return empty;
@@ -804,24 +820,29 @@ function cmdOnboardHook(): void {
 const NOTEBOOK_UPDATE_EVERY = 10;
 
 function cmdLessonReady(): void {
-  if (shouldSuppressHook(readHookPayload())) process.exit(0);
+  const hook = readHookPayload();
+  if (shouldSuppressHook(hook)) process.exit(0);
   // No DB → no profile yet. Stay silent without creating coaching.db.
   if (!existsSync(db.DB_PATH)) process.exit(0);
-  let result: { allowed: boolean; nextLessonNumber: number };
+  let result: { cue: boolean; nextLessonNumber: number };
   try {
     result = db.withConnection((conn) => {
-      if (!db.isOnboardingComplete(conn).knowledge_ready) {
-        return { allowed: false, nextLessonNumber: 0 };
+      if (!db.isOnboardingComplete(conn).knowledge_ready)
+        return { cue: false, nextLessonNumber: 0 };
+      if (!coach.checkRateLimit(conn).allowed) return { cue: false, nextLessonNumber: 0 };
+      // Interaction-pacing gate: count eligible stops and cue at most once every
+      // `nudge_every` (per session, or globally). Reset happens in log_lesson.
+      const settings = db.getSettings(conn);
+      if (settings.nudge_every > 0) {
+        const n = db.bumpNudge(conn, hook.session_id ?? "__nosession__", settings.nudge_scope);
+        if (n < settings.nudge_every) return { cue: false, nextLessonNumber: 0 };
       }
-      return {
-        allowed: coach.checkRateLimit(conn).allowed,
-        nextLessonNumber: Number(coach.getStats(conn).total_lessons ?? 0) + 1,
-      };
+      return { cue: true, nextLessonNumber: Number(coach.getStats(conn).total_lessons ?? 0) + 1 };
     });
   } catch {
     process.exit(0);
   }
-  if (!result.allowed) process.exit(0);
+  if (!result.cue) process.exit(0);
 
   const { nextLessonNumber } = result;
   const updateDue = nextLessonNumber % NOTEBOOK_UPDATE_EVERY === 0;

@@ -119,7 +119,13 @@ describe("db knowledge + groups + settings", () => {
   });
   it("settings get/set + migration + onboarding flag", () => {
     c = freshDb();
-    expect(db.getSettings(c)).toEqual({ max_per_day: 2, min_gap_minutes: 240, ui_theme: "system" });
+    expect(db.getSettings(c)).toEqual({
+      max_per_day: 2,
+      min_gap_minutes: 240,
+      ui_theme: "system",
+      nudge_every: 10,
+      nudge_scope: "session",
+    });
     db.setSetting(c, "max_per_day", "5");
     db.setSetting(c, "ui_theme", "dark");
     expect(db.getSettings(c).max_per_day).toBe(5);
@@ -133,6 +139,22 @@ describe("db knowledge + groups + settings", () => {
     expect(db.isOnboardingComplete(c).knowledge_ready).toBe(true);
     db.insertLesson(c, lesson());
     expect(db.getUsageDefaults(c).repository).toBeNull();
+  });
+  it("nudge counter: per-session, global SUM, reset, prune", () => {
+    c = freshDb();
+    // per-session: each session counts independently
+    expect(db.bumpNudge(c, "s1", "session")).toBe(1);
+    expect(db.bumpNudge(c, "s1", "session")).toBe(2);
+    expect(db.bumpNudge(c, "s2", "session")).toBe(1);
+    // global: SUM across all sessions (s1=2, s2=1, s3=1 → 4)
+    expect(db.bumpNudge(c, "s3", "global")).toBe(4);
+    // reset clears every counter
+    db.resetNudge(c);
+    expect(db.bumpNudge(c, "s1", "session")).toBe(1);
+    // prune keeps the table bounded to MAX_NUDGE_SESSIONS
+    for (let i = 0; i < db.MAX_NUDGE_SESSIONS + 5; i++) db.bumpNudge(c, `p${i}`, "session");
+    const n = Number((c.prepare("SELECT COUNT(*) AS n FROM nudge_state").get() as { n: number }).n);
+    expect(n).toBeLessThanOrEqual(db.MAX_NUDGE_SESSIONS);
   });
   it("backup → restore round-trip", () => {
     c = freshDb();

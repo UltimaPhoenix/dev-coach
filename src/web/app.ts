@@ -331,10 +331,15 @@ export function createApp(): Hono {
     const minGap = Number.parseInt(textField(body, "min_gap_minutes", "240"), 10);
     let theme = textField(body, "ui_theme", "system");
     if (!["system", "dark", "light"].includes(theme)) theme = "system";
+    const nudgeEvery = Math.max(0, Number.parseInt(textField(body, "nudge_every", "10"), 10) || 0);
+    let nudgeScope = textField(body, "nudge_scope", "session");
+    if (nudgeScope !== "session" && nudgeScope !== "global") nudgeScope = "session";
     db.withConnection((conn) => {
       db.setSetting(conn, "max_per_day", String(maxPerDay));
       db.setSetting(conn, "min_gap_minutes", String(Number.isNaN(minGap) ? 240 : minGap));
       db.setSetting(conn, "ui_theme", theme);
+      db.setSetting(conn, "nudge_every", String(nudgeEvery));
+      db.setSetting(conn, "nudge_scope", nudgeScope);
     });
     return c.redirect("/settings", 303);
   });

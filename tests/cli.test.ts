@@ -73,7 +73,10 @@ describe("cli", () => {
     expect(onb.code).toBe(0);
     expect(onb.out).toContain('"decision":"block"');
     expect(onb.out).toContain("complete_onboarding");
-    db.withConnection((c) => db.upsertKnowledge(c, "python", 4));
+    db.withConnection((c) => {
+      db.upsertKnowledge(c, "python", 4);
+      db.setSetting(c, "nudge_every", "0"); // disable interaction pacing for this test
+    });
     // Profile exists → silent: exit 0 with no decision payload.
     const silent = await run(["onboard-hook"]);
     expect(silent.code).toBe(0);
@@ -107,6 +110,7 @@ describe("cli", () => {
           );
         }
         db.upsertKnowledge(c, "python", 4);
+        db.setSetting(c, "nudge_every", "0"); // isolate the notebook-checkpoint gate
       });
     seed(5); // next lesson is #6 → not a checkpoint → skip the notebook update
     expect((await run(["lesson-ready"])).out).toContain("Do NOT call update_notebook");
@@ -114,6 +118,26 @@ describe("cli", () => {
     const due = await run(["lesson-ready"]);
     expect(due.out).toContain("notebook checkpoint");
     expect(due.out).toContain("call update_notebook");
+  });
+
+  it("lesson-ready paces the cue by nudge_every (interaction counter)", async () => {
+    db.withConnection((c) => {
+      c.exec("DELETE FROM lessons; DELETE FROM nudge_state;");
+      db.upsertKnowledge(c, "python", 4);
+      db.setSetting(c, "nudge_every", "2");
+    });
+    // 1st eligible stop → counter 1 < 2 → silent
+    expect((await run(["lesson-ready"])).out).not.toContain("decision");
+    // 2nd → counter 2 ≥ 2 → cue
+    expect((await run(["lesson-ready"])).out).toContain('"decision":"block"');
+  });
+
+  it("set accepts/validates nudge_every and nudge_scope", async () => {
+    expect((await run(["set", "nudge_every", "5"])).out).toContain("Set nudge_every");
+    expect((await run(["set", "nudge_every", "abc"])).code).toBe(1);
+    expect((await run(["set", "nudge_scope", "global"])).out).toContain("Set nudge_scope");
+    expect((await run(["set", "nudge_scope", "bogus"])).code).toBe(1);
+    expect((await run(["settings"])).out).toContain("nudge_scope");
   });
 
   it("parseHookPayload: extracts stop_hook_active and permission_mode", () => {

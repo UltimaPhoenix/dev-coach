@@ -87,8 +87,11 @@ instructions (`onboard-hook` cues onboarding; `lesson-ready` delivers the full l
 
 `lessons` (16 cols incl. `categories` JSON, `feedback`, `starred`, git metadata, `body`),
 `knowledge` (topic, confidence 0–10, updated_at), `settings`, `knowledge_group_names`,
-`knowledge_groups` (composite PK), plus 4 indexes. All DDL is `CREATE … IF NOT EXISTS` + `INSERT OR
-IGNORE` (idempotent). `DEFAULT_SETTINGS`: `max_per_day=2`, `min_gap_minutes=240`, `ui_theme=system`.
+`knowledge_groups` (composite PK), `nudge_state` (per-session lesson-cue counter — runtime
+only, never backed up), plus 4 indexes. All DDL is `CREATE … IF NOT EXISTS` + `INSERT OR
+IGNORE` (idempotent). `DEFAULT_SETTINGS`: `max_per_day=2`, `min_gap_minutes=240`, `ui_theme=system`,
+`nudge_every=10` (interactions between lesson cues; 0 = every turn), `nudge_scope=session` (count
+per chat session, or `global`).
 `DEFAULT_PROFILE` (`core/db.ts`) seeds 24 topics only via `complete_onboarding` (an empty knowledge
 table reliably means onboarding hasn't run).
 

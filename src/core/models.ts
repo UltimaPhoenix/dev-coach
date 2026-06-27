@@ -109,10 +109,17 @@ export type Profile = z.infer<typeof ProfileSchema>;
 export const UiThemeSchema = z.enum(["system", "dark", "light"]);
 export type UiTheme = z.infer<typeof UiThemeSchema>;
 
+export const NudgeScopeSchema = z.enum(["session", "global"]);
+export type NudgeScope = z.infer<typeof NudgeScopeSchema>;
+
 export const SettingsSchema = z.object({
   max_per_day: z.number().int().default(2),
   min_gap_minutes: z.number().int().default(240),
   ui_theme: UiThemeSchema.default("system"),
+  // How many eligible interactions between lesson cues (0 = cue every turn).
+  nudge_every: z.number().int().min(0).default(10),
+  // Count interactions per chat session, or globally across sessions.
+  nudge_scope: NudgeScopeSchema.default("session"),
 });
 export type Settings = z.infer<typeof SettingsSchema>;
 

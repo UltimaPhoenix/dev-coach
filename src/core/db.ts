@@ -19,6 +19,7 @@ import {
   type KnowledgeEntry,
   type KnowledgeGroup,
   type Lesson,
+  type NudgeScope,
   parseLesson,
   type Settings,
   type UiTheme,
@@ -66,7 +67,12 @@ export const DEFAULT_SETTINGS: Record<string, string> = {
   max_per_day: "2",
   min_gap_minutes: "240",
   ui_theme: "system",
+  nudge_every: "10",
+  nudge_scope: "session",
 };
+
+/** Cap on how many session rows nudge_state keeps (pruned hard on every bump). */
+export const MAX_NUDGE_SESSIONS = 50;
 
 // ── Low-level helpers ────────────────────────────────────────────────────────
 
@@ -149,6 +155,14 @@ export function initSchema(db: DatabaseSync): void {
         group_name TEXT NOT NULL,
         topic      TEXT NOT NULL,
         PRIMARY KEY (group_name, topic)
+    );
+
+    -- Runtime-only: per-session interaction counter for lesson-cue pacing.
+    -- Never exported/imported (backup carries config, not this state).
+    CREATE TABLE IF NOT EXISTS nudge_state (
+        session_id    TEXT PRIMARY KEY,
+        interactions  INTEGER NOT NULL DEFAULT 0,
+        updated_at    TEXT NOT NULL
     );
 
     CREATE INDEX IF NOT EXISTS idx_lessons_timestamp ON lessons (timestamp);
@@ -512,10 +526,15 @@ export function getSettings(db: DatabaseSync): Settings {
   const rawTheme = data.ui_theme ?? "system";
   const theme: UiTheme =
     rawTheme === "dark" || rawTheme === "light" || rawTheme === "system" ? rawTheme : "system";
+  const nudgeEveryRaw = data.nudge_every;
+  const nudgeEvery = nudgeEveryRaw !== undefined ? Number.parseInt(nudgeEveryRaw, 10) : 10;
+  const nudgeScope: NudgeScope = data.nudge_scope === "global" ? "global" : "session";
   return {
     max_per_day: maxRaw !== undefined ? Number.parseInt(maxRaw, 10) : 2,
     min_gap_minutes: gap,
     ui_theme: theme,
+    nudge_every: Number.isFinite(nudgeEvery) && nudgeEvery >= 0 ? nudgeEvery : 10,
+    nudge_scope: nudgeScope,
   };
 }
 
@@ -526,6 +545,41 @@ export function setSetting(db: DatabaseSync, key: string, value: string): void {
     key,
     value,
   );
+}
+
+// ── Nudge state (runtime lesson-cue pacing; not exported) ──────────────────────
+
+/**
+ * Increment the current session's interaction counter, prune to the most-recent
+ * MAX_NUDGE_SESSIONS rows, and return the count for the gate: the session's own count
+ * (`scope === "session"`) or the SUM across all sessions (`scope === "global"`).
+ */
+export function bumpNudge(db: DatabaseSync, sessionId: string, scope: string): number {
+  const now = new Date().toISOString();
+  runSql(
+    db,
+    "INSERT INTO nudge_state (session_id, interactions, updated_at) VALUES (?, 1, ?) " +
+      "ON CONFLICT(session_id) DO UPDATE SET interactions = interactions + 1, updated_at = excluded.updated_at",
+    sessionId,
+    now,
+  );
+  // Hard prune: keep only the most-recently-updated rows, drop the rest.
+  runSql(
+    db,
+    "DELETE FROM nudge_state WHERE session_id NOT IN " +
+      "(SELECT session_id FROM nudge_state ORDER BY updated_at DESC LIMIT ?)",
+    MAX_NUDGE_SESSIONS,
+  );
+  const row =
+    scope === "global"
+      ? getRow(db, "SELECT COALESCE(SUM(interactions), 0) AS n FROM nudge_state")
+      : getRow(db, "SELECT interactions AS n FROM nudge_state WHERE session_id = ?", sessionId);
+  return Number(row?.n ?? 0);
+}
+
+/** Clear all interaction counters — called when a lesson is recorded. */
+export function resetNudge(db: DatabaseSync): void {
+  runSql(db, "DELETE FROM nudge_state");
 }
 
 export function isOnboardingComplete(db: DatabaseSync): { knowledge_ready: boolean } {
@@ -594,6 +648,10 @@ function restoreSettingsSection(db: DatabaseSync, unzipped: Unzipped, result: Re
   if ("min_gap_minutes" in s) setSetting(db, "min_gap_minutes", String(s.min_gap_minutes));
   if (s.ui_theme === "system" || s.ui_theme === "dark" || s.ui_theme === "light") {
     setSetting(db, "ui_theme", s.ui_theme);
+  }
+  if ("nudge_every" in s) setSetting(db, "nudge_every", String(s.nudge_every));
+  if (s.nudge_scope === "session" || s.nudge_scope === "global") {
+    setSetting(db, "nudge_scope", s.nudge_scope);
   }
   result.settings = 1;
 }

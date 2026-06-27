@@ -839,6 +839,21 @@ ${
           <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">Minimum gap between lessons.</p>
         </div>
       </div>
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label for="nudge-every" class="block text-sm text-gray-600 dark:text-gray-400 mb-1">Interactions between lessons</label>
+          <input id="nudge-every" type="number" name="nudge_every" min="0" max="1000" value="${d.settings.nudge_every}" class="w-full bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white rounded px-3 py-2 text-sm focus:outline-none focus:border-indigo-500" />
+          <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">Cue at most once every N (0 = every turn).</p>
+        </div>
+        <div>
+          <label for="nudge-scope" class="block text-sm text-gray-600 dark:text-gray-400 mb-1">Count interactions</label>
+          <select id="nudge-scope" name="nudge_scope" class="w-full bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white rounded px-3 py-2 text-sm focus:outline-none focus:border-indigo-500">
+            <option value="session" ${d.settings.nudge_scope === "session" ? "selected" : ""}>Per chat session</option>
+            <option value="global" ${d.settings.nudge_scope === "global" ? "selected" : ""}>Globally</option>
+          </select>
+          <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">Per-chat or across all sessions.</p>
+        </div>
+      </div>
       <fieldset class="border-0 p-0 m-0">
         <legend class="block text-sm text-gray-600 dark:text-gray-400 mb-1">UI theme</legend>
         <div class="flex gap-2">

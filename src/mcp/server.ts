@@ -18,6 +18,7 @@ import {
   FeedbackSchema,
   type Lesson,
   LevelSchema,
+  NudgeScopeSchema,
   parseLesson,
   RepositoryPlatformSchema,
   UiThemeSchema,
@@ -66,6 +67,8 @@ const settingsOutputShape = {
   max_per_day: z.number().int(),
   min_gap_minutes: z.number().int(),
   ui_theme: UiThemeSchema,
+  nudge_every: z.number().int(),
+  nudge_scope: NudgeScopeSchema,
 };
 
 // ── JSON resource helper ─────────────────────────────────────────────────────
@@ -162,7 +165,11 @@ export function createServer(): McpServer {
             usage.repository_platform ??
             null,
         });
-        db.withConnection((c) => db.insertLesson(c, lesson));
+        db.withConnection((c) => {
+          db.insertLesson(c, lesson);
+          // A lesson was delivered → reset the interaction-pacing counters.
+          db.resetNudge(c);
+        });
 
         // Inline feedback via elicitation — capability-gated, with a graceful no-op fallback.
         try {
@@ -500,10 +507,15 @@ export function createServer(): McpServer {
       title: "Update Settings",
       description:
         "Update a coaching setting. max_per_day: integer 1-20. min_gap_minutes: integer 0-1440 " +
-        "(0 = no cooldown). Returns the full updated Settings.",
+        "(0 = no cooldown). nudge_every: integer 0-1000 interactions between lesson cues " +
+        "(0 = cue every turn). nudge_scope: 'session' | 'global'. Returns the full updated Settings.",
       inputSchema: {
-        key: z.enum(["max_per_day", "min_gap_minutes"]).describe("Setting key"),
-        value: z.string().describe("New value as an integer string"),
+        key: z
+          .enum(["max_per_day", "min_gap_minutes", "nudge_every", "nudge_scope"])
+          .describe("Setting key"),
+        value: z
+          .string()
+          .describe("New value (integer string; or 'session'|'global' for nudge_scope)"),
       },
       outputSchema: settingsOutputShape,
       annotations: {
@@ -514,6 +526,19 @@ export function createServer(): McpServer {
       },
     },
     (args) => {
+      const save = (v: string) =>
+        structured(
+          db.withConnection((c) => {
+            db.setSetting(c, args.key, v);
+            return db.getSettings(c);
+          }),
+        );
+      if (args.key === "nudge_scope") {
+        if (args.value !== "session" && args.value !== "global") {
+          return errResult("nudge_scope must be 'session' or 'global'");
+        }
+        return save(args.value);
+      }
       const intVal = Number.parseInt(args.value, 10);
       if (Number.isNaN(intVal)) return errResult(`Value must be an integer, got '${args.value}'`);
       if (args.key === "max_per_day" && !(intVal >= 1 && intVal <= 20)) {
@@ -522,11 +547,10 @@ export function createServer(): McpServer {
       if (args.key === "min_gap_minutes" && !(intVal >= 0 && intVal <= 1440)) {
         return errResult("min_gap_minutes must be between 0 and 1440");
       }
-      const settings = db.withConnection((c) => {
-        db.setSetting(c, args.key, String(intVal));
-        return db.getSettings(c);
-      });
-      return structured(settings);
+      if (args.key === "nudge_every" && !(intVal >= 0 && intVal <= 1000)) {
+        return errResult("nudge_every must be between 0 and 1000");
+      }
+      return save(String(intVal));
     },
   );
 
