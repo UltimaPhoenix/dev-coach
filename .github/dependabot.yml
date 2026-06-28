@@ -1,9 +1,11 @@
 version: 2
 
 updates:
-  # Node dependencies (npm / package.json)
+  # Node dependencies (npm / package.json) — root package + the Docusaurus docs site
   - package-ecosystem: npm
-    directory: /
+    directories:
+      - "/"
+      - "/website"
     schedule:
       interval: weekly
       day: monday
