@@ -180,6 +180,7 @@ jobs:
     permissions:
       contents: read
       id-token: write # npm provenance / OIDC trusted publishing (tokenless)
+      deployments: write # record an "npm" deployment for the Deployments dashboard
     steps:
       - uses: actions/checkout@v7
         with:
@@ -196,6 +197,25 @@ jobs:
       # no NODE_AUTH_TOKEN). Requires the GitHub trusted publisher registered
       # on npmjs.com for this repo + workflow file (environment left blank).
       - run: npm publish --access public
+      # Surface npm in the repo's Deployments dashboard. Done via the API rather than a job-level
+      # `environment:` key on purpose: an environment would change the OIDC subject claim and break
+      # trusted publishing unless mirrored in npmjs.com's trusted-publisher settings.
+      - name: Record npm deployment
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const { version } = require(`${process.env.GITHUB_WORKSPACE}/package.json`);
+            const common = { owner: context.repo.owner, repo: context.repo.repo };
+            const dep = await github.rest.repos.createDeployment({
+              ...common, ref: context.sha, environment: 'npm',
+              auto_merge: false, required_contexts: [],
+              production_environment: true, description: 'Published to npm',
+            });
+            await github.rest.repos.createDeploymentStatus({
+              ...common, deployment_id: dep.data.id, state: 'success',
+              environment_url: `https://www.npmjs.com/package/devcoach/v/${version}`,
+              description: 'Published to npm',
+            });
 
   # ── GitHub Release with the signed .mcpb attached ──────────────────────────
   release:
@@ -254,6 +274,9 @@ jobs:
     needs: [publish, bump]
     if: ${{ always() && needs.publish.result == 'success' }}
     runs-on: ubuntu-latest
+    environment:
+      name: homebrew-tap
+      url: https://github.com/UltimaPhoenix/homebrew-tap/blob/main/Formula/devcoach.rb
     env:
       TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
     steps:
@@ -285,6 +308,9 @@ jobs:
     needs: [publish, bump]
     if: ${{ always() && needs.publish.result == 'success' }}
     runs-on: ubuntu-latest
+    environment:
+      name: claude-marketplace
+      url: https://github.com/UltimaPhoenix/claude-plugins-marketplace
     env:
       MARKETPLACE_TOKEN: ${{ secrets.CLAUDE_PLUGIN_MARKETPLACE }}
     steps:
