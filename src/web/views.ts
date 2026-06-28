@@ -346,7 +346,7 @@ export function lessonsPage(d: LessonsData): Html {
     : (PERIOD_LABELS[s.period] ?? "All time");
   const feedbackLabel = s.feedback ? (FEEDBACK_LABELS[s.feedback] ?? "Feedback") : "Feedback";
   const levelTextColor: Record<string, string> = {
-    junior: "text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20",
+    junior: "text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-900/20",
     mid: "text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20",
     senior: "text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/20",
   };
@@ -550,7 +550,7 @@ ${
         <td class="px-3 py-3 max-w-xs"><a href="/lessons/${encodeURIComponent(lesson.id)}" class="font-medium text-gray-800 dark:text-gray-100 hover:text-indigo-600 dark:hover:text-indigo-400 transition line-clamp-2">${lesson.title}</a></td>
         <td class="px-3 py-3" onclick="event.stopPropagation()" onkeydown="event.stopPropagation()"><a href="${lessonsQs(s, { level: lesson.level })}" class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${levelTextColor[lesson.level] ?? ""} hover:ring-2 hover:ring-current hover:ring-offset-1 transition-shadow">${lesson.level}</a></td>
         <td class="px-3 py-3 hidden lg:table-cell" onclick="event.stopPropagation()" onkeydown="event.stopPropagation()"><div class="flex flex-wrap gap-1">${lesson.categories.map((cat) => html`<a href="${lessonsQs(s, { category: cat })}" class="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors">${cat}</a>`)}</div></td>
-        <td class="px-3 py-3 hidden xl:table-cell" onclick="event.stopPropagation()" onkeydown="event.stopPropagation()">${lesson.feedback === "know" ? html`<span class="text-xs text-emerald-600 dark:text-emerald-400 font-medium">✓ Known</span>` : lesson.feedback === "dont_know" ? html`<span class="text-xs text-rose-500 dark:text-rose-400 font-medium">✗ Unknown</span>` : ""}</td>
+        <td class="px-3 py-3 hidden xl:table-cell" onclick="event.stopPropagation()" onkeydown="event.stopPropagation()">${lesson.feedback === "know" ? html`<span class="text-xs text-teal-600 dark:text-teal-400 font-medium">✓ Known</span>` : lesson.feedback === "dont_know" ? html`<span class="text-xs text-rose-500 dark:text-rose-400 font-medium">✗ Unknown</span>` : ""}</td>
       </tr>`;
       })}
     </tbody>
