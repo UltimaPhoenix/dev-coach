@@ -6,13 +6,13 @@
   </a>
 </p>
 
-[![npm](https://img.shields.io/npm/v/devcoach?logo=npm)](https://www.npmjs.com/package/devcoach)
+[![npm](https://img.shields.io/npm/v/devcoach?logo=npm&color=4f46e5&labelColor=312e81)](https://www.npmjs.com/package/devcoach)
 [![CI](https://github.com/UltimaPhoenix/dev-coach/actions/workflows/ci.yml/badge.svg)](https://github.com/UltimaPhoenix/dev-coach/actions/workflows/ci.yml)
 [![Quality Gate](https://sonarcloud.io/api/project_badges/measure?project=UltimaPhoenix_dev-coach&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=UltimaPhoenix_dev-coach)
 [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=UltimaPhoenix_dev-coach&metric=coverage)](https://sonarcloud.io/summary/new_code?id=UltimaPhoenix_dev-coach)
-[![Node](https://img.shields.io/badge/node-%E2%89%A524-brightgreen?logo=node.js)](https://nodejs.org/)
-[![Docs](https://img.shields.io/badge/docs-GitHub%20Pages-purple)](https://ultimaphoenix.github.io/dev-coach/)
-[![License](https://img.shields.io/badge/license-AGPL%203.0-blue)](LICENSE)
+[![Node](https://img.shields.io/badge/node-%E2%89%A524-4f46e5?logo=node.js&logoColor=white&labelColor=312e81)](https://nodejs.org/)
+[![Docs](https://img.shields.io/badge/docs-GitHub%20Pages-5eead4?labelColor=312e81)](https://ultimaphoenix.github.io/dev-coach/)
+[![License](https://img.shields.io/badge/license-AGPL%203.0-4f46e5?labelColor=312e81)](LICENSE)
 
 **Stay sharp while your AI does the work.**
 
