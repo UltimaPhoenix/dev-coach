@@ -10,6 +10,9 @@
   --ifm-color-primary-lightest: #8e89f4;
   --ifm-code-font-size: 95%;
   --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.1);
+
+  /* Brand accent: the teal of "coach" in the social card. Darker on light backgrounds for contrast. */
+  --devcoach-accent: #0d9488;
 }
 
 [data-theme="dark"] {
@@ -21,4 +24,41 @@
   --ifm-color-primary-lighter: #9da7fb;
   --ifm-color-primary-lightest: #bcc3fc;
   --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.3);
+
+  /* Bright teal reads better on the dark navbar — matches the social card exactly. */
+  --devcoach-accent: #5eead4;
+}
+
+/*
+ * Brand wordmark: "dev" in the theme foreground, "coach" in the teal accent — the
+ * social-card treatment. The real "devcoach" title text is kept in the DOM (font-size:0)
+ * for the link's accessible name; the two-tone version is drawn with ::before/::after.
+ */
+.navbar__title {
+  font-size: 0;
+  letter-spacing: 0;
+}
+.navbar__title::before,
+.navbar__title::after {
+  font-size: 1.15rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  vertical-align: middle;
+}
+.navbar__title::before {
+  content: "dev";
+  color: var(--ifm-navbar-link-color);
+}
+.navbar__title::after {
+  content: "coach";
+  color: var(--devcoach-accent);
+}
+
+/* Reusable inline wordmark for prose/MDX: <span class="devcoach-wm">dev<span>coach</span></span>. */
+.devcoach-wm {
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+.devcoach-wm > span {
+  color: var(--devcoach-accent);
 }
