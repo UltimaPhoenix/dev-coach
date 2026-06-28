@@ -1,0 +1,43 @@
+# devcoach
+
+> devcoach is a free, local, open-source MCP (Model Context Protocol) server that turns every task your AI agent finishes into one short, in-context lesson — progressive technical coaching for Claude Code, Claude Desktop, Cursor, and other MCP-compatible tools. Everything stays on your machine in a single SQLite file: no accounts, no telemetry, no calls home.
+
+Install: `npx -y devcoach mcp` · MCP config: `{ "mcpServers": { "devcoach": { "command": "npx", "args": ["-y", "devcoach", "mcp"] } } }`
+
+devcoach decides whether to deliver a lesson after each completed task, based on your knowledge map, a rate limit (default 2/day, 4h gap), and what it has already taught — so it teaches a little, continuously, and stays out of the way. It keeps developers sharp enough to validate what AI produces, precisely as that skill becomes harder to maintain.
+
+## Docs
+
+- [What devcoach is](https://ultimaphoenix.github.io/dev-coach/): overview, what a lesson looks like, the local-first learning notebook.
+- [Why devcoach](https://ultimaphoenix.github.io/dev-coach/why): the problem (skill erosion under AI-assisted dev) and how in-context coaching addresses it; comparison vs courses, docs, and inline AI explanations.
+- [How it works](https://ultimaphoenix.github.io/dev-coach/how-it-works): the session-startup, coaching-loop, lesson-selection, and depth-calibration flows.
+- [FAQ](https://ultimaphoenix.github.io/dev-coach/faq): concise answers to common questions — what it is, who it's for, supported agents, privacy, pricing, install.
+- [Vision & roadmap](https://ultimaphoenix.github.io/dev-coach/vision): free, local, not commercialized; what's being explored next.
+
+## Install
+
+- [Install overview](https://ultimaphoenix.github.io/dev-coach/install): choose a method.
+- [npx (no install)](https://ultimaphoenix.github.io/dev-coach/install/npx): `npx -y devcoach mcp` — runs immediately.
+- [Homebrew](https://ultimaphoenix.github.io/dev-coach/install/homebrew): macOS/Linux; also installs the CLI.
+- [Claude Code plugin](https://ultimaphoenix.github.io/dev-coach/install/claude-code-plugin): one-click, bundles everything.
+- [Claude Desktop extension](https://ultimaphoenix.github.io/dev-coach/install/claude-desktop): the signed `.mcpb` bundle.
+- [Other MCP agents](https://ultimaphoenix.github.io/dev-coach/install/other-agents): Cursor and any MCP-compatible client.
+
+## Using devcoach
+
+- [Coaching in your agent](https://ultimaphoenix.github.io/dev-coach/usage/coaching): your first lesson, onboarding, and the feedback loop.
+- [CLI reference](https://ultimaphoenix.github.io/dev-coach/usage/cli): all CLI subcommands.
+- [Web dashboard](https://ultimaphoenix.github.io/dev-coach/usage/web-ui): manage your knowledge map locally.
+
+## Reference
+
+- [MCP server reference](https://ultimaphoenix.github.io/dev-coach/reference/mcp-server): all tools and resources exposed over MCP.
+- [Configuration](https://ultimaphoenix.github.io/dev-coach/reference/configuration): rate limits, nudge cadence, data location.
+- [Privacy & security](https://ultimaphoenix.github.io/dev-coach/reference/privacy): local-first design, what is and isn't stored.
+- [License & commercial use](https://ultimaphoenix.github.io/dev-coach/reference/license): AGPL-3.0, dual-license.
+
+## Optional
+
+- [Full documentation as one file](https://ultimaphoenix.github.io/dev-coach/llms-full.txt): the entire docs corpus concatenated for retrieval.
+- [GitHub repository](https://github.com/UltimaPhoenix/dev-coach): source, issues, discussions.
+- [npm package](https://www.npmjs.com/package/devcoach): `devcoach`.

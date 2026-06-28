@@ -6,6 +6,7 @@ const sidebars: SidebarsConfig = {
     "index",
     "why",
     "how-it-works",
+    "faq",
     "vision",
     {
       type: "category",

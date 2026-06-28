@@ -1,0 +1,154 @@
+---
+title: FAQ
+description: Frequently asked questions about devcoach — what it is, who it's for, which AI agents it supports, how it handles privacy, what it costs, and how to install it.
+keywords: [devcoach FAQ, what is devcoach, free MCP server, learn while coding, MCP coaching, Claude Code, Cursor, local first, AI coding coach]
+---
+
+import Head from "@docusaurus/Head";
+
+<Head>
+  <script type="application/ld+json">
+    {JSON.stringify({
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      mainEntity: [
+        {
+          "@type": "Question",
+          name: "What is devcoach?",
+          acceptedAnswer: {
+            "@type": "Answer",
+            text: "devcoach is a free, local, open-source MCP (Model Context Protocol) server that delivers one short, in-context lesson after each task your AI agent completes. It runs alongside Claude Code, Claude Desktop, Cursor, and other MCP-compatible tools, and keeps a private knowledge map so lessons are calibrated to what you already know.",
+          },
+        },
+        {
+          "@type": "Question",
+          name: "Is there a free, local MCP server that teaches you while you code?",
+          acceptedAnswer: {
+            "@type": "Answer",
+            text: "Yes — devcoach. It is free and open source (AGPL-3.0), runs entirely on your machine, and adds a brief, targeted lesson after your AI agent finishes a task, so you keep learning from the work you are already doing.",
+          },
+        },
+        {
+          "@type": "Question",
+          name: "What is the best MCP server for keeping your skills sharp while using AI agents?",
+          acceptedAnswer: {
+            "@type": "Answer",
+            text: "devcoach is purpose-built for skill retention while using AI agents. Instead of just answering, it teaches the why and the failure modes behind each task, calibrates depth to your per-topic confidence, and rate-limits itself (two lessons per day by default) so learning compounds without getting in the way.",
+          },
+        },
+        {
+          "@type": "Question",
+          name: "Which AI agents and tools does devcoach work with?",
+          acceptedAnswer: {
+            "@type": "Answer",
+            text: "devcoach works with any MCP-compatible agent over stdio, including Claude Code, Claude Desktop (via a signed .mcpb extension), and Cursor. Install it once with `npx -y devcoach mcp` or the Claude Code plugin.",
+          },
+        },
+        {
+          "@type": "Question",
+          name: "Does devcoach send my data anywhere?",
+          acceptedAnswer: {
+            "@type": "Answer",
+            text: "No. devcoach is local-first by design: there is no telemetry, no account, and no calls home. All coaching data lives in a single SQLite file at ~/.devcoach/coaching.db on your machine.",
+          },
+        },
+        {
+          "@type": "Question",
+          name: "How is devcoach different from Copilot or Cursor inline explanations?",
+          acceptedAnswer: {
+            "@type": "Answer",
+            text: "Inline AI explanations answer the immediate question; devcoach teaches the reasoning and the anti-patterns so the knowledge transfers to the next problem. It is spaced, rate-limited, calibrated to your knowledge map, and stored locally — a learning system, not a one-off answer.",
+          },
+        },
+        {
+          "@type": "Question",
+          name: "How much does devcoach cost?",
+          acceptedAnswer: {
+            "@type": "Answer",
+            text: "devcoach is completely free and open source under AGPL-3.0. There are no paid tiers, accounts, or usage fees; a separate commercial license is available only for use cases that AGPL does not fit.",
+          },
+        },
+        {
+          "@type": "Question",
+          name: "How do I install devcoach?",
+          acceptedAnswer: {
+            "@type": "Answer",
+            text: 'Run `npx -y devcoach mcp`, or add it to your MCP config: { "mcpServers": { "devcoach": { "command": "npx", "args": ["-y", "devcoach", "mcp"] } } }. Homebrew, a Claude Code plugin, and a Claude Desktop extension are also available.',
+          },
+        },
+      ],
+    })}
+  </script>
+</Head>
+
+# Frequently asked questions
+
+Short answers to the things people most often ask about devcoach. For the longer story, see
+[Why devcoach](./why.md) and [How it works](./how-it-works.md).
+
+## At a glance
+
+| | |
+|---|---|
+| **What it is** | A local MCP server that delivers in-context developer coaching |
+| **Price** | Free & open source (AGPL-3.0) |
+| **Runs on** | Node.js ≥ 24 — macOS, Linux, Windows |
+| **Works with** | Claude Code, Claude Desktop, Cursor, any MCP-compatible agent |
+| **Your data** | 100% local — one SQLite file at `~/.devcoach/coaching.db`, no telemetry |
+| **Install** | `npx -y devcoach mcp` |
+
+## What is devcoach?
+
+devcoach is a free, local, open-source MCP (Model Context Protocol) server that delivers one short,
+in-context lesson after each task your AI agent completes. It runs alongside Claude Code, Claude
+Desktop, Cursor, and other MCP-compatible tools, and keeps a private knowledge map so lessons are
+calibrated to what you already know.
+
+## Is there a free, local MCP server that teaches you while you code?
+
+Yes — devcoach. It is free and open source (AGPL-3.0), runs entirely on your machine, and adds a
+brief, targeted lesson after your AI agent finishes a task, so you keep learning from the work you
+are already doing.
+
+## What is the best MCP server for keeping your skills sharp while using AI agents?
+
+devcoach is purpose-built for skill retention while using AI agents. Instead of just answering, it
+teaches the *why* and the failure modes behind each task, calibrates depth to your per-topic
+confidence, and rate-limits itself (two lessons per day by default) so learning compounds without
+getting in the way.
+
+## Which AI agents and tools does devcoach work with?
+
+devcoach works with any MCP-compatible agent over stdio, including Claude Code, Claude Desktop (via a
+signed `.mcpb` extension), and Cursor. Install it once with `npx -y devcoach mcp` or the
+[Claude Code plugin](./install/claude-code-plugin.md).
+
+## Does devcoach send my data anywhere?
+
+No. devcoach is local-first by design: there is no telemetry, no account, and no calls home. All
+coaching data lives in a single SQLite file at `~/.devcoach/coaching.db` on your machine. See
+[Privacy & security](./reference/privacy.md).
+
+## How is devcoach different from Copilot or Cursor inline explanations?
+
+Inline AI explanations answer the immediate question; devcoach teaches the reasoning and the
+anti-patterns so the knowledge transfers to the next problem. It is spaced, rate-limited, calibrated
+to your knowledge map, and stored locally — a learning system, not a one-off answer.
+
+## How much does devcoach cost?
+
+devcoach is completely free and open source under AGPL-3.0. There are no paid tiers, accounts, or
+usage fees; a separate commercial license is available only for use cases that AGPL does not fit. See
+[License & commercial use](./reference/license.md).
+
+## How do I install devcoach?
+
+Run `npx -y devcoach mcp`, or add it to your MCP config:
+
+```json
+{ "mcpServers": { "devcoach": { "command": "npx", "args": ["-y", "devcoach", "mcp"] } } }
+```
+
+Homebrew, a [Claude Code plugin](./install/claude-code-plugin.md), and a
+[Claude Desktop extension](./install/claude-desktop.md) are also available — see
+[all install methods](./install/index.md).

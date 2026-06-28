@@ -1,4 +1,46 @@
+# devcoach documentation — all crawlers welcome, AI/answer engines included.
+# We *want* LLMs and answer engines to read, index, and cite these docs.
+# Curated entry points for LLMs: /llms.txt and /llms-full.txt
+
 User-agent: *
+Allow: /
+
+# --- AI / answer-engine crawlers & training signals (explicit opt-in) ---
+
+User-agent: GPTBot
+Allow: /
+
+User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: anthropic-ai
+Allow: /
+
+User-agent: Claude-Web
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Perplexity-User
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: Applebot-Extended
+Allow: /
+
+User-agent: CCBot
+Allow: /
+
+User-agent: cohere-ai
 Allow: /
 
 Sitemap: https://ultimaphoenix.github.io/dev-coach/sitemap.xml
