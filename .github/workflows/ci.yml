@@ -86,7 +86,7 @@ jobs:
           path: coverage
       # Cache the scanner CLI + analyzer/JRE so it isn't re-downloaded each run.
       - name: Cache SonarQube scanner
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ~/.sonar/cache
           key: ${{ runner.os }}-sonar
@@ -201,7 +201,7 @@ jobs:
       # `environment:` key on purpose: an environment would change the OIDC subject claim and break
       # trusted publishing unless mirrored in npmjs.com's trusted-publisher settings.
       - name: Record npm deployment
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         with:
           script: |
             const { version } = require(`${process.env.GITHUB_WORKSPACE}/package.json`);
