@@ -1,5 +1,11 @@
 # devcoach
 
+<p align="center">
+  <a href="https://ultimaphoenix.github.io/dev-coach/">
+    <img src="https://ultimaphoenix.github.io/dev-coach/img/og-card.jpg" alt="devcoach — progressive technical coaching, right inside your AI agent" width="760">
+  </a>
+</p>
+
 [![npm](https://img.shields.io/npm/v/devcoach?logo=npm)](https://www.npmjs.com/package/devcoach)
 [![CI](https://github.com/UltimaPhoenix/dev-coach/actions/workflows/ci.yml/badge.svg)](https://github.com/UltimaPhoenix/dev-coach/actions/workflows/ci.yml)
 [![Quality Gate](https://sonarcloud.io/api/project_badges/measure?project=UltimaPhoenix_dev-coach&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=UltimaPhoenix_dev-coach)
