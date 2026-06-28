@@ -457,13 +457,13 @@ For Claude Desktop, delete the `devcoach` key from the platform config file (pat
 
 **Full documentation:** The README is a quick start. For detailed guides, visit the **[official docs](https://ultimaphoenix.github.io/dev-coach/)**:
 
-- **[Why devcoach exists](docs/why.md)** — the philosophy and market opportunity
+- **[Why devcoach exists](docs/why.md)** — the philosophy
 - **[How it works](docs/how-it-works.md)** — session startup, coaching loop, lesson selection
 - **[Using the web dashboard](docs/usage/web-ui.md)** — personalise your knowledge map, filter lessons, jump to code context
 - **[CLI reference](docs/usage/cli.md)** — all commands for querying and managing data
 - **[Configuration](docs/reference/configuration.md)** — rate limits, data location, schema
 - **[Privacy & security](docs/reference/privacy.md)** — local-first architecture, what we collect
-- **[Vision & roadmap](docs/vision.md)** — free tier today, courses and team SaaS planned
+- **[Vision & roadmap](docs/vision.md)** — free, local, not commercialized; ideas we're exploring next
 - **[Plugin marketplace](docs/install/claude-code-plugin.md#about-the-personal-marketplace)** — UltimaPhoenix plugin collection
 
 ---

@@ -1,3 +1,9 @@
+---
+title: How it works
+description: How devcoach decides when and what to teach — the session-startup, coaching-loop, and lesson-selection flows that fire after your AI agent finishes a task.
+keywords: [how devcoach works, coaching loop, lesson selection, MCP coaching, rate limit, knowledge map]
+---
+
 # How it works
 
 devcoach is a silent technical coach that hooks into every Claude response.

@@ -1,3 +1,9 @@
+---
+title: Why devcoach
+description: Why devcoach exists — AI writes more of our code, so the scarce skill becomes validating what it produces. devcoach keeps you sharp with one short, in-context lesson at a time.
+keywords: [why devcoach, AI and developer skills, skill erosion, validating AI code, continuous learning for developers]
+---
+
 # Why devcoach
 
 AI agents now write a large share of the code we ship. They scaffold features, fix bugs, choose libraries,

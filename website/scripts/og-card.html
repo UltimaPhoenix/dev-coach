@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+  <!--
+    Source template for the social/OG card at website/static/img/og-card.jpg (1200×630).
+    Regenerate after editing:
+      npx playwright screenshot --viewport-size=1200,630 \
+        "file://$PWD/website/scripts/og-card.html" website/static/img/og-card.jpg
+    (run from the repo root; macOS renders the color 🎓 emoji correctly).
+  -->
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1200px; height: 630px; overflow: hidden; }
+      body {
+        position: relative;
+        display: flex;
+        align-items: center;
+        gap: 36px;
+        padding: 64px;
+        font-family: -apple-system, "SF Pro Display", "Segoe UI", Inter, system-ui, sans-serif;
+        color: #e9edf6;
+        background:
+          radial-gradient(120% 130% at 12% 8%, rgba(99, 102, 241, 0.28), transparent 55%),
+          radial-gradient(120% 120% at 100% 100%, rgba(45, 212, 191, 0.20), transparent 50%),
+          linear-gradient(135deg, #0b1020 0%, #121a2e 55%, #0d1424 100%);
+      }
+
+      /* ── Left: brand + tagline ── */
+      .brand { width: 540px; flex: 0 0 auto; }
+      .logo { display: flex; align-items: center; gap: 22px; }
+      .logo .cap { font-size: 96px; line-height: 1; filter: drop-shadow(0 6px 14px rgba(0,0,0,.45)); }
+      .logo .word { font-size: 86px; font-weight: 800; letter-spacing: -2px; }
+      .logo .word span { color: #5eead4; }
+      .tagline {
+        margin-top: 30px;
+        font-size: 33px;
+        line-height: 1.32;
+        font-weight: 600;
+        color: #c5cde0;
+        max-width: 500px;
+      }
+      .pills { margin-top: 34px; display: flex; gap: 12px; flex-wrap: wrap; }
+      .pill {
+        font-size: 21px;
+        font-weight: 600;
+        padding: 9px 18px;
+        border-radius: 999px;
+        color: #cfe9e3;
+        background: rgba(94, 234, 212, 0.10);
+        border: 1px solid rgba(94, 234, 212, 0.35);
+      }
+
+      /* ── Right: framed product screenshot ── */
+      .shot {
+        flex: 1 1 auto;
+        height: 502px;
+        border-radius: 18px;
+        overflow: hidden;
+        background: #0a0e1a;
+        border: 1px solid rgba(148, 163, 184, 0.30);
+        box-shadow: 0 30px 70px rgba(0, 0, 0, 0.55);
+        transform: rotate(1.4deg);
+      }
+      .shot .bar {
+        height: 38px;
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        padding: 0 16px;
+        background: #161d2e;
+        border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+      }
+      .shot .bar i { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+      .shot .bar i:nth-child(1) { background: #ff5f57; }
+      .shot .bar i:nth-child(2) { background: #febc2e; }
+      .shot .bar i:nth-child(3) { background: #28c840; }
+      .shot img { display: block; width: 100%; height: calc(502px - 38px); object-fit: cover; object-position: top left; }
+    </style>
+  </head>
+  <body>
+    <div class="brand">
+      <div class="logo">
+        <span class="cap">🎓</span>
+        <span class="word">dev<span>coach</span></span>
+      </div>
+      <div class="tagline">Progressive technical coaching, right inside your AI agent.</div>
+      <div class="pills">
+        <span class="pill">Free &amp; open-source</span>
+        <span class="pill">100% local</span>
+        <span class="pill">MCP</span>
+      </div>
+    </div>
+    <div class="shot">
+      <div class="bar"><i></i><i></i><i></i></div>
+      <img src="../../docs/screenshots/lessons-dark.png" alt="devcoach lessons dashboard" />
+    </div>
+  </body>
+</html>

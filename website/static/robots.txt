@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://ultimaphoenix.github.io/dev-coach/sitemap.xml

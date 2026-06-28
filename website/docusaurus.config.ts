@@ -36,13 +36,31 @@ const config: Config = {
           editUrl: "https://github.com/UltimaPhoenix/dev-coach/edit/main/",
         },
         blog: false,
+        // Help search engines crawl every page; the classic preset auto-emits sitemap.xml.
+        sitemap: { changefreq: "weekly", priority: 0.5, filename: "sitemap.xml" },
         theme: { customCss: "./src/css/custom.css" },
       } satisfies Preset.Options,
     ],
   ],
 
   themeConfig: {
-    image: "img/docusaurus-social-card.jpg",
+    // Social/OG card shown in link previews (Docusaurus also emits twitter:card=summary_large_image).
+    image: "img/og-card.jpg",
+    // Extra <meta> for search engines and social cards; Docusaurus dedupes against page frontmatter.
+    metadata: [
+      {
+        name: "description",
+        content:
+          "devcoach is a free, local, open-source MCP server that turns every task your AI agent finishes into one short, in-context lesson — progressive technical coaching for Claude Code, Cursor, and other MCP tools.",
+      },
+      {
+        name: "keywords",
+        content:
+          "devcoach, MCP server, Model Context Protocol, AI coding coach, Claude Code, Cursor, learn while coding, developer skill retention, technical coaching, AI pair programming, code learning tool",
+      },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
+    ],
     colorMode: { defaultMode: "dark", respectPrefersColorScheme: true },
     // Cleaner mermaid presets (closer to the old Material look) instead of the harsh default.
     mermaid: { theme: { light: "neutral", dark: "dark" } },
