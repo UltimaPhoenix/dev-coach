@@ -1,8 +1,8 @@
 version: 2
 
 updates:
-  # Python dependencies (uv / pyproject.toml)
-  - package-ecosystem: uv
+  # Node dependencies (npm / package.json)
+  - package-ecosystem: npm
     directory: /
     schedule:
       interval: weekly
