@@ -2,7 +2,7 @@
 // exercising the fd0 transport (readHookPayload's FIFO/file/socket detection) that the
 // in-process CLI tests bypass. Each test gets its own sandbox HOME.
 import { execFileSync, spawn } from "node:child_process";
-import { existsSync, mkdtempSync } from "node:fs";
+import { existsSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -121,18 +121,32 @@ describe("hooks via real child processes (piped stdin)", () => {
   it("recovers a logged-but-invisible lesson card, exactly once", () => {
     const home = freshHome();
     seedProfile(home, 99);
+    // A turn whose transcript has no card anywhere (recovery must be confirmed by the
+    // transcript — the final message alone is not a reliable negative).
+    const transcript = join(home, "transcript.jsonl");
+    writeFileSync(
+      transcript,
+      [
+        JSON.stringify({ type: "user", message: { content: "do the task" } }),
+        JSON.stringify({
+          type: "assistant",
+          message: { content: [{ type: "text", text: "done." }] },
+        }),
+      ].join("\n"),
+    );
     // log_lesson equivalent: counters reset + display flag armed
     db.withConnection((c) => {
       db.resetNudge(c);
       db.markDisplayPending(c);
     }, dbPathOf(home));
 
-    // Reply lacks the band → one recovery block, flag consumed.
+    // Reply lacks the band (and the transcript confirms) → one recovery block, flag consumed.
     const out = JSON.parse(
       hook("stop-hook", home, {
         session_id: "s1",
         stop_hook_active: true,
         last_assistant_message: "Lesson logged.",
+        transcript_path: transcript,
       }),
     );
     expect(out.decision).toBe("block");
@@ -143,6 +157,7 @@ describe("hooks via real child processes (piped stdin)", () => {
         session_id: "s1",
         stop_hook_active: true,
         last_assistant_message: "Lesson logged.",
+        transcript_path: transcript,
       }),
     ).toBe("");
 
@@ -155,7 +170,7 @@ describe("hooks via real child processes (piped stdin)", () => {
       }),
     ).toBe("");
 
-    // No last_assistant_message signal (older Claude Code) → no recovery, no error.
+    // No last_assistant_message/transcript signal (older Claude Code) → no recovery, no error.
     db.withConnection((c) => db.markDisplayPending(c), dbPathOf(home));
     expect(hook("stop-hook", home, { session_id: "s1", stop_hook_active: true })).toBe("");
   }, 60_000);

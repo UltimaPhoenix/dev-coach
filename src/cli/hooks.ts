@@ -17,18 +17,20 @@ import * as coach from "../core/coach";
 import * as db from "../core/db";
 
 /**
- * Claude Code passes the hook payload as JSON on stdin. We use four fields:
+ * Claude Code passes the hook payload as JSON on stdin. We use five fields:
  * `stop_hook_active` (true when this stop is itself a hook-forced continuation —
  * re-blocking then would loop forever), `permission_mode` (`"plan"` while the user
- * is planning, when the model cannot deliver or save a lesson), `session_id`, and
- * `last_assistant_message` (the final reply text — used to verify the lesson card is
- * actually visible). Empty/garbage input is treated as a fresh, non-plan stop.
+ * is planning, when the model cannot deliver or save a lesson), `session_id`,
+ * `last_assistant_message` (the FINAL assistant message only — NOT the whole turn),
+ * and `transcript_path` (the session .jsonl — the reliable way to see the whole
+ * turn). Empty/garbage input is treated as a fresh, non-plan stop.
  */
 export interface HookPayload {
   stop_hook_active: boolean;
   permission_mode: string | null;
   session_id: string | null;
   last_assistant_message: string | null;
+  transcript_path: string | null;
 }
 
 export function parseHookPayload(raw: string): HookPayload {
@@ -40,6 +42,7 @@ export function parseHookPayload(raw: string): HookPayload {
       session_id: typeof p?.session_id === "string" ? p.session_id : null,
       last_assistant_message:
         typeof p?.last_assistant_message === "string" ? p.last_assistant_message : null,
+      transcript_path: typeof p?.transcript_path === "string" ? p.transcript_path : null,
     };
   } catch {
     return {
@@ -47,6 +50,7 @@ export function parseHookPayload(raw: string): HookPayload {
       permission_mode: null,
       session_id: null,
       last_assistant_message: null,
+      transcript_path: null,
     };
   }
 }
@@ -62,6 +66,7 @@ function readHookPayload(): HookPayload {
     permission_mode: null,
     session_id: null,
     last_assistant_message: null,
+    transcript_path: null,
   };
   try {
     const st = fstatSync(0);
@@ -190,6 +195,60 @@ const CARD_RECOVERY_CUE =
   "result (the block between the two `### ──────── 🎓 devcoach ────────` band " +
   "headings) — as your ENTIRE reply, no other text, no tool calls.";
 
+const CARD_BAND = "🎓 devcoach";
+
+/**
+ * Was the lesson card visible in the turn that just stopped? `last_assistant_message`
+ * alone is NOT a reliable negative: Claude Code sends only the final assistant message,
+ * and in a multi-phase turn (card mid-turn → post-log_lesson checkpoint work → closing
+ * line) the card lives in an earlier message — seen live as a false recovery at a
+ * notebook checkpoint. So a positive match on the final message is trusted, a negative
+ * is confirmed by scanning the transcript's last turn, and with no readable transcript
+ * we return null (no signal) rather than risk re-printing a card the user already saw.
+ */
+function cardVisibleInLastTurn(payload: HookPayload): boolean | null {
+  if (payload.last_assistant_message?.includes(CARD_BAND)) return true;
+  if (!payload.transcript_path) return null;
+  try {
+    const lines = readFileSync(payload.transcript_path, "utf8").split("\n");
+    // Walk the turn backwards: assistant text entries until the user prompt that
+    // started it (a non-tool-result user entry). Sidechain (subagent) entries are
+    // not part of the visible reply.
+    for (let i = lines.length - 1; i >= 0; i--) {
+      const line = lines[i];
+      if (!line) continue;
+      let entry: {
+        type?: string;
+        isSidechain?: boolean;
+        message?: { content?: unknown };
+      };
+      try {
+        entry = JSON.parse(line);
+      } catch {
+        continue;
+      }
+      if (entry?.isSidechain === true) continue;
+      const content = entry?.message?.content;
+      if (entry?.type === "assistant" && Array.isArray(content)) {
+        for (const c of content) {
+          if (c?.type === "text" && typeof c.text === "string" && c.text.includes(CARD_BAND)) {
+            return true;
+          }
+        }
+      }
+      if (entry?.type === "user") {
+        const toolResult =
+          Array.isArray(content) &&
+          content.some((c) => (c as { type?: string })?.type === "tool_result");
+        if (!toolResult) return false; // the turn's opening prompt — no card found
+      }
+    }
+    return false;
+  } catch {
+    return null; // unreadable transcript → no reliable signal
+  }
+}
+
 type StopDecision =
   | { kind: "silent"; note: string }
   | { kind: "onboard"; note: string }
@@ -214,8 +273,7 @@ function decideStop(
   if (
     !plan &&
     db.takeDisplayPending(conn) &&
-    payload.last_assistant_message !== null && // older Claude Code — no signal
-    !payload.last_assistant_message.includes("🎓 devcoach")
+    cardVisibleInLastTurn(payload) === false // null = no signal → never recover blindly
   ) {
     return { kind: "recover-card", note: "card missing from reply — recovering" };
   }
