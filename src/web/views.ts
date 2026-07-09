@@ -53,7 +53,11 @@ export function layout(o: {
 </head>
 <body class="bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-100 min-h-screen font-mono transition-colors duration-200">
   <nav class="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-6 py-3 flex items-center gap-6">
-    <span class="text-indigo-600 dark:text-indigo-400 font-bold text-lg">🎓 devcoach</span>
+    <!-- Brand wordmark, mirrors the docs site (website/src/css/custom.css): "dev" in the
+         theme foreground, "coach" in the teal accent (#0d9488 / #5eead4 = teal-600/300). -->
+    <span class="font-extrabold text-lg tracking-tight text-gray-900 dark:text-gray-100"
+      >🎓 dev<span class="text-teal-600 dark:text-teal-300">coach</span></span
+    >
     ${link("/", "Profile", o.currentPath === "/")}
     ${link("/lessons", "Lessons", o.currentPath.includes("/lessons"))}
     ${link("/settings", "Settings", o.currentPath === "/settings")}
