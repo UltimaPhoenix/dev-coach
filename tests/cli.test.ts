@@ -238,7 +238,7 @@ describe("cli", () => {
     );
     const empty = parseHookPayload("not json");
     expect(empty.stop_hook_active).toBe(false);
-    expect(empty.permission_mode).toBe(null);
+    expect(empty.permission_mode).toBeNull();
   });
 
   it("knowledge + group + settings commands", async () => {
@@ -329,7 +329,7 @@ describe("cli", () => {
       expect(r.out).toContain("Registered via");
       expect(r.out).toContain("Hooks installed");
       const saved = JSON.parse(readFileSync(settings, "utf8"));
-      expect(saved.hooks.Stop.length).toBe(1);
+      expect(saved.hooks.Stop).toHaveLength(1);
       expect(saved.hooks.Stop[0].hooks[0].command).toContain("stop-hook");
       expect(saved.hooks.Stop[0].hooks[0].timeout).toBe(60);
       expect(saved.hooks.UserPromptSubmit[0].hooks[0].command).toContain("prompt-hook");
@@ -354,7 +354,7 @@ describe("cli", () => {
       expect(stopCmds.some((cmd: string) => cmd.includes("stop-hook"))).toBe(true);
       expect(stopCmds.some((cmd: string) => cmd.includes("my-other-tool"))).toBe(true);
       expect(stopCmds.some((cmd: string) => cmd.includes("lesson-ready"))).toBe(false);
-      expect(repaired.hooks.UserPromptSubmit.length).toBe(1);
+      expect(repaired.hooks.UserPromptSubmit).toHaveLength(1);
     } finally {
       process.env.PATH = savedPath;
     }

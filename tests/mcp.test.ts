@@ -19,9 +19,9 @@ const text = (r: any): string => r.content[0].text;
 describe("mcp server", () => {
   it("lists 15 tools, 9 resources + 1 template, 1 prompt", async () => {
     const { client, server } = await connect();
-    expect((await client.listTools()).tools.length).toBe(15);
-    expect((await client.listResources()).resources.length).toBe(9);
-    expect((await client.listResourceTemplates()).resourceTemplates.length).toBe(1);
+    expect((await client.listTools()).tools).toHaveLength(15);
+    expect((await client.listResources()).resources).toHaveLength(9);
+    expect((await client.listResourceTemplates()).resourceTemplates).toHaveLength(1);
     expect((await client.listPrompts()).prompts[0].name).toBe("devcoach_instructions");
     await client.close();
     await server.close();
@@ -129,9 +129,8 @@ describe("mcp server", () => {
     });
     expect(emptyBody.isError).toBe(true);
     expect(
-      JSON.parse(text(await client.callTool({ name: "get_lessons", arguments: { limit: 5 } })))
-        .length,
-    ).toBe(1);
+      JSON.parse(text(await client.callTool({ name: "get_lessons", arguments: { limit: 5 } }))),
+    ).toHaveLength(1);
     expect(
       text(
         await client.callTool({

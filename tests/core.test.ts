@@ -63,13 +63,13 @@ describe("db lessons", () => {
         starred: true,
       }),
     );
-    expect(db.getLessons(c).length).toBe(2);
+    expect(db.getLessons(c)).toHaveLength(2);
     expect(db.getLessonById(c, "l1")?.topic_id).toBe("python");
     expect(db.getLessons(c, { category: "docker" }).map((l) => l.id)).toEqual(["l2"]);
     expect(db.getLessons(c, { level: "senior" })[0]?.id).toBe("l2");
-    expect(db.getLessons(c, { starred: true }).length).toBe(1);
+    expect(db.getLessons(c, { starred: true })).toHaveLength(1);
     expect(db.getLessons(c, { search: "Generators" })[0]?.id).toBe("l1");
-    expect(db.getLessons(c, { page: 1, per_page: 1 }).length).toBe(1);
+    expect(db.getLessons(c, { page: 1, per_page: 1 })).toHaveLength(1);
     expect(db.getAllCategories(c)).toEqual(["docker", "perf", "python"]);
     expect(db.getDistinctColumn(c, "project")).toEqual([]);
     expect(() => db.getDistinctColumn(c, "evil")).toThrow();
@@ -77,12 +77,12 @@ describe("db lessons", () => {
   it("date range, period, feedback filters", () => {
     c = freshDb();
     db.insertLesson(c, lesson());
-    expect(db.getLessons(c, { date_from: "2026-06-16", date_to: "2026-06-16" }).length).toBe(1);
-    expect(db.getLessons(c, { date_to: "2020-01-01" }).length).toBe(0);
-    expect(db.getLessons(c, { period: "year" }).length).toBe(1); // lesson dated today → within the year
-    expect(db.getLessons(c, { feedback: "none" }).length).toBe(1);
+    expect(db.getLessons(c, { date_from: "2026-06-16", date_to: "2026-06-16" })).toHaveLength(1);
+    expect(db.getLessons(c, { date_to: "2020-01-01" })).toHaveLength(0);
+    expect(db.getLessons(c, { period: "year" })).toHaveLength(1); // lesson dated today → within the year
+    expect(db.getLessons(c, { feedback: "none" })).toHaveLength(1);
     db.setFeedback(c, "l1", "know");
-    expect(db.getLessons(c, { feedback: "know" }).length).toBe(1);
+    expect(db.getLessons(c, { feedback: "know" })).toHaveLength(1);
   });
   it("star, delete, taught, counts", () => {
     c = freshDb();
@@ -266,7 +266,7 @@ describe("db knowledge + groups + settings", () => {
     const r = db.restoreBackupZip(c2, zip);
     expect(r.topics).toBe(1);
     expect(r.lessons).toBe(1);
-    expect(db.getLessons(c2).length).toBe(1);
+    expect(db.getLessons(c2)).toHaveLength(1);
     // duplicate import is skipped
     const r2 = db.restoreBackupZip(c2, zip);
     expect(r2.skipped).toBe(1);
