@@ -26,10 +26,12 @@ devcoach --version
 | Command | Description |
 |---|---|
 | `devcoach mcp` | Start the MCP server (stdio) — used by your agent's MCP config |
-| `devcoach install [--claude-code] [--claude-desktop] [--force] [--skip-hook]` | Register the MCP server (user scope) + Stop hooks |
+| `devcoach install [--claude-code] [--claude-desktop] [--force] [--skip-hook]` | Register the MCP server (user scope) + hooks + skill; repairs stale hook layouts |
+| `devcoach doctor` | Diagnose the Claude Code wiring and pacing state — explains why the next stop would or wouldn't cue a lesson |
 | `devcoach setup` | Interactive onboarding wizard (import a backup or build a profile) |
 | `devcoach ui [--port <n>]` | Launch the web dashboard (default port 7860) |
-| `devcoach onboard-hook` / `lesson-ready` | Claude Code Stop hooks (exit 0; silent, or a `{decision:block}` cue on stdout) |
+| `devcoach stop-hook` / `prompt-hook` | Claude Code hooks: Stop (onboarding check + lesson cue) and UserPromptSubmit (priming). Exit 0 always; silent or a JSON directive on stdout. Set `DEVCOACH_HOOK_DEBUG=1` to trace decisions in `~/.devcoach/hook.log` |
+| `devcoach onboard-hook` / `lesson-ready` | Legacy two-entry Stop hooks (still supported; `install` migrates to `stop-hook`) |
 
 ## Knowledge map
 

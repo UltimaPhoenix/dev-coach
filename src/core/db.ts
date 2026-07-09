@@ -27,7 +27,9 @@ import {
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
-export const DEVCOACH_DIR = join(homedir(), ".devcoach");
+// DEVCOACH_DIR env override: test/e2e sandboxing only — the documented exception to
+// the "paths always derive from os.homedir()" rule.
+export const DEVCOACH_DIR = process.env.DEVCOACH_DIR ?? join(homedir(), ".devcoach");
 export const DB_PATH = join(DEVCOACH_DIR, "coaching.db");
 export const LEARNING_STATE_PATH = join(DEVCOACH_DIR, "learning-state.md");
 
@@ -93,13 +95,46 @@ function runSql(db: DatabaseSync, sql: string, ...params: SqlParam[]): number {
 
 export function getConnection(dbPath: string = DB_PATH): DatabaseSync {
   if (dbPath !== ":memory:") mkdirSync(dirname(dbPath), { recursive: true });
-  return new DatabaseSyncImpl(dbPath);
+  const db = new DatabaseSyncImpl(dbPath);
+  // Two writers can collide (the MCP server plus a Stop hook from a concurrent
+  // session); wait briefly instead of failing SQLITE_BUSY and dropping a cue.
+  db.exec("PRAGMA busy_timeout = 3000");
+  return db;
 }
+
+/**
+ * Schema stamp for the fast path: when `PRAGMA user_version` already matches, the whole
+ * DDL/seed batch is skipped (hooks run on every agent stop — one pragma read beats ~14
+ * idempotent statements). Bump it whenever initSchema/migrate changes. The legacy Python
+ * runtime ignores user_version, so stamping is safe on the shared DB.
+ */
+export const SCHEMA_VERSION = 1;
 
 export function getInitializedConnection(dbPath: string = DB_PATH): DatabaseSync {
   const db = getConnection(dbPath);
-  initSchema(db);
+  const row = db.prepare("PRAGMA user_version").get() as { user_version?: number } | undefined;
+  if (Number(row?.user_version ?? 0) !== SCHEMA_VERSION) {
+    initSchema(db);
+    db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
+  }
   return db;
+}
+
+/** Run `fn` atomically: one IMMEDIATE transaction — a single lock/journal cycle. */
+export function withTransaction<T>(db: DatabaseSync, fn: () => T): T {
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    const result = fn();
+    db.exec("COMMIT");
+    return result;
+  } catch (err) {
+    try {
+      db.exec("ROLLBACK");
+    } catch {
+      // connection unusable — the original error matters more
+    }
+    throw err;
+  }
 }
 
 /** Open an initialized connection, run `fn`, and guarantee close (mirrors db.connection()). */
@@ -165,6 +200,18 @@ export function initSchema(db: DatabaseSync): void {
         updated_at    TEXT NOT NULL
     );
 
+    -- Runtime-only, single row: cue lifecycle. pending=1 between an emitted cue and
+    -- its resolution (log_lesson or skip_lesson), arming a shorter retry threshold.
+    -- display_pending=1 between log_lesson and the next stop, where the hook verifies
+    -- the lesson card is actually visible (last_assistant_message) and recovers it.
+    CREATE TABLE IF NOT EXISTS cue_state (
+        id               INTEGER PRIMARY KEY CHECK (id = 1),
+        pending          INTEGER NOT NULL DEFAULT 0,
+        last_cue_at      TEXT,
+        last_skip_reason TEXT,
+        display_pending  INTEGER NOT NULL DEFAULT 0
+    );
+
     CREATE INDEX IF NOT EXISTS idx_lessons_timestamp ON lessons (timestamp);
     CREATE INDEX IF NOT EXISTS idx_lessons_starred_ts ON lessons (starred, timestamp);
     CREATE INDEX IF NOT EXISTS idx_lessons_feedback ON lessons (feedback);
@@ -177,6 +224,11 @@ export function initSchema(db: DatabaseSync): void {
 function migrate(db: DatabaseSync): void {
   try {
     db.exec("ALTER TABLE lessons ADD COLUMN body TEXT");
+  } catch {
+    // column already exists
+  }
+  try {
+    db.exec("ALTER TABLE cue_state ADD COLUMN display_pending INTEGER NOT NULL DEFAULT 0");
   } catch {
     // column already exists
   }
@@ -555,21 +607,48 @@ export function setSetting(db: DatabaseSync, key: string, value: string): void {
  * (`scope === "session"`) or the SUM across all sessions (`scope === "global"`).
  */
 export function bumpNudge(db: DatabaseSync, sessionId: string, scope: string): number {
-  const now = new Date().toISOString();
-  runSql(
+  const row = getRow(
     db,
     "INSERT INTO nudge_state (session_id, interactions, updated_at) VALUES (?, 1, ?) " +
-      "ON CONFLICT(session_id) DO UPDATE SET interactions = interactions + 1, updated_at = excluded.updated_at",
+      "ON CONFLICT(session_id) DO UPDATE SET interactions = interactions + 1, " +
+      "updated_at = excluded.updated_at RETURNING interactions",
     sessionId,
-    now,
+    new Date().toISOString(),
   );
-  // Hard prune: keep only the most-recently-updated rows, drop the rest.
-  runSql(
+  const own = Number(row?.interactions ?? 0);
+  // Only a brand-new session row (interactions = 1) can grow the table past the cap —
+  // prune just then, keeping the most-recently-updated rows.
+  if (own === 1) {
+    runSql(
+      db,
+      "DELETE FROM nudge_state WHERE session_id NOT IN " +
+        "(SELECT session_id FROM nudge_state ORDER BY updated_at DESC LIMIT ?)",
+      MAX_NUDGE_SESSIONS,
+    );
+  }
+  return scope === "global" ? peekNudge(db, sessionId, scope) : own;
+}
+
+export interface NudgeSessionRow {
+  session_id: string;
+  interactions: number;
+  updated_at: string;
+}
+
+/** All session counters, most recently active first (doctor). */
+export function listNudgeSessions(db: DatabaseSync): NudgeSessionRow[] {
+  return allRows(
     db,
-    "DELETE FROM nudge_state WHERE session_id NOT IN " +
-      "(SELECT session_id FROM nudge_state ORDER BY updated_at DESC LIMIT ?)",
-    MAX_NUDGE_SESSIONS,
-  );
+    "SELECT session_id, interactions, updated_at FROM nudge_state ORDER BY updated_at DESC",
+  ).map((r) => ({
+    session_id: String(r.session_id),
+    interactions: Number(r.interactions),
+    updated_at: String(r.updated_at),
+  }));
+}
+
+/** Read the current counter without bumping (doctor / prompt-hook dry runs). */
+export function peekNudge(db: DatabaseSync, sessionId: string, scope: string): number {
   const row =
     scope === "global"
       ? getRow(db, "SELECT COALESCE(SUM(interactions), 0) AS n FROM nudge_state")
@@ -577,9 +656,78 @@ export function bumpNudge(db: DatabaseSync, sessionId: string, scope: string): n
   return Number(row?.n ?? 0);
 }
 
-/** Clear all interaction counters — called when a lesson is recorded. */
+/** Clear all interaction counters and disarm the retry window — a lesson was recorded. */
 export function resetNudge(db: DatabaseSync): void {
   runSql(db, "DELETE FROM nudge_state");
+  runSql(db, "UPDATE cue_state SET pending = 0 WHERE id = 1");
+}
+
+// ── Cue state (runtime lesson-cue lifecycle) ────────────────────────────────────
+
+/** After an unresolved cue, retry at min(NUDGE_RETRY_AFTER, nudge_every) further stops. */
+export const NUDGE_RETRY_AFTER = 3;
+
+export interface CueState {
+  pending: boolean;
+  last_cue_at: string | null;
+  last_skip_reason: string | null;
+  display_pending: boolean;
+}
+
+export function getCueState(db: DatabaseSync): CueState {
+  const row = getRow(
+    db,
+    "SELECT pending, last_cue_at, last_skip_reason, display_pending FROM cue_state WHERE id = 1",
+  );
+  return {
+    pending: Number(row?.pending ?? 0) === 1,
+    last_cue_at: (row?.last_cue_at as string | null) ?? null,
+    last_skip_reason: (row?.last_skip_reason as string | null) ?? null,
+    display_pending: Number(row?.display_pending ?? 0) === 1,
+  };
+}
+
+/** A cue was emitted: re-start pacing from zero and arm the shorter retry threshold. */
+export function markCuePending(db: DatabaseSync): void {
+  runSql(
+    db,
+    "INSERT INTO cue_state (id, pending, last_cue_at) VALUES (1, 1, ?) " +
+      "ON CONFLICT(id) DO UPDATE SET pending = 1, last_cue_at = excluded.last_cue_at",
+    new Date().toISOString(),
+  );
+  runSql(db, "DELETE FROM nudge_state");
+}
+
+/**
+ * The model declined explicitly (skip_lesson): the pacing window is resolved just like
+ * a delivered lesson — counters restart, the retry window disarms, the why is kept.
+ * This also lets a primed turn resolve BEFORE the Stop hook, so no block is needed.
+ */
+export function clearCuePending(db: DatabaseSync, reason?: string): void {
+  runSql(
+    db,
+    "INSERT INTO cue_state (id, pending, last_skip_reason) VALUES (1, 0, ?) " +
+      "ON CONFLICT(id) DO UPDATE SET pending = 0, last_skip_reason = excluded.last_skip_reason",
+    reason ?? null,
+  );
+  runSql(db, "DELETE FROM nudge_state");
+}
+
+/** log_lesson saved a lesson: the next stop must verify the card is actually visible. */
+export function markDisplayPending(db: DatabaseSync): void {
+  runSql(
+    db,
+    "INSERT INTO cue_state (id, pending, display_pending) VALUES (1, 0, 1) " +
+      "ON CONFLICT(id) DO UPDATE SET display_pending = 1",
+  );
+}
+
+/** Read-and-clear the display flag — true when the last turn logged a lesson. */
+export function takeDisplayPending(db: DatabaseSync): boolean {
+  const row = getRow(db, "SELECT display_pending FROM cue_state WHERE id = 1");
+  const pending = Number(row?.display_pending ?? 0) === 1;
+  if (pending) runSql(db, "UPDATE cue_state SET display_pending = 0 WHERE id = 1");
+  return pending;
 }
 
 export function isOnboardingComplete(db: DatabaseSync): { knowledge_ready: boolean } {

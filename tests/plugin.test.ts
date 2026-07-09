@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -16,8 +16,13 @@ describe("claude code plugin packaging", () => {
     expect(manifest.version).toBe(pkg.version);
   });
 
-  it("bundled SKILL.md is identical to assets/SKILL.md (single source of truth)", () => {
+  it("bundled skill dir is identical to assets/ (single source of truth)", () => {
     expect(read("plugin", "skills", "devcoach", "SKILL.md")).toBe(read("assets", "SKILL.md"));
+    for (const ref of readdirSync(join(root, "assets", "references"))) {
+      expect(read("plugin", "skills", "devcoach", "references", ref)).toBe(
+        read("assets", "references", ref),
+      );
+    }
   });
 
   it("self-marketplace points at ./plugin", () => {
@@ -36,12 +41,16 @@ describe("claude code plugin packaging", () => {
     expect(server.args).toEqual(["${CLAUDE_PLUGIN_ROOT}/scripts/launch.mjs", "mcp"]);
   });
 
-  it("ships both Stop hooks (onboard-hook + lesson-ready)", () => {
+  it("ships the merged stop-hook + prompt-hook, each with a timeout", () => {
     const { hooks } = readJson("plugin", "hooks", "hooks.json");
-    const commands = (hooks.Stop as { hooks: { command: string }[] }[]).flatMap((e) =>
-      e.hooks.map((h) => h.command),
-    );
-    expect(commands.some((c) => c.includes("onboard-hook"))).toBe(true);
-    expect(commands.some((c) => c.includes("lesson-ready"))).toBe(true);
+    type Entry = { hooks: { command: string; timeout?: number }[] };
+    const stop = (hooks.Stop as Entry[]).flatMap((e) => e.hooks);
+    expect(stop).toHaveLength(1);
+    expect(stop[0].command).toContain("stop-hook");
+    expect(stop[0].timeout).toBe(60);
+    const prompt = (hooks.UserPromptSubmit as Entry[]).flatMap((e) => e.hooks);
+    expect(prompt).toHaveLength(1);
+    expect(prompt[0].command).toContain("prompt-hook");
+    expect(prompt[0].timeout).toBe(30);
   });
 });

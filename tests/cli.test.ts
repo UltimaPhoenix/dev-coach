@@ -132,6 +132,89 @@ describe("cli", () => {
     expect((await run(["lesson-ready"])).out).toContain('"decision":"block"');
   });
 
+  it("lesson-ready resets pacing on emission (no cue storm) and retries while pending", async () => {
+    db.withConnection((c) => {
+      c.exec("DELETE FROM lessons; DELETE FROM nudge_state; UPDATE cue_state SET pending = 0;");
+      db.upsertKnowledge(c, "python", 4);
+      db.setSetting(c, "nudge_every", "2");
+      db.setSetting(c, "min_gap_minutes", "0");
+      db.setSetting(c, "max_per_day", "99");
+    });
+    expect((await run(["lesson-ready"])).out).not.toContain("decision");
+    const cue = await run(["lesson-ready"]);
+    expect(cue.out).toContain('"decision":"block"');
+    // the new compact cue invokes the skill and offers the explicit no-op path
+    expect(cue.out).toContain("devcoach` skill");
+    expect(cue.out).toContain("skip_lesson");
+    expect(cue.out).toContain("systemMessage");
+    // the stop right after a cue is silent again (reset-on-emission)…
+    expect((await run(["lesson-ready"])).out).not.toContain("decision");
+    // …and the unresolved cue re-fires at the retry threshold
+    expect((await run(["lesson-ready"])).out).toContain('"decision":"block"');
+  });
+
+  it("prompt-hook primes only when the next stop reaches the threshold", async () => {
+    db.withConnection((c) => {
+      c.exec("DELETE FROM lessons; DELETE FROM nudge_state; UPDATE cue_state SET pending = 0;");
+      db.upsertKnowledge(c, "python", 4);
+      db.setSetting(c, "nudge_every", "2");
+      db.setSetting(c, "min_gap_minutes", "0");
+      db.setSetting(c, "max_per_day", "99");
+    });
+    // counter 0 → next stop is 1/2 → no prime
+    expect((await run(["prompt-hook"])).out).not.toContain("additionalContext");
+    db.withConnection((c) => db.bumpNudge(c, "__nosession__", "session"));
+    // counter 1 → next stop reaches 2/2 → prime, without bumping
+    const primed = await run(["prompt-hook"]);
+    expect(primed.out).toContain("additionalContext");
+    expect(primed.out).toContain("skip_lesson");
+    expect(db.withConnection((c) => db.peekNudge(c, "__nosession__", "session"))).toBe(1);
+  });
+
+  it("doctor reports wiring, pacing, and a verdict — and always exits 0", async () => {
+    cleanClaudeSettings();
+    db.withConnection((c) => {
+      db.upsertKnowledge(c, "python", 4);
+      db.setSetting(c, "nudge_every", "2");
+    });
+    const r = await run(["doctor"]);
+    expect(r.code).toBeNull(); // never process.exit(≠0)
+    expect(r.out).toContain("devcoach doctor");
+    expect(r.out).toContain("no devcoach hooks");
+    expect(r.out).toContain("onboarding complete");
+    expect(r.out).toContain("nudge_every=2");
+    expect(r.out).toContain("Verdict");
+
+    writeFileSync(join(process.env.HOME as string, ".claude", "settings.json"), "{bad json");
+    expect((await run(["doctor"])).out).toContain("not valid JSON");
+
+    // plugin + settings.json hooks at once → double-count warning
+    writeFileSync(
+      join(process.env.HOME as string, ".claude", "settings.json"),
+      JSON.stringify({
+        enabledPlugins: { "devcoach@marketplace": true },
+        hooks: { Stop: [{ hooks: [{ type: "command", command: "devcoach stop-hook" }] }] },
+      }),
+    );
+    expect((await run(["doctor"])).out).toContain("registered TWICE");
+  });
+
+  it("DEVCOACH_HOOK_DEBUG=1 logs hook decisions to ~/.devcoach/hook.log", async () => {
+    db.withConnection((c) => {
+      c.exec("DELETE FROM nudge_state;");
+      db.upsertKnowledge(c, "python", 4);
+      db.setSetting(c, "nudge_every", "5");
+    });
+    process.env.DEVCOACH_HOOK_DEBUG = "1";
+    try {
+      await run(["lesson-ready"]);
+    } finally {
+      delete process.env.DEVCOACH_HOOK_DEBUG;
+    }
+    const logFile = join(process.env.HOME as string, ".devcoach", "hook.log");
+    expect(readFileSync(logFile, "utf8")).toContain("lesson-ready - paced");
+  });
+
   it("set accepts/validates nudge_every and nudge_scope", async () => {
     expect((await run(["set", "nudge_every", "5"])).out).toContain("Set nudge_every");
     expect((await run(["set", "nudge_every", "abc"])).code).toBe(1);
@@ -236,7 +319,7 @@ describe("cli", () => {
     }
   });
 
-  it("install via a present `claude` CLI registers + writes/overwrites Stop hooks", async () => {
+  it("install via a present `claude` CLI registers + writes/repairs the hooks", async () => {
     const settings = cleanClaudeSettings();
     const binDir = fakeBin("claude", "#!/bin/sh\nexit 0\n");
     const savedPath = process.env.PATH;
@@ -244,20 +327,48 @@ describe("cli", () => {
     try {
       const r = await run(["install", "--claude-code", "--force"]);
       expect(r.out).toContain("Registered via");
-      expect(r.out).toContain("Stop hooks installed");
+      expect(r.out).toContain("Hooks installed");
       const saved = JSON.parse(readFileSync(settings, "utf8"));
-      const cmds = saved.hooks.Stop.flatMap((e: any) => e.hooks.map((h: any) => h.command));
-      expect(cmds.some((cmd: string) => cmd.includes("onboard-hook"))).toBe(true);
-      expect(cmds.some((cmd: string) => cmd.includes("lesson-ready"))).toBe(true);
+      expect(saved.hooks.Stop.length).toBe(1);
+      expect(saved.hooks.Stop[0].hooks[0].command).toContain("stop-hook");
+      expect(saved.hooks.Stop[0].hooks[0].timeout).toBe(60);
+      expect(saved.hooks.UserPromptSubmit[0].hooks[0].command).toContain("prompt-hook");
+      expect(saved.hooks.UserPromptSubmit[0].hooks[0].timeout).toBe(30);
 
-      // re-run without --force → hooks already present, left alone
-      expect((await run(["install", "--claude-code"])).out).toContain(
-        "Stop hooks already installed",
-      );
-      // re-run with --force → existing devcoach hooks removed and re-added
-      expect((await run(["install", "--claude-code", "--force"])).out).toContain(
-        "Stop hooks installed",
-      );
+      // re-run without --force → current layout, left alone
+      expect((await run(["install", "--claude-code"])).out).toContain("Already installed");
+
+      // legacy two-entry Stop layout (pre-0.8) is repaired WITHOUT --force,
+      // leaving foreign hooks untouched
+      saved.hooks.Stop = [
+        { hooks: [{ type: "command", command: "npx -y devcoach onboard-hook" }] },
+        { hooks: [{ type: "command", command: "npx -y devcoach lesson-ready" }] },
+        { hooks: [{ type: "command", command: "my-other-tool --check" }] },
+      ];
+      saved.hooks.UserPromptSubmit = undefined;
+      writeFileSync(settings, JSON.stringify(saved));
+      expect((await run(["install", "--claude-code"])).out).toContain("Hooks installed");
+      const repaired = JSON.parse(readFileSync(settings, "utf8"));
+      const stopCmds = repaired.hooks.Stop.flatMap((e: any) => e.hooks.map((h: any) => h.command));
+      expect(stopCmds).toHaveLength(2); // merged devcoach entry + the foreign hook
+      expect(stopCmds.some((cmd: string) => cmd.includes("stop-hook"))).toBe(true);
+      expect(stopCmds.some((cmd: string) => cmd.includes("my-other-tool"))).toBe(true);
+      expect(stopCmds.some((cmd: string) => cmd.includes("lesson-ready"))).toBe(false);
+      expect(repaired.hooks.UserPromptSubmit.length).toBe(1);
+    } finally {
+      process.env.PATH = savedPath;
+    }
+  });
+
+  it("install skips the hooks when the devcoach plugin is enabled", async () => {
+    const settings = cleanClaudeSettings();
+    writeFileSync(settings, JSON.stringify({ enabledPlugins: { "devcoach@ultimaphoenix": true } }));
+    const savedPath = process.env.PATH;
+    process.env.PATH = fakeBin("claude", "#!/bin/sh\nexit 0\n");
+    try {
+      const r = await run(["install", "--claude-code"]);
+      expect(r.out).toContain("plugin already provides the hooks");
+      expect(JSON.parse(readFileSync(settings, "utf8")).hooks).toBeUndefined();
     } finally {
       process.env.PATH = savedPath;
     }
@@ -282,6 +393,40 @@ describe("cli", () => {
   it("install into Claude Desktop reports an already-registered server", async () => {
     expect((await run(["install", "--claude-desktop", "--force"])).out).toContain("Installed into");
     expect((await run(["install", "--claude-desktop"])).out).toContain("Already registered");
+  });
+
+  it("install writes the Claude Code skill + stamp; welcome/stats hint when missing or outdated", async () => {
+    const settings = cleanClaudeSettings();
+    const skillDir = join(process.env.HOME as string, ".claude", "skills", "devcoach");
+    const savedPath = process.env.PATH;
+    process.env.PATH = fakeBin("claude", "#!/bin/sh\nexit 0\n");
+    try {
+      // Fresh install → SKILL.md + version stamp written.
+      const r = await run(["install", "--claude-code", "--force"]);
+      expect(r.out).toContain("Skill…");
+      expect(existsSync(join(skillDir, "SKILL.md"))).toBe(true);
+      expect(readFileSync(join(skillDir, ".devcoach-version"), "utf8").trim()).toBe(VERSION);
+      // Current → no hint, and a re-run without --force leaves it alone.
+      expect((await run([])).out).not.toContain("out of date");
+      expect((await run(["install", "--claude-code"])).out).toContain("Already installed");
+      // Stale stamp (post-upgrade) → welcome + stats hint to re-run install…
+      writeFileSync(join(skillDir, ".devcoach-version"), "0.0.1\n");
+      expect((await run([])).out).toContain("out of date");
+      expect((await run(["stats"])).out).toContain("out of date");
+      // …and install refreshes it without --force (the skill file is devcoach-owned).
+      expect((await run(["install", "--claude-code"])).out).toContain(`Installed into ${skillDir}`);
+      expect(readFileSync(join(skillDir, ".devcoach-version"), "utf8").trim()).toBe(VERSION);
+      // Missing + Stop hooks present → hinted; missing + no hooks (Desktop-only) → silent.
+      rmSync(join(process.env.HOME as string, ".claude", "skills"), {
+        recursive: true,
+        force: true,
+      });
+      expect((await run([])).out).toContain("not installed");
+      writeFileSync(settings, "{}");
+      expect((await run([])).out).not.toContain("not installed");
+    } finally {
+      process.env.PATH = savedPath;
+    }
   });
 
   it("onboard-hook re-cues every stop until a profile exists (no debounce)", async () => {

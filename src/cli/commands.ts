@@ -1,15 +1,7 @@
 // CLI subcommands — Commander dispatcher,
 // zero-dependency styled output (term.ts), Stop hooks (exit 0; silent, or a {decision:block} cue).
 import { spawnSync } from "node:child_process";
-import {
-  accessSync,
-  constants,
-  existsSync,
-  fstatSync,
-  mkdirSync,
-  readFileSync,
-  writeFileSync,
-} from "node:fs";
+import { accessSync, constants, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir, platform } from "node:os";
 import { dirname, join } from "node:path";
 import { createInterface } from "node:readline/promises";
@@ -18,9 +10,8 @@ import * as coach from "../core/coach";
 import * as db from "../core/db";
 import { detectStack } from "../core/detect";
 import { detectGitContext } from "../core/git";
-import { runStdio } from "../mcp/server";
+import { readSkill, readSkillReferences } from "../skill";
 import { VERSION } from "../version";
-import { startUi } from "../web/app";
 import {
   type Column,
   c,
@@ -301,6 +292,9 @@ function cmdStats(): void {
       renderTable(undefined, [{ header: "Weakest topics" }, { header: "Strongest topics" }], rows),
     );
   }
+
+  const hint = skillHint();
+  if (hint) log(`\n${hint}`);
 }
 
 function cmdSet(key: string, value: string): void {
@@ -425,12 +419,14 @@ interface McpConfig {
 interface HookCmd {
   type: string;
   command: string;
+  timeout?: number;
 }
 interface HookEntry {
   hooks?: HookCmd[];
 }
 interface CodeSettings {
-  hooks?: { Stop?: HookEntry[] };
+  hooks?: Record<string, HookEntry[] | undefined>;
+  enabledPlugins?: Record<string, boolean>;
   [k: string]: unknown;
 }
 
@@ -453,26 +449,38 @@ function claudeDesktopConfigPath(): string {
   return join(xdg, "Claude", "claude_desktop_config.json");
 }
 const CLAUDE_CODE_SETTINGS = join(homedir(), ".claude", "settings.json");
+const CLAUDE_CODE_SKILL_DIR = join(homedir(), ".claude", "skills", "devcoach");
+const SKILL_STAMP = join(CLAUDE_CODE_SKILL_DIR, ".devcoach-version");
 
-function onPath(bin: string): boolean {
+function findOnPath(bin: string): string | null {
   for (const dir of (process.env.PATH ?? "").split(":")) {
     if (!dir) continue;
     try {
       accessSync(join(dir, bin), constants.X_OK);
-      return true;
+      return join(dir, bin);
     } catch {
       // not here — keep scanning
     }
   }
-  return false;
+  return null;
 }
+const onPath = (bin: string): boolean => findOnPath(bin) !== null;
 
 function detectInstallMethod(): { command: string; args: string[] } {
   if (onPath("devcoach")) return { command: "devcoach", args: ["mcp"] };
   return { command: "npx", args: ["-y", "devcoach", "mcp"] };
 }
+
+/**
+ * Hook command prefix. Hooks may run with a minimal GUI PATH, so prefer the absolute
+ * binary path — except when the PATH hit lives in an ephemeral per-shell dir (fnm
+ * multishells), where the bare name outlives the path. `npx -y devcoach` is the last
+ * resort: it works everywhere but needs the npx cache (or network) on every stop.
+ */
 function hookPrefix(): string {
-  return detectInstallMethod().command === "devcoach" ? "devcoach" : "npx -y devcoach";
+  const hit = findOnPath("devcoach");
+  if (!hit) return "npx -y devcoach";
+  return hit.includes("fnm_multishells") ? "devcoach" : hit;
 }
 
 function installViaClaudeCli(scope: string, force: boolean): string {
@@ -524,33 +532,120 @@ function installTo(path: string, entry: object, force: boolean): string {
   return `${c.green("✓")} Installed into ${path}`;
 }
 
-function installHook(force: boolean): string {
+/** The exact hook layout devcoach owns: one merged Stop entry + the priming hook. */
+function desiredHooks(): Record<string, HookEntry> {
   const prefix = hookPrefix();
+  return {
+    Stop: { hooks: [{ type: "command", command: `${prefix} stop-hook`, timeout: 60 }] },
+    UserPromptSubmit: {
+      hooks: [{ type: "command", command: `${prefix} prompt-hook`, timeout: 30 }],
+    },
+  };
+}
+
+/** True when the devcoach Claude Code plugin is enabled — it ships the same hooks. */
+function pluginHooksActive(data: CodeSettings): boolean {
+  return Object.entries(data.enabledPlugins ?? {}).some(
+    ([name, enabled]) => enabled && name.startsWith("devcoach@"),
+  );
+}
+
+/**
+ * Install (or repair) the devcoach hooks in ~/.claude/settings.json. The entries are
+ * fully devcoach-owned — like the skill, a stale or legacy layout (two Stop entries,
+ * npx prefix, missing timeout) is normalized WITHOUT --force; user hooks are untouched.
+ */
+function installHook(): string {
   const path = CLAUDE_CODE_SETTINGS;
   const read = readJsonFile<CodeSettings>(path);
   if (!read.ok) return read.error;
   const data = read.data;
+  if (pluginHooksActive(data)) {
+    return (
+      `${c.yellow("Skipped")} — the devcoach plugin already provides the hooks ` +
+      "(installing both would double-count interactions)"
+    );
+  }
   data.hooks ??= {};
   const hooks = data.hooks;
-  hooks.Stop ??= [];
-  const stop = hooks.Stop;
-  const existing = stop
-    .map((e, i): [HookEntry, number] => [e, i])
-    .filter(([e]) => (e.hooks ?? []).some((h) => (h.command ?? "").includes("devcoach")))
-    .map(([, i]) => i);
-  if (existing.length) {
-    if (!force) {
-      return `${c.yellow("Stop hooks already installed")} in ${path} (use --force to overwrite)`;
-    }
-    for (const i of existing.toReversed()) stop.splice(i, 1);
+  let changed = false;
+  for (const [event, desired] of Object.entries(desiredHooks())) {
+    hooks[event] ??= [];
+    const list = hooks[event];
+    const ours = list
+      .map((e, i): [HookEntry, number] => [e, i])
+      .filter(([e]) => (e.hooks ?? []).some((h) => (h.command ?? "").includes("devcoach")))
+      .map(([, i]) => i);
+    const [only] = ours;
+    if (
+      ours.length === 1 &&
+      only !== undefined &&
+      JSON.stringify(list[only]) === JSON.stringify(desired)
+    )
+      continue;
+    for (const i of ours.toReversed()) list.splice(i, 1);
+    list.push(desired);
+    changed = true;
   }
-  stop.push(
-    { hooks: [{ type: "command", command: `${prefix} onboard-hook` }] },
-    { hooks: [{ type: "command", command: `${prefix} lesson-ready` }] },
-  );
+  if (!changed) return `${c.yellow("Already installed")} in ${path} (current layout)`;
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, `${JSON.stringify(data, null, 2)}\n`);
-  return `${c.green("✓")} Stop hooks installed into ${path}`;
+  return `${c.green("✓")} Hooks installed into ${path} (Stop + UserPromptSubmit)`;
+}
+
+// ── Claude Code skill ────────────────────────────────────────────────────────
+// ~/.claude/skills/devcoach/SKILL.md is fully owned by devcoach (content = bundled
+// assets/SKILL.md), so an outdated copy is refreshed without --force — that is the whole
+// point of re-running `devcoach install` after an upgrade (npm, Homebrew, …).
+
+type SkillStatus = "missing" | "outdated" | "current";
+
+function skillStatus(): SkillStatus {
+  if (!existsSync(join(CLAUDE_CODE_SKILL_DIR, "SKILL.md"))) return "missing";
+  try {
+    if (readFileSync(SKILL_STAMP, "utf8").trim() === VERSION) return "current";
+  } catch {
+    // no readable stamp → predates version stamping → outdated
+  }
+  return "outdated";
+}
+
+function installSkill(force: boolean): string {
+  if (!force && skillStatus() === "current") {
+    return `${c.yellow("Already installed")} in ${CLAUDE_CODE_SKILL_DIR} (current version)`;
+  }
+  mkdirSync(CLAUDE_CODE_SKILL_DIR, { recursive: true });
+  writeFileSync(join(CLAUDE_CODE_SKILL_DIR, "SKILL.md"), readSkill());
+  const refs = readSkillReferences();
+  if (refs.length) {
+    const refDir = join(CLAUDE_CODE_SKILL_DIR, "references");
+    mkdirSync(refDir, { recursive: true });
+    for (const ref of refs) writeFileSync(join(refDir, ref.name), ref.content);
+  }
+  writeFileSync(SKILL_STAMP, `${VERSION}\n`);
+  return `${c.green("✓")} Installed into ${CLAUDE_CODE_SKILL_DIR}`;
+}
+
+/** One-line upgrade hint for the welcome screen and `stats` — empty string when nothing to say. */
+function skillHint(): string {
+  const status = skillStatus();
+  if (status === "outdated") {
+    return `${c.yellow("→")} The devcoach Claude Code skill is out of date — run ${c.bold("devcoach install")} to refresh it.`;
+  }
+  if (status === "missing") {
+    // Only nudge users who already wired devcoach into Claude Code (Stop hooks present):
+    // Desktop-only or not-yet-installed users would see a false alarm.
+    const read = readJsonFile<CodeSettings>(CLAUDE_CODE_SETTINGS);
+    const hooked =
+      read.ok &&
+      (read.data.hooks?.Stop ?? []).some((e) =>
+        (e.hooks ?? []).some((h) => (h.command ?? "").includes("devcoach")),
+      );
+    if (hooked) {
+      return `${c.yellow("→")} The devcoach Claude Code skill is not installed — run ${c.bold("devcoach install")} to add it.`;
+    }
+  }
+  return "";
 }
 
 interface InstallOpts {
@@ -579,7 +674,8 @@ function cmdInstall(o: InstallOpts): void {
       needsRestart = true;
     }
     log(`  MCP server…  ${msg}`);
-    if (!o.skipHook) log(`  Stop hooks… ${installHook(o.force)}`);
+    if (!o.skipHook) log(`  Hooks…       ${installHook()}`);
+    log(`  Skill…       ${installSkill(o.force)}`);
     log();
   }
 
@@ -595,9 +691,138 @@ function cmdInstall(o: InstallOpts): void {
     c.dim(
       "Tip: run devcoach backup to export your profile, lessons and settings.\n" +
         "     run devcoach restore <file> to import a backup on a new machine.\n" +
-        "     The coaching skill is served automatically via the MCP prompt — always up to date.",
+        "     After upgrading devcoach (npm, Homebrew), re-run devcoach install to refresh the skill.",
     ),
   );
+}
+
+// ── Doctor ───────────────────────────────────────────────────────────────────
+
+/**
+ * Read-only diagnosis of the devcoach ⇄ Claude Code wiring, ending with a verdict on
+ * whether the next eligible stop would cue a lesson and why. Always exits 0 — doctor
+ * reports problems, it never is one.
+ */
+function cmdDoctor(): void {
+  const ok = (s: string): void => log(`  ${c.green("✓")} ${s}`);
+  const warn = (s: string): void => log(`  ${c.yellow("→")} ${s}`);
+  const bad = (s: string): void => log(`  ${c.red("✗")} ${s}`);
+
+  log(`\n${c.bold("devcoach doctor")} ${c.dim(`v${VERSION}`)}\n`);
+
+  log(c.bold("Environment"));
+  const nodeMajor = Number.parseInt(process.versions.node.split(".")[0] ?? "0", 10);
+  if (nodeMajor >= 24) ok(`Node ${process.versions.node} (≥ 24)`);
+  else bad(`Node ${process.versions.node} — devcoach needs Node ≥ 24 (embedded node:sqlite)`);
+
+  log(c.bold("\nClaude Code wiring"));
+  const read = readJsonFile<CodeSettings>(CLAUDE_CODE_SETTINGS);
+  if (!read.ok) {
+    bad(`${CLAUDE_CODE_SETTINGS} is not valid JSON — hooks cannot run`);
+  } else {
+    const pluginOn = pluginHooksActive(read.data);
+    const ours: { event: string; cmd: HookCmd }[] = [];
+    for (const [event, entries] of Object.entries(read.data.hooks ?? {})) {
+      for (const e of entries ?? []) {
+        for (const h of e.hooks ?? []) {
+          if ((h.command ?? "").includes("devcoach")) ours.push({ event, cmd: h });
+        }
+      }
+    }
+    if (pluginOn && ours.length) {
+      bad(
+        "devcoach hooks are registered TWICE (plugin + settings.json) — interactions are " +
+          "double-counted. Disable the plugin or remove the settings.json entries.",
+      );
+    } else if (pluginOn) {
+      ok("hooks provided by the devcoach plugin");
+    } else if (!ours.length) {
+      bad(`no devcoach hooks in ${CLAUDE_CODE_SETTINGS} — run ${c.bold("devcoach install")}`);
+    } else {
+      const legacy = ours.filter(
+        ({ cmd }) => cmd.command.includes("onboard-hook") || cmd.command.includes("lesson-ready"),
+      );
+      if (legacy.length)
+        warn(
+          `legacy two-entry Stop layout — run ${c.bold("devcoach install")} to merge into one ` +
+            "stop-hook entry (fewer spawns per stop)",
+        );
+      else ok(`Stop hook wired (${ours.filter((o) => o.event === "Stop").length} entry)`);
+      if (!ours.some((o) => o.event === "UserPromptSubmit"))
+        warn(
+          `no UserPromptSubmit priming hook — run ${c.bold("devcoach install")} to add it ` +
+            "(lessons land more reliably)",
+        );
+      else ok("UserPromptSubmit priming hook wired");
+      for (const { cmd } of ours) {
+        const bin = cmd.command.split(" ")[0] ?? "";
+        if (bin.startsWith("/") && !existsSync(bin))
+          bad(`hook command not found: ${bin} — re-run ${c.bold("devcoach install")}`);
+        if (cmd.command.startsWith("npx "))
+          warn("hook runs via npx — needs the npx cache (or network) on every stop");
+        if (cmd.timeout == null) warn(`hook entry has no timeout (${cmd.command})`);
+      }
+    }
+
+    const skill = skillStatus();
+    if (skill === "current") ok("Claude Code skill installed (current version)");
+    else if (pluginOn) ok("Claude Code skill bundled with the plugin");
+    else if (skill === "outdated")
+      warn(`Claude Code skill is out of date — run ${c.bold("devcoach install")}`);
+    else warn(`Claude Code skill not installed — run ${c.bold("devcoach install")}`);
+
+    const mcpRead = readJsonFile<McpConfig>(join(homedir(), ".claude.json"));
+    if (mcpRead.ok && mcpRead.data.mcpServers?.devcoach) ok("MCP server registered (user scope)");
+    else
+      warn(
+        "MCP server not found in ~/.claude.json — it may be registered elsewhere " +
+          `(check with ${c.bold("claude mcp get devcoach")})`,
+      );
+  }
+
+  log(c.bold("\nDatabase & pacing"));
+  if (!existsSync(db.DB_PATH)) {
+    warn(`no database yet (${db.DB_PATH}) — onboarding runs on the first technical task`);
+    log();
+    return;
+  }
+  try {
+    db.withConnection((conn) => {
+      ok(`database opens (${db.DB_PATH})`);
+      if (db.isOnboardingComplete(conn).knowledge_ready) ok("onboarding complete");
+      else warn("onboarding not complete — the next stop cues it");
+      const settings = db.getSettings(conn);
+      log(
+        `    settings: max_per_day=${settings.max_per_day} · min_gap_minutes=${settings.min_gap_minutes} · ` +
+          `nudge_every=${settings.nudge_every} · nudge_scope=${settings.nudge_scope}`,
+      );
+      const sessions = db.listNudgeSessions(conn);
+      const total = sessions.reduce((sum, s) => sum + s.interactions, 0);
+      log(
+        `    pacing: ${sessions.length} session(s) counted, ${total} interaction(s) total` +
+          (sessions[0]
+            ? ` — latest ${sessions[0].session_id.slice(0, 8)}… at ${sessions[0].interactions}`
+            : ""),
+      );
+      const cue = db.getCueState(conn);
+      if (cue.pending) warn(`a cue is pending since ${cue.last_cue_at} (retry threshold armed)`);
+      else if (cue.last_skip_reason) log(`    last skip: "${cue.last_skip_reason}"`);
+      if (cue.display_pending)
+        warn("a lesson was logged and the next stop will verify its card is visible");
+      const rate = coach.checkRateLimit(conn);
+      if (rate.allowed) ok("rate limit: allowed");
+      else warn(`rate limit: ${rate.reason}`);
+
+      log(c.bold("\nVerdict"));
+      const verdict = coach.explainCue(conn, sessions[0]?.session_id ?? null);
+      if (verdict.wouldCue) ok("the next eligible stop WOULD cue a lesson");
+      else warn("the next eligible stop would NOT cue a lesson:");
+      for (const reason of verdict.reasons) log(`      · ${reason}`);
+    });
+  } catch (err) {
+    bad(`database check failed: ${err}`);
+  }
+  log();
 }
 
 // ── Setup wizard (interactive) ───────────────────────────────────────────────
@@ -730,161 +955,14 @@ async function cmdSetup(): Promise<void> {
   }
 }
 
-// ── Stop hooks ───────────────────────────────────────────────────────────────
+// ── Hooks ────────────────────────────────────────────────────────────────────
+// The hook implementations live in ./hooks (a lean chunk loaded by src/bin.ts without
+// the full CLI bundle); imported here for Commander registration, re-exported for the
+// tests and for API stability.
+import { cmdLessonReady, cmdOnboardHook, cmdPromptHook, cmdStopHook } from "./hooks";
 
-/**
- * Claude Code passes the Stop-hook payload as JSON on stdin. We use two fields:
- * `stop_hook_active` (true when this stop is itself a hook-forced continuation —
- * re-blocking then would loop forever) and `permission_mode` (`"plan"` while the user
- * is planning, when the model cannot deliver or save a lesson). Empty/garbage input is
- * treated as a fresh, non-plan stop.
- */
-export interface HookPayload {
-  stop_hook_active: boolean;
-  permission_mode: string | null;
-  session_id: string | null;
-}
-
-export function parseHookPayload(raw: string): HookPayload {
-  try {
-    const p = JSON.parse(raw);
-    return {
-      stop_hook_active: p?.stop_hook_active === true,
-      permission_mode: typeof p?.permission_mode === "string" ? p.permission_mode : null,
-      session_id: typeof p?.session_id === "string" ? p.session_id : null,
-    };
-  } catch {
-    return { stop_hook_active: false, permission_mode: null, session_id: null };
-  }
-}
-
-/**
- * Read the Stop-hook payload from stdin, but only when it is actually piped (Claude
- * Code delivers it over a SOCKET; a FIFO or a redirected file carry it too). Skip a
- * TTY/character device, where a blocking read would hang an interactive run or a test.
- */
-function readHookPayload(): HookPayload {
-  const empty: HookPayload = { stop_hook_active: false, permission_mode: null, session_id: null };
-  try {
-    const st = fstatSync(0);
-    if (!st.isFIFO() && !st.isFile() && !st.isSocket()) return empty;
-    return parseHookPayload(readFileSync(0, "utf8"));
-  } catch {
-    return empty;
-  }
-}
-
-/** A Stop hook stays silent on a hook-forced continuation, or while in plan mode. */
-function shouldSuppressHook(p: HookPayload): boolean {
-  return p.stop_hook_active || p.permission_mode === "plan";
-}
-
-/**
- * Block the stop without the non-zero "Stop hook error" framing. Claude Code reads
- * `{decision:"block", reason}` from stdout (exit 0), blocks the stop, and feeds
- * `reason` to the model as the reason it must keep working — same compulsion as an
- * exit-2 stderr cue, but Claude Code no longer labels it an error.
- */
-function emitBlock(reason: string): never {
-  process.stdout.write(`${JSON.stringify({ decision: "block", reason })}\n`);
-  process.exit(0);
-}
-
-function cmdOnboardHook(): void {
-  if (shouldSuppressHook(readHookPayload())) process.exit(0);
-  // No DB yet → onboarding has not run. Cue WITHOUT creating coaching.db or any
-  // marker file, so an interrupted onboarding leaves nothing behind and re-cues on
-  // the next task. The artifacts appear only when complete_onboarding actually runs.
-  if (existsSync(db.DB_PATH)) {
-    let ready: boolean;
-    try {
-      ready = db.withConnection((conn) => db.isOnboardingComplete(conn).knowledge_ready);
-    } catch {
-      process.exit(0);
-    }
-    if (ready) process.exit(0);
-  }
-
-  emitBlock(
-    "devcoach: the user has no coaching profile yet. Ask them how they want to set it up — " +
-      "Automatic (detect this project's tech stack), Guided (a short conversation to map topics " +
-      "and confidence levels), or Import (restore from a backup) — and do not pick for them. " +
-      "After they choose, build the profile and save it by calling the devcoach " +
-      "`complete_onboarding` MCP tool (not a shell command) before ending your turn.",
-  );
-}
-
-// The notebook's observations are refreshed only every Nth delivered lesson, not after
-// each one. The hook owns the count (the DB is the source of truth) so the model never
-// has to count.
-const NOTEBOOK_UPDATE_EVERY = 10;
-
-function cmdLessonReady(): void {
-  const hook = readHookPayload();
-  if (shouldSuppressHook(hook)) process.exit(0);
-  // No DB → no profile yet. Stay silent without creating coaching.db.
-  if (!existsSync(db.DB_PATH)) process.exit(0);
-  let result: { cue: boolean; nextLessonNumber: number };
-  try {
-    result = db.withConnection((conn) => {
-      if (!db.isOnboardingComplete(conn).knowledge_ready)
-        return { cue: false, nextLessonNumber: 0 };
-      if (!coach.checkRateLimit(conn).allowed) return { cue: false, nextLessonNumber: 0 };
-      // Interaction-pacing gate: count eligible stops and cue at most once every
-      // `nudge_every` (per session, or globally). Reset happens in log_lesson.
-      const settings = db.getSettings(conn);
-      if (settings.nudge_every > 0) {
-        const n = db.bumpNudge(conn, hook.session_id ?? "__nosession__", settings.nudge_scope);
-        if (n < settings.nudge_every) return { cue: false, nextLessonNumber: 0 };
-      }
-      return { cue: true, nextLessonNumber: Number(coach.getStats(conn).total_lessons ?? 0) + 1 };
-    });
-  } catch {
-    process.exit(0);
-  }
-  if (!result.cue) process.exit(0);
-
-  const { nextLessonNumber } = result;
-  const updateDue = nextLessonNumber % NOTEBOOK_UPDATE_EVERY === 0;
-  const nextCheckpoint =
-    Math.ceil(nextLessonNumber / NOTEBOOK_UPDATE_EVERY) * NOTEBOOK_UPDATE_EVERY;
-  const notebookStep = updateDue
-    ? `6. This is lesson #${nextLessonNumber} — a notebook checkpoint (every ${NOTEBOOK_UPDATE_EVERY} ` +
-      "lessons). After log_lesson returns the feedback, call update_notebook with the revised " +
-      "notebook markdown: fold in what the user absorbed or struggled with and any new pattern, " +
-      `keep the prior notes, and record "(updated after ${nextLessonNumber} lessons)".`
-    : `6. Do NOT call update_notebook this time — the notebook is refreshed only every ` +
-      `${NOTEBOOK_UPDATE_EVERY} lessons (next checkpoint at lesson #${nextCheckpoint}). Just ` +
-      "deliver the card and call log_lesson.";
-
-  emitBlock(
-    "devcoach: a lesson is due for the technical work just completed. Do it now — do not " +
-      "acknowledge this message and do not explain what you are about to do.\n\n" +
-      "1. Read the MCP resources devcoach://profile, devcoach://taught-topics, and " +
-      "devcoach://notebook.\n" +
-      "2. Decide whether the work just completed warrants ONE lesson: writing or reviewing " +
-      "code, commits, debugging, config, queries, or infra = yes; pure questions, chat, or " +
-      "non-technical replies = no. If no, output nothing further and stop.\n" +
-      "3. Use the notebook to choose WHAT to teach: skip topics it marks as absorbed, prefer " +
-      "its 'Recommended focus', calibrate depth from 'Recurring patterns', and watch its 'Open " +
-      "hypotheses'. Pick ONE devcoach://profile topic NOT already in devcoach://taught-topics, " +
-      "pitched at or above the user's confidence band.\n" +
-      "4. FIRST write the lesson as your visible reply — in EXACTLY this format. It is plain " +
-      "markdown between two band headings; do NOT prefix lines with '>' (no blockquote):\n\n" +
-      "### ──────── 🎓 devcoach ────────\n" +
-      "**[Title]** · [Category] · [Junior|Mid|Senior]\n\n" +
-      "[3–6 short paragraphs: explain the why, tie it to the task; fenced code if useful]\n\n" +
-      "💡 *Senior tip:* [one line]\n" +
-      "### ──────── [topic] · [level] ────────\n\n" +
-      "5. ONLY AFTER the card is written, call log_lesson. Put title/topic_id/categories/level/" +
-      "summary in their own fields; body = ONLY the prose + the 💡 tip as CLEAN markdown (no " +
-      "bands, no '>' quote, no title or 'Category · Level' line). log_lesson then asks the user " +
-      "'Did that land?', so the card MUST be printed first.\n" +
-      `${notebookStep}\n\n` +
-      "The rate-limit check is already done by this hook — skip it. Output only the lesson " +
-      "card (or nothing). No preamble, no meta-commentary.",
-  );
-}
+export { buildLessonCue, type HookPayload, parseHookPayload } from "./hooks";
+export { cmdLessonReady, cmdOnboardHook, cmdPromptHook, cmdStopHook };
 
 // ── Welcome ──────────────────────────────────────────────────────────────────
 
@@ -893,9 +971,10 @@ function printWelcome(): void {
     ["mcp", "Start the MCP server (stdio) for Claude Code / Claude Desktop"],
     ["ui [--port N]", "Launch the web dashboard  (default port: 7860)"],
     ["setup", "First-run wizard: import backup or build your knowledge profile"],
-    ["install", "Register the MCP server + Stop hook in Claude Code / Claude Desktop"],
+    ["install", "Register the MCP server + Stop hooks + skill in Claude Code / Claude Desktop"],
     ["onboard-hook", "Claude Code Stop hook: cue onboarding when no profile exists"],
     ["lesson-ready", "Claude Code Stop hook: cue a lesson when one is due"],
+    ["doctor", "Diagnose the Claude Code wiring — explains why a lesson would(n't) fire"],
     ["profile", "Show the knowledge map"],
     ["stats", "Coaching statistics and rate-limit status"],
     ["settings / set", "Show / update settings (max_per_day | min_gap_minutes)"],
@@ -912,6 +991,8 @@ function printWelcome(): void {
   log(
     `\n${c.dim("Run")} ${c.bold("devcoach <command> --help")} ${c.dim("for per-command options.")}\n`,
   );
+  const hint = skillHint();
+  if (hint) log(`${hint}\n`);
 }
 
 // ── Dispatch (Commander) ─────────────────────────────────────────────────────
@@ -950,7 +1031,15 @@ function buildProgram(): Command {
     // Default action when no subcommand is given: branded welcome screen.
     .action(() => printWelcome());
 
-  program.command("mcp").description("Start the MCP server (stdio transport)").action(runStdio);
+  // The MCP server (SDK + zod schemas) and the web UI (Hono + views) are the two heavy
+  // corners of the bundle — loaded on demand so plain CLI commands never parse them.
+  program
+    .command("mcp")
+    .description("Start the MCP server (stdio transport)")
+    .action(async () => {
+      const { runStdio } = await import("../mcp/server");
+      await runStdio();
+    });
 
   program.command("profile").description("Show the knowledge map").action(cmdProfile);
 
@@ -1086,7 +1175,7 @@ function buildProgram(): Command {
 
   program
     .command("install")
-    .description("Register the MCP server + Stop hooks in Claude Code / Claude Desktop")
+    .description("Register the MCP server + Stop hooks + skill in Claude Code / Claude Desktop")
     .option("--claude-code", "Target Claude Code only")
     .option("--claude-desktop", "Target Claude Desktop only")
     .option("--force", "Overwrite existing devcoach entry")
@@ -1107,25 +1196,43 @@ function buildProgram(): Command {
     );
 
   program
+    .command("doctor")
+    .description("Diagnose the devcoach ⇄ Claude Code wiring and the lesson pacing state")
+    .action(cmdDoctor);
+
+  program
     .command("ui")
     .description("Launch the web dashboard")
     .option("--port <port>", "Port", "7860")
-    .action((opts: { port?: string }) => startUi(Number.parseInt(opts.port ?? "7860", 10) || 7860));
+    .action(async (opts: { port?: string }) => {
+      const { startUi } = await import("../web/app");
+      startUi(Number.parseInt(opts.port ?? "7860", 10) || 7860);
+    });
 
   program
     .command("setup")
     .description("First-run wizard: import backup or build your knowledge profile")
     .action(cmdSetup);
 
-  // Stop hooks — hidden from help; exit 0 always (silent, or a {decision:block} cue on stdout).
+  // Hooks — hidden from help; exit 0 always (silent, or a JSON directive on stdout).
+  // Wrapped in arrows: Commander passes (options, command) to actions, which would
+  // otherwise clobber the HookPayload default parameter.
+  program
+    .command("stop-hook", { hidden: true })
+    .description("Claude Code Stop hook: onboarding check + lesson cue in one spawn")
+    .action(() => cmdStopHook());
+  program
+    .command("prompt-hook", { hidden: true })
+    .description("Claude Code UserPromptSubmit hook: prime the model when a lesson is due")
+    .action(() => cmdPromptHook());
   program
     .command("onboard-hook", { hidden: true })
-    .description("Claude Code Stop hook: cue onboarding")
-    .action(cmdOnboardHook);
+    .description("Claude Code Stop hook: cue onboarding (legacy two-entry layout)")
+    .action(() => cmdOnboardHook());
   program
     .command("lesson-ready", { hidden: true })
-    .description("Claude Code Stop hook: signal a lesson is due")
-    .action(cmdLessonReady);
+    .description("Claude Code Stop hook: signal a lesson is due (legacy two-entry layout)")
+    .action(() => cmdLessonReady());
 
   return program;
 }

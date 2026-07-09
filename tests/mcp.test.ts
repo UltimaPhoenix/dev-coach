@@ -17,9 +17,9 @@ async function connect() {
 const text = (r: any): string => r.content[0].text;
 
 describe("mcp server", () => {
-  it("lists 14 tools, 9 resources + 1 template, 1 prompt", async () => {
+  it("lists 15 tools, 9 resources + 1 template, 1 prompt", async () => {
     const { client, server } = await connect();
-    expect((await client.listTools()).tools.length).toBe(14);
+    expect((await client.listTools()).tools.length).toBe(15);
     expect((await client.listResources()).resources.length).toBe(9);
     expect((await client.listResourceTemplates()).resourceTemplates.length).toBe(1);
     expect((await client.listPrompts()).prompts[0].name).toBe("devcoach_instructions");
@@ -88,6 +88,30 @@ describe("mcp server", () => {
     expect(log.structuredContent.id).toBe("t1");
     expect(log.structuredContent.body).toBe("Full lesson body.");
     expect(log.structuredContent.feedback).toBeNull();
+    // The result echoes the rendered card so a lesson logged without being displayed
+    // can be recovered verbatim by the model.
+    expect(text(log)).toContain("must already be visible");
+    expect(text(log)).toContain("🎓 devcoach");
+    expect(text(log)).toContain("Full lesson body.");
+
+    // log_lesson flags the next stop to verify the card is visible.
+    expect(db.withConnection((c) => db.takeDisplayPending(c))).toBe(true);
+
+    // skip_lesson records the decline and resolves the pacing window: pending cue
+    // disarmed AND counters restarted (a primed turn resolves before the Stop hook).
+    db.withConnection((c) => {
+      db.markCuePending(c);
+      db.bumpNudge(c, "s-skip", "session");
+    });
+    const skip: any = await client.callTool({
+      name: "skip_lesson",
+      arguments: { reason: "pure conversation, nothing technical" },
+    });
+    expect(text(skip)).toContain("re-armed");
+    const cueState = db.withConnection((c) => db.getCueState(c));
+    expect(cueState.pending).toBe(false);
+    expect(cueState.last_skip_reason).toBe("pure conversation, nothing technical");
+    expect(db.withConnection((c) => db.peekNudge(c, "s-skip", "session"))).toBe(0);
 
     // An empty body is rejected — a lesson with no content is useless in the UI.
     const emptyBody: any = await client.callTool({

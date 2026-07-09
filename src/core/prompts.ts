@@ -12,24 +12,23 @@ function band(title: string): string {
   return `### ${"─".repeat(left)} ${title} ${"─".repeat(pad - left)}`;
 }
 
-/** Format a Lesson as the markdown block appended to a coaching response. */
+/**
+ * Format a Lesson as the chat card: a titled top band, `**Title** · Category · Level`,
+ * the body (or summary) as plain markdown — never `> ` blockquoted, which breaks on
+ * multi-paragraph bodies and fenced code — and a bottom band echoing topic · level.
+ * Must stay in sync with the card format described in assets/SKILL.md §4.
+ */
 export function formatLessonForDisplay(lesson: Lesson): string {
   const levelLabel = lesson.level.charAt(0).toUpperCase() + lesson.level.slice(1);
   const categoryStr = lesson.categories.join(" · ");
-  const content = [
-    `${categoryStr} · Level: ${levelLabel}`,
+  return [
+    band("🎓 devcoach"),
+    `**${lesson.title}** · ${categoryStr} · ${levelLabel}`,
     "",
-    `**${lesson.title}**`,
+    lesson.body?.trim() || lesson.summary,
     "",
-    lesson.summary,
-  ];
-  if (lesson.task_context) {
-    content.push("", `*Context: ${lesson.task_context}*`);
-  }
-  const quoted = content.map((line) => `> ${line}`.replace(/\s+$/, ""));
-  return [band("🎓 devcoach"), ...quoted, "", band(`${lesson.topic_id} · ${lesson.level}`)].join(
-    "\n",
-  );
+    band(`${lesson.topic_id} · ${lesson.level}`),
+  ].join("\n");
 }
 
 /** Select a prompt template based on confidence (0-3 junior, 4-6 mid, 7-9 senior, 10 mastered → ""). */

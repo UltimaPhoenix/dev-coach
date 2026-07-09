@@ -46,6 +46,7 @@
     "format": "biome format --write .",
     "test": "vitest run",
     "test:cov": "vitest run --coverage",
+    "test:e2e": "npm run build && node scripts/e2e-claude.mjs",
     "mcpb": "npm run build && node scripts/build-mcpb.mjs",
     "mcpb:sign": "npm run build && node scripts/build-mcpb.mjs --sign",
     "plugin:sync": "node scripts/sync-plugin.mjs",

@@ -1,9 +1,9 @@
 // Keep the Claude Code plugin (plugin/) in sync with the repo's single sources of truth:
 //   • plugin/.claude-plugin/plugin.json  version  ←  package.json version
-//   • plugin/skills/devcoach/SKILL.md             ←  assets/SKILL.md
+//   • plugin/skills/devcoach/            ←  assets/SKILL.md + assets/references/
 // Idempotent: writing the same content twice is a no-op. Run it in the bump job and before packing.
 //   node scripts/sync-plugin.mjs
-import { cpSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -16,10 +16,13 @@ const manifestPath = join(root, "plugin", ".claude-plugin", "plugin.json");
 const manifest = readFileSync(manifestPath, "utf8");
 writeFileSync(manifestPath, manifest.replace(/"version": "[^"]+"/, `"version": "${version}"`));
 
-// 2. Copy the coaching skill verbatim (single source of truth: assets/SKILL.md).
-const skillDest = join(root, "plugin", "skills", "devcoach", "SKILL.md");
-mkdirSync(dirname(skillDest), { recursive: true });
-cpSync(join(root, "assets", "SKILL.md"), skillDest);
+// 2. Copy the coaching skill verbatim (single source of truth: assets/SKILL.md +
+//    assets/references/ for progressive disclosure).
+const skillDir = join(root, "plugin", "skills", "devcoach");
+mkdirSync(skillDir, { recursive: true });
+cpSync(join(root, "assets", "SKILL.md"), join(skillDir, "SKILL.md"));
+rmSync(join(skillDir, "references"), { recursive: true, force: true });
+cpSync(join(root, "assets", "references"), join(skillDir, "references"), { recursive: true });
 
 // 3. Pin the published devcoach version the plugin installs at runtime (scripts/launch.mjs) to this
 //    release — same in-place regex approach, so a version bump re-triggers the launcher's npm install.

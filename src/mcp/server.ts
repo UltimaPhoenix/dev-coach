@@ -1,5 +1,5 @@
 // MCP server on the official @modelcontextprotocol/sdk.
-// 13 tools, 9 resources, and the devcoach_instructions prompt. Tools follow the build-mcp-server
+// 15 tools, 10 resources, and the devcoach_instructions prompt. Tools follow the build-mcp-server
 // review: title + hint annotations, tight Zod schemas with .describe(), outputSchema/structuredContent
 // for model returns, isError on failure, and an elicitation capability-check in log_lesson.
 import { spawn } from "node:child_process";
@@ -23,7 +23,8 @@ import {
   RepositoryPlatformSchema,
   UiThemeSchema,
 } from "../core/models";
-import { readSkill } from "../skill";
+import { formatLessonForDisplay } from "../core/prompts";
+import { readSkill, readSkillReferences } from "../skill";
 import { VERSION } from "../version";
 
 // ── Result helpers ───────────────────────────────────────────────────────────
@@ -167,8 +168,10 @@ export function createServer(): McpServer {
         });
         db.withConnection((c) => {
           db.insertLesson(c, lesson);
-          // A lesson was delivered → reset the interaction-pacing counters.
+          // A lesson was delivered → reset the interaction-pacing counters, and flag
+          // the next stop to verify the card is actually visible in the reply.
           db.resetNudge(c);
+          db.markDisplayPending(c);
         });
 
         // Inline feedback via elicitation — capability-gated, with a graceful no-op fallback.
@@ -203,7 +206,20 @@ export function createServer(): McpServer {
         } catch {
           // elicitation not supported by this client — lesson is already saved
         }
-        return structured(lesson);
+        // Belt-and-braces for display: the card must be user-visible chat output, but
+        // nothing can verify that server-side — so echo the rendered card and make the
+        // model print it if it skipped that step.
+        return {
+          content: [
+            txt(
+              "Lesson saved. REQUIRED: the lesson card must already be visible in your " +
+                "reply. If it is not, print the card below VERBATIM now, before any other " +
+                `output:\n\n${formatLessonForDisplay(lesson)}`,
+            ),
+            txt(JSON.stringify(lesson)),
+          ],
+          structuredContent: lesson,
+        };
       } catch (err) {
         return errResult(`log_lesson failed: ${err}`);
       }
@@ -391,6 +407,38 @@ export function createServer(): McpServer {
         return { content: [txt(String(ok))] };
       } catch (err) {
         return errResult(`submit_feedback failed for '${args.lesson_id}': ${err}`);
+      }
+    },
+  );
+
+  server.registerTool(
+    "skip_lesson",
+    {
+      title: "Skip Lesson",
+      description:
+        "Decline a lesson cue: call this when the coaching hook asked for a lesson but the " +
+        "completed work does not warrant one (pure questions, chat, nothing technical). " +
+        "Re-arms the pacing counter so the cue is not repeated immediately. " +
+        "Never call it after delivering a lesson — log_lesson already resolves the cue.",
+      inputSchema: {
+        reason: z
+          .string()
+          .min(1)
+          .describe("One line: why no lesson was warranted (shown in `devcoach doctor`)"),
+      },
+      annotations: {
+        title: "Skip Lesson",
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (args) => {
+      try {
+        db.withConnection((c) => db.clearCuePending(c, args.reason));
+        return { content: [txt("Cue skipped — pacing re-armed. Output nothing to the user.")] };
+      } catch (err) {
+        return errResult(`skip_lesson failed: ${err}`);
       }
     },
   );
@@ -884,11 +932,19 @@ export function createServer(): McpServer {
     "devcoach_instructions",
     {
       title: "devcoach coaching instructions",
-      description: "Full coaching instructions for the devcoach skill (content of SKILL.md).",
+      description:
+        "Full coaching instructions for the devcoach skill (SKILL.md plus its reference files).",
     },
-    () => ({
-      messages: [{ role: "user", content: { type: "text", text: readSkill() } }],
-    }),
+    () => {
+      // Clients without a skill directory (Claude Desktop) can't do progressive
+      // disclosure — inline the reference files after the main instructions.
+      const refs = readSkillReferences()
+        .map((r) => `\n\n---\n\n<!-- reference: ${r.name} -->\n\n${r.content}`)
+        .join("");
+      return {
+        messages: [{ role: "user", content: { type: "text", text: readSkill() + refs } }],
+      };
+    },
   );
 
   return server;

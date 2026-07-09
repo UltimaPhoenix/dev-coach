@@ -19,11 +19,13 @@ npx @modelcontextprotocol/inspector npx -y devcoach mcp
 Claude Desktop config file: macOS `~/Library/Application Support/Claude/claude_desktop_config.json` ·
 Windows `%APPDATA%\Claude\claude_desktop_config.json` · Linux `~/.config/Claude/claude_desktop_config.json`.
 
-## Tools (13)
+## Tools (15)
 
 | Tool | Purpose | Annotation |
 |---|---|---|
-| `log_lesson` | Save a delivered lesson (auto-fills git context; elicits inline feedback) | write |
+| `log_lesson` | Save a delivered lesson (auto-fills git context; elicits inline feedback; echoes the rendered card) | write |
+| `skip_lesson` | Decline a lesson cue with a one-line reason; re-arms the pacing counter | write |
+| `update_notebook` | Overwrite the coaching notebook (`learning-state.md`) with revised markdown | write |
 | `update_knowledge` | Adjust a topic's confidence by a delta (clamped 0–10) | write |
 | `get_lessons` | Query lesson history (period, category, level, git, starred, feedback, search, date range) | read-only |
 | `star_lesson` | Star / unstar a lesson | write |
@@ -40,19 +42,22 @@ Windows `%APPDATA%\Claude\claude_desktop_config.json` · Linux `~/.config/Claude
 Each tool declares a `title` and read-only/destructive hints, validates input with Zod, returns typed
 `structuredContent` where applicable, and reports failures as `{ isError: true, … }` with a recovery hint.
 
-## Resources (9)
+## Resources (10)
 
-`devcoach://profile` · `settings` · `lessons/recent` · `stats` · `taught-topics` · `rate-limit` ·
+`devcoach://profile` · `notebook` (text/markdown) · `settings` · `lessons/recent` · `stats` ·
+`taught-topics` · `rate-limit` ·
 `context` · `onboarding` · `lessons/{lesson_id}` (templated). All return `application/json` and never
 throw — on error they return `{ "error": … }`. Read `taught-topics` before selecting a lesson topic to
 avoid repetition; read `rate-limit` to decide whether to deliver.
 
 ## Prompt
 
-`devcoach_instructions` returns the full coaching instructions (`assets/SKILL.md`). MCP prompts are
-surfaced as user-invocable slash commands (Claude Code, Claude Desktop) — they are **not** auto-injected
-into context. Coaching is driven by the `lesson-ready` Stop hook, which carries a self-contained lesson
-directive, so no separate skill install is needed.
+`devcoach_instructions` returns the full coaching instructions (`assets/SKILL.md` plus its reference
+files, inlined). MCP prompts are surfaced as user-invocable slash commands (Claude Code, Claude
+Desktop) — they are **not** auto-injected into context. In Claude Code, coaching is driven by the
+`stop-hook`/`prompt-hook` pair: the Stop cue invokes the devcoach **skill** deterministically (with a
+compact self-contained fallback when the skill isn't installed), and the model can decline via
+`skip_lesson` when the turn wasn't technical.
 
 ## Data models
 

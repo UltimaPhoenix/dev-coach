@@ -36,6 +36,34 @@ Via web UI: `devcoach ui` → Settings page.
 
 ---
 
+## Lesson pacing (nudge)
+
+Beyond the rate limits, devcoach paces the *coaching cue* itself — the hook signal that
+asks the agent to deliver a lesson. This keeps coaching deliberately quiet: short
+sessions may produce no lesson at all, by design.
+
+| Setting | Default | Values | Description |
+|---------|---------|--------|-------------|
+| `nudge_every` | 10 | 0–∞ | Interactions (agent stops) between lesson cues. `0` = cue on every eligible stop |
+| `nudge_scope` | `session` | `session` \| `global` | Count interactions per chat session, or across all sessions |
+
+How the counter behaves:
+
+- **Plan-mode turns don't count** — planning isn't coachable work.
+- **Rate-limited stops keep accumulating**, so the cue fires at the first allowed stop.
+- **When a cue fires, the counter resets** — no cue storms after the threshold.
+- **A resolution restarts the window**: both `log_lesson` (lesson delivered) and
+  `skip_lesson` (explicit decline) reset the counters.
+- **An unresolved cue retries sooner**: if the agent neither logs a lesson (`log_lesson`)
+  nor declines explicitly (`skip_lesson`), the next cue comes after
+  `min(3, nudge_every)` further stops instead of the full threshold.
+- **The card is enforced**: the stop after `log_lesson` verifies the lesson card is
+  visible in the reply and reprints it once if it isn't.
+
+`devcoach doctor` prints the live counters and explains whether the next stop would cue.
+
+---
+
 ## Data location
 
 ```
@@ -82,6 +110,11 @@ knowledge_groups (group_name TEXT, topic TEXT, PRIMARY KEY (group_name, topic))
 
 -- Settings
 settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)
+
+-- Runtime-only pacing state (never included in backups)
+nudge_state (session_id TEXT PRIMARY KEY, interactions INTEGER, updated_at TEXT)
+cue_state (id INTEGER PRIMARY KEY CHECK (id = 1), pending INTEGER,
+           last_cue_at TEXT, last_skip_reason TEXT)
 ```
 
 ---

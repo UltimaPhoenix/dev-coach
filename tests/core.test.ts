@@ -156,6 +156,106 @@ describe("db knowledge + groups + settings", () => {
     const n = Number((c.prepare("SELECT COUNT(*) AS n FROM nudge_state").get() as { n: number }).n);
     expect(n).toBeLessThanOrEqual(db.MAX_NUDGE_SESSIONS);
   });
+  it("cue_state: pending lifecycle + resetNudge disarms", () => {
+    c = freshDb();
+    expect(db.getCueState(c)).toEqual({
+      pending: false,
+      last_cue_at: null,
+      last_skip_reason: null,
+      display_pending: false,
+    });
+    db.bumpNudge(c, "s1", "session");
+    db.markCuePending(c);
+    const armed = db.getCueState(c);
+    expect(armed.pending).toBe(true);
+    expect(armed.last_cue_at).not.toBeNull();
+    // markCuePending also restarts pacing from zero
+    expect(db.peekNudge(c, "s1", "session")).toBe(0);
+    // skip resolves the whole window: pending disarmed AND counters restarted
+    db.bumpNudge(c, "s1", "session");
+    db.clearCuePending(c, "nothing technical");
+    expect(db.getCueState(c).pending).toBe(false);
+    expect(db.getCueState(c).last_skip_reason).toBe("nothing technical");
+    expect(db.peekNudge(c, "s1", "session")).toBe(0);
+    db.markCuePending(c);
+    db.resetNudge(c); // log_lesson path
+    expect(db.getCueState(c).pending).toBe(false);
+    // display flag: set by log_lesson, consumed once by the next stop
+    db.markDisplayPending(c);
+    expect(db.takeDisplayPending(c)).toBe(true);
+    expect(db.takeDisplayPending(c)).toBe(false);
+  });
+
+  it("evaluateCue: gates in order, resets on emission, retries, counts plan mode", () => {
+    c = freshDb();
+    const opts = { planMode: false };
+    expect(coach.evaluateCue(c, "s1", opts).reason).toContain("onboarding");
+
+    db.upsertKnowledge(c, "ts", 5);
+    db.setSetting(c, "nudge_every", "5");
+    db.setSetting(c, "min_gap_minutes", "0");
+    db.setSetting(c, "max_per_day", "99");
+
+    // pacing: 4 silent stops, cue on the 5th, counter reset + retry armed
+    for (let i = 1; i <= 4; i++) {
+      const d = coach.evaluateCue(c, "s1", opts);
+      expect(d.cue).toBe(false);
+      expect(d.reason).toContain(`paced (${i}/5)`);
+    }
+    const cue = coach.evaluateCue(c, "s1", opts);
+    expect(cue.cue).toBe(true);
+    expect(cue.nextLessonNumber).toBe(1);
+    expect(db.getCueState(c).pending).toBe(true);
+    // retry window: threshold drops to min(3, nudge_every)
+    expect(coach.evaluateCue(c, "s1", opts).reason).toContain("paced (1/3");
+    expect(coach.evaluateCue(c, "s1", opts).cue).toBe(false);
+    expect(coach.evaluateCue(c, "s1", opts).cue).toBe(true);
+
+    // plan mode: never counts and never cues
+    db.resetNudge(c);
+    for (let i = 1; i <= 4; i++) coach.evaluateCue(c, "s1", opts);
+    const plan = coach.evaluateCue(c, "s1", { planMode: true });
+    expect(plan.cue).toBe(false);
+    expect(plan.reason).toContain("plan mode (not counted)");
+    expect(db.peekNudge(c, "s1", "session")).toBe(4); // the plan-mode stop did NOT count
+    expect(coach.evaluateCue(c, "s1", opts).cue).toBe(true); // 5th real stop cues
+
+    // rate limited: accumulates without cueing and without arming the retry
+    db.resetNudge(c);
+    db.setSetting(c, "max_per_day", "0");
+    for (let i = 1; i <= 5; i++) coach.evaluateCue(c, "s1", opts);
+    const limited = coach.evaluateCue(c, "s1", opts);
+    expect(limited.cue).toBe(false);
+    expect(limited.reason).toContain("rate limited");
+    expect(db.getCueState(c).pending).toBe(false);
+    db.setSetting(c, "max_per_day", "99");
+    expect(coach.evaluateCue(c, "s1", opts).cue).toBe(true); // first allowed stop cues
+
+    // nudge_every=0 → every eligible stop cues
+    db.setSetting(c, "nudge_every", "0");
+    expect(coach.evaluateCue(c, "s1", opts).cue).toBe(true);
+    expect(coach.evaluateCue(c, "s1", opts).reason).toContain("pacing disabled");
+  });
+
+  it("explainCue: read-only dry run of the next stop", () => {
+    c = freshDb();
+    expect(coach.explainCue(c, "s1").wouldCue).toBe(false); // onboarding incomplete
+    db.upsertKnowledge(c, "ts", 5);
+    db.setSetting(c, "nudge_every", "2");
+    db.setSetting(c, "min_gap_minutes", "0");
+    db.setSetting(c, "max_per_day", "99");
+    const below = coach.explainCue(c, "s1");
+    expect(below.wouldCue).toBe(false);
+    expect(below.reasons.join()).toContain("1/2");
+    expect(db.peekNudge(c, "s1", "session")).toBe(0); // never bumps
+    db.bumpNudge(c, "s1", "session");
+    expect(coach.explainCue(c, "s1").wouldCue).toBe(true);
+    db.setSetting(c, "max_per_day", "0");
+    const limited = coach.explainCue(c, "s1");
+    expect(limited.wouldCue).toBe(false);
+    expect(limited.reasons.join()).toContain("rate limited");
+  });
+
   it("backup → restore round-trip", () => {
     c = freshDb();
     db.upsertKnowledge(c, "python", 4);
@@ -213,10 +313,13 @@ describe("coach", () => {
 
 describe("prompts", () => {
   it("formats a lesson card and level prompts", () => {
-    const out = formatLessonForDisplay(lesson({ task_context: "loop" }));
+    const out = formatLessonForDisplay(lesson({ body: "Lazy evaluation defers work.\n\n💡 tip" }));
     expect(out).toContain("🎓 devcoach");
     expect(out).toContain("**Generators**");
-    expect(out).toContain("Context: loop");
+    expect(out).toContain("Lazy evaluation defers work.");
+    expect(out).not.toContain("> ");
+    // body missing → summary is the card text
+    expect(formatLessonForDisplay(lesson({ body: null }))).toContain("lazy");
     expect(buildPromptForLevel("docker", "ctx", 2)).toContain("beginner");
     expect(buildPromptForLevel("docker", "ctx", 5)).toContain("intermediate");
     expect(buildPromptForLevel("docker", "ctx", 8)).toContain("senior-level");

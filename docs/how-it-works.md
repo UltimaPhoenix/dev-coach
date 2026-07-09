@@ -37,27 +37,40 @@ flowchart LR
 
 ## Coaching loop
 
-After every technical task Claude evaluates whether to deliver a lesson.
-The loop is silent when nothing is worth teaching or when the rate limit is reached.
+The loop is driven by two Claude Code hooks. `prompt-hook` (UserPromptSubmit) peeks at
+the pacing state and, when a lesson will be due at the end of the turn, primes the model
+invisibly so the lesson lands naturally at the bottom of the reply. `stop-hook` (Stop)
+owns the pacing counter and is the enforcement: when a lesson is due but wasn't
+delivered, it cues the model — which either activates the devcoach skill and delivers
+ONE lesson, or declines explicitly via `skip_lesson` (re-arming the pacing) when the
+turn wasn't technical. The loop is silent between cues, in plan mode (those turns
+don't count), and while rate-limited (turns keep accumulating).
 
 ```mermaid
 flowchart TD
-    A([Task completed]) --> B[Check rate limit]
-    B -->|denied| Z([Silent])
-    B -->|allowed| D
+    A([Task completed]) --> B{stop-hook:\npaced + rate limit ok?}
+    B -->|not yet| Z([Silent — counter +1])
+    B -->|lesson due| C[Cue: activate the\ndevcoach skill]
 
     subgraph loop["coaching loop"]
-        D[Select topic & depth]
-        E[Compose & deliver]
+        D{Technical\nwork?}
+        E[Select topic & depth]
+        F[Print lesson card]
         G[log_lesson]
+        S[skip_lesson]
     end
 
-    D -->|nothing| Z
-    D -->|found| E
-    E --> G
-    G --> F([Done])
+    C --> D
+    D -->|no| S --> Z2([Silent — pacing re-armed])
+    D -->|yes| E --> F --> G
+    G --> H([Done — counter reset])
     G -.->|prompts| U(["You: ✅ ❌ ⏭"])
 ```
+
+If a cue goes unresolved (no `log_lesson`, no `skip_lesson`), the next cue arrives after
+`min(3, nudge_every)` further stops instead of the full threshold. `log_lesson` echoes
+the rendered card back to the model, so a lesson logged without being displayed is
+recovered verbatim instead of staying invisible.
 
 ---
 

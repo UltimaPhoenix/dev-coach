@@ -142,13 +142,13 @@ npm run mcpb        # → dist-mcpb/devcoach-<version>.mcpb
 <details>
 <summary><strong>npx / npm CLI</strong> (any MCP agent — no install)</summary>
 
-No install required — `npx` runs devcoach on demand. For **Claude Code** and **Claude Desktop**, one command registers the MCP server and wires up automatic lesson delivery:
+No install required — `npx` runs devcoach on demand. For **Claude Code** and **Claude Desktop**, one command registers the MCP server, wires up automatic lesson delivery (Stop hooks), and installs the coaching **skill** into `~/.claude/skills/devcoach/`:
 
 ```bash
 npx -y devcoach install
 ```
 
-Restart your agent afterward. Prefer a global binary? `npm install -g devcoach`, then run `devcoach install` (and drop the `npx -y` prefix everywhere).
+Restart your agent afterward. Prefer a global binary? `npm install -g devcoach`, then run `devcoach install` (and drop the `npx -y` prefix everywhere). After upgrading devcoach, re-run `devcoach install` to refresh the skill — `devcoach stats` reminds you when it's out of date.
 
 </details>
 
@@ -170,14 +170,17 @@ claude mcp add --scope user devcoach npx -- -y devcoach mcp
 { "mcpServers": { "devcoach": { "type": "stdio", "command": "npx", "args": ["-y", "devcoach", "mcp"] } } }
 ```
 
-Then add the Stop hooks to `~/.claude/settings.json` for automatic lesson delivery:
+Then add the hooks to `~/.claude/settings.json` for automatic lesson delivery — `stop-hook` decides
+after each turn whether a lesson is due, `prompt-hook` primes the model up front when one is:
 
 ```json
 {
   "hooks": {
     "Stop": [
-      { "hooks": [{ "type": "command", "command": "npx -y devcoach onboard-hook" }] },
-      { "hooks": [{ "type": "command", "command": "npx -y devcoach lesson-ready" }] }
+      { "hooks": [{ "type": "command", "command": "npx -y devcoach stop-hook", "timeout": 60 }] }
+    ],
+    "UserPromptSubmit": [
+      { "hooks": [{ "type": "command", "command": "npx -y devcoach prompt-hook", "timeout": 30 }] }
     ]
   }
 }
@@ -376,7 +379,7 @@ The CLI is a secondary interface for querying and managing your coaching data. E
 
 | Command | Description |
 |---------|-------------|
-| `devcoach install` | Register with Claude Code / Claude Desktop |
+| `devcoach install` | Register with Claude Code (MCP + hooks + skill) / Claude Desktop |
 | `devcoach profile` | Show your knowledge map with confidence bars |
 | `devcoach stats` | Overview: lesson counts, weakest/strongest topics |
 | `devcoach lessons` | Browse lesson history with filters |
@@ -427,9 +430,13 @@ devcoach requires Node.js ≥ 24. Check your version: `node --version`. If you'r
 
 Run `devcoach install` to re-register the server with Claude Code or Claude Desktop, then restart the agent. If the issue persists, check `~/.claude.json` (Claude Code) and confirm the `devcoach` entry is present and the command is correct.
 
-**"Stop hooks not firing"**
+**"Coaching isn't firing / no lessons appear"**
 
-Stop hooks (automatic lesson delivery after each task) are Claude Code-specific and require `~/.claude/settings.json` to have the two devcoach hook entries (automatic if you ran `devcoach install`, manual if you did it yourself). Other agents (Cursor, Windsurf, Cline) don't support hooks — coaching is available on demand via MCP tools or manual prompting.
+Run **`devcoach doctor`** — it checks the whole wiring (Node version, hook entries in `~/.claude/settings.json`, skill, MCP registration, database, pacing counters, rate limit) and ends with a verdict explaining exactly why the next stop would or wouldn't cue a lesson. Remember that pacing is intentionally quiet: with the defaults a lesson is cued only after `nudge_every` interactions in a session and within the rate limits — that's by design, not a bug. For a live trace, set `DEVCOACH_HOOK_DEBUG=1` and watch `~/.devcoach/hook.log`: every hook run appends one line with its decision (`paced (3/10)`, `rate limited: …`, `cue`). Hooks are Claude Code-specific; other agents (Cursor, Windsurf, Cline) don't support them — coaching is available on demand via MCP tools or manual prompting.
+
+**"Stop hook error occurred" next to a lesson**
+
+That notice is Claude Code's current labeling of *any* Stop hook that blocks — including devcoach's lesson cue (the accompanying "🎓 devcoach…" line tells you it's coaching, not a failure). It's harmless, and by design it's also rare: the UserPromptSubmit priming hook delivers most lessons within the turn, so the blocking fallback only fires when that didn't happen.
 
 **"SQLite permission error"**
 

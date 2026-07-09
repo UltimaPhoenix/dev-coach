@@ -1,14 +1,20 @@
-// Rate limiting, profile, knowledge deltas, and stats.
+// Rate limiting, profile, knowledge deltas, stats, and the lesson-cue decision engine.
 import type { DatabaseSync } from "node:sqlite";
 import {
+  bumpNudge,
   countFilteredLessons,
   countLessonsSince,
   getAllKnowledge,
+  getCueState,
   getKnowledgeEntries,
   getKnowledgeGroupList,
   getLastLessonTimestamp,
   getSettings,
   getTaughtTopicIds,
+  isOnboardingComplete,
+  markCuePending,
+  NUDGE_RETRY_AFTER,
+  peekNudge,
   setFeedback,
   upsertKnowledge,
 } from "./db";
@@ -117,5 +123,96 @@ export function listTaughtTopics(db: DatabaseSync): string[] {
     return getTaughtTopicIds(db);
   } catch {
     return [];
+  }
+}
+
+// ── Lesson-cue decision engine (used by the Stop hook, doctor, and prompt-hook) ──
+
+export interface CueDecision {
+  cue: boolean;
+  /** Human-readable outcome — surfaced by `doctor` and DEVCOACH_HOOK_DEBUG. */
+  reason: string;
+  nextLessonNumber: number;
+}
+
+/**
+ * Decide whether this stop cues a lesson. Mutates pacing state: bumps the interaction
+ * counter (plan-mode stops never count — planning is not coachable work) and, when it
+ * cues, resets the counter and arms the shorter retry threshold (markCuePending).
+ * Rate-limited stops keep accumulating so the cue fires at the first allowed stop.
+ */
+export function evaluateCue(
+  db: DatabaseSync,
+  sessionId: string | null,
+  opts: { planMode: boolean },
+): CueDecision {
+  const none = (reason: string): CueDecision => ({ cue: false, reason, nextLessonNumber: 0 });
+  if (opts.planMode) return none("plan mode (not counted)");
+  if (!isOnboardingComplete(db).knowledge_ready) return none("onboarding not complete");
+
+  const settings = getSettings(db);
+  let pacing = "pacing disabled (nudge_every=0)";
+  if (settings.nudge_every > 0) {
+    const n = bumpNudge(db, sessionId ?? "__nosession__", settings.nudge_scope);
+    const { pending } = getCueState(db);
+    const threshold = pending
+      ? Math.min(NUDGE_RETRY_AFTER, settings.nudge_every)
+      : settings.nudge_every;
+    pacing = `${n}/${threshold}${pending ? " (retry window)" : ""}`;
+    if (n < threshold) return none(`paced (${pacing})`);
+  }
+  const rate = checkRateLimit(db);
+  if (!rate.allowed) return none(`rate limited: ${rate.reason ?? "denied"}`);
+
+  markCuePending(db);
+  return {
+    cue: true,
+    reason: `cue (${pacing})`,
+    nextLessonNumber: Number(getStats(db).total_lessons ?? 0) + 1,
+  };
+}
+
+/**
+ * Read-only dry run of `evaluateCue` for the NEXT eligible stop — no bump, no state
+ * change. Drives `doctor`'s verdict and the prompt-hook's priming decision.
+ */
+export function explainCue(
+  db: DatabaseSync,
+  sessionId: string | null,
+): { wouldCue: boolean; reasons: string[] } {
+  try {
+    const reasons: string[] = [];
+    let wouldCue = true;
+    if (!isOnboardingComplete(db).knowledge_ready) {
+      return { wouldCue: false, reasons: ["onboarding not complete — no knowledge topics yet"] };
+    }
+    const settings = getSettings(db);
+    if (settings.nudge_every > 0) {
+      const n = peekNudge(db, sessionId ?? "__nosession__", settings.nudge_scope) + 1;
+      const { pending } = getCueState(db);
+      const threshold = pending
+        ? Math.min(NUDGE_RETRY_AFTER, settings.nudge_every)
+        : settings.nudge_every;
+      if (n < threshold) {
+        wouldCue = false;
+        reasons.push(
+          `pacing: next stop would be ${n}/${threshold}${pending ? " (retry window)" : ""}`,
+        );
+      } else {
+        reasons.push(`pacing: next stop reaches the threshold (${n}/${threshold})`);
+      }
+    } else {
+      reasons.push("pacing disabled (nudge_every=0) — every eligible stop cues");
+    }
+    const rate = checkRateLimit(db);
+    if (rate.allowed) {
+      reasons.push("rate limit: allowed");
+    } else {
+      wouldCue = false;
+      reasons.push(`rate limited: ${rate.reason ?? "denied"}`);
+    }
+    return { wouldCue, reasons };
+  } catch (err) {
+    return { wouldCue: false, reasons: [`check failed: ${err}`] };
   }
 }
