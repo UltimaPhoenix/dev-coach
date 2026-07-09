@@ -10,10 +10,11 @@ export default defineConfig({
       include: ["src/**"],
       // bin shebang entry is the thin process wrapper; exercised end-to-end, not unit-counted.
       exclude: ["src/bin.ts"],
-      // Gate near the achieved coverage (actuals ~97 lines / 96 statements / 98 functions) with a
+      // Gate near the achieved coverage (actuals ~95 lines / 94 statements / 97 functions) with a
       // small margin. Branches kept lower: many remaining branches are defensive catch/null-fallback
-      // paths and git-detection branches that vary by environment/CI.
-      thresholds: { lines: 90, functions: 90, statements: 90, branches: 70 },
+      // paths and git-detection branches that vary by environment/CI. Note: the hook spawn tests
+      // run in child processes v8 can't see — tests/hooks.test.ts re-covers those lines in-process.
+      thresholds: { lines: 92, functions: 95, statements: 91, branches: 76 },
     },
   },
 });
