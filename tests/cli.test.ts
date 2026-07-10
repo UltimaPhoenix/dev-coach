@@ -355,6 +355,27 @@ describe("cli", () => {
       expect(stopCmds.some((cmd: string) => cmd.includes("my-other-tool"))).toBe(true);
       expect(stopCmds.some((cmd: string) => cmd.includes("lesson-ready"))).toBe(false);
       expect(repaired.hooks.UserPromptSubmit).toHaveLength(1);
+
+      // dev-tree layouts spell it `dev-coach` (not `devcoach`) — they must be swept
+      // too, or they double-count interactions alongside the current entry (seen live)
+      repaired.hooks.Stop = [
+        {
+          hooks: [
+            { type: "command", command: "node /Users/x/dev/dev-coach/dist/bin.js onboard-hook" },
+          ],
+        },
+        {
+          hooks: [
+            { type: "command", command: "node /Users/x/dev/dev-coach/dist/bin.js lesson-ready" },
+          ],
+        },
+        { hooks: [{ type: "command", command: "/opt/homebrew/bin/devcoach stop-hook" }] },
+      ];
+      writeFileSync(settings, JSON.stringify(repaired));
+      expect((await run(["install", "--claude-code"])).out).toContain("Hooks installed");
+      const swept = JSON.parse(readFileSync(settings, "utf8"));
+      expect(swept.hooks.Stop).toHaveLength(1);
+      expect(swept.hooks.Stop[0].hooks[0].command).toContain("stop-hook");
     } finally {
       process.env.PATH = savedPath;
     }

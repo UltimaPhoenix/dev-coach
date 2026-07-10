@@ -551,6 +551,19 @@ function pluginHooksActive(data: CodeSettings): boolean {
 }
 
 /**
+ * Match any devcoach hook command, past or present: the installed binary (`devcoach`,
+ * `npx -y devcoach`) AND dev-tree layouts (`node …/dev-coach/dist/bin.js`), across every
+ * hook-subcommand generation. A bare `includes("devcoach")` missed the dev-tree paths
+ * (they spell it `dev-coach`), leaving stale entries behind to double-count interactions.
+ * Require binary hint + subcommand so a user hook that merely mentions devcoach never matches.
+ */
+function isDevcoachHookCommand(cmd: string): boolean {
+  return (
+    /dev-?coach/i.test(cmd) && /\b(?:stop-hook|prompt-hook|onboard-hook|lesson-ready)\b/.test(cmd)
+  );
+}
+
+/**
  * Install (or repair) the devcoach hooks in ~/.claude/settings.json. The entries are
  * fully devcoach-owned — like the skill, a stale or legacy layout (two Stop entries,
  * npx prefix, missing timeout) is normalized WITHOUT --force; user hooks are untouched.
@@ -574,7 +587,7 @@ function installHook(): string {
     const list = hooks[event];
     const ours = list
       .map((e, i): [HookEntry, number] => [e, i])
-      .filter(([e]) => (e.hooks ?? []).some((h) => (h.command ?? "").includes("devcoach")))
+      .filter(([e]) => (e.hooks ?? []).some((h) => isDevcoachHookCommand(h.command ?? "")))
       .map(([, i]) => i);
     const [only] = ours;
     if (
@@ -639,7 +652,7 @@ function skillHint(): string {
     const hooked =
       read.ok &&
       (read.data.hooks?.Stop ?? []).some((e) =>
-        (e.hooks ?? []).some((h) => (h.command ?? "").includes("devcoach")),
+        (e.hooks ?? []).some((h) => isDevcoachHookCommand(h.command ?? "")),
       );
     if (hooked) {
       return `${c.yellow("→")} The devcoach Claude Code skill is not installed — run ${c.bold("devcoach install")} to add it.`;
@@ -725,7 +738,7 @@ function cmdDoctor(): void {
     for (const [event, entries] of Object.entries(read.data.hooks ?? {})) {
       for (const e of entries ?? []) {
         for (const h of e.hooks ?? []) {
-          if ((h.command ?? "").includes("devcoach")) ours.push({ event, cmd: h });
+          if (isDevcoachHookCommand(h.command ?? "")) ours.push({ event, cmd: h });
         }
       }
     }
@@ -742,12 +755,18 @@ function cmdDoctor(): void {
       const legacy = ours.filter(
         ({ cmd }) => cmd.command.includes("onboard-hook") || cmd.command.includes("lesson-ready"),
       );
+      const stopCount = ours.filter((o) => o.event === "Stop").length;
       if (legacy.length)
         warn(
           `legacy two-entry Stop layout — run ${c.bold("devcoach install")} to merge into one ` +
             "stop-hook entry (fewer spawns per stop)",
         );
-      else ok(`Stop hook wired (${ours.filter((o) => o.event === "Stop").length} entry)`);
+      else if (stopCount > 1)
+        warn(
+          `${stopCount} devcoach Stop entries — interactions are counted ${stopCount}× per stop; ` +
+            `run ${c.bold("devcoach install")} to keep only the current one`,
+        );
+      else ok(`Stop hook wired (${stopCount} entry)`);
       if (!ours.some((o) => o.event === "UserPromptSubmit"))
         warn(
           `no UserPromptSubmit priming hook — run ${c.bold("devcoach install")} to add it ` +
