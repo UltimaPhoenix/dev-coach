@@ -47,7 +47,7 @@ dev-coach/
 │   │   ├── db.ts           # node:sqlite schema + migrations + query helpers + DEFAULT_PROFILE
 │   │   ├── coach.ts        # rate limit, cue engine (evaluateCue/explainCue), profile, stats
 │   │   ├── git.ts  detect.ts  prompts.ts   # prompts.ts renders the lesson card (formatLessonForDisplay)
-│   ├── mcp/server.ts       # McpServer: 15 tools + 10 resources + devcoach_instructions prompt
+│   ├── mcp/server.ts       # McpServer: 15 tools + 11 resources + devcoach_instructions prompt
 │   ├── cli/commands.ts     # Commander dispatcher (26 subcommands incl. doctor + hooks) + term.ts
 │   └── web/app.ts          # Hono app (19 routes) + views.ts (hono/html pages)
 ├── tests/                  # Vitest (core, mcp, web, cli, setup-wizard, hooks-spawn)
@@ -68,14 +68,18 @@ dev-coach/
 Every tool registers a `title` + read-only/destructive annotations, a tight Zod `inputSchema` with
 `.describe()` on each param, `outputSchema`/`structuredContent` for model-shaped returns
 (`Lesson`/`Profile`/`Settings`), and returns `{ isError: true, … }` with a recovery hint on failure.
-`log_lesson` elicits inline feedback (capability-gated on `getClientCapabilities()?.elicitation`),
-resets the pacing counters, and **echoes the rendered card** in its result so a lesson logged
-without being displayed can be recovered verbatim. `skip_lesson` is the explicit no-op: it records
+`log_lesson` elicits inline feedback (capability-gated on `getClientCapabilities()?.elicitation`)
+and resets the pacing counters. Its result deliberately does **not** echo the rendered card (the
+echo made the model re-print it after the tool-approval pause → double card); a logged-but-invisible
+card is recovered by the stop-hook, which renders it from the DB (`formatLessonForDisplay`).
+`skip_lesson` is the explicit no-op: it records
 why no lesson was warranted and re-arms the pacing (clears `cue_state.pending`).
 
-## MCP resources (10)
+## MCP resources (11)
 
-`devcoach://profile`, `notebook` (text/markdown — the coaching notebook, read to choose what to teach),
+`devcoach://briefing` (**the pre-lesson read** — one call returns onboarding status, rate limit,
+taught topics, profile, and the notebook; SKILL.md prescribes this single read instead of five),
+`profile`, `notebook` (text/markdown — the coaching notebook),
 `settings`, `lessons/recent`, `stats`, `taught-topics`, `rate-limit`, `context`,
 `onboarding`, and the templated `lessons/{lesson_id}`. Each returns JSON (except `notebook`)
 and never throws (returns
@@ -136,8 +140,9 @@ Every silent exit returns a human-readable `reason` (consumed by doctor + `DEVCO
 `explainCue` is the read-only dry run (doctor verdict, prompt-hook priming). Resolution:
 `log_lesson` → `resetNudge` + `markDisplayPending`; `skip_lesson` → `clearCuePending(reason)`
 (both restart counters — a primed turn resolves BEFORE the Stop hook, so no block is needed).
-Card recovery: the stop after `log_lesson` consumes `display_pending` and, when
-`last_assistant_message` lacks the `🎓 devcoach` band, blocks ONCE to reprint the card.
+Card recovery: the stop after `log_lesson` consumes `display_pending` and, when the turn
+(final message + transcript scan) lacks the `🎓 devcoach` band, blocks ONCE — the block
+embeds the card rendered from the DB, so the model just prints it.
 Note: current Claude Code shows a generic "Stop hook error occurred" notice on ANY blocking Stop
 hook (verified empirically) — hence priming-first design; blocks are the rare fallback.
 

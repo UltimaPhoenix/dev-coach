@@ -8,6 +8,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import * as db from "../src/core/db";
+import { parseLesson } from "../src/core/models";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const BIN = [join(root, "node_modules", "tsx", "dist", "cli.mjs"), join(root, "src", "bin.ts")];
@@ -134,13 +135,28 @@ describe("hooks via real child processes (piped stdin)", () => {
         }),
       ].join("\n"),
     );
-    // log_lesson equivalent: counters reset + display flag armed
+    // log_lesson equivalent: lesson saved + counters reset + display flag armed
     db.withConnection((c) => {
+      db.insertLesson(
+        c,
+        parseLesson({
+          id: "l-rec",
+          timestamp: "2026-06-16T10:00:00Z",
+          topic_id: "sqlite",
+          categories: ["db"],
+          title: "Recovered lesson",
+          level: "mid",
+          summary: "s",
+          body: "Body to recover.",
+        }),
+      );
       db.resetNudge(c);
       db.markDisplayPending(c);
     }, dbPathOf(home));
 
-    // Reply lacks the band (and the transcript confirms) → one recovery block, flag consumed.
+    // Reply lacks the band (and the transcript confirms) → one recovery block, flag
+    // consumed. The block embeds the card rendered from the DB (log_lesson's result
+    // no longer echoes it), so the model only has to print it.
     const out = JSON.parse(
       hook("stop-hook", home, {
         session_id: "s1",
@@ -151,6 +167,9 @@ describe("hooks via real child processes (piped stdin)", () => {
     );
     expect(out.decision).toBe("block");
     expect(out.reason).toContain("NOT visible");
+    expect(out.reason).toContain("🎓 devcoach");
+    expect(out.reason).toContain("**Recovered lesson**");
+    expect(out.reason).toContain("Body to recover.");
     // Second stop: flag already consumed → silent.
     expect(
       hook("stop-hook", home, {

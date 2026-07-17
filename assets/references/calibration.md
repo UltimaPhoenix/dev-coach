@@ -1,7 +1,7 @@
 # devcoach — Dynamic calibration
 
-Read this file after a `log_lesson` where `total_lessons % 10 == 0` (check
-`total_lessons` in `devcoach://rate-limit`), then run the four steps below.
+Read this file when the hook cue marks the lesson as a notebook checkpoint (every
+10 lessons — never count yourself), then run the four steps below.
 
 ## Step 1 — Fetch the window
 

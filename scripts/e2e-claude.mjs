@@ -101,6 +101,8 @@ if (hermetic) {
   }
   if (hasHooks) {
     console.log("using the devcoach hooks already wired in ~/.claude/settings.json");
+    console.log("  note: those hooks run the INSTALLED devcoach — if it is older than this repo,");
+    console.log("  hook-side behaviour (cue text, recovery) reflects the installed version.");
   } else {
     const extra = join(sandbox, "settings.json");
     writeFileSync(extra, JSON.stringify({ hooks: desiredHooks }));
@@ -210,6 +212,10 @@ if (smoke.status !== 0 || /not logged in/i.test(smoke.out)) {
 }
 console.log("preflight ok\n");
 cli("set", "nudge_every", "0"); // now every eligible stop cues
+// A realistic gap isolates the double-print check: without it, the stop right after
+// log_lesson re-cues (pacing disabled + no gap) and the model legitimately prints a
+// second card — the deferred same-turn re-cue, not the double-print bug under test.
+cli("set", "min_gap_minutes", "240");
 
 const BAND = /### ─+ 🎓 devcoach ─+/g;
 
@@ -230,12 +236,16 @@ if (gained !== 1 || bands === 0) {
 }
 check("exactly one lesson row was logged", gained === 1, `got ${gained}`);
 check("the lesson card is visible in the reply", bands >= 1, `bands: ${bands}`);
-// 2 bands can legitimately appear when the card-recovery block reprints it
-check("no cue storm (card printed once or twice)", bands <= 2, `bands: ${bands}`);
+// log_lesson no longer echoes the card and recovery only fires when the transcript
+// lacks the band — a second print is the double-card regression, not tolerable slack.
+check("the card is printed exactly once", bands === 1, `bands: ${bands}`);
 check("cue resolved (no pending retry)", Number(cueState().pending ?? 0) === 0);
 
 // ── Scenario 2: non-technical prompt → skip_lesson, no card ───────────────────
 console.log("\nscenario 2: non-technical prompt → skip_lesson, no card");
+// The skip path needs a cue to decline — drop the gap again so the lesson logged in
+// scenario 1 doesn't rate-limit this turn's cue.
+cli("set", "min_gap_minutes", "0");
 const before2 = lessonCount();
 const s2 = claude("Ciao! Come stai oggi? Nessuna domanda tecnica, solo due chiacchiere.");
 const bands2 = (s2.out.match(BAND) ?? []).length;

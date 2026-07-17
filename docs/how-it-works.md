@@ -68,9 +68,12 @@ flowchart TD
 ```
 
 If a cue goes unresolved (no `log_lesson`, no `skip_lesson`), the next cue arrives after
-`min(3, nudge_every)` further stops instead of the full threshold. `log_lesson` echoes
-the rendered card back to the model, so a lesson logged without being displayed is
-recovered verbatim instead of staying invisible.
+`min(3, nudge_every)` further stops instead of the full threshold. The pre-lesson context
+(onboarding status, rate limit, taught topics, profile, notebook) arrives in ONE silent
+`devcoach://briefing` read, and the card is printed exactly once: if a lesson was logged
+without its card ever becoming visible, the Stop hook detects it from the session
+transcript and re-prints the card itself — `log_lesson`'s result deliberately does not
+echo it, so the model is never tempted to print it twice.
 
 ---
 

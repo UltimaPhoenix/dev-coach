@@ -23,7 +23,7 @@ Windows `%APPDATA%\Claude\claude_desktop_config.json` · Linux `~/.config/Claude
 
 | Tool | Purpose | Annotation |
 |---|---|---|
-| `log_lesson` | Save a delivered lesson (auto-fills git context; elicits inline feedback; echoes the rendered card) | write |
+| `log_lesson` | Save a delivered lesson (auto-fills git context; elicits inline feedback) | write |
 | `skip_lesson` | Decline a lesson cue with a one-line reason; re-arms the pacing counter | write |
 | `update_notebook` | Overwrite the coaching notebook (`learning-state.md`) with revised markdown | write |
 | `update_knowledge` | Adjust a topic's confidence by a delta (clamped 0–10) | write |
@@ -42,13 +42,14 @@ Windows `%APPDATA%\Claude\claude_desktop_config.json` · Linux `~/.config/Claude
 Each tool declares a `title` and read-only/destructive hints, validates input with Zod, returns typed
 `structuredContent` where applicable, and reports failures as `{ isError: true, … }` with a recovery hint.
 
-## Resources (10)
+## Resources (11)
 
-`devcoach://profile` · `notebook` (text/markdown) · `settings` · `lessons/recent` · `stats` ·
-`taught-topics` · `rate-limit` ·
+`devcoach://briefing` · `profile` · `notebook` (text/markdown) · `settings` · `lessons/recent` ·
+`stats` · `taught-topics` · `rate-limit` ·
 `context` · `onboarding` · `lessons/{lesson_id}` (templated). All return `application/json` and never
-throw — on error they return `{ "error": … }`. Read `taught-topics` before selecting a lesson topic to
-avoid repetition; read `rate-limit` to decide whether to deliver.
+throw — on error they return `{ "error": … }`. **`briefing` is the pre-lesson read**: one call
+returns onboarding status, rate limit, taught topics, the knowledge profile, and the coaching
+notebook — the individual resources remain for the dashboard and targeted queries.
 
 ## Prompt
 

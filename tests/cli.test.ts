@@ -86,8 +86,7 @@ describe("cli", () => {
     expect(lr.code).toBe(0);
     expect(lr.out).toContain('"decision":"block"');
     expect(lr.out).toContain("log_lesson");
-    expect(lr.out).toContain("devcoach://profile");
-    expect(lr.out).toContain("devcoach://notebook");
+    expect(lr.out).toContain("devcoach://briefing");
     expect(lr.out).toContain("update_notebook");
   });
 

@@ -1,5 +1,5 @@
 // MCP server on the official @modelcontextprotocol/sdk.
-// 15 tools, 10 resources, and the devcoach_instructions prompt. Tools follow the build-mcp-server
+// 15 tools, 11 resources, and the devcoach_instructions prompt. Tools follow the build-mcp-server
 // review: title + hint annotations, tight Zod schemas with .describe(), outputSchema/structuredContent
 // for model returns, isError on failure, and an elicitation capability-check in log_lesson.
 import { spawn } from "node:child_process";
@@ -23,7 +23,6 @@ import {
   RepositoryPlatformSchema,
   UiThemeSchema,
 } from "../core/models";
-import { formatLessonForDisplay } from "../core/prompts";
 import { readSkill, readSkillReferences } from "../skill";
 import { VERSION } from "../version";
 
@@ -206,15 +205,14 @@ export function createServer(): McpServer {
         } catch {
           // elicitation not supported by this client — lesson is already saved
         }
-        // Belt-and-braces for display: the card must be user-visible chat output, but
-        // nothing can verify that server-side — so echo the rendered card and make the
-        // model print it if it skipped that step.
+        // The card is chat output the server cannot verify; a missing card is recovered
+        // by the Stop hook's transcript check. Never echo the card here — after the
+        // tool-approval pause the model re-printed the echo, doubling the card.
         return {
           content: [
             txt(
-              "Lesson saved. REQUIRED: the lesson card must already be visible in your " +
-                "reply. If it is not, print the card below VERBATIM now, before any other " +
-                `output:\n\n${formatLessonForDisplay(lesson)}`,
+              "Lesson saved. The card must already be visible in your reply — output " +
+                "NOTHING else now and NEVER print the card a second time.",
             ),
             txt(JSON.stringify(lesson)),
           ],
@@ -865,6 +863,50 @@ export function createServer(): McpServer {
           allowed: false,
           reason: `Rate limit check unavailable: ${err}`,
         });
+      }
+    },
+  );
+
+  server.registerResource(
+    "briefing",
+    "devcoach://briefing",
+    meta(
+      "Lesson Briefing",
+      "Everything needed before delivering a lesson in ONE read: onboarding status, " +
+        "rate limit, taught topics, knowledge profile, and the coaching notebook.",
+    ),
+    (uri) => {
+      try {
+        let notebook = "";
+        try {
+          if (existsSync(db.LEARNING_STATE_PATH))
+            notebook = readFileSync(db.LEARNING_STATE_PATH, "utf8");
+        } catch {
+          // notebook unreadable — deliver the rest of the briefing without it
+        }
+        const data = db.withConnection((c) => {
+          const knowledgeReady = db.isOnboardingComplete(c).knowledge_ready;
+          const notebookReady = notebook.length > 0;
+          const rate = coach.checkRateLimit(c);
+          const rateLimit: Record<string, unknown> = {
+            allowed: rate.allowed,
+            total_lessons: db.countFilteredLessons(c),
+          };
+          if (rate.reason != null) rateLimit.reason = rate.reason;
+          return {
+            onboarding: {
+              knowledge_ready: knowledgeReady,
+              notebook_ready: notebookReady,
+              needs_onboarding: !(knowledgeReady && notebookReady),
+            },
+            rate_limit: rateLimit,
+            taught_topics: coach.listTaughtTopics(c),
+            profile: coach.getProfile(c),
+          };
+        });
+        return jsonResource(uri, { ...data, notebook });
+      } catch (err) {
+        return jsonResource(uri, { error: String(err) });
       }
     },
   );

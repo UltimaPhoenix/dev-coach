@@ -15,6 +15,7 @@ import { join } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
 import * as coach from "../core/coach";
 import * as db from "../core/db";
+import { formatLessonForDisplay } from "../core/prompts";
 
 /**
  * Claude Code passes the hook payload as JSON on stdin. We use five fields:
@@ -177,23 +178,36 @@ export function buildLessonCue(nextLessonNumber: number): string {
     "technical), call the devcoach `skip_lesson` tool with a one-line reason and output " +
     "nothing.\n" +
     `${notebookStep}\n\n` +
-    "If the devcoach skill is not available, fall back to: read devcoach://profile, " +
-    "devcoach://taught-topics, and devcoach://notebook; pick ONE untaught profile topic at or " +
+    "If the devcoach skill is not available, fall back to: read devcoach://briefing (one read: " +
+    "profile, taught topics, notebook); pick ONE untaught profile topic at or " +
     "above the user's confidence band; write the card as plain markdown (no '>' blockquote) " +
     "between two band headings `### ──────── 🎓 devcoach ────────` and " +
     "`### ──────── [topic] · [level] ────────`, with `**[Title]** · [Category] · [Level]`, " +
     "3–6 short paragraphs tied to the task, and a `💡 *Senior tip:*` line; THEN call " +
     "log_lesson (body = clean markdown without bands or the title line).\n\n" +
-    "The rate-limit check is already done by this hook — skip it. Output only the lesson card " +
-    "(or nothing). No preamble, no meta-commentary."
+    "The rate-limit check is already done by this hook — skip it. Work in silence: never " +
+    "narrate devcoach tool calls or resource reads ('checking your profile…'). Output only " +
+    "the lesson card (or nothing). No preamble, no meta-commentary."
   );
 }
 
-const CARD_RECOVERY_CUE =
-  "devcoach: the lesson was saved with log_lesson but its card is NOT visible in your " +
-  "reply. Print the lesson card now, verbatim, exactly as echoed by the log_lesson " +
-  "result (the block between the two `### ──────── 🎓 devcoach ────────` band " +
-  "headings) — as your ENTIRE reply, no other text, no tool calls.";
+/**
+ * The lesson was saved but its card never became visible. The hook renders the card
+ * from the DB itself (log_lesson's result deliberately does NOT echo the card — the
+ * echo made the model re-print it after the tool-approval pause, doubling the card),
+ * so the model only has to print it verbatim.
+ */
+function buildCardRecoveryCue(conn: DatabaseSync): string {
+  const [last] = db.getLessons(conn, { page: 1, per_page: 1 });
+  const card = last
+    ? `:\n\n${formatLessonForDisplay(last)}`
+    : " (rebuild it verbatim from the arguments of your log_lesson call).";
+  return (
+    "devcoach: the lesson was saved with log_lesson but its card is NOT visible in your " +
+    "reply. Print this lesson card now, as your ENTIRE reply — no other text, no tool " +
+    `calls${card}`
+  );
+}
 
 const CARD_BAND = "🎓 devcoach";
 
@@ -252,7 +266,7 @@ function cardVisibleInLastTurn(payload: HookPayload): boolean | null {
 type StopDecision =
   | { kind: "silent"; note: string }
   | { kind: "onboard"; note: string }
-  | { kind: "recover-card"; note: string }
+  | { kind: "recover-card"; cue: string; note: string }
   | { kind: "cue"; nextLessonNumber: number; note: string };
 
 /**
@@ -275,7 +289,11 @@ function decideStop(
     db.takeDisplayPending(conn) &&
     cardVisibleInLastTurn(payload) === false // null = no signal → never recover blindly
   ) {
-    return { kind: "recover-card", note: "card missing from reply — recovering" };
+    return {
+      kind: "recover-card",
+      cue: buildCardRecoveryCue(conn),
+      note: "card missing from reply — recovering",
+    };
   }
   if (payload.stop_hook_active) return { kind: "silent", note: "hook-forced continuation" };
   if (!db.isOnboardingComplete(conn).knowledge_ready) {
@@ -308,7 +326,7 @@ function runStopDecision(
       emitBlock(ONBOARD_CUE);
       break;
     case "recover-card":
-      emitBlock(CARD_RECOVERY_CUE, "🎓 devcoach: recovering the lesson card…");
+      emitBlock(decision.cue, "🎓 devcoach: recovering the lesson card…");
       break;
     case "cue":
       emitBlock(buildLessonCue(decision.nextLessonNumber), "🎓 devcoach: preparing a lesson…");
@@ -347,7 +365,9 @@ const PROMPT_PRIME =
   "a log_lesson call. The card must be the LAST visible text — after log_lesson returns, " +
   "output nothing else.\n" +
   "- If it is not technical: silently call the devcoach `skip_lesson` tool with a one-line " +
-  "reason and output nothing about it.";
+  "reason and output nothing about it.\n" +
+  "- Either way, work in silence: never narrate devcoach tool calls or resource reads " +
+  "('checking your profile…').";
 
 /**
  * UserPromptSubmit hook: read-only peek (never bumps — the Stop hook owns the counter).

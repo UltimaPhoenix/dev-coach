@@ -17,10 +17,10 @@ async function connect() {
 const text = (r: any): string => r.content[0].text;
 
 describe("mcp server", () => {
-  it("lists 15 tools, 9 resources + 1 template, 1 prompt", async () => {
+  it("lists 15 tools, 10 resources + 1 template, 1 prompt", async () => {
     const { client, server } = await connect();
     expect((await client.listTools()).tools).toHaveLength(15);
-    expect((await client.listResources()).resources).toHaveLength(9);
+    expect((await client.listResources()).resources).toHaveLength(10);
     expect((await client.listResourceTemplates()).resourceTemplates).toHaveLength(1);
     expect((await client.listPrompts()).prompts[0].name).toBe("devcoach_instructions");
     await client.close();
@@ -88,11 +88,11 @@ describe("mcp server", () => {
     expect(log.structuredContent.id).toBe("t1");
     expect(log.structuredContent.body).toBe("Full lesson body.");
     expect(log.structuredContent.feedback).toBeNull();
-    // The result echoes the rendered card so a lesson logged without being displayed
-    // can be recovered verbatim by the model.
+    // The result must NOT echo the rendered card (the echo made the model re-print
+    // it after the tool-approval pause → double card); recovery is the Stop hook's job.
     expect(text(log)).toContain("must already be visible");
-    expect(text(log)).toContain("🎓 devcoach");
-    expect(text(log)).toContain("Full lesson body.");
+    expect(text(log)).toContain("NEVER print the card a second time");
+    expect(text(log)).not.toContain("🎓 devcoach");
 
     // log_lesson flags the next stop to verify the card is visible.
     expect(db.withConnection((c) => db.takeDisplayPending(c))).toBe(true);
@@ -228,10 +228,19 @@ describe("mcp server", () => {
       "devcoach://rate-limit",
       "devcoach://context",
       "devcoach://onboarding",
+      "devcoach://briefing",
     ]) {
       const r: any = await client.readResource({ uri });
       expect(r.contents[0].text).toBeTruthy();
     }
+    // The aggregated briefing carries the whole pre-lesson read in ONE resource.
+    const briefing: any = await client.readResource({ uri: "devcoach://briefing" });
+    const b = JSON.parse(briefing.contents[0].text);
+    expect(b.onboarding.knowledge_ready).toBe(true);
+    expect(b.rate_limit.allowed).toBe(true);
+    expect(Array.isArray(b.taught_topics)).toBe(true); // lessons from earlier tests may show
+    expect(b.profile.knowledge.map((k: any) => k.topic)).toContain("python");
+    expect(typeof b.notebook).toBe("string");
     const byId: any = await client.readResource({ uri: "devcoach://lessons/missing" });
     expect(JSON.parse(byId.contents[0].text).error).toContain("not found");
     const pr: any = await client.getPrompt({ name: "devcoach_instructions" });
@@ -356,6 +365,7 @@ describe("mcp server error paths", () => {
       "devcoach://rate-limit",
       "devcoach://context",
       "devcoach://onboarding",
+      "devcoach://briefing",
       "devcoach://lessons/some-id",
     ]) {
       const r: any = await client.readResource({ uri });

@@ -17,9 +17,10 @@ by teaching one thing at a time, at the right moment, based on what they actuall
 
 The three hard rules, before anything else:
 
-1. **The lesson card is printed as visible reply text BEFORE calling `log_lesson`.**
-   `log_lesson`'s result echoes the rendered card — if you ever call it without having
-   printed the card, print the echoed card verbatim immediately, before any other output.
+1. **The lesson card is printed as visible reply text BEFORE calling `log_lesson` —
+   and only once, ever.** If you suspect the card was never printed, do NOT self-correct
+   by re-printing: a devcoach hook verifies visibility after the turn and recovers a
+   missing card itself. A card printed twice is an error.
 2. **The card ends the reply.** After `log_lesson` returns, output nothing else — no
    "lesson logged", no summary. The card is the last visible text of the turn.
 3. **A cue you decline is a `skip_lesson` call.** If a devcoach hook asked for a lesson
@@ -36,30 +37,26 @@ user explicitly asks to (re-)initialise their profile — read `references/onboa
 in this skill's directory and follow it. Do not deliver a lesson in the same turn as
 `complete_onboarding`; end the response after confirming setup.
 
-## Session context
-
-Before the first lesson in this context window, read the coaching notebook — the
-`devcoach://notebook` MCP resource — if it has not already been loaded, and use it for
-all subsequent lessons in this window. Resume its patterns and hypotheses, prioritise
-angles it flags as pending, avoid ground it marks as absorbed. If empty, proceed
-without prior context. Do not mention the notebook to the user — it is internal.
-
 ## Before delivering a lesson
 
-Always read these MCP resources before deciding to teach:
+Read the **`devcoach://briefing`** MCP resource — ONE silent read returns everything
+below (never read the underlying resources one by one; each extra call is noise):
 
-- `devcoach://onboarding` — either flag false → onboarding first (see above)
-- `devcoach://rate-limit` — `allowed: false` → skip entirely, say nothing.
+- `onboarding` — either flag false → onboarding first (see above)
+- `rate_limit` — `allowed: false` → skip entirely, say nothing.
   **Exception:** the user explicitly asked for a lesson ("coach me", "teach me
   something", "devcoach") → deliver regardless; don't mention the bypass.
   (When a hook cue triggered you, the hook already checked this — skip the check.)
-- `devcoach://taught-topics` — never repeat a topic already listed (fuzzy match:
+- `taught_topics` — never repeat a topic already listed (fuzzy match:
   `topic_foo` also rules out `topic_foo_variant`; prefer a different angle over any
   risk of repetition). **Exception:** confidence 10 ignores this filter.
-- `devcoach://profile` — confidence drives depth; every profile topic is declared
+- `profile` — confidence drives depth; every profile topic is declared
   learning intent, so prefer profile topics over off-profile ones
-- `devcoach://notebook` — elevate its "Recommended focus" angles, watch its "Open
-  hypotheses", calibrate depth from "Recurring patterns"
+- `notebook` — the coaching notebook: resume its patterns and hypotheses, elevate its
+  "Recommended focus" angles, watch its "Open hypotheses", calibrate depth from
+  "Recurring patterns". If empty, proceed without prior context. Never mention it —
+  it is internal. One briefing read covers the whole context window; do not re-read
+  for later lessons in the same window.
 
 ## When to activate
 
@@ -161,6 +158,9 @@ checkpoints, never touch the notebook.
 
 ## Operating notes
 
+- **From the cue (or prime) to the card: zero visible text.** Never narrate tool calls
+  or resource reads — "checking your profile…", "reading the briefing…", "calling
+  devcoach for taught topics…" are all forbidden. The user sees only the card.
 - Never break the flow of the main response — the lesson is always at the bottom
 - Never mention a skipped lesson, the rate limit, or the notebook
 - The lesson must feel natural and contextual, not a mechanical add-on

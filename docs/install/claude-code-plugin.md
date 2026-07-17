@@ -13,7 +13,7 @@ terminal and want the `devcoach` CLI too? Use [Homebrew](./homebrew.md) instead.
 
 devcoach ships as a **Claude Code plugin** that bundles everything in one install:
 
-- the **MCP server** (15 tools, 10 resources, the `devcoach_instructions` prompt),
+- the **MCP server** (15 tools, 11 resources, the `devcoach_instructions` prompt),
 - the two automatic-coaching **hooks** (`stop-hook` on Stop, `prompt-hook` on UserPromptSubmit), and
 - the coaching **skill** (`SKILL.md` + its reference files).
 
