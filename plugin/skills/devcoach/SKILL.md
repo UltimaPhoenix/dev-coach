@@ -4,10 +4,13 @@ description: >
   Personal coaching engine: deliver, log, and manage progressive technical lessons.
   Use when a devcoach hook cue asks for a lesson; when the user asks about their
   learning — "what did I learn today/this week", "show my profile", "how good am I
-  at X", "coaching log", "lessons to revisit" — or asks to set up or reconfigure
-  devcoach ("setup devcoach", "redo onboarding", "reset my topics"); and after
-  completing a substantial technical task (code, review, commit, debugging, config,
-  queries, infra) to evaluate whether ONE lesson is due.
+  at X", "coaching log", "lessons to revisit" — or asks to set up, review, or
+  reconfigure devcoach ("setup devcoach", "redo onboarding", "reset my topics",
+  "review my profile", "review/rebuild my notebook", "refresh my profile from my
+  projects", "any new tech I should track?"); and after completing a substantial
+  technical task (code, review, commit, debugging, config, queries, infra) to
+  evaluate whether ONE lesson is due — even when the user never mentions devcoach
+  or coaching by name.
 ---
 
 # devcoach — Progressive Coaching
@@ -37,6 +40,14 @@ Read `devcoach://onboarding`. If `knowledge_ready` or `notebook_ready` is false 
 user explicitly asks to (re-)initialise their profile — read `references/onboarding.md`
 in this skill's directory and follow it. Do not deliver a lesson in the same turn as
 `complete_onboarding`; end the response after confirming setup.
+
+## Review & rebuild
+
+When the user asks to review or rebuild their profile or notebook — "review my
+profile/notebook", "rebuild/refresh my notebook", "refresh my profile from my
+projects", "any new tech I should track?" — read `references/review.md` in this
+skill's directory and follow it. Those flows are incremental and non-destructive;
+only an explicit "redo onboarding" goes through `references/onboarding.md`.
 
 ## Before delivering a lesson
 
@@ -130,10 +141,13 @@ know / dont_know / skip) — never render a feedback question yourself. Read the
 
 - `"know"` / `"dont_know"` → confidence already adjusted server-side. Done.
 - `null` → elicitation unsupported/declined. Append the text prompt "Did that land?
-  ✅ know · ❌ don't know · ⏭ skip", collect the reply next turn, then call
-  `submit_feedback(id, value)` — but only when confidence is below the lesson's band
-  for "know" (within/above band → already calibrated, skip the call). Never call
-  `update_knowledge` on top of feedback.
+  ✅ know · ❌ don't know · ⏭ skip" — and this line may only ever appear DIRECTLY
+  BENEATH the card's closing band in your reply text. If the card is not right
+  above it (the body you passed to log_lesson is invisible to the user — composing
+  it is not printing it), write the full card first, then this line. Collect the
+  reply next turn, then call `submit_feedback(id, value)` — but only when
+  confidence is below the lesson's band for "know" (within/above band → already
+  calibrated, skip the call). Never call `update_knowledge` on top of feedback.
 
 **Starring:** after feedback, if it was `dont_know` on a mid/senior lesson, or
 `get_lessons({search: topic_id})` shows 2+ lessons on the topic, offer *"Want to save
