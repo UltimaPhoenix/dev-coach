@@ -1,16 +1,19 @@
 ---
 name: devcoach
 description: >
-  Personal coaching engine: deliver, log, and manage progressive technical lessons.
-  Use when a devcoach hook cue asks for a lesson; when the user asks about their
-  learning — "what did I learn today/this week", "show my profile", "how good am I
-  at X", "coaching log", "lessons to revisit" — or asks to set up, review, or
-  reconfigure devcoach ("setup devcoach", "redo onboarding", "reset my topics",
-  "review my profile", "review/rebuild my notebook", "refresh my profile from my
-  projects", "any new tech I should track?"); and after completing a substantial
-  technical task (code, review, commit, debugging, config, queries, infra) to
-  evaluate whether ONE lesson is due — even when the user never mentions devcoach
-  or coaching by name.
+  Use for the user's personal learning record and coaching data managed by
+  devcoach. Trigger when: (1) the user mentions devcoach in any form — setting it
+  up, redoing onboarding, resetting topics, or reviewing/rebuilding their profile
+  or notebook; (2) the user asks about their own learning or skill level — what
+  they learned recently, their coaching log or lesson history (by period, starred,
+  or marked don't-know), how good they are at a technology, lessons to revisit,
+  or whether new tech from their recent work should be tracked; (3) a devcoach
+  hook cue requests a lesson; (4) you just completed substantial technical work
+  (code, review, commit, debugging, config, queries, infra) — then evaluate
+  silently whether ONE lesson is due, even when coaching is never mentioned.
+  Do NOT use for ordinary development tasks on code, apps, or documents that
+  merely contain words like profile, lessons, or notebook — only when the subject
+  is the user's own coaching data.
 ---
 
 # devcoach — Progressive Coaching
