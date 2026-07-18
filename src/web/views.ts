@@ -15,6 +15,13 @@ function jsonForScript(v: unknown): string {
   );
 }
 
+/** CSS-selector-safe element id \u2014 topic/lesson ids are free text and may start with a digit. */
+function domId(prefix: string, key: string): string {
+  return (
+    prefix + key.replace(/[^A-Za-z0-9_-]/g, (ch) => `_${(ch.codePointAt(0) ?? 0).toString(16)}`)
+  );
+}
+
 // ── Layout (base.html) ───────────────────────────────────────────────────────
 
 export function layout(o: {
@@ -55,8 +62,8 @@ export function layout(o: {
   <nav class="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-6 py-3 flex items-center gap-6">
     <!-- Brand wordmark, mirrors the docs site (website/src/css/custom.css): "dev" in the
          theme foreground, "coach" in the teal accent (#0d9488 / #5eead4 = teal-600/300). -->
-    <span class="font-extrabold text-lg tracking-tight text-gray-900 dark:text-gray-100"
-      >🎓 dev<span class="text-teal-600 dark:text-teal-300">coach</span></span
+    <a href="/" class="font-extrabold text-lg tracking-tight text-gray-900 dark:text-gray-100 hover:opacity-80 transition"
+      >🎓 dev<span class="text-teal-600 dark:text-teal-300">coach</span></a
     >
     ${link("/", "Profile", o.currentPath === "/")}
     ${link("/lessons", "Lessons", o.currentPath.includes("/lessons"))}
@@ -109,7 +116,7 @@ export function profilePage(d: ProfileData): Html {
       .map((g) => html`<option value="${g}" ${g === current ? "selected" : ""}>${g}</option>`);
 
   const body = html`
-<div x-data="{ editMode: JSON.parse(localStorage.getItem('km-edit-mode') || 'false'), toggle() { this.editMode = !this.editMode; localStorage.setItem('km-edit-mode', this.editMode); } }">
+<div id="knowledge-map" x-data="{ editMode: JSON.parse(localStorage.getItem('km-edit-mode') || 'false'), toggle() { this.editMode = !this.editMode; localStorage.setItem('km-edit-mode', this.editMode); } }">
 
 <div class="flex items-center justify-between mb-6">
   <h1 class="text-2xl font-bold text-indigo-600 dark:text-indigo-400">Knowledge Map</h1>
@@ -118,7 +125,7 @@ export function profilePage(d: ProfileData): Html {
       <button type="button" @click="open = !open"
               class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-indigo-400">+ Add group</button>
       <div x-show="open" @click.outside="open = false" class="absolute right-0 top-full mt-1 z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg p-3 w-56" style="display:none">
-        <form method="post" action="/groups" class="flex gap-2">
+        <form method="post" action="/groups" hx-post="/groups" hx-target="#knowledge-map" hx-select="#knowledge-map" hx-swap="outerHTML" class="flex gap-2">
           <input type="text" name="group_name" placeholder="Group name…" required class="flex-1 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
           <button type="submit" class="px-3 py-1.5 rounded-lg text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-500 transition">Add</button>
         </form>
@@ -127,7 +134,7 @@ export function profilePage(d: ProfileData): Html {
     <div x-show="editMode" style="display:none" x-data="{ open: false }" class="relative">
       <button type="button" @click="open = !open" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-indigo-400">+ Add topic</button>
       <div x-show="open" @click.outside="open = false" class="absolute right-0 top-full mt-1 z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg p-4 w-72" style="display:none">
-        <form method="post" action="/knowledge" class="space-y-3">
+        <form method="post" action="/knowledge" hx-post="/knowledge" hx-target="#knowledge-map" hx-select="#knowledge-map" hx-swap="outerHTML" class="space-y-3">
           <div>
             <label for="add-topic-id" class="block text-xs text-gray-400 dark:text-gray-500 mb-1">Topic ID</label>
             <input id="add-topic-id" type="text" name="topic" placeholder="e.g. rust_lifetimes" required class="w-full text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
@@ -179,7 +186,7 @@ ${Object.entries(d.categorised).map(([category, topics]) => {
       <h2 class="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500 shrink-0">${category}</h2>
       ${
         category !== "Other"
-          ? html`<form x-show="editMode" style="display:none" method="post" action="/groups/${encodeURIComponent(category)}/delete" onsubmit="return confirm('Remove group &quot;${category}&quot;? Topics will move to Other.')">
+          ? html`<form x-show="editMode" style="display:none" method="post" action="/groups/${encodeURIComponent(category)}/delete" hx-post="/groups/${encodeURIComponent(category)}/delete" hx-target="#knowledge-map" hx-select="#knowledge-map" hx-swap="outerHTML" hx-confirm="Remove group &quot;${category}&quot;? Topics will move to Other.">
           <button type="submit" class="text-xs text-gray-300 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 transition w-4 text-center opacity-0 group-hover/section:opacity-100" title="Delete group">×</button>
         </form>`
           : ""
@@ -188,7 +195,7 @@ ${Object.entries(d.categorised).map(([category, topics]) => {
     <div x-show="editMode" style="display:none" x-data="{ open: false }" class="relative">
       <button type="button" @click="open = !open" class="text-xs text-gray-300 dark:text-gray-600 hover:text-indigo-500 dark:hover:text-indigo-400 transition px-1">+ topic</button>
       <div x-show="open" @click.outside="open = false" class="absolute right-0 top-full mt-1 z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg p-3 w-64" style="display:none">
-        <form method="post" action="/knowledge" class="space-y-2">
+        <form method="post" action="/knowledge" hx-post="/knowledge" hx-target="#knowledge-map" hx-select="#knowledge-map" hx-swap="outerHTML" class="space-y-2">
           <input type="hidden" name="group" value="${category !== "Other" ? category : ""}" />
           <input type="text" name="topic" placeholder="topic_id (e.g. rust_lifetimes)" required class="w-full text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
           <div class="flex items-center gap-2">
@@ -202,6 +209,7 @@ ${Object.entries(d.categorised).map(([category, topics]) => {
   </div>
   <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-x-8 gap-y-0">
     ${topics.map((entry) => {
+      const rowId = domId("topic-row-", entry.topic);
       const conf = entry.confidence;
       const pct = Math.trunc((conf / 10) * 100);
       const color = conf >= 7 ? "bg-green-500" : conf >= 4 ? "bg-yellow-500" : "bg-red-500";
@@ -212,12 +220,12 @@ ${Object.entries(d.categorised).map(([category, topics]) => {
             ? "text-yellow-600 dark:text-yellow-400"
             : "text-red-600 dark:text-red-400";
       return html`
-    <div class="flex items-center gap-2 py-1.5 border-b border-gray-100 dark:border-gray-800/50 group/row">
+    <div id="${rowId}" class="flex items-center gap-2 py-1.5 border-b border-gray-100 dark:border-gray-800/50 group/row">
       <div x-show="editMode" style="display:none" x-data="{ open: false }" class="relative shrink-0 flex items-center">
         <button type="button" @click="open = !open" class="text-xs text-gray-200 dark:text-gray-700 hover:text-indigo-500 dark:hover:text-indigo-400 transition w-4 text-center opacity-0 group-hover/row:opacity-100" title="Move to group">⇄</button>
         <div x-show="open" @click.outside="open = false" class="absolute left-0 top-full mt-1 z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg p-1 w-40" style="display:none">
-          <form method="post" action="/knowledge/${encodeURIComponent(entry.topic)}/group">
-            <select name="group" onchange="this.form.submit()" class="w-full text-xs bg-transparent text-gray-700 dark:text-gray-200 px-2 py-1 focus:outline-none">
+          <form method="post" action="/knowledge/${encodeURIComponent(entry.topic)}/group" hx-post="/knowledge/${encodeURIComponent(entry.topic)}/group" hx-target="#knowledge-map" hx-select="#knowledge-map" hx-swap="outerHTML">
+            <select name="group" onchange="this.form.requestSubmit()" class="w-full text-xs bg-transparent text-gray-700 dark:text-gray-200 px-2 py-1 focus:outline-none">
               <option value="Other" ${category === "Other" ? "selected" : ""}>Other (ungrouped)</option>
               ${groupOptions(category)}
             </select>
@@ -227,18 +235,18 @@ ${Object.entries(d.categorised).map(([category, topics]) => {
       <div class="flex items-center gap-1 flex-1 min-w-0">
         <a x-show="!editMode" href="/lessons?search=${encodeURIComponent(entry.topic)}" class="text-sm text-gray-700 dark:text-gray-200 min-w-0 truncate hover:text-indigo-600 dark:hover:text-indigo-400 hover:underline transition" title="${entry.topic}">${entry.topic}</a>
         <span x-show="editMode" style="display:none" class="text-sm text-gray-700 dark:text-gray-200 min-w-0 truncate" title="${entry.topic}">${entry.topic}</span>
-        <form x-show="editMode" style="display:none" method="post" action="/knowledge/${encodeURIComponent(entry.topic)}/delete" onsubmit="return confirm('Remove ${entry.topic} from your knowledge map?')" class="shrink-0 flex items-center">
+        <form x-show="editMode" style="display:none" method="post" action="/knowledge/${encodeURIComponent(entry.topic)}/delete" hx-post="/knowledge/${encodeURIComponent(entry.topic)}/delete" hx-target="#knowledge-map" hx-select="#knowledge-map" hx-swap="outerHTML" hx-confirm="Remove ${entry.topic} from your knowledge map?" class="shrink-0 flex items-center">
           <button type="submit" class="text-xs text-gray-200 dark:text-gray-700 hover:text-red-500 dark:hover:text-red-400 transition w-4 text-center opacity-0 group-hover/row:opacity-100" title="Remove topic">×</button>
         </form>
       </div>
-      <form x-show="editMode" style="display:none" method="post" action="/knowledge/${encodeURIComponent(entry.topic)}" class="shrink-0 flex items-center">
+      <form x-show="editMode" style="display:none" method="post" action="/knowledge/${encodeURIComponent(entry.topic)}" hx-post="/knowledge/${encodeURIComponent(entry.topic)}" hx-target="#${rowId}" hx-select="#${rowId}" hx-swap="outerHTML" class="shrink-0 flex items-center">
         <input type="hidden" name="delta" value="-1" />
         <button class="text-xs text-gray-300 dark:text-gray-600 hover:text-red-500 dark:hover:text-red-400 transition w-5 text-center leading-none">−</button>
       </form>
       <div class="w-20 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden shrink-0">
         <div class="${color} h-full rounded-full transition-all" style="width: ${pct}%"></div>
       </div>
-      <form x-show="editMode" style="display:none" method="post" action="/knowledge/${encodeURIComponent(entry.topic)}" class="shrink-0 flex items-center">
+      <form x-show="editMode" style="display:none" method="post" action="/knowledge/${encodeURIComponent(entry.topic)}" hx-post="/knowledge/${encodeURIComponent(entry.topic)}" hx-target="#${rowId}" hx-select="#${rowId}" hx-swap="outerHTML" class="shrink-0 flex items-center">
         <input type="hidden" name="delta" value="1" />
         <button class="text-xs text-gray-300 dark:text-gray-600 hover:text-green-600 dark:hover:text-green-400 transition w-5 text-center leading-none">+</button>
       </form>
@@ -536,11 +544,12 @@ ${
     </thead>
     <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
       ${d.lessons.map((lesson) => {
+        const rowId = domId("lesson-row-", lesson.id);
         const date = lesson.timestamp.slice(0, 10);
         const tip = lesson.timestamp.slice(0, 16).replace("T", " ");
-        return html`<tr class="hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors group cursor-pointer" tabindex="0" onclick="window.location='/lessons/${encodeURIComponent(lesson.id)}'" onkeydown="if(event.key==='Enter')window.location='/lessons/${encodeURIComponent(lesson.id)}'" role="link">
+        return html`<tr id="${rowId}" class="hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors group cursor-pointer" tabindex="0" onclick="window.location='/lessons/${encodeURIComponent(lesson.id)}'" onkeydown="if(event.key==='Enter')window.location='/lessons/${encodeURIComponent(lesson.id)}'" role="link">
         <td class="px-3 py-3" onclick="event.stopPropagation()" onkeydown="event.stopPropagation()">
-          <form method="post" action="/lessons/${encodeURIComponent(lesson.id)}/star">
+          <form method="post" action="/lessons/${encodeURIComponent(lesson.id)}/star" hx-post="/lessons/${encodeURIComponent(lesson.id)}/star" hx-target="#${rowId}" hx-select="#${rowId}" hx-swap="outerHTML">
             <input type="hidden" name="starred" value="${lesson.starred ? "0" : "1"}" />
             <input type="hidden" name="next" value="/lessons${lessonsQs(s)}" />
             <button type="submit" title="${lesson.starred ? "Unstar" : "Star"}" class="w-6 text-lg text-center leading-none transition ${lesson.starred ? "text-yellow-400 hover:text-yellow-300" : "text-gray-300 dark:text-gray-600 hover:text-yellow-400"}">${lesson.starred ? "★" : "☆"}</button>
@@ -691,12 +700,15 @@ export function lessonDetailPage(d: { lesson: Lesson; uiTheme: string }): Html {
   const hasMeta = Boolean(l.project || l.repository || l.branch || l.commit_hash || l.folder);
   const date = l.timestamp.slice(0, 10);
   const tip = l.timestamp.slice(0, 16).replace("T", " ");
+  // One feedback POST re-renders both regions: the badge row (target) and, out of band,
+  // the footer buttons — the markdown body is client-rendered, so a full-page swap would blank it.
+  const feedbackHx = `hx-post="/lessons/${encodeURIComponent(l.id)}/feedback" hx-target="#lesson-meta" hx-select="#lesson-meta" hx-swap="outerHTML" hx-select-oob="#lesson-feedback:outerHTML"`;
 
   const body = html`
 <div class="mb-4"><a href="/lessons" class="text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-white text-sm transition">← Back to lessons</a></div>
 <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-6">
   <div class="flex flex-wrap items-center gap-3 mb-2">
-    <form method="post" action="/lessons/${encodeURIComponent(l.id)}/star">
+    <form id="lesson-star" method="post" action="/lessons/${encodeURIComponent(l.id)}/star" hx-post="/lessons/${encodeURIComponent(l.id)}/star" hx-target="#lesson-star" hx-select="#lesson-star" hx-swap="outerHTML">
       <input type="hidden" name="starred" value="${l.starred ? "0" : "1"}" />
       <input type="hidden" name="next" value="/lessons/${encodeURIComponent(l.id)}" />
       <button type="submit" title="${l.starred ? "Unstar" : "Star"}" class="w-6 text-center text-xl leading-none transition ${l.starred ? "text-yellow-400 hover:text-yellow-300" : "text-gray-300 dark:text-gray-600 hover:text-yellow-400"}">${l.starred ? "★" : "☆"}</button>
@@ -704,7 +716,7 @@ export function lessonDetailPage(d: { lesson: Lesson; uiTheme: string }): Html {
     <h1 class="text-xl font-bold text-gray-900 dark:text-white flex-1 min-w-0">${l.title}</h1>
     <a href="/lessons?level=${l.level}" class="text-xs font-semibold px-2 py-0.5 rounded-full border ${levelClass} shrink-0 hover:ring-2 hover:ring-current hover:ring-offset-1 transition-shadow">${l.level}</a>
   </div>
-  <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-500 dark:text-gray-400 mb-5">
+  <div id="lesson-meta" class="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-500 dark:text-gray-400 mb-5">
     <span class="relative group/date cursor-default">🗓 <span data-ts="${l.timestamp}">${date}</span>
       <span class="absolute z-10 bottom-full left-0 mb-1 px-2 py-1 rounded bg-gray-800 dark:bg-gray-700 text-white text-xs whitespace-nowrap pointer-events-none opacity-0 group-hover/date:opacity-100 transition-opacity duration-150">${tip}</span>
     </span>
@@ -717,7 +729,7 @@ export function lessonDetailPage(d: { lesson: Lesson; uiTheme: string }): Html {
               ? html`<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-700">✓ I know this</span>`
               : html`<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-700">✗ I don't know this</span>`
           }
-        <form method="post" action="/lessons/${encodeURIComponent(l.id)}/feedback"><input type="hidden" name="feedback" value="clear" /><input type="hidden" name="next" value="/lessons/${encodeURIComponent(l.id)}" /><button type="submit" class="text-xs text-gray-400 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-400 transition">Clear</button></form>`
+        <form method="post" action="/lessons/${encodeURIComponent(l.id)}/feedback" ${raw(feedbackHx)}><input type="hidden" name="feedback" value="clear" /><input type="hidden" name="next" value="/lessons/${encodeURIComponent(l.id)}" /><button type="submit" class="text-xs text-gray-400 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-400 transition">Clear</button></form>`
         : ""
     }
   </div>
@@ -738,14 +750,14 @@ export function lessonDetailPage(d: { lesson: Lesson; uiTheme: string }): Html {
   </div></div>`
       : ""
   }
-  ${
+  <div id="lesson-feedback">${
     !l.feedback
       ? html`<div class="mt-6 pt-4 border-t border-gray-100 dark:border-gray-800 flex flex-wrap gap-2">
-    <form method="post" action="/lessons/${encodeURIComponent(l.id)}/feedback"><input type="hidden" name="feedback" value="know" /><input type="hidden" name="next" value="/lessons/${encodeURIComponent(l.id)}" /><button type="submit" class="px-3 py-1 rounded text-sm font-medium transition bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-green-100 dark:hover:bg-green-800 hover:text-green-700 dark:hover:text-white">✓ I know this</button></form>
-    <form method="post" action="/lessons/${encodeURIComponent(l.id)}/feedback"><input type="hidden" name="feedback" value="dont_know" /><input type="hidden" name="next" value="/lessons/${encodeURIComponent(l.id)}" /><button type="submit" class="px-3 py-1 rounded text-sm font-medium transition bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-red-100 dark:hover:bg-red-900 hover:text-red-700 dark:hover:text-white">✗ I don't know this</button></form>
+    <form method="post" action="/lessons/${encodeURIComponent(l.id)}/feedback" ${raw(feedbackHx)}><input type="hidden" name="feedback" value="know" /><input type="hidden" name="next" value="/lessons/${encodeURIComponent(l.id)}" /><button type="submit" class="px-3 py-1 rounded text-sm font-medium transition bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-green-100 dark:hover:bg-green-800 hover:text-green-700 dark:hover:text-white">✓ I know this</button></form>
+    <form method="post" action="/lessons/${encodeURIComponent(l.id)}/feedback" ${raw(feedbackHx)}><input type="hidden" name="feedback" value="dont_know" /><input type="hidden" name="next" value="/lessons/${encodeURIComponent(l.id)}" /><button type="submit" class="px-3 py-1 rounded text-sm font-medium transition bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-red-100 dark:hover:bg-red-900 hover:text-red-700 dark:hover:text-white">✗ I don't know this</button></form>
   </div>`
       : ""
-  }
+  }</div>
   <div class="mt-4 pt-4 border-t border-gray-100 dark:border-gray-800 text-xs text-gray-300 dark:text-gray-600">ID: ${l.id}</div>
 </div>`;
 

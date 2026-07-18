@@ -18,7 +18,15 @@
     return rtf.format(-Math.floor(diffDays / 365), 'year');
   }
 
-  document.querySelectorAll('[data-ts]').forEach(function (el) {
-    el.textContent = relativeTime(el.dataset.ts);
+  function applyRelativeTimes(root) {
+    root.querySelectorAll('[data-ts]').forEach(function (el) {
+      el.textContent = relativeTime(el.dataset.ts);
+    });
+  }
+
+  applyRelativeTimes(document);
+  /* HTMX-swapped fragments (lesson rows, lesson meta) arrive with raw dates. */
+  document.body.addEventListener('htmx:afterSettle', function () {
+    applyRelativeTimes(document);
   });
 })();
