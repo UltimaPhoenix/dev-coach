@@ -5,7 +5,7 @@ import type { DatabaseSync } from "node:sqlite";
 import { afterEach, describe, expect, it } from "vitest";
 import * as coach from "../src/core/coach";
 import * as db from "../src/core/db";
-import { detectStack } from "../src/core/detect";
+import { detectStack, mergeStacks } from "../src/core/detect";
 import { detectGitContext } from "../src/core/git";
 import { normalizeTimestamp, parseLesson } from "../src/core/models";
 import { buildPromptForLevel, formatLessonForDisplay } from "../src/core/prompts";
@@ -333,6 +333,8 @@ describe("detect + git", () => {
     writeFileSync(join(dir, "pyproject.toml"), "fastapi\ndjango");
     mkdirSync(join(dir, ".github", "workflows"), { recursive: true });
     writeFileSync(join(dir, ".github", "workflows", "ci.yml"), "on: push");
+    writeFileSync(join(dir, "Package.swift"), "// swift-tools-version:6.0");
+    mkdirSync(join(dir, "Thing.xcodeproj")); // *.xcodeproj is a directory entry
     const stack = detectStack(dir);
     expect(stack.javascript).toBe(6);
     expect(stack.react).toBe(6);
@@ -341,7 +343,12 @@ describe("detect + git", () => {
     expect(stack.fastapi).toBe(6);
     expect(stack.django).toBe(6);
     expect(stack.github_actions).toBe(6);
+    expect(stack.swift).toBe(6);
     expect(detectStack(join(tmpdir(), "does-not-exist-xyz"))).toEqual({});
+  });
+  it("mergeStacks keeps the highest confidence per topic", () => {
+    expect(mergeStacks({ go: 5, docker: 7 }, { go: 6 }, {})).toEqual({ go: 6, docker: 7 });
+    expect(mergeStacks()).toEqual({});
   });
   it("detectGitContext returns the expected shape", () => {
     const ctx = detectGitContext();

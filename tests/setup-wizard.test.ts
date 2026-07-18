@@ -1,4 +1,4 @@
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
@@ -94,6 +94,34 @@ describe("setup wizard", () => {
       expect(know.go).toBe(8);
       expect(know.elixir).toBe(7);
       expect(know.rust).toBeUndefined(); // skipped
+    } finally {
+      process.chdir(cwd);
+    }
+  });
+
+  it("automatic mode folds in the Claude Code history scan", async () => {
+    const home = process.env.HOME as string;
+    const histProj = join(home, "projects", "jvm-service");
+    mkdirSync(histProj, { recursive: true });
+    writeFileSync(join(histProj, "build.gradle"), "plugins { id 'java' }\n");
+    writeFileSync(join(home, ".claude.json"), JSON.stringify({ projects: { [histProj]: {} } }));
+
+    const empty = mkdtempSync(join(tmpdir(), "dc-empty-"));
+    const cwd = process.cwd();
+    process.chdir(empty); // no cwd signals — everything comes from the history scan
+    try {
+      const out = await runSetup([
+        "", // Step1: skip backup
+        "a", // Step2: automatic detection
+        "", // detected `java` → keep suggested confidence
+        "", // no extra topics
+        "n", // Step3: no groups
+        "2", // Step4: max per day
+        "240", // min gap
+      ]);
+      expect(out).toContain("Scanned 1 Claude Code project(s)");
+      expect(out).toContain("jvm-service");
+      expect(db.withConnection((c) => db.getAllKnowledge(c)).java).toBe(6);
     } finally {
       process.chdir(cwd);
     }

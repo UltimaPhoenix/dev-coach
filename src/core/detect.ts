@@ -40,6 +40,9 @@ const STACK_SIGNALS: ReadonlyArray<readonly [string, string, number]> = [
   ["svelte.config.*", "svelte", 6],
   ["nuxt.config.*", "vue", 6],
   ["vite.config.*", "javascript", 6],
+  ["*.xcodeproj", "swift", 6],
+  ["*.xcworkspace", "swift", 6],
+  ["Package.swift", "swift", 6],
 ];
 
 const JS_FRAMEWORK_MAP: Record<string, string> = {
@@ -153,4 +156,15 @@ export function detectStack(folder: string): Record<string, number> {
   addPythonFrameworks(folder, add);
 
   return result;
+}
+
+/** Merge detected stacks, keeping the highest confidence seen per topic. */
+export function mergeStacks(...stacks: Record<string, number>[]): Record<string, number> {
+  const merged: Record<string, number> = {};
+  for (const stack of stacks) {
+    for (const [topic, confidence] of Object.entries(stack)) {
+      if ((merged[topic] ?? -1) < confidence) merged[topic] = confidence;
+    }
+  }
+  return merged;
 }

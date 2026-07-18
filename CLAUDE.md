@@ -47,6 +47,7 @@ dev-coach/
 │   │   ├── db.ts           # node:sqlite schema + migrations + query helpers + DEFAULT_PROFILE
 │   │   ├── coach.ts        # rate limit, cue engine (evaluateCue/explainCue), profile, stats
 │   │   ├── git.ts  detect.ts  prompts.ts   # prompts.ts renders the lesson card (formatLessonForDisplay)
+│   │   ├── claude-history.ts   # cross-project stack scan of ~/.claude (projects map, manifests, activity, memories)
 │   ├── mcp/server.ts       # McpServer: 15 tools + 11 resources + devcoach_instructions prompt
 │   ├── cli/commands.ts     # Commander dispatcher (26 subcommands incl. doctor + hooks) + term.ts
 │   └── web/app.ts          # Hono app (19 routes) + views.ts (hono/html pages)
@@ -84,7 +85,12 @@ taught topics, profile, and the notebook; SKILL.md prescribes this single read i
 `settings`, `lessons/recent`, `stats`, `taught-topics`, `rate-limit`, `context`,
 `onboarding`, and the templated `lessons/{lesson_id}`. Each returns JSON (except `notebook`)
 and never throws (returns
-`{ error }` on failure).
+`{ error }` on failure). `onboarding` carries the **history-wide** `detected_stack`
+(`scanClaudeHistory()` over the `~/.claude.json` projects map + depth-limited manifest walks +
+`history.jsonl` activity + per-project auto-memory excerpts, merged with the cwd's
+`detectStack`) plus `detected_projects` provenance (name, topics, prompt_count, last_activity,
+memory) and `scanned_projects` — only the `MAX_RECENT_PROJECTS` most recently active projects
+are scanned, prompt text is never read, and any failure degrades to an empty scan.
 
 ## MCP prompt
 
@@ -154,8 +160,10 @@ hook (verified empirically) — hence priming-first design; blocks are the rare 
 - One-way dependency: `core/` never imports from `mcp/`, `cli/`, or `web/`.
 - `db.ts` = pure query helpers; every DB access wrapped in try/catch with graceful fallback —
   **never crash the server**.
-- DB/notebook paths always derived from `os.homedir()/.devcoach`, never hardcoded. Sole exception:
-  the `DEVCOACH_DIR` env override (`core/db.ts`) for test/e2e sandboxing.
+- DB/notebook paths always derived from `os.homedir()/.devcoach`, never hardcoded. Sole exceptions:
+  the `DEVCOACH_DIR` env override (`core/db.ts`) for test/e2e sandboxing, and
+  `DEVCOACH_CLAUDE_DIR`/`CLAUDE_CONFIG_DIR` (`core/claude-history.ts`) to relocate the
+  Claude Code history the onboarding scan reads.
 - `assets/` is the tracked source of truth (SKILL.md + web static) — `package.json` `files` ships it.
 - Prefer a Node built-in over a dependency; pin deps at latest stable.
 

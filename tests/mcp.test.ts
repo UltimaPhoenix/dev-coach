@@ -1,4 +1,5 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { ElicitRequestSchema } from "@modelcontextprotocol/sdk/types.js";
@@ -218,6 +219,12 @@ describe("mcp server", () => {
   it("reads every resource and the prompt", async () => {
     const { client, server } = await connect();
     await client.callTool({ name: "complete_onboarding", arguments: { topics: { python: 4 } } });
+    // Seed a fake Claude Code history so the onboarding resource has a scan to report.
+    const home = process.env.HOME as string;
+    const histProj = join(home, "projects", "ios-thing");
+    mkdirSync(histProj, { recursive: true });
+    writeFileSync(join(histProj, "Package.swift"), "// swift-tools-version:6.0");
+    writeFileSync(join(home, ".claude.json"), JSON.stringify({ projects: { [histProj]: {} } }));
     for (const uri of [
       "devcoach://profile",
       "devcoach://settings",
@@ -232,6 +239,13 @@ describe("mcp server", () => {
       const r: any = await client.readResource({ uri });
       expect(r.contents[0].text).toBeTruthy();
     }
+    // The onboarding resource merges the history-wide scan with cwd detection.
+    const onboarding: any = await client.readResource({ uri: "devcoach://onboarding" });
+    const o = JSON.parse(onboarding.contents[0].text);
+    expect(o.detected_stack.swift).toBe(6);
+    expect(o.scanned_projects).toBeGreaterThanOrEqual(1);
+    const ios = o.detected_projects.find((p: any) => p.name === "ios-thing");
+    expect(ios.topics).toContain("swift");
     // The aggregated briefing carries the whole pre-lesson read in ONE resource.
     const briefing: any = await client.readResource({ uri: "devcoach://briefing" });
     const b = JSON.parse(briefing.contents[0].text);

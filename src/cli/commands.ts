@@ -6,9 +6,10 @@ import { homedir, platform } from "node:os";
 import { dirname, join } from "node:path";
 import { createInterface } from "node:readline/promises";
 import { Command } from "commander";
+import { scanClaudeHistory } from "../core/claude-history";
 import * as coach from "../core/coach";
 import * as db from "../core/db";
-import { detectStack } from "../core/detect";
+import { detectStack, mergeStacks } from "../core/detect";
 import { detectGitContext } from "../core/git";
 import { readSkill, readSkillReferences } from "../skill";
 import { VERSION } from "../version";
@@ -889,10 +890,19 @@ async function cmdSetup(): Promise<void> {
     if (mode.startsWith("a")) {
       const git = detectGitContext();
       const cwd = git.folder ?? process.cwd();
-      const detected = detectStack(cwd);
+      const scan = scanClaudeHistory();
+      const detected = mergeStacks(detectStack(cwd), scan.detected_stack);
       const keys = Object.keys(detected).sort((a, b) => a.localeCompare(b));
+      if (scan.scanned_projects > 0) {
+        log(
+          `\n${c.dim(`Scanned ${scan.scanned_projects} Claude Code project(s) from your history:`)}`,
+        );
+        for (const p of scan.projects.slice(0, 8)) {
+          log(c.dim(`  ${p.name} — ${p.topics.join(", ") || "no stack signals"}`));
+        }
+      }
       if (keys.length) {
-        log(`\n${c.dim(`Detected from ${c.cyan(cwd)}:`)}`);
+        log(`\n${c.dim(`Detected (history + ${c.cyan(cwd)}):`)}`);
         for (const topic of keys) {
           const defaultConf = detected[topic] ?? 5;
           const raw = await ask(

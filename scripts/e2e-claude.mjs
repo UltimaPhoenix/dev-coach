@@ -57,7 +57,14 @@ if (spawnSync("which", ["claude"], { encoding: "utf8" }).status !== 0)
 const sandbox = mkdtempSync(join(tmpdir(), "dc-e2e-"));
 const dataDir = join(sandbox, "devcoach"); // devcoach DB/notebook, both modes
 const dbPath = join(dataDir, "coaching.db");
-const env = { ...process.env, DEVCOACH_DIR: dataDir, NO_COLOR: "1" };
+// DEVCOACH_CLAUDE_DIR points the history scan at an empty sandbox dir so the MCP
+// server spawned by claude never reads the real ~/.claude history in attached mode.
+const env = {
+  ...process.env,
+  DEVCOACH_DIR: dataDir,
+  DEVCOACH_CLAUDE_DIR: join(sandbox, "claude-data"),
+  NO_COLOR: "1",
+};
 const claudeArgs = [];
 console.log(
   `mode: ${hermetic ? "hermetic (sandbox HOME)" : "attached (real Claude config, sandboxed DEVCOACH_DIR)"}`,

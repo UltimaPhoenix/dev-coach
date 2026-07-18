@@ -111,11 +111,14 @@ function emitBlock(reason: string, systemMessage?: string): never {
 // marker file, so an interrupted onboarding leaves nothing behind and re-cues on
 // the next task. The artifacts appear only when complete_onboarding actually runs.
 const ONBOARD_CUE =
-  "devcoach: the user has no coaching profile yet. Ask them how they want to set it up — " +
-  "Automatic (detect this project's tech stack), Guided (a short conversation to map topics " +
-  "and confidence levels), or Import (restore from a backup) — and do not pick for them. " +
-  "After they choose, build the profile and save it by calling the devcoach " +
-  "`complete_onboarding` MCP tool (not a shell command) before ending your turn.";
+  "devcoach: the user has no coaching profile yet. Ask them how they want to set it up " +
+  "and STRONGLY recommend Automatic — devcoach scans their full Claude Code history " +
+  "across all their projects (read devcoach://onboarding for the detected stack and " +
+  "per-project evidence) so the profile reflects what they actually build. Also offer " +
+  "Guided (a short conversation to map topics and confidence levels) and Import " +
+  "(restore from a backup), but lead with Automatic; do not pick for them. After they " +
+  "choose, build the profile and save it by calling the devcoach `complete_onboarding` " +
+  "MCP tool (not a shell command) before ending your turn.";
 
 export function cmdOnboardHook(payload: HookPayload = readHookPayload()): void {
   if (shouldSuppressHook(payload)) process.exit(0);

@@ -8,9 +8,10 @@ import { dirname } from "node:path";
 import { McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
+import { scanClaudeHistory } from "../core/claude-history";
 import * as coach from "../core/coach";
 import * as db from "../core/db";
-import { detectStack } from "../core/detect";
+import { detectStack, mergeStacks } from "../core/detect";
 import { detectGitContext } from "../core/git";
 import {
   confidenceInputSchema,
@@ -940,7 +941,11 @@ export function createServer(): McpServer {
   server.registerResource(
     "onboarding",
     "devcoach://onboarding",
-    meta("Onboarding", "Onboarding status, auto-detected stack, and project topic defaults."),
+    meta(
+      "Onboarding",
+      "Onboarding status, the stack detected across the full Claude Code history " +
+        "(with per-project provenance), and project topic defaults.",
+    ),
     (uri) => {
       try {
         const status = db.withConnection((c) => db.isOnboardingComplete(c));
@@ -948,12 +953,15 @@ export function createServer(): McpServer {
         const notebookReady =
           existsSync(db.LEARNING_STATE_PATH) && statSync(db.LEARNING_STATE_PATH).size > 0;
         const git = detectGitContext();
-        const detected = detectStack(git.folder ?? process.cwd());
+        const scan = scanClaudeHistory();
+        const detected = mergeStacks(detectStack(git.folder ?? process.cwd()), scan.detected_stack);
         return jsonResource(uri, {
           knowledge_ready: knowledgeReady,
           notebook_ready: notebookReady,
           needs_onboarding: !(knowledgeReady && notebookReady),
           detected_stack: detected,
+          detected_projects: scan.projects,
+          scanned_projects: scan.scanned_projects,
           default_topics: db.DEFAULT_PROFILE,
           context_ready: git.branch !== null,
         });

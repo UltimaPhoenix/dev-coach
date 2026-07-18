@@ -21,20 +21,30 @@ This means a user who restores from backup has their knowledge automatically, so
 only Step 4 runs. On-demand re-setup ("redo onboarding", "reset my topics") always
 re-runs Steps 1–3 regardless of `knowledge_ready`.
 
-## Step 1 — Ask how to set up (always ask; never pick for the user)
+## Step 1 — Ask how to set up (strongly recommend Automatic; never pick for the user)
 
-Present a single choice using the client's question UI (e.g. AskUserQuestion in
-Claude Code). Offer exactly three options and mark **Automatic** as recommended:
+Read `devcoach://onboarding` FIRST — its `detected_stack`, `detected_projects`, and
+`scanned_projects` come from a scan of the user's **full Claude Code history** (every
+project Claude has worked in, ranked by recent activity), not just the current folder.
 
-- **Automatic (Recommended)** — detect the tech stack from this project and build a
-  profile from it.
+Then present a single choice using the client's question UI (e.g. AskUserQuestion in
+Claude Code). Offer exactly three options, and make **Automatic** the first option,
+**strongly recommended**, with its description citing the real evidence — name the
+project count and 2–3 detected topics with where they were seen, e.g. *"I scanned 9
+of your Claude Code projects and found TypeScript (dev-coach), Java (discordbot,
+over-night-runner), Swift (blueprince) — I can build your profile from that."*:
+
+- **Automatic (Strongly recommended)** — build the profile from the detected
+  history-wide stack; the user only confirms and adjusts confidences.
 - **Guided** — a step-by-step conversation to map knowledge, confidence levels, and
   topic groups (thorough, interactive).
 - **Import backup** — restore knowledge, lessons, and settings from an existing
   backup file.
 
-Do **not** default to Automatic silently — surface the choice and wait for the user's
-answer before proceeding.
+When the scan found nothing (`scanned_projects` 0 or an empty `detected_stack`),
+present Automatic without the evidence sentence — it falls back to the current
+project's files. Do **not** default to Automatic silently — surface the choice and
+wait for the user's answer before proceeding.
 
 **If Import backup:** ask for the file path and call `restore` (CLI) with it. Restore
 brings back knowledge entries automatically — no further DB steps needed. Re-read
@@ -44,11 +54,14 @@ Step 4. If `notebook_ready` is also true, proceed normally.
 ## Step 2 — Collect topics for the chosen mode
 
 **Automatic mode:**
-- Read `devcoach://onboarding` and present a merged topic list: `detected_stack`
-  (auto-detected from project files) enriched with relevant entries from
-  `default_topics` (the project's default knowledge map).
-- Show each topic with its suggested confidence. Ask the user to confirm, adjust,
-  or remove each: *"Looks right? Or enter 1–10 to change it."*
+- Present a merged topic list: `detected_stack` (history-wide, already merged with
+  the current project) enriched with relevant entries from `default_topics` (the
+  project's default knowledge map).
+- Show each topic with its suggested confidence **and its provenance** from
+  `detected_projects` — e.g. *"java 6 — seen in discordbot, over-night-runner"*.
+  Weight what you emphasise by `prompt_count` and `last_activity`: a stack the user
+  works in daily deserves more topics than a one-off experiment. Ask the user to
+  confirm, adjust, or remove each: *"Looks right? Or enter 1–10 to change it."*
 - After the list, ask: *"Anything else I missed? List any tools, languages,
   frameworks, or practices you work with regularly."* — add each with a confidence.
 
@@ -105,9 +118,11 @@ as the `notebook` field of the `complete_onboarding` call in Step 3. The tool sa
 to `~/.devcoach/learning-state.md` atomically with the profile (so it is never empty
 and never created before the user finishes).
 
-Make it **personalized**: draw on everything you know about *this* user — not only this
-onboarding conversation, but how they work across **all their projects** (languages and
-tools they reach for, recurring habits, strengths, and gaps you have observed elsewhere).
+Make it **personalized**: draw on everything you know about *this* user — this
+onboarding conversation, plus the real cross-project data in `detected_projects`
+(per-project stacks, activity volume and recency, and each project's auto-`memory`
+excerpt — distilled facts about how the user actually works). Cite project names and
+observed habits; never quote prompt text (it is not in the data, by design).
 Generic boilerplate is a failure; write specific, real notes. Use this structure:
 
 ```markdown
