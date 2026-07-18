@@ -98,6 +98,11 @@ Priority order:
 Tiebreaker: always prefer the profile topic. Never teach off-context lessons, and
 never pitch **below** the user's confidence band on that topic.
 
+When the task's real stack is **not tracked** in the profile, prefer offering to
+track it (Profile expansion below) over teaching it by analogy to a tracked
+topic — analogy filing records the lesson under the wrong stack and can hide an
+entire technology from the coaching record for months.
+
 **Depth per confidence** (per-topic, never an average): `0–3` junior — explain from
 scratch, analogies, no jargon · `4–6` mid — the why, alternatives, trade-offs ·
 `7–9` senior — edge cases, production trade-offs, historical context · `10` —

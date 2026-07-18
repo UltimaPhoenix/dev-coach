@@ -60,3 +60,8 @@ against the current profile:
   appear in **no** scanned project. Offer `remove_topic`; keeping them is fine.
 - Nothing qualifies → say so in one line and stop. An overcrowded topic list
   dilutes lesson choice — fewer, real topics beat completeness.
+- `devcoach://onboarding` unreachable, or `detected_projects` empty → derive
+  candidates from lesson history instead (`get_lessons`: recurring stacks in
+  `task_context` that lack a matching topic), tell the user the evidence is
+  history-only, and defer the retirement pass — never guess retirements
+  without profile access.
