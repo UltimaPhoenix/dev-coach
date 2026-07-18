@@ -58,6 +58,23 @@ const lessonOutputShape = {
   feedback: FeedbackSchema.nullable(),
 };
 
+// log_lesson's output adds a model-facing self-check. It must live in
+// structuredContent: when a tool returns structured output, Claude Code surfaces
+// THAT to the model and drops the plain-text content blocks — an instruction
+// placed there is never seen (verified via session transcripts).
+const logLessonOutputShape = {
+  ...lessonOutputShape,
+  reply_check: z.string(),
+};
+
+const CARD_REPLY_CHECK =
+  "Saved — but saving does NOT display anything. The user sees ONLY plain text you " +
+  "write in your reply; the title/body inside this tool call's ARGUMENTS are invisible " +
+  "to them, and having composed them does not count as having shown the card. Did you " +
+  "already write the full card (both ### band headings + title line + body + tip) as " +
+  "plain reply text, outside any tool call? If yes: output nothing. If no: write the " +
+  "card now, as the final text of your reply. Never write it twice.";
+
 const profileOutputShape = {
   knowledge: z.array(z.object({ topic: z.string(), confidence: z.number().int() })),
   groups: z.array(z.object({ name: z.string(), topics: z.array(z.string()) })),
@@ -127,7 +144,7 @@ export function createServer(): McpServer {
           "github | gitlab | bitbucket | local (auto-detected if omitted)",
         ),
       },
-      outputSchema: lessonOutputShape,
+      outputSchema: logLessonOutputShape,
       annotations: {
         title: "Log Lesson",
         destructiveHint: false,
@@ -167,10 +184,8 @@ export function createServer(): McpServer {
         });
         db.withConnection((c) => {
           db.insertLesson(c, lesson);
-          // A lesson was delivered → reset the interaction-pacing counters, and flag
-          // the next stop to verify the card is actually visible in the reply.
+          // A lesson was delivered → reset the interaction-pacing counters.
           db.resetNudge(c);
-          db.markDisplayPending(c);
         });
 
         // Inline feedback via elicitation — capability-gated, with a graceful no-op fallback.
@@ -205,18 +220,14 @@ export function createServer(): McpServer {
         } catch {
           // elicitation not supported by this client — lesson is already saved
         }
-        // The card is chat output the server cannot verify; a missing card is recovered
-        // by the Stop hook's transcript check. Never echo the card here — after the
-        // tool-approval pause the model re-printed the echo, doubling the card.
+        // The card is chat output the server cannot verify, so the result carries a
+        // conditional self-check instead of hook machinery: a model that skipped the
+        // card prints it now; one that printed it stops. Never echo the rendered card
+        // here — after the tool-approval pause the model re-printed the echo,
+        // doubling the card.
         return {
-          content: [
-            txt(
-              "Lesson saved. The card must already be visible in your reply — output " +
-                "NOTHING else now and NEVER print the card a second time.",
-            ),
-            txt(JSON.stringify(lesson)),
-          ],
-          structuredContent: lesson,
+          content: [txt(`Lesson saved. ${CARD_REPLY_CHECK}`), txt(JSON.stringify(lesson))],
+          structuredContent: { ...lesson, reply_check: CARD_REPLY_CHECK },
         };
       } catch (err) {
         return errResult(`log_lesson failed: ${err}`);

@@ -102,7 +102,7 @@ if (hermetic) {
   if (hasHooks) {
     console.log("using the devcoach hooks already wired in ~/.claude/settings.json");
     console.log("  note: those hooks run the INSTALLED devcoach — if it is older than this repo,");
-    console.log("  hook-side behaviour (cue text, recovery) reflects the installed version.");
+    console.log("  hook-side behaviour (cue text) reflects the installed version.");
   } else {
     const extra = join(sandbox, "settings.json");
     writeFileSync(extra, JSON.stringify({ hooks: desiredHooks }));
@@ -118,6 +118,13 @@ cli("knowledge-add", "typescript", "--confidence", "4");
 cli("set", "nudge_every", "99");
 cli("set", "min_gap_minutes", "0");
 cli("set", "max_per_day", "99");
+// Seed the notebook too: with it missing, devcoach://onboarding reports
+// notebook_ready:false and the skill runs onboarding INSIDE scenario 1's lesson
+// turn — the scenarios must exercise the normal, fully-onboarded lesson path.
+writeFileSync(
+  join(dataDir, "learning-state.md"),
+  "# devcoach — Coaching Notebook\n\n## Observations\nSeeded by e2e.\n",
+);
 
 const mcpConfig = join(sandbox, "mcp.json");
 writeFileSync(
@@ -236,8 +243,8 @@ if (gained !== 1 || bands === 0) {
 }
 check("exactly one lesson row was logged", gained === 1, `got ${gained}`);
 check("the lesson card is visible in the reply", bands >= 1, `bands: ${bands}`);
-// log_lesson no longer echoes the card and recovery only fires when the transcript
-// lacks the band — a second print is the double-card regression, not tolerable slack.
+// log_lesson does not echo the card — a second print is the double-card
+// regression, not tolerable slack.
 check("the card is printed exactly once", bands === 1, `bands: ${bands}`);
 check("cue resolved (no pending retry)", Number(cueState().pending ?? 0) === 0);
 

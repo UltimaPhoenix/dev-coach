@@ -108,7 +108,7 @@ export function getConnection(dbPath: string = DB_PATH): DatabaseSync {
  * idempotent statements). Bump it whenever initSchema/migrate changes. The legacy Python
  * runtime ignores user_version, so stamping is safe on the shared DB.
  */
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 export function getInitializedConnection(dbPath: string = DB_PATH): DatabaseSync {
   const db = getConnection(dbPath);
@@ -202,14 +202,11 @@ export function initSchema(db: DatabaseSync): void {
 
     -- Runtime-only, single row: cue lifecycle. pending=1 between an emitted cue and
     -- its resolution (log_lesson or skip_lesson), arming a shorter retry threshold.
-    -- display_pending=1 between log_lesson and the next stop, where the hook verifies
-    -- the lesson card is actually visible (last_assistant_message) and recovers it.
     CREATE TABLE IF NOT EXISTS cue_state (
         id               INTEGER PRIMARY KEY CHECK (id = 1),
         pending          INTEGER NOT NULL DEFAULT 0,
         last_cue_at      TEXT,
-        last_skip_reason TEXT,
-        display_pending  INTEGER NOT NULL DEFAULT 0
+        last_skip_reason TEXT
     );
 
     CREATE INDEX IF NOT EXISTS idx_lessons_timestamp ON lessons (timestamp);
@@ -224,11 +221,6 @@ export function initSchema(db: DatabaseSync): void {
 function migrate(db: DatabaseSync): void {
   try {
     db.exec("ALTER TABLE lessons ADD COLUMN body TEXT");
-  } catch {
-    // column already exists
-  }
-  try {
-    db.exec("ALTER TABLE cue_state ADD COLUMN display_pending INTEGER NOT NULL DEFAULT 0");
   } catch {
     // column already exists
   }
@@ -671,19 +663,17 @@ export interface CueState {
   pending: boolean;
   last_cue_at: string | null;
   last_skip_reason: string | null;
-  display_pending: boolean;
 }
 
 export function getCueState(db: DatabaseSync): CueState {
   const row = getRow(
     db,
-    "SELECT pending, last_cue_at, last_skip_reason, display_pending FROM cue_state WHERE id = 1",
+    "SELECT pending, last_cue_at, last_skip_reason FROM cue_state WHERE id = 1",
   );
   return {
     pending: Number(row?.pending ?? 0) === 1,
     last_cue_at: (row?.last_cue_at as string | null) ?? null,
     last_skip_reason: (row?.last_skip_reason as string | null) ?? null,
-    display_pending: Number(row?.display_pending ?? 0) === 1,
   };
 }
 
@@ -711,23 +701,6 @@ export function clearCuePending(db: DatabaseSync, reason?: string): void {
     reason ?? null,
   );
   runSql(db, "DELETE FROM nudge_state");
-}
-
-/** log_lesson saved a lesson: the next stop must verify the card is actually visible. */
-export function markDisplayPending(db: DatabaseSync): void {
-  runSql(
-    db,
-    "INSERT INTO cue_state (id, pending, display_pending) VALUES (1, 0, 1) " +
-      "ON CONFLICT(id) DO UPDATE SET display_pending = 1",
-  );
-}
-
-/** Read-and-clear the display flag — true when the last turn logged a lesson. */
-export function takeDisplayPending(db: DatabaseSync): boolean {
-  const row = getRow(db, "SELECT display_pending FROM cue_state WHERE id = 1");
-  const pending = Number(row?.display_pending ?? 0) === 1;
-  if (pending) runSql(db, "UPDATE cue_state SET display_pending = 0 WHERE id = 1");
-  return pending;
 }
 
 export function isOnboardingComplete(db: DatabaseSync): { knowledge_ready: boolean } {

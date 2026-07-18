@@ -2,13 +2,12 @@
 // exercising the fd0 transport (readHookPayload's FIFO/file/socket detection) that the
 // in-process CLI tests bypass. Each test gets its own sandbox HOME.
 import { execFileSync, spawn } from "node:child_process";
-import { existsSync, mkdtempSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import * as db from "../src/core/db";
-import { parseLesson } from "../src/core/models";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const BIN = [join(root, "node_modules", "tsx", "dist", "cli.mjs"), join(root, "src", "bin.ts")];
@@ -118,81 +117,6 @@ describe("hooks via real child processes (piped stdin)", () => {
     // Plan mode never primes.
     expect(hook("prompt-hook", home, { ...payload, permission_mode: "plan" })).toBe("");
   }, 30_000);
-
-  it("recovers a logged-but-invisible lesson card, exactly once", () => {
-    const home = freshHome();
-    seedProfile(home, 99);
-    // A turn whose transcript has no card anywhere (recovery must be confirmed by the
-    // transcript — the final message alone is not a reliable negative).
-    const transcript = join(home, "transcript.jsonl");
-    writeFileSync(
-      transcript,
-      [
-        JSON.stringify({ type: "user", message: { content: "do the task" } }),
-        JSON.stringify({
-          type: "assistant",
-          message: { content: [{ type: "text", text: "done." }] },
-        }),
-      ].join("\n"),
-    );
-    // log_lesson equivalent: lesson saved + counters reset + display flag armed
-    db.withConnection((c) => {
-      db.insertLesson(
-        c,
-        parseLesson({
-          id: "l-rec",
-          timestamp: "2026-06-16T10:00:00Z",
-          topic_id: "sqlite",
-          categories: ["db"],
-          title: "Recovered lesson",
-          level: "mid",
-          summary: "s",
-          body: "Body to recover.",
-        }),
-      );
-      db.resetNudge(c);
-      db.markDisplayPending(c);
-    }, dbPathOf(home));
-
-    // Reply lacks the band (and the transcript confirms) → one recovery block, flag
-    // consumed. The block embeds the card rendered from the DB (log_lesson's result
-    // no longer echoes it), so the model only has to print it.
-    const out = JSON.parse(
-      hook("stop-hook", home, {
-        session_id: "s1",
-        stop_hook_active: true,
-        last_assistant_message: "Lesson logged.",
-        transcript_path: transcript,
-      }),
-    );
-    expect(out.decision).toBe("block");
-    expect(out.reason).toContain("NOT visible");
-    expect(out.reason).toContain("🎓 devcoach");
-    expect(out.reason).toContain("**Recovered lesson**");
-    expect(out.reason).toContain("Body to recover.");
-    // Second stop: flag already consumed → silent.
-    expect(
-      hook("stop-hook", home, {
-        session_id: "s1",
-        stop_hook_active: true,
-        last_assistant_message: "Lesson logged.",
-        transcript_path: transcript,
-      }),
-    ).toBe("");
-
-    // Card present in the reply → flag consumed silently.
-    db.withConnection((c) => db.markDisplayPending(c), dbPathOf(home));
-    expect(
-      hook("stop-hook", home, {
-        session_id: "s1",
-        last_assistant_message: "…\n### ──────── 🎓 devcoach ────────\nbody\n",
-      }),
-    ).toBe("");
-
-    // No last_assistant_message/transcript signal (older Claude Code) → no recovery, no error.
-    db.withConnection((c) => db.markDisplayPending(c), dbPathOf(home));
-    expect(hook("stop-hook", home, { session_id: "s1", stop_hook_active: true })).toBe("");
-  }, 60_000);
 
   it("two concurrent hooks on one DB both exit 0 (busy_timeout)", async () => {
     const home = freshHome();

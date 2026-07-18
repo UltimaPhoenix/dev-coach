@@ -89,13 +89,12 @@ describe("mcp server", () => {
     expect(log.structuredContent.body).toBe("Full lesson body.");
     expect(log.structuredContent.feedback).toBeNull();
     // The result must NOT echo the rendered card (the echo made the model re-print
-    // it after the tool-approval pause → double card); recovery is the Stop hook's job.
-    expect(text(log)).toContain("must already be visible");
-    expect(text(log)).toContain("NEVER print the card a second time");
+    // it after the tool-approval pause → double card); it carries a conditional
+    // self-check instead — inside structuredContent, the only part Claude Code
+    // surfaces to the model.
+    expect(log.structuredContent.reply_check).toContain("ARGUMENTS are invisible");
+    expect(log.structuredContent.reply_check).toContain("Never write it twice");
     expect(text(log)).not.toContain("🎓 devcoach");
-
-    // log_lesson flags the next stop to verify the card is visible.
-    expect(db.withConnection((c) => db.takeDisplayPending(c))).toBe(true);
 
     // skip_lesson records the decline and resolves the pacing window: pending cue
     // disarmed AND counters restarted (a primed turn resolves before the Stop hook).

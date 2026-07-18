@@ -70,9 +70,10 @@ Every tool registers a `title` + read-only/destructive annotations, a tight Zod 
 (`Lesson`/`Profile`/`Settings`), and returns `{ isError: true, … }` with a recovery hint on failure.
 `log_lesson` elicits inline feedback (capability-gated on `getClientCapabilities()?.elicitation`)
 and resets the pacing counters. Its result deliberately does **not** echo the rendered card (the
-echo made the model re-print it after the tool-approval pause → double card); a logged-but-invisible
-card is recovered by the stop-hook, which renders it from the DB (`formatLessonForDisplay`).
-`skip_lesson` is the explicit no-op: it records
+echo made the model re-print it after the tool-approval pause → double card); instead the
+`structuredContent` carries a `reply_check` self-check ("tool ARGUMENTS are invisible to the
+user") — it must live there because Claude Code surfaces structured output to the model and
+drops the plain-text content blocks. `skip_lesson` is the explicit no-op: it records
 why no lesson was warranted and re-arms the pacing (clears `cue_state.pending`).
 
 ## MCP resources (11)
@@ -138,11 +139,8 @@ reach it) → threshold (`pending ? min(NUDGE_RETRY_AFTER=3, nudge_every) : nudg
 rate limit (denied stops keep accumulating) → cue: `markCuePending` (reset counters + arm retry).
 Every silent exit returns a human-readable `reason` (consumed by doctor + `DEVCOACH_HOOK_DEBUG`).
 `explainCue` is the read-only dry run (doctor verdict, prompt-hook priming). Resolution:
-`log_lesson` → `resetNudge` + `markDisplayPending`; `skip_lesson` → `clearCuePending(reason)`
+`log_lesson` → `resetNudge`; `skip_lesson` → `clearCuePending(reason)`
 (both restart counters — a primed turn resolves BEFORE the Stop hook, so no block is needed).
-Card recovery: the stop after `log_lesson` consumes `display_pending` and, when the turn
-(final message + transcript scan) lacks the `🎓 devcoach` band, blocks ONCE — the block
-embeds the card rendered from the DB, so the model just prints it.
 Note: current Claude Code shows a generic "Stop hook error occurred" notice on ANY blocking Stop
 hook (verified empirically) — hence priming-first design; blocks are the rare fallback.
 

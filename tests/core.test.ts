@@ -162,7 +162,6 @@ describe("db knowledge + groups + settings", () => {
       pending: false,
       last_cue_at: null,
       last_skip_reason: null,
-      display_pending: false,
     });
     db.bumpNudge(c, "s1", "session");
     db.markCuePending(c);
@@ -180,10 +179,6 @@ describe("db knowledge + groups + settings", () => {
     db.markCuePending(c);
     db.resetNudge(c); // log_lesson path
     expect(db.getCueState(c).pending).toBe(false);
-    // display flag: set by log_lesson, consumed once by the next stop
-    db.markDisplayPending(c);
-    expect(db.takeDisplayPending(c)).toBe(true);
-    expect(db.takeDisplayPending(c)).toBe(false);
   });
 
   it("evaluateCue: gates in order, resets on emission, retries, counts plan mode", () => {

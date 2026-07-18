@@ -2,8 +2,7 @@
 // process.exit/stdout spied). The spawn suite (hooks-spawn.test.ts) already exercises the
 // same paths end-to-end in child processes, but v8 coverage cannot see child processes —
 // this file makes the hook module's branches count. Runs against the per-file sandbox HOME.
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { mkdirSync, rmSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import {
   cmdOnboardHook,
@@ -18,7 +17,6 @@ const payload = (over: Partial<HookPayload> = {}): HookPayload => ({
   stop_hook_active: false,
   permission_mode: "default",
   session_id: "s1",
-  last_assistant_message: null,
   ...over,
 });
 
@@ -82,77 +80,13 @@ describe("hooks in-process (runHook dispatcher + payload-injected entrypoints)",
     expect(JSON.parse(r.out).reason).toContain("complete_onboarding");
   });
 
-  it("card recovery trusts the whole turn (transcript), not just the final message", () => {
+  it("an eligible stop cues a lesson once a profile exists", () => {
     seedProfile();
-    const home = process.env.HOME as string;
-    const entry = (o: object): string => JSON.stringify(o);
-    // The live false positive: card printed mid-turn, then checkpoint work, then a
-    // closing line — the FINAL assistant message has no band, but the card WAS visible.
-    const cardMidTurn = join(home, "card-mid-turn.jsonl");
-    writeFileSync(
-      cardMidTurn,
-      [
-        entry({ type: "user", message: { content: "do the task" } }),
-        entry({
-          type: "assistant",
-          message: {
-            content: [{ type: "text", text: "work…\n### ──────── 🎓 devcoach ────────\nbody" }],
-          },
-        }),
-        entry({ type: "user", message: { content: [{ type: "tool_result", content: "ok" }] } }),
-        entry({
-          type: "assistant",
-          message: { content: [{ type: "text", text: "The lesson has been logged." }] },
-        }),
-      ].join("\n"),
-    );
-    db.withConnection((c) => db.markDisplayPending(c));
-    const falsePositive = capture(() =>
-      cmdStopHook(
-        payload({
-          stop_hook_active: true,
-          last_assistant_message: "The lesson has been logged.",
-          transcript_path: cardMidTurn,
-        }),
-      ),
-    );
-    expect(falsePositive).toEqual({ out: "", code: 0 }); // card found in the turn → silent
-
-    // Genuinely missing: no band anywhere in the turn → recover.
-    const noCard = join(home, "no-card.jsonl");
-    writeFileSync(
-      noCard,
-      [
-        entry({ type: "user", message: { content: "do the task" } }),
-        entry({ type: "assistant", message: { content: [{ type: "text", text: "done." }] } }),
-      ].join("\n"),
-    );
-    db.withConnection((c) => db.markDisplayPending(c));
-    const rec = capture(() =>
-      cmdStopHook(
-        payload({
-          stop_hook_active: true,
-          last_assistant_message: "Lesson logged.",
-          transcript_path: noCard,
-        }),
-      ),
-    );
-    expect(JSON.parse(rec.out).reason).toContain("NOT visible");
-    expect(JSON.parse(rec.out).systemMessage).toContain("recovering");
-
-    // No transcript and no band in the final message → no reliable signal → never
-    // recover blindly (the flag is still consumed).
-    db.withConnection((c) => db.markDisplayPending(c));
-    expect(
-      capture(() =>
-        cmdStopHook(payload({ stop_hook_active: true, last_assistant_message: "Lesson logged." })),
-      ),
-    ).toEqual({ out: "", code: 0 });
-
-    // Flag consumed → a normal eligible stop now cues the lesson (nudge_every=0).
     const cue = capture(() => cmdStopHook(payload()));
+    expect(cue.code).toBe(0);
     expect(JSON.parse(cue.out).decision).toBe("block");
     expect(JSON.parse(cue.out).reason).toContain("skip_lesson");
+    expect(JSON.parse(cue.out).systemMessage).toContain("preparing a lesson");
   });
 
   it("a broken DB never breaks a hook: every entrypoint exits 0 silently", () => {

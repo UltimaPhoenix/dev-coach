@@ -826,8 +826,6 @@ function cmdDoctor(): void {
       const cue = db.getCueState(conn);
       if (cue.pending) warn(`a cue is pending since ${cue.last_cue_at} (retry threshold armed)`);
       else if (cue.last_skip_reason) log(`    last skip: "${cue.last_skip_reason}"`);
-      if (cue.display_pending)
-        warn("a lesson was logged and the next stop will verify its card is visible");
       const rate = coach.checkRateLimit(conn);
       if (rate.allowed) ok("rate limit: allowed");
       else warn(`rate limit: ${rate.reason}`);

@@ -15,23 +15,18 @@ import { join } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
 import * as coach from "../core/coach";
 import * as db from "../core/db";
-import { formatLessonForDisplay } from "../core/prompts";
 
 /**
- * Claude Code passes the hook payload as JSON on stdin. We use five fields:
+ * Claude Code passes the hook payload as JSON on stdin. We use three fields:
  * `stop_hook_active` (true when this stop is itself a hook-forced continuation —
  * re-blocking then would loop forever), `permission_mode` (`"plan"` while the user
- * is planning, when the model cannot deliver or save a lesson), `session_id`,
- * `last_assistant_message` (the FINAL assistant message only — NOT the whole turn),
- * and `transcript_path` (the session .jsonl — the reliable way to see the whole
- * turn). Empty/garbage input is treated as a fresh, non-plan stop.
+ * is planning, when the model cannot deliver or save a lesson), and `session_id`.
+ * Empty/garbage input is treated as a fresh, non-plan stop.
  */
 export interface HookPayload {
   stop_hook_active: boolean;
   permission_mode: string | null;
   session_id: string | null;
-  last_assistant_message: string | null;
-  transcript_path: string | null;
 }
 
 export function parseHookPayload(raw: string): HookPayload {
@@ -41,17 +36,12 @@ export function parseHookPayload(raw: string): HookPayload {
       stop_hook_active: p?.stop_hook_active === true,
       permission_mode: typeof p?.permission_mode === "string" ? p.permission_mode : null,
       session_id: typeof p?.session_id === "string" ? p.session_id : null,
-      last_assistant_message:
-        typeof p?.last_assistant_message === "string" ? p.last_assistant_message : null,
-      transcript_path: typeof p?.transcript_path === "string" ? p.transcript_path : null,
     };
   } catch {
     return {
       stop_hook_active: false,
       permission_mode: null,
       session_id: null,
-      last_assistant_message: null,
-      transcript_path: null,
     };
   }
 }
@@ -66,8 +56,6 @@ function readHookPayload(): HookPayload {
     stop_hook_active: false,
     permission_mode: null,
     session_id: null,
-    last_assistant_message: null,
-    transcript_path: null,
   };
   try {
     const st = fstatSync(0);
@@ -191,82 +179,9 @@ export function buildLessonCue(nextLessonNumber: number): string {
   );
 }
 
-/**
- * The lesson was saved but its card never became visible. The hook renders the card
- * from the DB itself (log_lesson's result deliberately does NOT echo the card — the
- * echo made the model re-print it after the tool-approval pause, doubling the card),
- * so the model only has to print it verbatim.
- */
-function buildCardRecoveryCue(conn: DatabaseSync): string {
-  const [last] = db.getLessons(conn, { page: 1, per_page: 1 });
-  const card = last
-    ? `:\n\n${formatLessonForDisplay(last)}`
-    : " (rebuild it verbatim from the arguments of your log_lesson call).";
-  return (
-    "devcoach: the lesson was saved with log_lesson but its card is NOT visible in your " +
-    "reply. Print this lesson card now, as your ENTIRE reply — no other text, no tool " +
-    `calls${card}`
-  );
-}
-
-const CARD_BAND = "🎓 devcoach";
-
-/**
- * Was the lesson card visible in the turn that just stopped? `last_assistant_message`
- * alone is NOT a reliable negative: Claude Code sends only the final assistant message,
- * and in a multi-phase turn (card mid-turn → post-log_lesson checkpoint work → closing
- * line) the card lives in an earlier message — seen live as a false recovery at a
- * notebook checkpoint. So a positive match on the final message is trusted, a negative
- * is confirmed by scanning the transcript's last turn, and with no readable transcript
- * we return null (no signal) rather than risk re-printing a card the user already saw.
- */
-function cardVisibleInLastTurn(payload: HookPayload): boolean | null {
-  if (payload.last_assistant_message?.includes(CARD_BAND)) return true;
-  if (!payload.transcript_path) return null;
-  try {
-    const lines = readFileSync(payload.transcript_path, "utf8").split("\n");
-    // Walk the turn backwards: assistant text entries until the user prompt that
-    // started it (a non-tool-result user entry). Sidechain (subagent) entries are
-    // not part of the visible reply.
-    for (let i = lines.length - 1; i >= 0; i--) {
-      const line = lines[i];
-      if (!line) continue;
-      let entry: {
-        type?: string;
-        isSidechain?: boolean;
-        message?: { content?: unknown };
-      };
-      try {
-        entry = JSON.parse(line);
-      } catch {
-        continue;
-      }
-      if (entry?.isSidechain === true) continue;
-      const content = entry?.message?.content;
-      if (entry?.type === "assistant" && Array.isArray(content)) {
-        for (const c of content) {
-          if (c?.type === "text" && typeof c.text === "string" && c.text.includes(CARD_BAND)) {
-            return true;
-          }
-        }
-      }
-      if (entry?.type === "user") {
-        const toolResult =
-          Array.isArray(content) &&
-          content.some((c) => (c as { type?: string })?.type === "tool_result");
-        if (!toolResult) return false; // the turn's opening prompt — no card found
-      }
-    }
-    return false;
-  } catch {
-    return null; // unreadable transcript → no reliable signal
-  }
-}
-
 type StopDecision =
   | { kind: "silent"; note: string }
   | { kind: "onboard"; note: string }
-  | { kind: "recover-card"; cue: string; note: string }
   | { kind: "cue"; nextLessonNumber: number; note: string };
 
 /**
@@ -274,9 +189,7 @@ type StopDecision =
  * a single lock/journal cycle, and atomic against a concurrent stop (two sessions
  * can never both cue from the same counter state).
  *
- * Order: card recovery (a block-delivered lesson ends on a stop_hook_active stop —
- * that is where its reply text is inspectable) → forced-continuation suppression →
- * onboarding → cue engine.
+ * Order: forced-continuation suppression → onboarding → cue engine.
  */
 function decideStop(
   conn: DatabaseSync,
@@ -284,17 +197,6 @@ function decideStop(
   opts: { onboardCue: boolean },
 ): StopDecision {
   const plan = payload.permission_mode === "plan";
-  if (
-    !plan &&
-    db.takeDisplayPending(conn) &&
-    cardVisibleInLastTurn(payload) === false // null = no signal → never recover blindly
-  ) {
-    return {
-      kind: "recover-card",
-      cue: buildCardRecoveryCue(conn),
-      note: "card missing from reply — recovering",
-    };
-  }
   if (payload.stop_hook_active) return { kind: "silent", note: "hook-forced continuation" };
   if (!db.isOnboardingComplete(conn).knowledge_ready) {
     if (!opts.onboardCue || plan) return { kind: "silent", note: "onboarding not complete" };
@@ -324,9 +226,6 @@ function runStopDecision(
   switch (decision.kind) {
     case "onboard":
       emitBlock(ONBOARD_CUE);
-      break;
-    case "recover-card":
-      emitBlock(decision.cue, "🎓 devcoach: recovering the lesson card…");
       break;
     case "cue":
       emitBlock(buildLessonCue(decision.nextLessonNumber), "🎓 devcoach: preparing a lesson…");
