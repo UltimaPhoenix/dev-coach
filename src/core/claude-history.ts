@@ -222,7 +222,7 @@ export function scanClaudeHistory(): ClaudeHistoryScan {
         signal: {
           name: basename(path),
           path,
-          topics: Object.keys(stack).sort(),
+          topics: Object.keys(stack).sort((a, b) => a.localeCompare(b)),
           prompt_count: seen?.count ?? 0,
           last_activity: seen?.last ? new Date(seen.last).toISOString() : null,
           memory,
