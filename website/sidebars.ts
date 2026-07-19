@@ -17,6 +17,8 @@ const sidebars: SidebarsConfig = {
         "install/homebrew",
         "install/claude-code-plugin",
         "install/claude-desktop",
+        "install/gemini-cli",
+        "install/codex",
         "install/npx",
         "install/other-agents",
         "install/claude-ai",

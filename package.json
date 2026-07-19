@@ -51,6 +51,7 @@
     "mcpb:sign": "npm run build && node scripts/build-mcpb.mjs --sign",
     "plugin:sync": "node scripts/sync-plugin.mjs",
     "plugin:zip": "node scripts/sync-plugin.mjs && node scripts/build-plugin-zip.mjs",
+    "gemini:zip": "node scripts/sync-plugin.mjs && node scripts/build-gemini-extension.mjs",
     "prepack": "npm run build"
   },
   "dependencies": {

@@ -16,7 +16,7 @@
 
 **Stay sharp while your AI does the work.**
 
-devcoach connects to Claude Code, Claude Desktop, Cursor, Windsurf, and other MCP-compatible tools. After every task you complete, it delivers a short targeted lesson calibrated to what you already know — no generic tutorials, no repeated topics, nothing to open.
+devcoach connects to Claude Code, Claude Desktop, Gemini CLI *(beta)*, Codex CLI *(beta)*, Cursor, Windsurf, and other MCP-compatible tools. After every task you complete, it delivers a short targeted lesson calibrated to what you already know — no generic tutorials, no repeated topics, nothing to open.
 
 Everything runs **locally**. No data leaves your machine. One SQLite file at `~/.devcoach/coaching.db`.
 
@@ -67,7 +67,7 @@ Everything stays on your machine. No telemetry, no accounts, no calls home. Just
 
 ## Installation
 
-devcoach runs **locally** — a stdio MCP server that stores everything in `~/.devcoach/coaching.db` on the machine where your agent runs. It works in **Claude Code** and **Claude Desktop**, but **not** on claude.ai web (which only supports hosted/remote connectors).
+devcoach runs **locally** — a stdio MCP server that stores everything in `~/.devcoach/coaching.db` on the machine where your agent runs. It works in **Claude Code**, **Claude Desktop**, **Gemini CLI** *(beta)*, and **Codex CLI** *(beta)*, but **not** on claude.ai web (which only supports hosted/remote connectors).
 
 **Requires Node.js ≥ 24** (devcoach uses the embedded `node:sqlite` module, available only from Node 24 onward).
 
@@ -192,6 +192,32 @@ after each turn whether a lesson is due, `prompt-hook` primes the model up front
 </details>
 
 <details>
+<summary><strong>Gemini CLI</strong> — full coaching loop (hooks + skill) — <strong>Beta</strong></summary>
+
+One command registers the MCP server, the `AfterAgent`/`BeforeAgent` lesson hooks, and the coaching skill:
+
+```bash
+npx -y devcoach install --gemini
+```
+
+Or install the bundled **Gemini extension** instead: download `devcoach-gemini-extension-<version>.zip` from the [latest release](https://github.com/UltimaPhoenix/dev-coach/releases/latest), unzip, then `gemini extensions install <folder>`. Pick **one** of the two (both provide the same hooks; devcoach detects the extension and skips duplicates). Details: [docs/install/gemini-cli.md](docs/install/gemini-cli.md).
+
+</details>
+
+<details>
+<summary><strong>Codex CLI</strong> — full coaching loop (hooks + skill) — <strong>Beta</strong></summary>
+
+One command registers the MCP server (`codex mcp add`), the `Stop`/`UserPromptSubmit` lesson hooks (`~/.codex/hooks.json`), and the coaching skill (`~/.agents/skills/`):
+
+```bash
+npx -y devcoach install --codex
+```
+
+Codex asks you to **trust** the new hooks once on the next run — approve them or coaching stays inert. Details: [docs/install/codex.md](docs/install/codex.md).
+
+</details>
+
+<details>
 <summary><strong>Other MCP agents</strong> (Cursor, Windsurf, Cline, Continue, Zed…)</summary>
 
 Add this to your agent's MCP config file:
@@ -215,7 +241,7 @@ Add this to your agent's MCP config file:
 | **Continue.dev** | `~/.continue/config.json` → `mcpServers` |
 | **Zed** | `.zed/settings.json` → `context_servers` |
 
-> Stop hooks (automatic lesson delivery after each task) are Claude Code-specific. Other agents have full access to all MCP tools and resources — coaching can be triggered manually or by prompting your agent.
+> Stop hooks (automatic lesson delivery after each task) exist for Claude Code, Gemini CLI, and Codex CLI. The agents in this table have full access to all MCP tools and resources — coaching can be triggered manually or by prompting your agent.
 
 </details>
 
@@ -432,7 +458,7 @@ Run `devcoach install` to re-register the server with Claude Code or Claude Desk
 
 **"Coaching isn't firing / no lessons appear"**
 
-Run **`devcoach doctor`** — it checks the whole wiring (Node version, hook entries in `~/.claude/settings.json`, skill, MCP registration, database, pacing counters, rate limit) and ends with a verdict explaining exactly why the next stop would or wouldn't cue a lesson. Remember that pacing is intentionally quiet: with the defaults a lesson is cued only after `nudge_every` interactions in a session and within the rate limits — that's by design, not a bug. For a live trace, set `DEVCOACH_HOOK_DEBUG=1` and watch `~/.devcoach/hook.log`: every hook run appends one line with its decision (`paced (3/10)`, `rate limited: …`, `cue`). Hooks are Claude Code-specific; other agents (Cursor, Windsurf, Cline) don't support them — coaching is available on demand via MCP tools or manual prompting.
+Run **`devcoach doctor`** — it checks the whole wiring (Node version, hook entries in `~/.claude/settings.json` — plus `~/.gemini/settings.json` and `~/.codex/hooks.json` when present — skill, MCP registration, database, pacing counters, rate limit) and ends with a verdict explaining exactly why the next stop would or wouldn't cue a lesson. Remember that pacing is intentionally quiet: with the defaults a lesson is cued only after `nudge_every` interactions in a session and within the rate limits — that's by design, not a bug. For a live trace, set `DEVCOACH_HOOK_DEBUG=1` and watch `~/.devcoach/hook.log`: every hook run appends one line with its decision (`paced (3/10)`, `rate limited: …`, `cue`). Hooks exist for Claude Code, Gemini CLI *(beta)*, and Codex CLI *(beta)*; other agents (Cursor, Windsurf, Cline) don't support them — coaching is available on demand via MCP tools or manual prompting.
 
 **"Stop hook error occurred" next to a lesson**
 

@@ -89,6 +89,56 @@ describe("hooks in-process (runHook dispatcher + payload-injected entrypoints)",
     expect(JSON.parse(cue.out).systemMessage).toContain("preparing a lesson");
   });
 
+  it("gemini hooks emit Gemini's wire shapes (deny decision, BeforeAgent prime, no Skill tool)", () => {
+    // Profile seeded by the previous test; nudge_every=0 → every eligible stop cues.
+    const cue = capture(() => cmdStopHook(payload(), "gemini"));
+    const parsed = JSON.parse(cue.out);
+    expect(parsed.decision).toBe("deny");
+    expect(parsed.reason).toContain("activate_skill");
+    expect(parsed.reason).not.toContain("Skill tool");
+    expect(parsed.reason).toContain("skip_lesson");
+
+    const prime = capture(() => cmdPromptHook(payload(), "gemini"));
+    const primed = JSON.parse(prime.out);
+    expect(primed.hookSpecificOutput.hookEventName).toBe("BeforeAgent");
+    expect(primed.hookSpecificOutput.additionalContext).toContain("activate_skill");
+  });
+
+  it("codex hooks reuse Claude's decision word and event name, without the Skill tool wording", () => {
+    const cue = capture(() => cmdStopHook(payload(), "codex"));
+    const parsed = JSON.parse(cue.out);
+    expect(parsed.decision).toBe("block");
+    expect(parsed.reason).toContain("Activate the `devcoach` skill");
+    expect(parsed.reason).not.toContain("Skill tool");
+
+    const prime = capture(() => cmdPromptHook(payload(), "codex"));
+    expect(JSON.parse(prime.out).hookSpecificOutput.hookEventName).toBe("UserPromptSubmit");
+  });
+
+  it("claude cue text is unchanged by the multi-client refactor (regression)", () => {
+    const cue = capture(() => cmdStopHook(payload()));
+    expect(JSON.parse(cue.out).reason).toContain("Invoke the `devcoach` skill (Skill tool) NOW");
+  });
+
+  it("gemini/codex stops honor the shared stop_hook_active and plan-mode suppression", () => {
+    expect(capture(() => cmdStopHook(payload({ stop_hook_active: true }), "gemini"))).toEqual({
+      out: "",
+      code: 0,
+    });
+    expect(capture(() => cmdStopHook(payload({ permission_mode: "plan" }), "codex"))).toEqual({
+      out: "",
+      code: 0,
+    });
+  });
+
+  it("runHook dispatches the per-client subcommands", () => {
+    // stdin is a TTY here → empty payload → fresh stop; profile exists → both cue.
+    expect(JSON.parse(capture(() => runHook("gemini-stop-hook")).out).decision).toBe("deny");
+    expect(JSON.parse(capture(() => runHook("codex-stop-hook")).out).decision).toBe("block");
+    expect(capture(() => runHook("gemini-prompt-hook")).out).toContain("BeforeAgent");
+    expect(capture(() => runHook("codex-prompt-hook")).out).toContain("UserPromptSubmit");
+  });
+
   it("a broken DB never breaks a hook: every entrypoint exits 0 silently", () => {
     rmSync(db.DB_PATH, { force: true });
     mkdirSync(db.DB_PATH); // a directory at DB_PATH → opening the DB throws

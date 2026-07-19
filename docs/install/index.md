@@ -8,9 +8,9 @@ keywords: [install devcoach, devcoach npx, devcoach homebrew, Claude Code plugin
 # Installation
 
 devcoach runs **locally** — a stdio MCP server that stores everything in `~/.devcoach/coaching.db` on the
-machine where your agent runs. It works in **Claude Code** and **Claude Desktop**, but **not** on claude.ai
-web (which only supports hosted/remote connectors — see [Privacy & security](../reference/privacy.md)).
-Requires **Node.js ≥ 24**.
+machine where your agent runs. It works in **Claude Code**, **Claude Desktop**, **Gemini CLI** *(beta)*, and
+**Codex CLI** *(beta)*, but **not** on claude.ai web (which only supports hosted/remote connectors — see
+[Privacy & security](../reference/privacy.md)). Requires **Node.js ≥ 24**.
 
 ## Which method is right for you?
 
@@ -33,6 +33,8 @@ devcoach works the same whichever way you install it — pick by how you like to
 | **[npx / npm CLI](./npx.md)** | Any MCP agent · Windows · npm workflows | Yes | Stable |
 | **[Claude Code plugin](./claude-code-plugin.md)** | **Non-expert Claude Code users — one-click setup** | No | Beta |
 | **[Claude Desktop (`.mcpb`)](./claude-desktop.md)** | **Non-expert Claude Desktop users — one-click setup** | No | Beta |
+| **[Gemini CLI](./gemini-cli.md)** | Google Gemini CLI — full loop (hooks + skill) | Yes | Beta |
+| **[Codex CLI](./codex.md)** | OpenAI Codex CLI — full loop (hooks + skill) | Yes | Beta |
 | **[Other MCP agents](./other-agents.md)** | Cursor, Windsurf, Cline, Continue, Zed | Yes | Beta |
 | **[claude.ai web](./claude-ai.md)** | claude.ai (skill-only, no MCP) | — | Beta |
 

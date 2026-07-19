@@ -1,0 +1,26 @@
+{
+  "hooks": {
+    "AfterAgent": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${extensionPath}/scripts/launch.mjs\" gemini-stop-hook",
+            "timeout": 60000
+          }
+        ]
+      }
+    ],
+    "BeforeAgent": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${extensionPath}/scripts/launch.mjs\" gemini-prompt-hook",
+            "timeout": 30000
+          }
+        ]
+      }
+    ]
+  }
+}

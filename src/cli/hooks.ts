@@ -1,7 +1,13 @@
-// Claude Code hooks (stop-hook, prompt-hook, and the legacy onboard-hook/lesson-ready).
-// Kept in a module of their own — hooks run on EVERY agent stop, so src/bin.ts loads
-// this lean chunk (node built-ins + core only) instead of the full CLI bundle
-// (Commander/zod/MCP SDK/Hono). Keep it dependency-free beyond core/.
+// Agent hooks (stop-hook, prompt-hook, their gemini-/codex- variants, and the legacy
+// onboard-hook/lesson-ready). Kept in a module of their own — hooks run on EVERY agent
+// stop, so src/bin.ts loads this lean chunk (node built-ins + core only) instead of the
+// full CLI bundle (Commander/zod/MCP SDK/Hono). Keep it dependency-free beyond core/.
+//
+// Gemini CLI and Codex CLI both cloned Claude Code's hook wire protocol: the stop-stage
+// payload carries the same `stop_hook_active` loop guard on all three, so one payload
+// parser and one suppression rule serve every client. What differs per client is only
+// the event names, the block decision word (gemini: "deny"), and how the model is told
+// to load the devcoach skill.
 import {
   appendFileSync,
   existsSync,
@@ -17,11 +23,19 @@ import * as coach from "../core/coach";
 import * as db from "../core/db";
 
 /**
- * Claude Code passes the hook payload as JSON on stdin. We use three fields:
+ * Which agent CLI invoked the hook. Selected by the subcommand the installed config
+ * runs (`stop-hook` vs `gemini-stop-hook` vs `codex-stop-hook`) — never sniffed from
+ * the payload, so a client renaming a field can only degrade gracefully.
+ */
+export type HookClient = "claude" | "gemini" | "codex";
+
+/**
+ * The agent passes the hook payload as JSON on stdin. We use three fields:
  * `stop_hook_active` (true when this stop is itself a hook-forced continuation —
- * re-blocking then would loop forever), `permission_mode` (`"plan"` while the user
- * is planning, when the model cannot deliver or save a lesson), and `session_id`.
- * Empty/garbage input is treated as a fresh, non-plan stop.
+ * re-blocking then would loop forever; Claude, Gemini, and Codex all send it),
+ * `permission_mode` (`"plan"` while the user is planning, when the model cannot
+ * deliver or save a lesson; Claude and Codex send it, Gemini has no plan mode), and
+ * `session_id`. Empty/garbage input is treated as a fresh, non-plan stop.
  */
 export interface HookPayload {
   stop_hook_active: boolean;
@@ -92,16 +106,24 @@ function hookDebugLog(hook: string, sessionId: string | null, msg: string): void
 }
 
 /**
- * Block the stop: Claude Code reads `{decision:"block", reason}` from stdout (exit 0),
- * blocks the stop, and feeds `reason` to the model as the reason it must keep working.
+ * Block the stop: the agent reads `{decision, reason}` from stdout (exit 0), blocks the
+ * stop, and feeds `reason` to the model as the reason it must keep working. Claude Code
+ * and Codex use `decision:"block"` (Codex's schema is a verbatim clone of Claude's);
+ * Gemini's AfterAgent uses `decision:"deny"` to force the retry that carries `reason`.
  * Current Claude Code shows a generic "Stop hook error occurred" notice on ANY blocking
  * Stop hook (verified empirically — even a minimal spec-perfect block), so blocks are
- * kept rare by design: the UserPromptSubmit priming is the primary delivery channel and
+ * kept rare by design: the prompt-stage priming is the primary delivery channel and
  * the block is the fallback. The `systemMessage` line tells the user what the notice is
  * about ("🎓 devcoach: preparing a lesson…").
  */
-function emitBlock(reason: string, systemMessage?: string): never {
-  const out: Record<string, string> = { decision: "block", reason };
+const BLOCK_DECISION: Record<HookClient, string> = {
+  claude: "block",
+  gemini: "deny",
+  codex: "block",
+};
+
+function emitBlock(client: HookClient, reason: string, systemMessage?: string): never {
+  const out: Record<string, string> = { decision: BLOCK_DECISION[client], reason };
   if (systemMessage) out.systemMessage = systemMessage;
   process.stdout.write(`${JSON.stringify(out)}\n`);
   process.exit(0);
@@ -133,7 +155,7 @@ export function cmdOnboardHook(payload: HookPayload = readHookPayload()): void {
     if (ready) process.exit(0);
   }
   hookDebugLog("onboard-hook", payload.session_id, "onboarding cue");
-  emitBlock(ONBOARD_CUE);
+  emitBlock("claude", ONBOARD_CUE);
 }
 
 // The notebook's observations are refreshed only every Nth delivered lesson, not after
@@ -142,12 +164,33 @@ export function cmdOnboardHook(payload: HookPayload = readHookPayload()): void {
 const NOTEBOOK_UPDATE_EVERY = 10;
 
 /**
+ * How each client's model loads the devcoach skill: Claude Code has the Skill tool,
+ * Gemini CLI the activate_skill tool, Codex picks skills by name. Only this sentence
+ * varies per client — the rest of the cue and prime text is identical everywhere
+ * (the Claude wording is the tuned original and must stay byte-for-byte stable).
+ */
+const SKILL_INVOCATION: Record<HookClient, { cue: string; prime: string }> = {
+  claude: {
+    cue: "Invoke the `devcoach` skill (Skill tool)",
+    prime: "invoke the `devcoach` skill (Skill tool)",
+  },
+  gemini: {
+    cue: "Activate the `devcoach` skill (activate_skill tool)",
+    prime: "activate the `devcoach` skill (activate_skill tool)",
+  },
+  codex: {
+    cue: "Activate the `devcoach` skill",
+    prime: "activate the `devcoach` skill",
+  },
+};
+
+/**
  * The cue is deliberately compact: the devcoach *skill* is the single source of truth
  * for the full coaching flow — the cue makes the model load it deterministically via
- * the Skill tool instead of duplicating it here. A 5-line fallback keeps the cue
- * self-contained when the skill is not installed.
+ * the client's skill mechanism instead of duplicating it here. A 5-line fallback keeps
+ * the cue self-contained when the skill is not installed.
  */
-export function buildLessonCue(nextLessonNumber: number): string {
+export function buildLessonCue(nextLessonNumber: number, client: HookClient = "claude"): string {
   const updateDue = nextLessonNumber % NOTEBOOK_UPDATE_EVERY === 0;
   const nextCheckpoint =
     Math.ceil(nextLessonNumber / NOTEBOOK_UPDATE_EVERY) * NOTEBOOK_UPDATE_EVERY;
@@ -161,7 +204,7 @@ export function buildLessonCue(nextLessonNumber: number): string {
   return (
     "devcoach: a lesson is due for the technical work just completed. Do it now — do not " +
     "acknowledge this message and do not explain what you are about to do.\n\n" +
-    "Invoke the `devcoach` skill (Skill tool) NOW and follow it to deliver ONE lesson. " +
+    `${SKILL_INVOCATION[client].cue} NOW and follow it to deliver ONE lesson. ` +
     "Three hard rules:\n" +
     "- The lesson card MUST be printed as your visible reply BEFORE calling log_lesson.\n" +
     "- After log_lesson returns, output NOTHING else — the card is the end of the reply.\n" +
@@ -214,7 +257,7 @@ function decideStop(
 function runStopDecision(
   hookName: string,
   payload: HookPayload,
-  opts: { onboardCue: boolean },
+  opts: { onboardCue: boolean; client: HookClient },
 ): never {
   let decision: StopDecision;
   try {
@@ -228,10 +271,14 @@ function runStopDecision(
   hookDebugLog(hookName, payload.session_id, decision.note);
   switch (decision.kind) {
     case "onboard":
-      emitBlock(ONBOARD_CUE);
+      emitBlock(opts.client, ONBOARD_CUE);
       break;
     case "cue":
-      emitBlock(buildLessonCue(decision.nextLessonNumber), "🎓 devcoach: preparing a lesson…");
+      emitBlock(
+        opts.client,
+        buildLessonCue(decision.nextLessonNumber, opts.client),
+        "🎓 devcoach: preparing a lesson…",
+      );
       break;
     default:
       break;
@@ -242,56 +289,84 @@ function runStopDecision(
 export function cmdLessonReady(payload: HookPayload = readHookPayload()): void {
   // No DB → no profile yet. Stay silent without creating coaching.db.
   if (!existsSync(db.DB_PATH)) process.exit(0);
-  runStopDecision("lesson-ready", payload, { onboardCue: false });
+  runStopDecision("lesson-ready", payload, { onboardCue: false, client: "claude" });
 }
 
 /**
- * Merged Stop hook (one process spawn per stop): onboarding check first, then the
- * lesson-cue pipeline. `onboard-hook` + `lesson-ready` remain for already-installed
- * hooks; new installs wire only `stop-hook`.
+ * Merged stop-stage hook (one process spawn per stop): onboarding check first, then the
+ * lesson-cue pipeline. Claude's Stop, Gemini's AfterAgent, and Codex's Stop all land
+ * here — only the emitted decision word and skill wording differ. `onboard-hook` +
+ * `lesson-ready` remain for already-installed hooks; new installs wire only the
+ * per-client stop hook.
  */
-export function cmdStopHook(payload: HookPayload = readHookPayload()): void {
+export function cmdStopHook(
+  payload: HookPayload = readHookPayload(),
+  client: HookClient = "claude",
+): void {
+  const hookName = client === "claude" ? "stop-hook" : `${client}-stop-hook`;
   if (!existsSync(db.DB_PATH)) {
     if (payload.stop_hook_active || payload.permission_mode === "plan") process.exit(0);
-    hookDebugLog("stop-hook", payload.session_id, "onboarding cue (no DB)");
-    emitBlock(ONBOARD_CUE);
+    hookDebugLog(hookName, payload.session_id, "onboarding cue (no DB)");
+    emitBlock(client, ONBOARD_CUE);
   }
-  runStopDecision("stop-hook", payload, { onboardCue: true });
+  runStopDecision(hookName, payload, { onboardCue: true, client });
 }
 
-const PROMPT_PRIME =
-  "devcoach: the lesson pacing threshold will be reached at the end of this turn. Resolve " +
-  "it before finishing:\n" +
-  "- If this task is technical: invoke the `devcoach` skill (Skill tool), then end your " +
-  "reply with ONE lesson card (the `### ──────── 🎓 devcoach ────────` block) followed by " +
-  "a log_lesson call. The card must be the LAST visible text — after log_lesson returns, " +
-  "output nothing else.\n" +
-  "- If it is not technical: silently call the devcoach `skip_lesson` tool with a one-line " +
-  "reason and output nothing about it.\n" +
-  "- Either way, work in silence: never narrate devcoach tool calls or resource reads " +
-  "('checking your profile…').";
+export function buildPromptPrime(client: HookClient = "claude"): string {
+  return (
+    "devcoach: the lesson pacing threshold will be reached at the end of this turn. Resolve " +
+    "it before finishing:\n" +
+    `- If this task is technical: ${SKILL_INVOCATION[client].prime}, then end your ` +
+    "reply with ONE lesson card (the `### ──────── 🎓 devcoach ────────` block) followed by " +
+    "a log_lesson call. The card must be the LAST visible text — after log_lesson returns, " +
+    "output nothing else.\n" +
+    "- If it is not technical: silently call the devcoach `skip_lesson` tool with a one-line " +
+    "reason and output nothing about it.\n" +
+    "- Either way, work in silence: never narrate devcoach tool calls or resource reads " +
+    "('checking your profile…')."
+  );
+}
 
 /**
- * UserPromptSubmit hook: read-only peek (never bumps — the Stop hook owns the counter).
- * When this turn's stop would reach the pacing threshold, prime the model up front via
- * invisible additionalContext so the lesson lands at the natural end of the reply; the
- * Stop hook stays as enforcement if it doesn't.
+ * The prompt-stage event each client names differently; its `hookSpecificOutput` must
+ * echo the client's own event name (required by Claude's and Codex's output schema,
+ * typed the same way in Gemini's BeforeAgent output).
  */
-export function cmdPromptHook(payload: HookPayload = readHookPayload()): void {
+const PROMPT_EVENT_NAME: Record<HookClient, string> = {
+  claude: "UserPromptSubmit",
+  gemini: "BeforeAgent",
+  codex: "UserPromptSubmit",
+};
+
+/**
+ * Prompt-stage hook (Claude/Codex UserPromptSubmit, Gemini BeforeAgent): read-only peek
+ * (never bumps — the stop hook owns the counter). When this turn's stop would reach the
+ * pacing threshold, prime the model up front via invisible additionalContext so the
+ * lesson lands at the natural end of the reply; the stop hook stays as enforcement if
+ * it doesn't.
+ */
+export function cmdPromptHook(
+  payload: HookPayload = readHookPayload(),
+  client: HookClient = "claude",
+): void {
+  const hookName = client === "claude" ? "prompt-hook" : `${client}-prompt-hook`;
   if (payload.permission_mode === "plan") process.exit(0);
   if (!existsSync(db.DB_PATH)) process.exit(0);
   let wouldCue: boolean;
   try {
     wouldCue = db.withConnection((conn) => coach.explainCue(conn, payload.session_id).wouldCue);
   } catch (err) {
-    hookDebugLog("prompt-hook", payload.session_id, `error: ${err}`);
+    hookDebugLog(hookName, payload.session_id, `error: ${err}`);
     process.exit(0);
   }
-  hookDebugLog("prompt-hook", payload.session_id, wouldCue ? "priming" : "no prime");
+  hookDebugLog(hookName, payload.session_id, wouldCue ? "priming" : "no prime");
   if (!wouldCue) process.exit(0);
   process.stdout.write(
     `${JSON.stringify({
-      hookSpecificOutput: { hookEventName: "UserPromptSubmit", additionalContext: PROMPT_PRIME },
+      hookSpecificOutput: {
+        hookEventName: PROMPT_EVENT_NAME[client],
+        additionalContext: buildPromptPrime(client),
+      },
     })}\n`,
   );
   process.exit(0);
@@ -303,8 +378,20 @@ export function runHook(cmd: string): void {
     case "stop-hook":
       cmdStopHook();
       break;
+    case "gemini-stop-hook":
+      cmdStopHook(readHookPayload(), "gemini");
+      break;
+    case "codex-stop-hook":
+      cmdStopHook(readHookPayload(), "codex");
+      break;
     case "prompt-hook":
       cmdPromptHook();
+      break;
+    case "gemini-prompt-hook":
+      cmdPromptHook(readHookPayload(), "gemini");
+      break;
+    case "codex-prompt-hook":
+      cmdPromptHook(readHookPayload(), "codex");
       break;
     case "onboard-hook":
       cmdOnboardHook();

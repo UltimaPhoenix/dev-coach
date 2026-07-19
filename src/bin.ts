@@ -5,7 +5,16 @@
 export {}; // top-level await needs module context — this file has no static imports
 
 const cmd = process.argv[2] ?? "";
-const HOOK_CMDS = new Set(["stop-hook", "prompt-hook", "onboard-hook", "lesson-ready"]);
+const HOOK_CMDS = new Set([
+  "stop-hook",
+  "prompt-hook",
+  "gemini-stop-hook",
+  "gemini-prompt-hook",
+  "codex-stop-hook",
+  "codex-prompt-hook",
+  "onboard-hook",
+  "lesson-ready",
+]);
 
 try {
   if (HOOK_CMDS.has(cmd)) {

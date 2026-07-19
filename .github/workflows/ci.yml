@@ -250,13 +250,18 @@ jobs:
       # Claude Code plugin zip (offline-installable marketplace; vector C). build-mcpb already ran
       # `npm run build`, and plugin:zip re-syncs the plugin before packing.
       - run: npm run plugin:zip
+      # Gemini CLI extension zip (beta): manifest at the archive root, installable after
+      # unzip via `gemini extensions install <dir>`.
+      - run: npm run gemini:zip
       - name: Generate SBOM + checksums for release assets
         run: |
           set -euo pipefail
           # CycloneDX SBOM of production deps (npm sbom is built into npm >= 10.7 — no extra dep).
           npm sbom --sbom-format cyclonedx --omit dev > dist-mcpb/devcoach.cdx.json
-          # Stage the plugin zip next to the .mcpb so one checksum file covers every release asset.
+          # Stage the plugin + gemini-extension zips next to the .mcpb so one checksum file
+          # covers every release asset.
           cp dist-plugin/devcoach-plugin-*.zip dist-mcpb/
+          cp dist-gemini/devcoach-gemini-extension-*.zip dist-mcpb/
           # Checksums over every release asset (.mcpb + zip + SBOM); run inside the dir so paths are bare.
           (cd dist-mcpb && shasum -a 256 *.mcpb *.zip *.cdx.json > SHASUMS256.txt)
       - uses: softprops/action-gh-release@v3

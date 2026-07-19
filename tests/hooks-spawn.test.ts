@@ -118,6 +118,35 @@ describe("hooks via real child processes (piped stdin)", () => {
     expect(hook("prompt-hook", home, { ...payload, permission_mode: "plan" })).toBe("");
   }, 30_000);
 
+  it("gemini/codex payloads flow through the per-client subcommands end-to-end", () => {
+    const home = freshHome();
+    seedProfile(home, 0); // nudge_every=0 → every eligible stop cues
+    const gemini = JSON.parse(
+      hook("gemini-stop-hook", home, {
+        session_id: "g1",
+        hook_event_name: "AfterAgent",
+        prompt: "task",
+        prompt_response: "done",
+        stop_hook_active: false,
+      }),
+    );
+    expect(gemini.decision).toBe("deny");
+    expect(gemini.reason).toContain("activate_skill");
+    // A hook-forced Gemini retry carries stop_hook_active → silent (no infinite loop).
+    expect(hook("gemini-stop-hook", home, { session_id: "g1", stop_hook_active: true })).toBe("");
+
+    const codex = JSON.parse(
+      hook("codex-stop-hook", home, {
+        session_id: "c1",
+        hook_event_name: "Stop",
+        permission_mode: "default",
+        stop_hook_active: false,
+      }),
+    );
+    expect(codex.decision).toBe("block");
+    expect(codex.reason).not.toContain("Skill tool");
+  }, 30_000);
+
   it("two concurrent hooks on one DB both exit 0 (busy_timeout)", async () => {
     const home = freshHome();
     seedProfile(home, 10);

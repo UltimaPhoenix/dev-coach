@@ -1,9 +1,4 @@
-// CLI subcommands — Commander dispatcher,
-// zero-dependency styled output (term.ts), Stop hooks (exit 0; silent, or a {decision:block} cue).
-import { spawnSync } from "node:child_process";
-import { accessSync, constants, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { homedir, platform } from "node:os";
-import { dirname, join } from "node:path";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { createInterface } from "node:readline/promises";
 import { Command } from "commander";
 import { scanClaudeHistory } from "../core/claude-history";
@@ -11,8 +6,8 @@ import * as coach from "../core/coach";
 import * as db from "../core/db";
 import { detectStack, mergeStacks } from "../core/detect";
 import { detectGitContext } from "../core/git";
-import { readSkill, readSkillReferences } from "../skill";
 import { VERSION } from "../version";
+import { cmdDoctor, cmdInstall, skillHint } from "./install";
 import {
   type Column,
   c,
@@ -411,438 +406,6 @@ function cmdRestore(input: string): void {
   if (result.learning_state) log(`${c.green("✓")} Notebook restored`);
 }
 
-// ── Install ──────────────────────────────────────────────────────────────────
-
-interface McpConfig {
-  mcpServers?: Record<string, unknown>;
-  [k: string]: unknown;
-}
-interface HookCmd {
-  type: string;
-  command: string;
-  timeout?: number;
-}
-interface HookEntry {
-  hooks?: HookCmd[];
-}
-interface CodeSettings {
-  hooks?: Record<string, HookEntry[] | undefined>;
-  enabledPlugins?: Record<string, boolean>;
-  [k: string]: unknown;
-}
-
-function claudeDesktopConfigPath(): string {
-  const sys = platform();
-  if (sys === "darwin") {
-    return join(
-      homedir(),
-      "Library",
-      "Application Support",
-      "Claude",
-      "claude_desktop_config.json",
-    );
-  }
-  if (sys === "win32") {
-    const appdata = process.env.APPDATA ?? join(homedir(), "AppData", "Roaming");
-    return join(appdata, "Claude", "claude_desktop_config.json");
-  }
-  const xdg = process.env.XDG_CONFIG_HOME ?? join(homedir(), ".config");
-  return join(xdg, "Claude", "claude_desktop_config.json");
-}
-const CLAUDE_CODE_SETTINGS = join(homedir(), ".claude", "settings.json");
-const CLAUDE_CODE_SKILL_DIR = join(homedir(), ".claude", "skills", "devcoach");
-const SKILL_STAMP = join(CLAUDE_CODE_SKILL_DIR, ".devcoach-version");
-
-function findOnPath(bin: string): string | null {
-  for (const dir of (process.env.PATH ?? "").split(":")) {
-    if (!dir) continue;
-    try {
-      accessSync(join(dir, bin), constants.X_OK);
-      return join(dir, bin);
-    } catch {
-      // not here — keep scanning
-    }
-  }
-  return null;
-}
-const onPath = (bin: string): boolean => findOnPath(bin) !== null;
-
-function detectInstallMethod(): { command: string; args: string[] } {
-  if (onPath("devcoach")) return { command: "devcoach", args: ["mcp"] };
-  return { command: "npx", args: ["-y", "devcoach", "mcp"] };
-}
-
-/**
- * Hook command prefix. Hooks may run with a minimal GUI PATH, so prefer the absolute
- * binary path — except when the PATH hit lives in an ephemeral per-shell dir (fnm
- * multishells), where the bare name outlives the path. `npx -y devcoach` is the last
- * resort: it works everywhere but needs the npx cache (or network) on every stop.
- */
-function hookPrefix(): string {
-  const hit = findOnPath("devcoach");
-  if (!hit) return "npx -y devcoach";
-  return hit.includes("fnm_multishells") ? "devcoach" : hit;
-}
-
-function installViaClaudeCli(scope: string, force: boolean): string {
-  if (!onPath("claude")) return "";
-  if (force)
-    spawnSync("claude", ["mcp", "remove", "--scope", scope, "devcoach"], { encoding: "utf8" });
-  const m = detectInstallMethod();
-  const res = spawnSync(
-    "claude",
-    ["mcp", "add", "--scope", scope, "devcoach", m.command, "--", ...m.args],
-    { encoding: "utf8" },
-  );
-  if (res.status === 0)
-    return `${c.green("✓")} Registered via \`claude mcp add\` (scope: ${scope})`;
-  const combined = `${res.stderr ?? ""}${res.stdout ?? ""}`.toLowerCase();
-  if (combined.includes("already")) {
-    return `${c.yellow("Already registered")} in Claude Code (use --force to overwrite)`;
-  }
-  return `${c.red("claude mcp add failed:")} ${(res.stderr || res.stdout || "").trim()}`;
-}
-
-// Read a JSON config file safely: missing → empty object; malformed → error (never overwrite it).
-type JsonRead<T> = { ok: true; data: T } | { ok: false; error: string };
-function readJsonFile<T extends object>(path: string): JsonRead<T> {
-  if (!existsSync(path)) return { ok: true, data: {} as T };
-  try {
-    const parsed: unknown = JSON.parse(readFileSync(path, "utf8"));
-    return { ok: true, data: (parsed ?? {}) as T };
-  } catch {
-    return {
-      ok: false,
-      error: `${c.red("✗")} ${path} is not valid JSON — fix it and re-run (left unchanged)`,
-    };
-  }
-}
-
-function installTo(path: string, entry: object, force: boolean): string {
-  const read = readJsonFile<McpConfig>(path);
-  if (!read.ok) return read.error;
-  const data = read.data;
-  data.mcpServers ??= {};
-  const servers = data.mcpServers;
-  if (servers.devcoach && !force) {
-    return `${c.yellow("Already registered")} in ${path} (use --force to overwrite)`;
-  }
-  servers.devcoach = entry;
-  mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, `${JSON.stringify(data, null, 2)}\n`);
-  return `${c.green("✓")} Installed into ${path}`;
-}
-
-/** The exact hook layout devcoach owns: one merged Stop entry + the priming hook. */
-function desiredHooks(): Record<string, HookEntry> {
-  const prefix = hookPrefix();
-  return {
-    Stop: { hooks: [{ type: "command", command: `${prefix} stop-hook`, timeout: 60 }] },
-    UserPromptSubmit: {
-      hooks: [{ type: "command", command: `${prefix} prompt-hook`, timeout: 30 }],
-    },
-  };
-}
-
-/** True when the devcoach Claude Code plugin is enabled — it ships the same hooks. */
-function pluginHooksActive(data: CodeSettings): boolean {
-  return Object.entries(data.enabledPlugins ?? {}).some(
-    ([name, enabled]) => enabled && name.startsWith("devcoach@"),
-  );
-}
-
-/**
- * Match any devcoach hook command, past or present: the installed binary (`devcoach`,
- * `npx -y devcoach`) AND dev-tree layouts (`node …/dev-coach/dist/bin.js`), across every
- * hook-subcommand generation. A bare `includes("devcoach")` missed the dev-tree paths
- * (they spell it `dev-coach`), leaving stale entries behind to double-count interactions.
- * Require binary hint + subcommand so a user hook that merely mentions devcoach never matches.
- */
-function isDevcoachHookCommand(cmd: string): boolean {
-  return (
-    /dev-?coach/i.test(cmd) && /\b(?:stop-hook|prompt-hook|onboard-hook|lesson-ready)\b/.test(cmd)
-  );
-}
-
-/**
- * Install (or repair) the devcoach hooks in ~/.claude/settings.json. The entries are
- * fully devcoach-owned — like the skill, a stale or legacy layout (two Stop entries,
- * npx prefix, missing timeout) is normalized WITHOUT --force; user hooks are untouched.
- */
-function installHook(): string {
-  const path = CLAUDE_CODE_SETTINGS;
-  const read = readJsonFile<CodeSettings>(path);
-  if (!read.ok) return read.error;
-  const data = read.data;
-  if (pluginHooksActive(data)) {
-    return (
-      `${c.yellow("Skipped")} — the devcoach plugin already provides the hooks ` +
-      "(installing both would double-count interactions)"
-    );
-  }
-  data.hooks ??= {};
-  const hooks = data.hooks;
-  let changed = false;
-  for (const [event, desired] of Object.entries(desiredHooks())) {
-    hooks[event] ??= [];
-    const list = hooks[event];
-    const ours = list
-      .map((e, i): [HookEntry, number] => [e, i])
-      .filter(([e]) => (e.hooks ?? []).some((h) => isDevcoachHookCommand(h.command ?? "")))
-      .map(([, i]) => i);
-    const [only] = ours;
-    if (
-      ours.length === 1 &&
-      only !== undefined &&
-      JSON.stringify(list[only]) === JSON.stringify(desired)
-    )
-      continue;
-    for (const i of ours.toReversed()) list.splice(i, 1);
-    list.push(desired);
-    changed = true;
-  }
-  if (!changed) return `${c.yellow("Already installed")} in ${path} (current layout)`;
-  mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, `${JSON.stringify(data, null, 2)}\n`);
-  return `${c.green("✓")} Hooks installed into ${path} (Stop + UserPromptSubmit)`;
-}
-
-// ── Claude Code skill ────────────────────────────────────────────────────────
-// ~/.claude/skills/devcoach/SKILL.md is fully owned by devcoach (content = bundled
-// assets/SKILL.md), so an outdated copy is refreshed without --force — that is the whole
-// point of re-running `devcoach install` after an upgrade (npm, Homebrew, …).
-
-type SkillStatus = "missing" | "outdated" | "current";
-
-function skillStatus(): SkillStatus {
-  if (!existsSync(join(CLAUDE_CODE_SKILL_DIR, "SKILL.md"))) return "missing";
-  try {
-    if (readFileSync(SKILL_STAMP, "utf8").trim() === VERSION) return "current";
-  } catch {
-    // no readable stamp → predates version stamping → outdated
-  }
-  return "outdated";
-}
-
-function installSkill(force: boolean): string {
-  if (!force && skillStatus() === "current") {
-    return `${c.yellow("Already installed")} in ${CLAUDE_CODE_SKILL_DIR} (current version)`;
-  }
-  mkdirSync(CLAUDE_CODE_SKILL_DIR, { recursive: true });
-  writeFileSync(join(CLAUDE_CODE_SKILL_DIR, "SKILL.md"), readSkill());
-  const refs = readSkillReferences();
-  if (refs.length) {
-    const refDir = join(CLAUDE_CODE_SKILL_DIR, "references");
-    mkdirSync(refDir, { recursive: true });
-    for (const ref of refs) writeFileSync(join(refDir, ref.name), ref.content);
-  }
-  writeFileSync(SKILL_STAMP, `${VERSION}\n`);
-  return `${c.green("✓")} Installed into ${CLAUDE_CODE_SKILL_DIR}`;
-}
-
-/** One-line upgrade hint for the welcome screen and `stats` — empty string when nothing to say. */
-function skillHint(): string {
-  const status = skillStatus();
-  if (status === "outdated") {
-    return `${c.yellow("→")} The devcoach Claude Code skill is out of date — run ${c.bold("devcoach install")} to refresh it.`;
-  }
-  if (status === "missing") {
-    // Only nudge users who already wired devcoach into Claude Code (Stop hooks present):
-    // Desktop-only or not-yet-installed users would see a false alarm.
-    const read = readJsonFile<CodeSettings>(CLAUDE_CODE_SETTINGS);
-    const hooked =
-      read.ok &&
-      (read.data.hooks?.Stop ?? []).some((e) =>
-        (e.hooks ?? []).some((h) => isDevcoachHookCommand(h.command ?? "")),
-      );
-    if (hooked) {
-      return `${c.yellow("→")} The devcoach Claude Code skill is not installed — run ${c.bold("devcoach install")} to add it.`;
-    }
-  }
-  return "";
-}
-
-interface InstallOpts {
-  claudeCode: boolean;
-  claudeDesktop: boolean;
-  force: boolean;
-  skipHook: boolean;
-}
-
-function cmdInstall(o: InstallOpts): void {
-  const doCode = o.claudeCode || !o.claudeDesktop;
-  const doDesktop = o.claudeDesktop || !o.claudeCode;
-  const m = detectInstallMethod();
-  let needsRestart = false;
-
-  log(c.bold("Setting up devcoach") + c.dim(`  (${m.command} ${m.args.join(" ")})`));
-  log();
-
-  if (doCode) {
-    log(c.bold("Claude Code"));
-    // "user" scope = all projects — matches the user-level Stop hooks (~/.claude/settings.json).
-    let msg = installViaClaudeCli("user", o.force);
-    if (!msg) {
-      const codeConfig = join(homedir(), ".claude.json");
-      msg = installTo(codeConfig, { type: "stdio", env: {}, ...m }, o.force);
-      needsRestart = true;
-    }
-    log(`  MCP server…  ${msg}`);
-    if (!o.skipHook) log(`  Hooks…       ${installHook()}`);
-    log(`  Skill…       ${installSkill(o.force)}`);
-    log();
-  }
-
-  if (doDesktop) {
-    log(c.bold("Claude Desktop"));
-    log(`  MCP server…  ${installTo(claudeDesktopConfigPath(), m, o.force)}`);
-    needsRestart = true;
-    log();
-  }
-
-  if (needsRestart) log(`${c.yellow("→")} Restart Claude Desktop to pick up the new server.\n`);
-  log(
-    c.dim(
-      "Tip: run devcoach backup to export your profile, lessons and settings.\n" +
-        "     run devcoach restore <file> to import a backup on a new machine.\n" +
-        "     After upgrading devcoach (npm, Homebrew), re-run devcoach install to refresh the skill.",
-    ),
-  );
-}
-
-// ── Doctor ───────────────────────────────────────────────────────────────────
-
-/**
- * Read-only diagnosis of the devcoach ⇄ Claude Code wiring, ending with a verdict on
- * whether the next eligible stop would cue a lesson and why. Always exits 0 — doctor
- * reports problems, it never is one.
- */
-function cmdDoctor(): void {
-  const ok = (s: string): void => log(`  ${c.green("✓")} ${s}`);
-  const warn = (s: string): void => log(`  ${c.yellow("→")} ${s}`);
-  const bad = (s: string): void => log(`  ${c.red("✗")} ${s}`);
-
-  log(`\n${c.bold("devcoach doctor")} ${c.dim(`v${VERSION}`)}\n`);
-
-  log(c.bold("Environment"));
-  const nodeMajor = Number.parseInt(process.versions.node.split(".")[0] ?? "0", 10);
-  if (nodeMajor >= 24) ok(`Node ${process.versions.node} (≥ 24)`);
-  else bad(`Node ${process.versions.node} — devcoach needs Node ≥ 24 (embedded node:sqlite)`);
-
-  log(c.bold("\nClaude Code wiring"));
-  const read = readJsonFile<CodeSettings>(CLAUDE_CODE_SETTINGS);
-  if (!read.ok) {
-    bad(`${CLAUDE_CODE_SETTINGS} is not valid JSON — hooks cannot run`);
-  } else {
-    const pluginOn = pluginHooksActive(read.data);
-    const ours: { event: string; cmd: HookCmd }[] = [];
-    for (const [event, entries] of Object.entries(read.data.hooks ?? {})) {
-      for (const e of entries ?? []) {
-        for (const h of e.hooks ?? []) {
-          if (isDevcoachHookCommand(h.command ?? "")) ours.push({ event, cmd: h });
-        }
-      }
-    }
-    if (pluginOn && ours.length) {
-      bad(
-        "devcoach hooks are registered TWICE (plugin + settings.json) — interactions are " +
-          "double-counted. Disable the plugin or remove the settings.json entries.",
-      );
-    } else if (pluginOn) {
-      ok("hooks provided by the devcoach plugin");
-    } else if (!ours.length) {
-      bad(`no devcoach hooks in ${CLAUDE_CODE_SETTINGS} — run ${c.bold("devcoach install")}`);
-    } else {
-      const legacy = ours.filter(
-        ({ cmd }) => cmd.command.includes("onboard-hook") || cmd.command.includes("lesson-ready"),
-      );
-      const stopCount = ours.filter((o) => o.event === "Stop").length;
-      if (legacy.length)
-        warn(
-          `legacy two-entry Stop layout — run ${c.bold("devcoach install")} to merge into one ` +
-            "stop-hook entry (fewer spawns per stop)",
-        );
-      else if (stopCount > 1)
-        warn(
-          `${stopCount} devcoach Stop entries — interactions are counted ${stopCount}× per stop; ` +
-            `run ${c.bold("devcoach install")} to keep only the current one`,
-        );
-      else ok(`Stop hook wired (${stopCount} entry)`);
-      if (!ours.some((o) => o.event === "UserPromptSubmit"))
-        warn(
-          `no UserPromptSubmit priming hook — run ${c.bold("devcoach install")} to add it ` +
-            "(lessons land more reliably)",
-        );
-      else ok("UserPromptSubmit priming hook wired");
-      for (const { cmd } of ours) {
-        const bin = cmd.command.split(" ")[0] ?? "";
-        if (bin.startsWith("/") && !existsSync(bin))
-          bad(`hook command not found: ${bin} — re-run ${c.bold("devcoach install")}`);
-        if (cmd.command.startsWith("npx "))
-          warn("hook runs via npx — needs the npx cache (or network) on every stop");
-        if (cmd.timeout == null) warn(`hook entry has no timeout (${cmd.command})`);
-      }
-    }
-
-    const skill = skillStatus();
-    if (skill === "current") ok("Claude Code skill installed (current version)");
-    else if (pluginOn) ok("Claude Code skill bundled with the plugin");
-    else if (skill === "outdated")
-      warn(`Claude Code skill is out of date — run ${c.bold("devcoach install")}`);
-    else warn(`Claude Code skill not installed — run ${c.bold("devcoach install")}`);
-
-    const mcpRead = readJsonFile<McpConfig>(join(homedir(), ".claude.json"));
-    if (mcpRead.ok && mcpRead.data.mcpServers?.devcoach) ok("MCP server registered (user scope)");
-    else
-      warn(
-        "MCP server not found in ~/.claude.json — it may be registered elsewhere " +
-          `(check with ${c.bold("claude mcp get devcoach")})`,
-      );
-  }
-
-  log(c.bold("\nDatabase & pacing"));
-  if (!existsSync(db.DB_PATH)) {
-    warn(`no database yet (${db.DB_PATH}) — onboarding runs on the first technical task`);
-    log();
-    return;
-  }
-  try {
-    db.withConnection((conn) => {
-      ok(`database opens (${db.DB_PATH})`);
-      if (db.isOnboardingComplete(conn).knowledge_ready) ok("onboarding complete");
-      else warn("onboarding not complete — the next stop cues it");
-      const settings = db.getSettings(conn);
-      log(
-        `    settings: max_per_day=${settings.max_per_day} · min_gap_minutes=${settings.min_gap_minutes} · ` +
-          `nudge_every=${settings.nudge_every} · nudge_scope=${settings.nudge_scope}`,
-      );
-      const sessions = db.listNudgeSessions(conn);
-      const total = sessions.reduce((sum, s) => sum + s.interactions, 0);
-      log(
-        `    pacing: ${sessions.length} session(s) counted, ${total} interaction(s) total` +
-          (sessions[0]
-            ? ` — latest ${sessions[0].session_id.slice(0, 8)}… at ${sessions[0].interactions}`
-            : ""),
-      );
-      const cue = db.getCueState(conn);
-      if (cue.pending) warn(`a cue is pending since ${cue.last_cue_at} (retry threshold armed)`);
-      else if (cue.last_skip_reason) log(`    last skip: "${cue.last_skip_reason}"`);
-      const rate = coach.checkRateLimit(conn);
-      if (rate.allowed) ok("rate limit: allowed");
-      else warn(`rate limit: ${rate.reason}`);
-
-      log(c.bold("\nVerdict"));
-      const verdict = coach.explainCue(conn, sessions[0]?.session_id ?? null);
-      if (verdict.wouldCue) ok("the next eligible stop WOULD cue a lesson");
-      else warn("the next eligible stop would NOT cue a lesson:");
-      for (const reason of verdict.reasons) log(`      · ${reason}`);
-    });
-  } catch (err) {
-    bad(`database check failed: ${err}`);
-  }
-  log();
-}
-
 // ── Setup wizard (interactive) ───────────────────────────────────────────────
 
 async function cmdSetup(): Promise<void> {
@@ -998,10 +561,10 @@ function printWelcome(): void {
     ["mcp", "Start the MCP server (stdio) for Claude Code / Claude Desktop"],
     ["ui [--port N]", "Launch the web dashboard  (default port: 7860)"],
     ["setup", "First-run wizard: import backup or build your knowledge profile"],
-    ["install", "Register the MCP server + Stop hooks + skill in Claude Code / Claude Desktop"],
+    ["install", "Register MCP server + hooks + skill (Claude default; --gemini/--codex beta)"],
     ["onboard-hook", "Claude Code Stop hook: cue onboarding when no profile exists"],
     ["lesson-ready", "Claude Code Stop hook: cue a lesson when one is due"],
-    ["doctor", "Diagnose the Claude Code wiring — explains why a lesson would(n't) fire"],
+    ["doctor", "Diagnose the agent wiring — explains why a lesson would(n't) fire"],
     ["profile", "Show the knowledge map"],
     ["stats", "Coaching statistics and rate-limit status"],
     ["settings / set", "Show / update settings (max_per_day | min_gap_minutes)"],
@@ -1202,21 +765,30 @@ function buildProgram(): Command {
 
   program
     .command("install")
-    .description("Register the MCP server + Stop hooks + skill in Claude Code / Claude Desktop")
+    .description(
+      "Register the MCP server + hooks + skill in Claude Code / Claude Desktop " +
+        "(default), Gemini CLI (--gemini, beta), or Codex CLI (--codex, beta)",
+    )
     .option("--claude-code", "Target Claude Code only")
     .option("--claude-desktop", "Target Claude Desktop only")
+    .option("--gemini", "Target Google Gemini CLI (beta)")
+    .option("--codex", "Target OpenAI Codex CLI (beta)")
     .option("--force", "Overwrite existing devcoach entry")
-    .option("--skip-hook", "Register MCP server only — skip the Stop hooks")
+    .option("--skip-hook", "Register MCP server only — skip the hooks")
     .action(
       (opts: {
         claudeCode?: boolean;
         claudeDesktop?: boolean;
+        gemini?: boolean;
+        codex?: boolean;
         force?: boolean;
         skipHook?: boolean;
       }) =>
         cmdInstall({
           claudeCode: Boolean(opts.claudeCode),
           claudeDesktop: Boolean(opts.claudeDesktop),
+          gemini: Boolean(opts.gemini),
+          codex: Boolean(opts.codex),
           force: Boolean(opts.force),
           skipHook: Boolean(opts.skipHook),
         }),
@@ -1224,7 +796,7 @@ function buildProgram(): Command {
 
   program
     .command("doctor")
-    .description("Diagnose the devcoach ⇄ Claude Code wiring and the lesson pacing state")
+    .description("Diagnose the devcoach ⇄ agent wiring and the lesson pacing state")
     .action(cmdDoctor);
 
   program
@@ -1252,6 +824,22 @@ function buildProgram(): Command {
     .command("prompt-hook", { hidden: true })
     .description("Claude Code UserPromptSubmit hook: prime the model when a lesson is due")
     .action(() => cmdPromptHook());
+  program
+    .command("gemini-stop-hook", { hidden: true })
+    .description("Gemini CLI AfterAgent hook: onboarding check + lesson cue in one spawn")
+    .action(() => cmdStopHook(undefined, "gemini"));
+  program
+    .command("gemini-prompt-hook", { hidden: true })
+    .description("Gemini CLI BeforeAgent hook: prime the model when a lesson is due")
+    .action(() => cmdPromptHook(undefined, "gemini"));
+  program
+    .command("codex-stop-hook", { hidden: true })
+    .description("Codex CLI Stop hook: onboarding check + lesson cue in one spawn")
+    .action(() => cmdStopHook(undefined, "codex"));
+  program
+    .command("codex-prompt-hook", { hidden: true })
+    .description("Codex CLI UserPromptSubmit hook: prime the model when a lesson is due")
+    .action(() => cmdPromptHook(undefined, "codex"));
   program
     .command("onboard-hook", { hidden: true })
     .description("Claude Code Stop hook: cue onboarding (legacy two-entry layout)")

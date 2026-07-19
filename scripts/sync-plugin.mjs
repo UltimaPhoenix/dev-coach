@@ -1,6 +1,10 @@
-// Keep the Claude Code plugin (plugin/) in sync with the repo's single sources of truth:
+// Keep the Claude Code plugin (plugin/) and the Gemini CLI extension (gemini-extension/)
+// in sync with the repo's single sources of truth:
 //   • plugin/.claude-plugin/plugin.json  version  ←  package.json version
 //   • plugin/skills/devcoach/            ←  assets/SKILL.md + assets/references/
+//   • gemini-extension/gemini-extension.json  version  ←  package.json version
+//   • gemini-extension/skills/devcoach/  ←  assets/SKILL.md + assets/references/
+//   • both package.json pins             ←  package.json version
 // Idempotent: writing the same content twice is a no-op. Run it in the bump job and before packing.
 //   node scripts/sync-plugin.mjs
 import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -30,4 +34,22 @@ const pluginPkgPath = join(root, "plugin", "package.json");
 const pluginPkg = readFileSync(pluginPkgPath, "utf8");
 writeFileSync(pluginPkgPath, pluginPkg.replace(/"devcoach": "[^"]+"/, `"devcoach": "${version}"`));
 
-console.log(`synced plugin → version ${version}, SKILL.md copied, devcoach pinned`);
+// 4. Same three steps for the Gemini CLI extension (manifest version, skill copy, runtime pin).
+const extManifestPath = join(root, "gemini-extension", "gemini-extension.json");
+const extManifest = readFileSync(extManifestPath, "utf8");
+writeFileSync(
+  extManifestPath,
+  extManifest.replace(/"version": "[^"]+"/, `"version": "${version}"`),
+);
+const extSkillDir = join(root, "gemini-extension", "skills", "devcoach");
+mkdirSync(extSkillDir, { recursive: true });
+cpSync(join(root, "assets", "SKILL.md"), join(extSkillDir, "SKILL.md"));
+rmSync(join(extSkillDir, "references"), { recursive: true, force: true });
+cpSync(join(root, "assets", "references"), join(extSkillDir, "references"), { recursive: true });
+const extPkgPath = join(root, "gemini-extension", "package.json");
+const extPkg = readFileSync(extPkgPath, "utf8");
+writeFileSync(extPkgPath, extPkg.replace(/"devcoach": "[^"]+"/, `"devcoach": "${version}"`));
+
+console.log(
+  `synced plugin + gemini-extension → version ${version}, SKILL.md copied, devcoach pinned`,
+);

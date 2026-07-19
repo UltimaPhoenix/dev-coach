@@ -449,6 +449,144 @@ describe("cli", () => {
     }
   });
 
+  it("install --gemini writes settings.json hooks + MCP (fallback path) and the shared skill", async () => {
+    const home = process.env.HOME as string;
+    const settings = join(home, ".gemini", "settings.json");
+    const skillDir = join(home, ".agents", "skills", "devcoach");
+    rmSync(join(home, ".gemini"), { recursive: true, force: true });
+    rmSync(join(home, ".agents"), { recursive: true, force: true });
+    // An empty PATH dir guarantees the no-CLI fallback even when a real gemini is installed.
+    const savedPath = process.env.PATH;
+    process.env.PATH = mkdtempSync(join(tmpdir(), "dc-nobin-"));
+    const r = await run(["install", "--gemini", "--force"]);
+    expect(r.out).toContain("Gemini CLI (beta)");
+    const saved = JSON.parse(readFileSync(settings, "utf8"));
+    expect(saved.mcpServers.devcoach.args).toContain("mcp");
+    expect(saved.hooks.AfterAgent[0].hooks[0].command).toContain("gemini-stop-hook");
+    expect(saved.hooks.AfterAgent[0].hooks[0].timeout).toBe(60000);
+    expect(saved.hooks.BeforeAgent[0].hooks[0].command).toContain("gemini-prompt-hook");
+    expect(saved.hooks.BeforeAgent[0].hooks[0].timeout).toBe(30000);
+    expect(existsSync(join(skillDir, "SKILL.md"))).toBe(true);
+    expect(readFileSync(join(skillDir, ".devcoach-version"), "utf8").trim()).toBe(VERSION);
+
+    // Re-run without --force → everything already current.
+    expect((await run(["install", "--gemini"])).out).toContain("Already");
+
+    // A stale gemini hook layout self-heals without --force (regex covers gemini-*-hook).
+    saved.hooks.AfterAgent = [
+      { hooks: [{ type: "command", command: "npx -y devcoach gemini-stop-hook" }] },
+      { hooks: [{ type: "command", command: "my-other-tool --check" }] },
+    ];
+    writeFileSync(settings, JSON.stringify(saved));
+    try {
+      expect((await run(["install", "--gemini"])).out).toContain("Hooks installed");
+      const repaired = JSON.parse(readFileSync(settings, "utf8"));
+      const cmds = repaired.hooks.AfterAgent.flatMap((e: any) =>
+        e.hooks.map((h: any) => h.command),
+      );
+      expect(cmds).toHaveLength(2);
+      expect(cmds.some((c: string) => c.includes("my-other-tool"))).toBe(true);
+      expect(repaired.hooks.AfterAgent.flatMap((e: any) => e.hooks)[1].timeout).toBe(60000);
+    } finally {
+      process.env.PATH = savedPath;
+    }
+  });
+
+  it("install --gemini registers via a present `gemini` CLI and skips hooks+skill when the extension is installed", async () => {
+    const home = process.env.HOME as string;
+    rmSync(join(home, ".gemini"), { recursive: true, force: true });
+    rmSync(join(home, ".agents"), { recursive: true, force: true });
+    const savedPath = process.env.PATH;
+    process.env.PATH = fakeBin("gemini", "#!/bin/sh\nexit 0\n"); // fake shadows any real gemini
+    try {
+      expect((await run(["install", "--gemini"])).out).toContain("Registered via `gemini mcp add`");
+      // Extension manifest present → hooks and skill are its job (double-count guard).
+      const extDir = join(home, ".gemini", "extensions", "devcoach");
+      mkdirSync(extDir, { recursive: true });
+      writeFileSync(join(extDir, "gemini-extension.json"), "{}");
+      rmSync(join(home, ".gemini", "settings.json"), { force: true });
+      rmSync(join(home, ".agents"), { recursive: true, force: true });
+      const r = await run(["install", "--gemini"]);
+      expect(r.out).toContain("extension already provides the hooks");
+      expect(r.out).toContain("bundled with the devcoach Gemini extension");
+      expect(existsSync(join(home, ".gemini", "settings.json"))).toBe(false);
+      expect(existsSync(join(home, ".agents"))).toBe(false);
+    } finally {
+      process.env.PATH = savedPath;
+      rmSync(join(home, ".gemini", "extensions"), { recursive: true, force: true });
+    }
+  });
+
+  it("install --codex writes hooks.json + skill and prints the TOML snippet without the codex CLI", async () => {
+    const home = process.env.HOME as string;
+    const hooksJson = join(home, ".codex", "hooks.json");
+    rmSync(join(home, ".codex"), { recursive: true, force: true });
+    rmSync(join(home, ".agents"), { recursive: true, force: true });
+    const savedPath = process.env.PATH;
+    // An empty PATH dir guarantees the no-CLI branch even when a real codex is installed.
+    process.env.PATH = mkdtempSync(join(tmpdir(), "dc-nobin-"));
+    try {
+      const r = await run(["install", "--codex"]);
+      expect(r.out).toContain("Codex CLI (beta)");
+      expect(r.out).toContain("[mcp_servers.devcoach]"); // manual TOML snippet, config left alone
+      const saved = JSON.parse(readFileSync(hooksJson, "utf8"));
+      expect(saved.hooks.Stop[0].hooks[0].command).toContain("codex-stop-hook");
+      expect(saved.hooks.Stop[0].hooks[0].timeout).toBe(60);
+      expect(saved.hooks.UserPromptSubmit[0].hooks[0].command).toContain("codex-prompt-hook");
+      expect(existsSync(join(home, ".agents", "skills", "devcoach", "SKILL.md"))).toBe(true);
+
+      // With a fake codex CLI on PATH the MCP step goes through `codex mcp add`.
+      process.env.PATH = fakeBin("codex", "#!/bin/sh\nexit 0\n");
+      expect((await run(["install", "--codex"])).out).toContain("Registered via `codex mcp add`");
+    } finally {
+      process.env.PATH = savedPath;
+    }
+  });
+
+  it("install never clobbers malformed gemini/codex config files", async () => {
+    const home = process.env.HOME as string;
+    const settings = join(home, ".gemini", "settings.json");
+    mkdirSync(dirname(settings), { recursive: true });
+    writeFileSync(settings, "{not json");
+    const r = await run(["install", "--gemini"]);
+    expect(r.out).toContain("not valid JSON");
+    expect(readFileSync(settings, "utf8")).toBe("{not json");
+    rmSync(join(home, ".gemini"), { recursive: true, force: true });
+  });
+
+  it("doctor shows Gemini/Codex sections only when their config dirs exist", async () => {
+    const home = process.env.HOME as string;
+    rmSync(join(home, ".gemini"), { recursive: true, force: true });
+    rmSync(join(home, ".codex"), { recursive: true, force: true });
+    const before = await run(["doctor"]);
+    expect(before.out).not.toContain("Gemini CLI wiring");
+    expect(before.out).not.toContain("Codex CLI wiring");
+
+    // Empty PATH dir → deterministic config-write path even with real CLIs installed.
+    const savedPath = process.env.PATH;
+    process.env.PATH = mkdtempSync(join(tmpdir(), "dc-nobin-"));
+    try {
+      await run(["install", "--gemini", "--codex", "--force"]);
+    } finally {
+      process.env.PATH = savedPath;
+    }
+    const after = await run(["doctor"]);
+    expect(after.out).toContain("Gemini CLI wiring (beta)");
+    expect(after.out).toContain("AfterAgent stop hook wired");
+    expect(after.out).toContain("BeforeAgent priming hook wired");
+    expect(after.out).toContain("Codex CLI wiring (beta)");
+    expect(after.out).toContain("Stop hook wired");
+
+    // Extension + settings hooks together → the double-registration alarm.
+    const extDir = join(home, ".gemini", "extensions", "devcoach");
+    mkdirSync(extDir, { recursive: true });
+    writeFileSync(join(extDir, "gemini-extension.json"), "{}");
+    expect((await run(["doctor"])).out).toContain("registered TWICE (extension + settings.json)");
+    rmSync(join(home, ".gemini"), { recursive: true, force: true });
+    rmSync(join(home, ".codex"), { recursive: true, force: true });
+    rmSync(join(home, ".agents"), { recursive: true, force: true });
+  });
+
   it("onboard-hook re-cues every stop until a profile exists (no debounce)", async () => {
     db.withConnection((c) =>
       c.exec(
