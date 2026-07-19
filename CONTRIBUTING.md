@@ -26,7 +26,9 @@ See [CLAUDE.md](CLAUDE.md) for the full project structure, stack, and convention
 - `core/` must never import from `mcp/`, `cli/`, or `web/`
 - Every DB access must be wrapped in try/catch — never crash the MCP server
 - Paths always derived from `os.homedir()/.devcoach`, never hardcoded
-- `assets/` is the tracked source of truth (SKILL.md + web static) — edit there, not in `dist/`
+- `assets/` is the tracked source of truth (SKILL.md + web static) — edit there, not in `dist/`.
+  `plugin/skills/` and `gemini-extension/skills/` are synced mirrors: never edit them directly,
+  run `npm run plugin:sync` (tests assert byte-identity with `assets/`)
 
 ## Submitting a PR
 
