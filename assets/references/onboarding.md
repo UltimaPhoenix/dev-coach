@@ -58,10 +58,16 @@ Step 4. If `notebook_ready` is also true, proceed normally.
   the current project) enriched with relevant entries from `default_topics` (the
   project's default knowledge map).
 - Show each topic with its suggested confidence **and its provenance** from
-  `detected_projects` — e.g. *"java 6 — seen in discordbot, over-night-runner"*.
+  `detected_projects`, as one plain-markdown bullet per topic (never a table, never
+  prose paragraphs — this list is scanned, not read):
+  ```markdown
+  - **java** — 6/10 — seen in discordbot, over-night-runner
+  - **typescript** — 7/10 — seen in dev-coach
+  ```
   Weight what you emphasise by `prompt_count` and `last_activity`: a stack the user
-  works in daily deserves more topics than a one-off experiment. Ask the user to
-  confirm, adjust, or remove each: *"Looks right? Or enter 1–10 to change it."*
+  works in daily deserves more topics than a one-off experiment. After the list, ask
+  the user to confirm, adjust, or remove each: *"Looks right? Or enter 1–10 to
+  change it."*
 - After the list, ask: *"Anything else I missed? List any tools, languages,
   frameworks, or practices you work with regularly."* — add each with a confidence.
 
@@ -99,7 +105,17 @@ Step 3 after all topics are known.
 ### Step 3b — Show the setup summary
 
 After saving (or after a restore), show the user a concise summary of what was set up:
-- The topics with their confidences, organised under their groups.
+the topics with their confidences, organised under their groups, as one `###` heading
+per group with a plain bullet list underneath (no table, no prose paragraph):
+```markdown
+### Languages
+- **python** — 7/10
+- **typescript** — 5/10
+
+### DevOps
+- **docker** — 8/10
+```
+Topics with no group go under a trailing `### Other` heading, same bullet shape.
 
 Then tell the user **how to change any of it later**, across all three surfaces:
 - **In chat** — just ask, e.g. *"set my Python confidence to 7"*, *"add Rust at 4"*,
