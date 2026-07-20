@@ -118,10 +118,10 @@ export function createServer(): McpServer {
       description:
         "Save a delivered lesson to the coaching log. Git metadata (project, repository, branch, " +
         "commit_hash, folder, repository_platform) is auto-detected from the workspace when omitted. " +
+        "timestamp is always stamped server-side with the current time — there is no argument for it. " +
         "Returns the saved Lesson with all resolved fields.",
       inputSchema: {
         id: z.string().describe("Unique lesson id (uuid or random string)"),
-        timestamp: z.string().describe("ISO 8601 timestamp; normalized to UTC and clamped to now"),
         topic_id: z.string().describe("Primary topic id, e.g. 'python'"),
         categories: z.array(z.string()).describe("Category tags, e.g. ['python','performance']"),
         title: z.string().describe("Short lesson title"),
@@ -164,7 +164,7 @@ export function createServer(): McpServer {
         }
         let lesson: Lesson = parseLesson({
           id: args.id,
-          timestamp: args.timestamp,
+          timestamp: new Date(),
           topic_id: args.topic_id,
           categories: args.categories,
           title: args.title,

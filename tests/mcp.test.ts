@@ -77,7 +77,6 @@ describe("mcp server", () => {
       name: "log_lesson",
       arguments: {
         id: "t1",
-        timestamp: "2026-06-16T10:00:00Z",
         topic_id: "python",
         categories: ["python"],
         title: "X",
@@ -89,6 +88,9 @@ describe("mcp server", () => {
     expect(log.structuredContent.id).toBe("t1");
     expect(log.structuredContent.body).toBe("Full lesson body.");
     expect(log.structuredContent.feedback).toBeNull();
+    // timestamp is not a tool argument — always the real current time, so rate
+    // limiting sees an accurate "last lesson" instant instead of a model's guess.
+    expect(Date.now() - new Date(log.structuredContent.timestamp).getTime()).toBeLessThan(60_000);
     // The result must NOT echo the rendered card (the echo made the model re-print
     // it after the tool-approval pause → double card); it carries a conditional
     // self-check instead — inside structuredContent, the only part Claude Code
@@ -118,7 +120,6 @@ describe("mcp server", () => {
       name: "log_lesson",
       arguments: {
         id: "t-empty",
-        timestamp: "2026-06-16T10:00:00Z",
         topic_id: "python",
         categories: ["python"],
         title: "X",
@@ -202,7 +203,6 @@ describe("mcp server", () => {
       name: "log_lesson",
       arguments: {
         id: "e1",
-        timestamp: "2026-06-16T10:00:00Z",
         topic_id: "python",
         categories: ["python"],
         title: "Elicited",
@@ -246,6 +246,14 @@ describe("mcp server", () => {
     expect(o.scanned_projects).toBeGreaterThanOrEqual(1);
     const ios = o.detected_projects.find((p: any) => p.name === "ios-thing");
     expect(ios.topics).toContain("swift");
+    // log_lesson now always stamps the real current time (never a model-supplied
+    // value), so a lesson logged by an earlier test in this shared-DB file can make
+    // the default 240-minute gap genuinely unmet here — force it open explicitly
+    // instead of relying on stale fixed timestamps to look "long ago".
+    await client.callTool({
+      name: "update_settings",
+      arguments: { key: "min_gap_minutes", value: "0" },
+    });
     // The aggregated briefing carries the whole pre-lesson read in ONE resource.
     const briefing: any = await client.readResource({ uri: "devcoach://briefing" });
     const b = JSON.parse(briefing.contents[0].text);
@@ -272,7 +280,6 @@ describe("mcp server error paths", () => {
       "log_lesson",
       {
         id: "x",
-        timestamp: "2026-01-01T00:00:00Z",
         topic_id: "python",
         categories: ["python"],
         title: "t",
@@ -314,7 +321,6 @@ describe("mcp server error paths", () => {
       name: "log_lesson",
       arguments: {
         id: "full",
-        timestamp: "2026-01-01T00:00:00Z",
         topic_id: "python",
         categories: ["python"],
         title: "Full",
@@ -350,7 +356,6 @@ describe("mcp server error paths", () => {
       name: "log_lesson",
       arguments: {
         id: "d1",
-        timestamp: "2026-01-01T00:00:00Z",
         topic_id: "python",
         categories: ["python"],
         title: "Declined",
