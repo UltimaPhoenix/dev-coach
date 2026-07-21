@@ -196,9 +196,10 @@ export function buildLessonCue(nextLessonNumber: number, client: HookClient = "c
     Math.ceil(nextLessonNumber / NOTEBOOK_UPDATE_EVERY) * NOTEBOOK_UPDATE_EVERY;
   const notebookStep = updateDue
     ? `This is lesson #${nextLessonNumber} — a notebook checkpoint (every ${NOTEBOOK_UPDATE_EVERY} ` +
-      "lessons): after log_lesson returns the feedback, also call update_notebook with the " +
-      `revised notebook markdown and record "(updated after ${nextLessonNumber} lessons)".`
-    : "Do NOT call update_notebook this time — the notebook is refreshed only every " +
+      "lessons): after log_lesson returns the feedback, also read references/calibration.md in the " +
+      "devcoach skill and run its notebook-update step (a direct file write), recording " +
+      `"(updated after ${nextLessonNumber} lessons)".`
+    : "Skip the notebook update this time — it is refreshed only every " +
       `${NOTEBOOK_UPDATE_EVERY} lessons (next checkpoint at lesson #${nextCheckpoint}).`;
 
   return (

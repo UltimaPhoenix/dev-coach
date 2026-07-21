@@ -87,7 +87,7 @@ describe("cli", () => {
     expect(lr.out).toContain('"decision":"block"');
     expect(lr.out).toContain("log_lesson");
     expect(lr.out).toContain("devcoach://briefing");
-    expect(lr.out).toContain("update_notebook");
+    expect(lr.out).toContain("notebook");
   });
 
   it("lesson-ready gates the notebook update to every 10 lessons", async () => {
@@ -112,11 +112,11 @@ describe("cli", () => {
         db.setSetting(c, "nudge_every", "0"); // isolate the notebook-checkpoint gate
       });
     seed(5); // next lesson is #6 → not a checkpoint → skip the notebook update
-    expect((await run(["lesson-ready"])).out).toContain("Do NOT call update_notebook");
+    expect((await run(["lesson-ready"])).out).toContain("Skip the notebook update this time");
     seed(9); // next lesson is #10 → checkpoint → update the notebook
     const due = await run(["lesson-ready"]);
     expect(due.out).toContain("notebook checkpoint");
-    expect(due.out).toContain("call update_notebook");
+    expect(due.out).toContain("references/calibration.md");
   });
 
   it("lesson-ready paces the cue by nudge_every (interaction counter)", async () => {

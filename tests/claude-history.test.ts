@@ -4,7 +4,11 @@ import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
-import { scanClaudeHistory } from "../src/core/claude-history";
+import {
+  DEEP_SCAN_SOFT_LIMIT,
+  scanClaudeHistory,
+  scanRecentProjectWindow,
+} from "../src/core/claude-history";
 
 const home = (): string => process.env.HOME as string;
 const configPath = (): string => join(home(), ".claude.json");
@@ -114,5 +118,64 @@ describe("scanClaudeHistory", () => {
   it("degrades to an empty scan on missing or corrupt ~/.claude.json", () => {
     writeFileSync(configPath(), "{ definitely not json");
     expect(scanClaudeHistory()).toEqual({ detected_stack: {}, projects: [], scanned_projects: 0 });
+  });
+});
+
+// Deep-onboarding pre-check: a genuine rolling date window (unlike scanClaudeHistory's
+// top-15-by-recency cap), still metadata-only — no prompt/display text is read here either.
+describe("scanRecentProjectWindow", () => {
+  beforeEach(() => {
+    mkdirSync(claudeDir(), { recursive: true });
+  });
+
+  const DAY_MS = 86_400_000;
+
+  it("counts only projects active within the window, excluding noise and zero-activity projects", () => {
+    const recent = project("recent");
+    const old = project("old");
+    const noActivity = project("no-activity"); // configured, but never appears in history.jsonl
+    const noise = mkdtempSync(join(tmpdir(), "dc-noise-window-"));
+
+    writeConfig({ [recent]: {}, [old]: {}, [noActivity]: {}, [noise]: {} });
+    writeHistory([
+      { project: recent, timestamp: Date.now() - 10 * DAY_MS },
+      { project: old, timestamp: Date.now() - 200 * DAY_MS },
+      { project: noise, timestamp: Date.now() - 1 * DAY_MS },
+    ]);
+
+    const result = scanRecentProjectWindow(3); // ~90-day window
+    expect(result.window_months).toBe(3);
+    expect(result.candidate_count).toBe(1);
+    expect(result.over_soft_limit).toBe(false);
+    expect(result.candidates).toHaveLength(1);
+    expect(result.candidates[0]?.name).toBe("recent");
+    expect(result.candidates[0]?.prompt_count).toBe(1);
+  });
+
+  it("flags over_soft_limit once candidates exceed DEEP_SCAN_SOFT_LIMIT", () => {
+    const count = DEEP_SCAN_SOFT_LIMIT + 1;
+    const paths = Array.from({ length: count }, (_, i) => project(`p${i}`));
+    writeConfig(Object.fromEntries(paths.map((p) => [p, {}])));
+    writeHistory(paths.map((p) => ({ project: p, timestamp: Date.now() - 1 * DAY_MS })));
+
+    const result = scanRecentProjectWindow(3);
+    expect(result.candidate_count).toBe(count);
+    expect(result.over_soft_limit).toBe(true);
+  });
+
+  it("a narrower window excludes what a wider window includes", () => {
+    const mid = project("mid-range");
+    writeConfig({ [mid]: {} });
+    writeHistory([{ project: mid, timestamp: Date.now() - 45 * DAY_MS }]);
+
+    expect(scanRecentProjectWindow(1).candidate_count).toBe(0); // ~30-day window misses it
+    expect(scanRecentProjectWindow(2).candidate_count).toBe(1); // ~60-day window catches it
+  });
+
+  it("degrades to zero candidates on missing or corrupt ~/.claude.json", () => {
+    writeFileSync(configPath(), "{ definitely not json");
+    const result = scanRecentProjectWindow(3);
+    expect(result.candidate_count).toBe(0);
+    expect(result.candidates).toEqual([]);
   });
 });

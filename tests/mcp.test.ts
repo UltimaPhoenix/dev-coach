@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
@@ -20,7 +20,11 @@ const text = (r: any): string => r.content[0].text;
 describe("mcp server", () => {
   it("lists 15 tools, 10 resources + 1 template, 1 prompt", async () => {
     const { client, server } = await connect();
-    expect((await client.listTools()).tools).toHaveLength(15);
+    const tools = (await client.listTools()).tools;
+    expect(tools).toHaveLength(15);
+    const names = tools.map((t: any) => t.name);
+    expect(names).toContain("preview_deep_scan");
+    expect(names).not.toContain("update_notebook");
     expect((await client.listResources()).resources).toHaveLength(10);
     expect((await client.listResourceTemplates()).resourceTemplates).toHaveLength(1);
     expect((await client.listPrompts()).prompts[0].name).toBe("devcoach_instructions");
@@ -28,33 +32,68 @@ describe("mcp server", () => {
     await server.close();
   });
 
-  it("update_notebook writes the notebook and devcoach://notebook serves it", async () => {
+  it("complete_onboarding guarantees a non-empty notebook placeholder; the skill writes the real one directly", async () => {
     const { client, server } = await connect();
+    rmSync(db.LEARNING_STATE_PATH, { force: true }); // isolate from other tests' notebook writes in this shared sandbox
     await client.callTool({
-      name: "update_notebook",
-      arguments: { notebook: "# Notebook\n\n## Observations\nUser absorbed sockets." },
+      name: "complete_onboarding",
+      arguments: { topics: { python: 4 } },
     });
+    // No notebook argument exists on this tool — it only guarantees the file exists and
+    // is non-empty the instant the profile saves.
+    expect(existsSync(db.LEARNING_STATE_PATH)).toBe(true);
+    expect(readFileSync(db.LEARNING_STATE_PATH, "utf8")).toBe("# devcoach — Coaching Notebook\n");
+
+    // The skill overwrites the placeholder directly, with its own file tools — simulated
+    // here as a plain write, no MCP tool involved.
+    writeFileSync(
+      db.LEARNING_STATE_PATH,
+      "# Notebook\n\n## Observations\nUser absorbed sockets.\n",
+    );
     const r: any = await client.readResource({ uri: "devcoach://notebook" });
     expect(r.contents[0].mimeType).toBe("text/markdown");
     expect(r.contents[0].text).toContain("User absorbed sockets.");
+
+    const onboarding: any = await client.readResource({ uri: "devcoach://onboarding" });
+    expect(JSON.parse(onboarding.contents[0].text).notebook_path).toBe(db.LEARNING_STATE_PATH);
+    const briefing: any = await client.readResource({ uri: "devcoach://briefing" });
+    expect(JSON.parse(briefing.contents[0].text).notebook_path).toBe(db.LEARNING_STATE_PATH);
+
+    await client.close();
+    await server.close();
+  });
+
+  it("preview_deep_scan returns a metadata-only windowed count with the requested/default months", async () => {
+    const { client, server } = await connect();
+    const withDefault: any = await client.callTool({ name: "preview_deep_scan", arguments: {} });
+    expect(withDefault.structuredContent.window_months).toBe(3);
+    expect(withDefault.structuredContent.candidate_count).toBe(0);
+    expect(withDefault.structuredContent.over_soft_limit).toBe(false);
+    expect(withDefault.structuredContent.candidates).toEqual([]);
+
+    const withMonths: any = await client.callTool({
+      name: "preview_deep_scan",
+      arguments: { months: 6 },
+    });
+    expect(withMonths.structuredContent.window_months).toBe(6);
     await client.close();
     await server.close();
   });
 
   it("runs the full tool surface", async () => {
     const { client, server } = await connect();
+    rmSync(db.LEARNING_STATE_PATH, { force: true }); // isolate from other tests' notebook writes in this shared sandbox
     const onb: any = await client.callTool({
       name: "complete_onboarding",
       arguments: {
         topics: { python: 4 },
         groups: { Languages: ["python"] },
-        notebook: "# devcoach — Coaching Notebook\n\n## Observations\nPrefers type safety.\n",
       },
     });
     expect(onb.structuredContent.knowledge[0].topic).toBe("python");
-    // The personalized notebook the model passes is saved verbatim to learning-state.md.
+    // No notebook argument — the tool only guarantees a non-empty placeholder.
     expect(existsSync(db.LEARNING_STATE_PATH)).toBe(true);
-    expect(readFileSync(db.LEARNING_STATE_PATH, "utf8")).toContain("Prefers type safety.");
+    expect(readFileSync(db.LEARNING_STATE_PATH, "utf8")).toBe("# devcoach — Coaching Notebook\n");
 
     await client.callTool({
       name: "add_topic",

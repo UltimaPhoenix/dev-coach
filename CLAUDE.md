@@ -64,7 +64,7 @@ dev-coach/
 
 `log_lesson`, `skip_lesson`, `update_knowledge`, `get_lessons`, `star_lesson`, `delete_lesson`,
 `submit_feedback`, `add_topic`, `remove_topic`, `add_group`, `remove_group`, `update_settings`,
-`open_ui`, `complete_onboarding`, `update_notebook`.
+`open_ui`, `complete_onboarding`, `preview_deep_scan`.
 
 Every tool registers a `title` + read-only/destructive annotations, a tight Zod `inputSchema` with
 `.describe()` on each param, `outputSchema`/`structuredContent` for model-shaped returns
@@ -76,6 +76,16 @@ echo made the model re-print it after the tool-approval pause → double card); 
 user") — it must live there because Claude Code surfaces structured output to the model and
 drops the plain-text content blocks. `skip_lesson` is the explicit no-op: it records
 why no lesson was warranted and re-arms the pacing (clears `cue_state.pending`).
+`log_lesson`'s `timestamp` is not an argument — always server-stamped with the real current time
+(a model has no clock; `min_gap_minutes` depends on this being accurate). `complete_onboarding`
+no longer accepts `notebook` either — it only guarantees `learning-state.md` is non-empty (a
+placeholder) the instant it saves the profile; the skill writes the real notebook directly to the
+path exposed by `devcoach://onboarding`/`devcoach://briefing`'s `notebook_path` field, same as
+`references/calibration.md` and `references/review.md` do at their own notebook touchpoints —
+there is no `update_notebook` tool. `preview_deep_scan` is a cheap, metadata-only pre-check (a
+real rolling date window, not `scanClaudeHistory`'s top-N-by-recency cap) used before "Automatic
+(Deep)" onboarding spawns a subagent to read real local conversation history — see `assets/
+references/onboarding.md` for the full flow and its privacy tradeoff.
 
 ## MCP resources (11)
 
@@ -90,7 +100,10 @@ and never throws (returns
 `history.jsonl` activity + per-project auto-memory excerpts, merged with the cwd's
 `detectStack`) plus `detected_projects` provenance (name, topics, prompt_count, last_activity,
 memory) and `scanned_projects` — only the `MAX_RECENT_PROJECTS` most recently active projects
-are scanned, prompt text is never read, and any failure degrades to an empty scan.
+are scanned, prompt text is never read, and any failure degrades to an empty scan. Both
+`onboarding` and `briefing` also carry `notebook_path` (`db.LEARNING_STATE_PATH`, resolved) so
+the model can Read/Write/Edit the notebook file directly instead of passing its markdown through
+a tool call.
 
 ## MCP prompt
 

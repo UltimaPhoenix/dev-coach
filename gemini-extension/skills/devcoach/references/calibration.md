@@ -31,8 +31,10 @@ For each lesson whose `topic_id` is not in `devcoach://profile`:
 
 ## Step 4 — Update the coaching notebook
 
-Read `devcoach://notebook`. Merge findings into the relevant sections and save the
-complete revised markdown via `update_notebook`:
+Read `devcoach://briefing` for the current notebook text and its `notebook_path` — one
+resource covers both. Merge findings into the relevant sections and write the complete
+revised markdown directly to `notebook_path` (your own Write/Edit tool), overwriting the
+file in one go:
 
 - **Recurring patterns** — append any `topic_id` that appeared 3+ times, with its count
   and whether feedback was positive, negative, or absent.

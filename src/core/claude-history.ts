@@ -250,3 +250,76 @@ export function scanClaudeHistory(): ClaudeHistoryScan {
     return EMPTY_SCAN;
   }
 }
+
+// ── Deep-onboarding pre-check ────────────────────────────────────────────────
+// A cheap, metadata-only pre-check for the "Automatic (Deep)" onboarding tier: unlike
+// scanClaudeHistory's top-N-by-recency cap, this uses a genuine rolling date window so the
+// skill can tell the user how many projects a deep read would cover before spawning the
+// (expensive) subagent that reads real transcript content. Still reads only project/timestamp
+// metadata via the same readActivity() — no prompt text, same guarantee, different cap.
+
+/** Above this many in-window candidates, the skill should ask before going deep. */
+export const DEEP_SCAN_SOFT_LIMIT = 8;
+const MAX_WINDOW_CANDIDATES_LISTED = 50;
+
+export interface RecentProjectWindow {
+  window_months: number;
+  cutoff: string;
+  candidate_count: number;
+  over_soft_limit: boolean;
+  candidates: Array<{
+    name: string;
+    path: string;
+    last_activity: string | null;
+    prompt_count: number;
+  }>;
+}
+
+const emptyWindow = (months: number, cutoff: string): RecentProjectWindow => ({
+  window_months: months,
+  cutoff,
+  candidate_count: 0,
+  over_soft_limit: false,
+  candidates: [],
+});
+
+/** Projects active within a real rolling window (months back from now) — a genuine date
+ * filter, unlike scanClaudeHistory's fixed top-15-by-recency cap. A project with no
+ * history.jsonl activity at all is correctly excluded (treated as last-seen at epoch). */
+export function scanRecentProjectWindow(months: number): RecentProjectWindow {
+  const safeMonths = Number.isFinite(months) && months > 0 ? months : 3;
+  const cutoffMs = Date.now() - safeMonths * 30 * 86_400_000;
+  const cutoff = new Date(cutoffMs).toISOString();
+  try {
+    const { configPath, historyPath } = resolvePaths();
+    let projectsMap: Record<string, unknown>;
+    try {
+      const config = JSON.parse(readFileSync(configPath, "utf8"));
+      projectsMap = config?.projects ?? {};
+    } catch {
+      return emptyWindow(safeMonths, cutoff);
+    }
+
+    const activity = readActivity(historyPath);
+    const inWindow = Object.keys(projectsMap)
+      .filter((p) => !isNoisePath(p) && isDirectory(p))
+      .map((p) => ({ path: p, seen: activity.get(p) }))
+      .filter((p) => (p.seen?.last ?? 0) >= cutoffMs)
+      .sort((a, b) => (b.seen?.last ?? 0) - (a.seen?.last ?? 0));
+
+    return {
+      window_months: safeMonths,
+      cutoff,
+      candidate_count: inWindow.length,
+      over_soft_limit: inWindow.length > DEEP_SCAN_SOFT_LIMIT,
+      candidates: inWindow.slice(0, MAX_WINDOW_CANDIDATES_LISTED).map((p) => ({
+        name: basename(p.path),
+        path: p.path,
+        last_activity: p.seen?.last ? new Date(p.seen.last).toISOString() : null,
+        prompt_count: p.seen?.count ?? 0,
+      })),
+    };
+  } catch {
+    return emptyWindow(safeMonths, cutoff);
+  }
+}

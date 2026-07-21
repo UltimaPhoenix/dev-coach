@@ -8,7 +8,7 @@ import { dirname } from "node:path";
 import { McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
-import { scanClaudeHistory } from "../core/claude-history";
+import { scanClaudeHistory, scanRecentProjectWindow } from "../core/claude-history";
 import * as coach from "../core/coach";
 import * as db from "../core/db";
 import { detectStack, mergeStacks } from "../core/detect";
@@ -87,6 +87,21 @@ const settingsOutputShape = {
   ui_theme: UiThemeSchema,
   nudge_every: z.number().int(),
   nudge_scope: NudgeScopeSchema,
+};
+
+const deepScanOutputShape = {
+  window_months: z.number().int(),
+  cutoff: z.string(),
+  candidate_count: z.number().int(),
+  over_soft_limit: z.boolean(),
+  candidates: z.array(
+    z.object({
+      name: z.string(),
+      path: z.string(),
+      last_activity: z.string().nullable(),
+      prompt_count: z.number().int(),
+    }),
+  ),
 };
 
 // ── JSON resource helper ─────────────────────────────────────────────────────
@@ -646,23 +661,16 @@ export function createServer(): McpServer {
       description:
         "Save the user's initial knowledge profile and mark onboarding complete. Wipes any " +
         "default-seeded profile. topics: {topic_id: confidence_0_to_10}. groups: {group_name: [topic_id,...]} " +
-        "(topics not in any group go to 'Other'). Pass the personalized coaching notebook as " +
-        "`notebook`; it is saved to learning-state.md atomically with the profile. Returns the updated Profile.",
+        "(topics not in any group go to 'Other'). Ensures learning-state.md exists and is non-empty " +
+        "(a placeholder if needed) — there is no notebook argument here. Write the real personalized " +
+        "notebook yourself right after, directly to the path in devcoach://onboarding's notebook_path " +
+        "field. Returns the updated Profile.",
       inputSchema: {
         topics: z.record(z.string(), confidenceInputSchema).describe("{topic_id: confidence 0-10}"),
         groups: z
           .record(z.string(), z.array(z.string()))
           .optional()
           .describe("{group_name: [topic_id, ...]}"),
-        notebook: z
-          .string()
-          .optional()
-          .describe(
-            "Full personalized coaching notebook (markdown) saved verbatim to learning-state.md. " +
-              "Write real observations about THIS user — background, strengths, gaps, and how they " +
-              "work across ALL their projects (not just this one), per the template in the devcoach " +
-              "skill. If omitted, a minimal placeholder is written so the file is never empty.",
-          ),
       },
       outputSchema: profileOutputShape,
       annotations: {
@@ -690,17 +698,13 @@ export function createServer(): McpServer {
           }
           return coach.getProfile(c);
         });
-        // Save the coaching notebook now that onboarding is complete — never before,
-        // so an abandoned onboarding leaves no trace. Prefer the model's personalized
-        // markdown; fall back to a minimal placeholder so the file is never empty.
-        const notebook = args.notebook?.trim();
+        // Ensure the notebook file exists and is non-empty the INSTANT the profile is
+        // saved — same call, same guarantee as before (never a window where
+        // knowledge_ready is true but no notebook file exists at all). The skill
+        // overwrites this placeholder with the real personalized notebook right after,
+        // writing directly to LEARNING_STATE_PATH with its own file tools.
         mkdirSync(dirname(db.LEARNING_STATE_PATH), { recursive: true });
-        if (notebook) {
-          writeFileSync(
-            db.LEARNING_STATE_PATH,
-            notebook.endsWith("\n") ? notebook : `${notebook}\n`,
-          );
-        } else if (!existsSync(db.LEARNING_STATE_PATH)) {
+        if (!existsSync(db.LEARNING_STATE_PATH) || statSync(db.LEARNING_STATE_PATH).size === 0) {
           writeFileSync(db.LEARNING_STATE_PATH, "# devcoach — Coaching Notebook\n");
         }
         return structured(profile);
@@ -711,36 +715,39 @@ export function createServer(): McpServer {
   );
 
   server.registerTool(
-    "update_notebook",
+    "preview_deep_scan",
     {
-      title: "Update Coaching Notebook",
+      title: "Preview Deep Scan",
       description:
-        "Overwrite the coaching notebook (~/.devcoach/learning-state.md) with revised markdown. " +
-        "Use it after a lesson to fold in what the user absorbed or struggled with, new recurring " +
-        "patterns, and updated hypotheses — keeping the prior notes. Pass the full notebook content.",
+        "Cheap, metadata-only pre-check for 'Automatic (Deep)' onboarding. Counts and lists Claude " +
+        "Code projects whose last recorded activity falls within a rolling window (months back from " +
+        "now) — a real date window, not a fixed top-N. Reads no prompt/conversation text, only " +
+        "project paths and activity timestamps. Call this BEFORE spawning the deep-read subagent: " +
+        "over_soft_limit true means there are enough candidates that the user should be asked " +
+        "whether to narrow the window, proceed anyway, or pick specific projects.",
       inputSchema: {
-        notebook: z
-          .string()
+        months: z
+          .number()
+          .int()
           .min(1)
-          .describe("Full notebook markdown saved verbatim to learning-state.md (overwrites)."),
+          .max(24)
+          .default(3)
+          .describe("Rolling window size in months, counting back from now"),
       },
+      outputSchema: deepScanOutputShape,
       annotations: {
-        title: "Update Coaching Notebook",
+        title: "Preview Deep Scan",
+        readOnlyHint: true,
         destructiveHint: false,
         idempotentHint: true,
         openWorldHint: false,
       },
     },
-    async (args) => {
+    (args) => {
       try {
-        mkdirSync(dirname(db.LEARNING_STATE_PATH), { recursive: true });
-        writeFileSync(
-          db.LEARNING_STATE_PATH,
-          args.notebook.endsWith("\n") ? args.notebook : `${args.notebook}\n`,
-        );
-        return { content: [txt("notebook updated")] };
+        return structured({ ...scanRecentProjectWindow(args.months) });
       } catch (err) {
-        return errResult(`update_notebook failed: ${err}`);
+        return errResult(`preview_deep_scan failed: ${err}`);
       }
     },
   );
@@ -916,7 +923,7 @@ export function createServer(): McpServer {
             profile: coach.getProfile(c),
           };
         });
-        return jsonResource(uri, { ...data, notebook });
+        return jsonResource(uri, { ...data, notebook, notebook_path: db.LEARNING_STATE_PATH });
       } catch (err) {
         return jsonResource(uri, { error: String(err) });
       }
@@ -964,6 +971,7 @@ export function createServer(): McpServer {
           scanned_projects: scan.scanned_projects,
           default_topics: db.DEFAULT_PROFILE,
           context_ready: git.branch !== null,
+          notebook_path: db.LEARNING_STATE_PATH,
         });
       } catch (err) {
         return jsonResource(uri, { error: String(err) });

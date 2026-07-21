@@ -32,6 +32,14 @@ file and store them somewhere you trust. See [Backup, export & import](../usage/
 
 ## What devcoach reads
 
-During automatic onboarding devcoach reads project files locally (manifests, lockfiles) to suggest topics.
-Git metadata — project, repository, branch, commit — is auto-detected from your working directory and
-stored only in your local database, purely to give lessons useful context.
+During automatic onboarding devcoach reads project files locally (manifests, lockfiles) and Claude Code's
+own project/activity metadata (never the content of what you typed) to suggest topics. Git metadata —
+project, repository, branch, commit — is auto-detected from your working directory and stored only in
+your local database, purely to give lessons useful context.
+
+**Automatic (Deep) onboarding is the one explicit exception.** It's an opt-in tier you choose at setup
+time, clearly labeled as such — if you pick it, the coaching skill additionally reads real conversation
+text from your local Claude Code session history (`~/.claude/projects/`) to build a more accurate,
+personalized profile and notebook. This still never leaves your machine except as part of your own
+conversation with the model, same as anything else in that session. Standard Automatic and Guided
+onboarding never read this content — only Deep does, and only when you choose it.

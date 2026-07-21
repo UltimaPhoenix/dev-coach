@@ -12,21 +12,21 @@ Route by intent:
 review my profile / notebook      →  Review (below)
 rebuild / refresh my notebook     →  Rebuild notebook (below)
 new tech to track?                →  New tech check (below)
-redo onboarding / reset topics    →  references/onboarding.md, Steps 1–3 (confirm first — it wipes)
+redo onboarding / reset topics    →  references/onboarding.md, Steps 1–4 (confirm first — it wipes)
 ```
 
 ## Review
 
 1. Read `devcoach://briefing` — one silent read returns the profile, the taught
-   topics, and the notebook.
+   topics, the notebook, and its `notebook_path`.
 2. Walk the user through the profile **grouped, not topic-by-topic**: show each
    group with its topics and confidences, and ask what looks wrong. Apply
    changes as they come: `update_knowledge` (confidence), `add_topic` /
    `remove_topic` (membership).
 3. Then show the notebook section by section (Observations, Recurring patterns,
    Recommended focus, Open hypotheses). Ask what is stale or wrong. Fold the
-   edits into a revised full markdown and save it with ONE `update_notebook`
-   call at the end — never one call per edit.
+   edits into a revised full markdown and save it with ONE direct Write to
+   `notebook_path` (from step 1) at the end — never one write per edit.
 4. Close with the New tech check below.
 
 ## Rebuild notebook
@@ -35,15 +35,15 @@ Re-derive the notebook from real data; the knowledge map is untouched.
 
 1. Read `devcoach://onboarding` — `detected_projects` carries the history-wide
    evidence: per-project stacks, activity volume and recency, and auto-memory
-   excerpts. Read `devcoach://briefing` for the current notebook and profile,
-   and `get_lessons({period: "all"})` for feedback history (`dont_know` lessons
-   are open gaps).
-2. Compose a fresh notebook (structure in `references/onboarding.md`, Step 4):
-   cite real cross-project observations — project names, stacks, what recurs,
-   what the memories reveal about how the user works. Preserve prior notes that
-   are still true; drop the stale ones. Never quote prompt text — it is not in
-   the data, by design.
-3. Show the draft, adjust to taste, save with `update_notebook`.
+   excerpts (and its `notebook_path`). Read `devcoach://briefing` for the
+   current notebook and profile, and `get_lessons({period: "all"})` for
+   feedback history (`dont_know` lessons are open gaps).
+2. Compose a fresh notebook (structure in `references/onboarding.md`'s notebook
+   composition section): cite real cross-project observations — project
+   names, stacks, what recurs, what the memories reveal about how the user
+   works. Preserve prior notes that are still true; drop the stale ones. Never
+   quote prompt text — it is not in the data, by design.
+3. Show the draft, adjust to taste, save with a direct Write to `notebook_path`.
 
 ## New tech check (keep the profile curated)
 

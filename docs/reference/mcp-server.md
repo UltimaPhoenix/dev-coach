@@ -25,7 +25,7 @@ Windows `%APPDATA%\Claude\claude_desktop_config.json` · Linux `~/.config/Claude
 |---|---|---|
 | `log_lesson` | Save a delivered lesson (auto-fills git context; elicits inline feedback) | write |
 | `skip_lesson` | Decline a lesson cue with a one-line reason; re-arms the pacing counter | write |
-| `update_notebook` | Overwrite the coaching notebook (`learning-state.md`) with revised markdown | write |
+| `preview_deep_scan` | Metadata-only pre-check for Automatic (Deep) onboarding: count/list projects active in a rolling date window | read-only |
 | `update_knowledge` | Adjust a topic's confidence by a delta (clamped 0–10) | write |
 | `get_lessons` | Query lesson history (period, category, level, git, starred, feedback, search, date range) | read-only |
 | `star_lesson` | Star / unstar a lesson | write |
@@ -37,7 +37,7 @@ Windows `%APPDATA%\Claude\claude_desktop_config.json` · Linux `~/.config/Claude
 | `remove_group` | Delete a group (topics move to Other) | **destructive** |
 | `update_settings` | Set `max_per_day` (1–20) or `min_gap_minutes` (0–1440) | write |
 | `open_ui` | Launch the web dashboard in the background | open-world |
-| `complete_onboarding` | Save the initial profile (topics + groups) and mark onboarding done | **destructive** |
+| `complete_onboarding` | Save the initial profile (topics + groups) and mark onboarding done; guarantees a non-empty notebook placeholder (the model writes the real notebook directly, see [privacy.md](privacy.md)) | **destructive** |
 
 Each tool declares a `title` and read-only/destructive hints, validates input with Zod, returns typed
 `structuredContent` where applicable, and reports failures as `{ isError: true, … }` with a recovery hint.
@@ -49,7 +49,10 @@ Each tool declares a `title` and read-only/destructive hints, validates input wi
 `context` · `onboarding` · `lessons/{lesson_id}` (templated). All return `application/json` and never
 throw — on error they return `{ "error": … }`. **`briefing` is the pre-lesson read**: one call
 returns onboarding status, rate limit, taught topics, the knowledge profile, and the coaching
-notebook — the individual resources remain for the dashboard and targeted queries.
+notebook — the individual resources remain for the dashboard and targeted queries. Both `briefing`
+and `onboarding` also carry `notebook_path` — the resolved absolute path to `learning-state.md` —
+so the model can Read/Write/Edit the notebook file directly instead of round-tripping its full
+markdown through a tool call.
 
 ## Prompt
 
@@ -68,7 +71,7 @@ See [configuration.md](configuration.md) for the SQLite schema. The `Lesson` sha
 ```jsonc
 {
   "id": "uuid-or-random",
-  "timestamp": "2026-01-15T20:30:00Z",   // ISO 8601; normalized to UTC, clamped to now
+  // timestamp is not an argument — log_lesson always stamps the real current time server-side
   "topic_id": "typescript",
   "categories": ["typescript", "performance"],
   "title": "Promise.allSettled vs Promise.all",
