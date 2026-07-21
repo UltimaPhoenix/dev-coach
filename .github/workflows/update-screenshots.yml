@@ -16,7 +16,7 @@ jobs:
           # (the default GITHUB_TOKEN bot is blocked by the required CLA check). The
           # commit message already carries [skip ci], so this push doesn't re-trigger CI.
           token: ${{ secrets.RELEASE_TOKEN }}
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version-file: .node-version
           cache: npm
