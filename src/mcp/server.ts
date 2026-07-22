@@ -1,7 +1,8 @@
 // MCP server on the official @modelcontextprotocol/sdk.
 // 15 tools, 11 resources, and the devcoach_instructions prompt. Tools follow the build-mcp-server
 // review: title + hint annotations, tight Zod schemas with .describe(), outputSchema/structuredContent
-// for model returns, isError on failure, and an elicitation capability-check in log_lesson.
+// for model returns, isError on failure. log_lesson is a pure save (never elicits);
+// feedback arrives next turn via submit_feedback.
 import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
@@ -177,7 +178,7 @@ export function createServer(): McpServer {
         } catch {
           usage = {};
         }
-        let lesson: Lesson = parseLesson({
+        const lesson: Lesson = parseLesson({
           id: args.id,
           timestamp: new Date(),
           topic_id: args.topic_id,
@@ -204,38 +205,12 @@ export function createServer(): McpServer {
           db.resetNudge(c);
         });
 
-        // Inline feedback via elicitation — capability-gated, with a graceful no-op fallback.
-        try {
-          const caps = server.server.getClientCapabilities();
-          if (caps?.elicitation) {
-            const r = await server.server.elicitInput({
-              message: "Did that land?",
-              requestedSchema: {
-                type: "object",
-                properties: {
-                  feedback: {
-                    type: "string",
-                    title: "Did that land?",
-                    description: "know = got it · dont_know = need to revisit · skip = no feedback",
-                    enum: ["know", "dont_know", "skip"],
-                  },
-                },
-                required: [],
-              },
-            });
-            const fb =
-              r.action === "accept" ? (r.content?.feedback as string | undefined) : undefined;
-            if (fb && fb !== "skip") {
-              db.withConnection((c) => {
-                db.setFeedback(c, args.id, fb);
-                coach.applyKnowledgeDelta(c, args.topic_id, fb === "know" ? 1 : -1);
-              });
-              lesson = { ...lesson, feedback: fb as Feedback };
-            }
-          }
-        } catch {
-          // elicitation not supported by this client — lesson is already saved
-        }
+        // Deliberately NO elicitation here: the card-last flow means log_lesson runs
+        // BEFORE the card is visible, so an inline "Did that land?" dialog asked about
+        // a lesson the user had not seen yet (observed live in Claude Code) — and the
+        // null fallback then printed the text prompt too, asking twice. Feedback is
+        // collected under the card as a text line and recorded next turn via
+        // submit_feedback.
         // The card is chat output the server cannot verify, so the result carries a
         // conditional self-check instead of hook machinery: a model that skipped the
         // card prints it now; one that printed it stops. Never echo the rendered card

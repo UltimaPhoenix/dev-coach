@@ -223,7 +223,11 @@ describe("mcp server", () => {
     await server.close();
   });
 
-  it("log_lesson collects inline feedback via elicitation when the client supports it", async () => {
+  it("log_lesson never elicits, even when the client declares the capability", async () => {
+    // Regression: in the card-last flow log_lesson runs BEFORE the card is visible,
+    // so an inline "Did that land?" dialog asked about an unseen lesson (observed
+    // live in Claude Code). Feedback is the text line under the card + next-turn
+    // submit_feedback — the tool itself must stay a pure, silent save.
     const [ct, st] = InMemoryTransport.createLinkedPair();
     const server = createServer();
     await server.connect(st);
@@ -231,10 +235,8 @@ describe("mcp server", () => {
       { name: "t", version: "1.0.0" },
       { capabilities: { elicitation: {} } },
     );
-    client.setRequestHandler(ElicitRequestSchema, async () => ({
-      action: "accept",
-      content: { feedback: "know" },
-    }));
+    const elicit = vi.fn(async () => ({ action: "accept" as const, content: { feedback: "know" } }));
+    client.setRequestHandler(ElicitRequestSchema, elicit);
     await client.connect(ct);
     await client.callTool({ name: "complete_onboarding", arguments: { topics: { python: 4 } } });
 
@@ -244,13 +246,14 @@ describe("mcp server", () => {
         id: "e1",
         topic_id: "python",
         categories: ["python"],
-        title: "Elicited",
+        title: "Silent save",
         level: "mid",
         summary: "s",
         body: "b",
       },
     });
-    expect(log.structuredContent.feedback).toBe("know"); // feedback applied inline
+    expect(elicit).not.toHaveBeenCalled();
+    expect(log.structuredContent.feedback).toBeNull(); // saved without inline feedback
     await client.close();
     await server.close();
   });
@@ -377,33 +380,6 @@ describe("mcp server error paths", () => {
     expect(log.structuredContent.project).toBe("explicitP");
     expect(log.structuredContent.repository_platform).toBe("gitlab");
     expect(log.structuredContent.folder).toBe("/explicit");
-    await client.close();
-    await server.close();
-  });
-
-  it("log_lesson still saves when the user declines the feedback elicitation", async () => {
-    const [ct, st] = InMemoryTransport.createLinkedPair();
-    const server = createServer();
-    await server.connect(st);
-    const client = new Client(
-      { name: "t", version: "1.0.0" },
-      { capabilities: { elicitation: {} } },
-    );
-    client.setRequestHandler(ElicitRequestSchema, async () => ({ action: "decline" }));
-    await client.connect(ct);
-    const log: any = await client.callTool({
-      name: "log_lesson",
-      arguments: {
-        id: "d1",
-        topic_id: "python",
-        categories: ["python"],
-        title: "Declined",
-        level: "mid",
-        summary: "s",
-        body: "b",
-      },
-    });
-    expect(log.structuredContent.feedback).toBeNull(); // declined → no feedback applied, lesson saved
     await client.close();
     await server.close();
   });

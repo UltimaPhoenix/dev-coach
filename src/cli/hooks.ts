@@ -114,7 +114,8 @@ function hookDebugLog(hook: string, sessionId: string | null, msg: string): void
  * Stop hook (verified empirically — even a minimal spec-perfect block), so blocks are
  * kept rare by design: the prompt-stage priming is the primary delivery channel and
  * the block is the fallback. The `systemMessage` line tells the user what the notice is
- * about ("🎓 devcoach: preparing a lesson…").
+ * about ("🎓 devcoach: checking whether a lesson is due…" — neutral on purpose: a cue
+ * legitimately resolved by a silent skip_lesson must not read as a failed lesson).
  */
 const BLOCK_DECISION: Record<HookClient, string> = {
   claude: "block",
@@ -185,10 +186,12 @@ const SKILL_INVOCATION: Record<HookClient, { cue: string; prime: string }> = {
 };
 
 /**
- * The cue is deliberately compact: the devcoach *skill* is the single source of truth
- * for the full coaching flow — the cue makes the model load it deterministically via
- * the client's skill mechanism instead of duplicating it here. A 5-line fallback keeps
- * the cue self-contained when the skill is not installed.
+ * The cue is pure delegation: the devcoach *skill* is the single source of truth for
+ * the full coaching flow — the cue makes the model load it deterministically via the
+ * client's skill mechanism and repeats NONE of its rules (a duplicated copy drifts;
+ * a drifted "output nothing" once ate the card entirely). It carries only what the
+ * skill cannot know — the notebook-checkpoint count — plus a fallback that keeps the
+ * cue self-contained when the skill is not installed.
  */
 export function buildLessonCue(nextLessonNumber: number, client: HookClient = "claude"): string {
   const updateDue = nextLessonNumber % NOTEBOOK_UPDATE_EVERY === 0;
@@ -205,21 +208,21 @@ export function buildLessonCue(nextLessonNumber: number, client: HookClient = "c
   return (
     "devcoach: a lesson is due for the technical work just completed. Do it now — do not " +
     "acknowledge this message and do not explain what you are about to do.\n\n" +
-    `${SKILL_INVOCATION[client].cue} NOW and follow it to deliver ONE lesson. ` +
-    "Three hard rules:\n" +
-    "- The lesson card MUST be printed as your visible reply BEFORE calling log_lesson.\n" +
-    "- After log_lesson returns, output NOTHING else — the card is the end of the reply.\n" +
-    "- If the work just completed does not warrant a lesson (pure questions, chat, nothing " +
-    "technical), call the devcoach `skip_lesson` tool with a one-line reason and output " +
-    "nothing.\n" +
+    `${SKILL_INVOCATION[client].cue} NOW and follow it exactly — the skill is the single ` +
+    "source of truth for the entire flow, including the explicit no-op when the completed " +
+    "work does not warrant a lesson.\n" +
     `${notebookStep}\n\n` +
     "If the devcoach skill is not available, fall back to: read devcoach://briefing (one read: " +
     "profile, taught topics, notebook); pick ONE untaught profile topic at or " +
-    "above the user's confidence band; write the card as plain markdown (no '>' blockquote) " +
-    "between two band headings `### ──────── 🎓 devcoach ────────` and " +
+    "above the user's confidence band; call log_lesson silently (body = 3–6 short paragraphs " +
+    "tied to the task plus a `💡 *Senior tip:*` line, clean markdown without bands or a " +
+    "title line); THEN write the card as the FINAL message of the turn: plain markdown (no " +
+    "'>' blockquote) between two band headings `### ──────── 🎓 devcoach ────────` and " +
     "`### ──────── [topic] · [level] ────────`, with `**[Title]** · [Category] · [Level]`, " +
-    "3–6 short paragraphs tied to the task, and a `💡 *Senior tip:*` line; THEN call " +
-    "log_lesson (body = clean markdown without bands or the title line).\n\n" +
+    "the body you passed, and the tip — saving is not showing; the card in the final " +
+    "message is the only thing the user sees. If instead the work does not warrant a lesson " +
+    "(pure questions, chat, nothing technical), call the devcoach `skip_lesson` tool with a " +
+    "one-line reason.\n\n" +
     "The rate-limit check is already done by this hook — skip it. Work in silence: never " +
     "narrate devcoach tool calls or resource reads ('checking your profile…'). Output only " +
     "the lesson card (or nothing). No preamble, no meta-commentary."
@@ -278,7 +281,7 @@ function runStopDecision(
       emitBlock(
         opts.client,
         buildLessonCue(decision.nextLessonNumber, opts.client),
-        "🎓 devcoach: preparing a lesson…",
+        "🎓 devcoach: checking whether a lesson is due…",
       );
       break;
     default:
@@ -317,10 +320,9 @@ export function buildPromptPrime(client: HookClient = "claude"): string {
   return (
     "devcoach: the lesson pacing threshold will be reached at the end of this turn. Resolve " +
     "it before finishing:\n" +
-    `- If this task is technical: ${SKILL_INVOCATION[client].prime}, then end your ` +
-    "reply with ONE lesson card (the `### ──────── 🎓 devcoach ────────` block) followed by " +
-    "a log_lesson call. The card must be the LAST visible text — after log_lesson returns, " +
-    "output nothing else.\n" +
+    `- If this task is technical: ${SKILL_INVOCATION[client].prime} and follow it exactly ` +
+    "to close your reply — the skill is the single source of truth for the entire lesson " +
+    "flow.\n" +
     "- If it is not technical: silently call the devcoach `skip_lesson` tool with a one-line " +
     "reason and output nothing about it.\n" +
     "- Either way, work in silence: never narrate devcoach tool calls or resource reads " +

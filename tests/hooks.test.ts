@@ -86,7 +86,18 @@ describe("hooks in-process (runHook dispatcher + payload-injected entrypoints)",
     expect(cue.code).toBe(0);
     expect(JSON.parse(cue.out).decision).toBe("block");
     expect(JSON.parse(cue.out).reason).toContain("skip_lesson");
-    expect(JSON.parse(cue.out).systemMessage).toContain("preparing a lesson");
+    expect(JSON.parse(cue.out).systemMessage).toContain("checking whether a lesson is due");
+  });
+
+  it("the cue delegates to the skill instead of duplicating its rules", () => {
+    // The cue once repeated the skill's rules and the copy drifted ("output NOTHING
+    // else" with no recovery clause) — models obeyed the drifted copy and the card
+    // was saved but never printed. Only the skill-missing fallback may instruct.
+    const cue = capture(() => cmdStopHook(payload()));
+    const reason = JSON.parse(cue.out).reason;
+    expect(reason).toContain("single source of truth");
+    expect(reason).not.toContain("output NOTHING else");
+    expect(reason).not.toContain("Three hard rules");
   });
 
   it("gemini hooks emit Gemini's wire shapes (deny decision, BeforeAgent prime, no Skill tool)", () => {

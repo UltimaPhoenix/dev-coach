@@ -69,12 +69,20 @@ dev-coach/
 Every tool registers a `title` + read-only/destructive annotations, a tight Zod `inputSchema` with
 `.describe()` on each param, `outputSchema`/`structuredContent` for model-shaped returns
 (`Lesson`/`Profile`/`Settings`), and returns `{ isError: true, … }` with a recovery hint on failure.
-`log_lesson` elicits inline feedback (capability-gated on `getClientCapabilities()?.elicitation`)
-and resets the pacing counters. Its result deliberately does **not** echo the rendered card (the
-echo made the model re-print it after the tool-approval pause → double card); instead the
-`structuredContent` carries a `reply_check` self-check ("tool ARGUMENTS are invisible to the
-user") — it must live there because Claude Code surfaces structured output to the model and
-drops the plain-text content blocks. `skip_lesson` is the explicit no-op: it records
+`log_lesson` is a **pure save** — it never elicits — and resets the pacing counters. Inline
+elicitation was removed: in the card-last flow the tool runs before the card is visible, so the
+"Did that land?" dialog asked about an unseen lesson (observed live in Claude Code, which DOES
+declare the elicitation capability) and the `null` fallback then printed the text prompt too,
+asking twice. Feedback is the text line under the card, recorded next turn via `submit_feedback`. **Ordering is log_lesson-first, card-last**: the skill has the
+model call the tool silently and write the card as the FINAL message of the turn. Card-first was
+tried and empirically fails — every Claude harness teaches "text between tool calls may not be
+shown; the deliverable is the final message", so models refuse the mid-turn card, bury the lesson
+in the tool args, and end the turn with nothing visible (saved-but-never-shown). The result
+deliberately does **not** echo the rendered card (the echo made the model re-print it after the
+tool-approval pause → double card); instead the `structuredContent` carries a `reply_check`
+self-check ("tool ARGUMENTS are invisible to the user … write the card as the final text") — it
+must live there because Claude Code surfaces structured output to the model and drops the
+plain-text content blocks. `skip_lesson` is the explicit no-op: it records
 why no lesson was warranted and re-arms the pacing (clears `cue_state.pending`).
 `log_lesson`'s `timestamp` is not an argument — always server-stamped with the real current time
 (a model has no clock; `min_gap_minutes` depends on this being accurate). `complete_onboarding`
@@ -112,9 +120,13 @@ a tool call.
 user-invocable slash commands, **not** auto-injected — so coaching is driven by the hooks:
 
 - **`stop-hook`** (Stop, one spawn per stop): onboarding check + cue engine. When a lesson is due
-  it emits `{decision:"block", reason, systemMessage}` — the reason is a compact directive that
-  **invokes the devcoach skill via the Skill tool** (SKILL.md owns the full flow; a 5-line fallback
-  covers missing skills) and offers `skip_lesson` as the explicit no-op.
+  it emits `{decision:"block", reason, systemMessage}` — the reason is a pure-delegation directive
+  that **invokes the devcoach skill via the Skill tool** and repeats NONE of its rules (a duplicated
+  copy once drifted to a flat "output NOTHING else" with no recovery clause — the card got saved but
+  never printed; a test locks the cue rule-free). It carries only the notebook-checkpoint count, the
+  5-line fallback for missing skills (the sole place allowed to instruct), and `skip_lesson` as the
+  explicit no-op. The `systemMessage` toast is neutral ("checking whether a lesson is due…") so a
+  silent skip doesn't read as a failed lesson.
 - **`prompt-hook`** (UserPromptSubmit): read-only peek (`explainCue`, never bumps); when this turn's
   stop would reach the threshold it primes the model via `hookSpecificOutput.additionalContext`.
 - `onboard-hook` / `lesson-ready` remain as the legacy two-entry layout; `devcoach install`

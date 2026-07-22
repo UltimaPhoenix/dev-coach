@@ -265,6 +265,9 @@ const s2 = claude("Ciao! Come stai oggi? Nessuna domanda tecnica, solo due chiac
 const bands2 = (s2.out.match(BAND) ?? []).length;
 check("no lesson row was logged", lessonCount() === before2, `delta ${lessonCount() - before2}`);
 check("no lesson card in the reply", bands2 === 0, `bands: ${bands2}`);
+// A declined cue must be fully silent — the feedback prompt belongs only under a
+// delivered card (observed regression: a stray line after skip_lesson).
+check("no stray feedback line after the skip", !/Did that land/.test(s2.out));
 const skipReason = cueState().last_skip_reason;
 check(
   "the model declined explicitly via skip_lesson",
