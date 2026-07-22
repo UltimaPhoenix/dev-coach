@@ -16,7 +16,6 @@ import { detectStack, mergeStacks } from "../core/detect";
 import { detectGitContext } from "../core/git";
 import {
   confidenceInputSchema,
-  type Feedback,
   FeedbackSchema,
   type Lesson,
   LevelSchema,
