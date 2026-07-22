@@ -235,7 +235,10 @@ describe("mcp server", () => {
       { name: "t", version: "1.0.0" },
       { capabilities: { elicitation: {} } },
     );
-    const elicit = vi.fn(async () => ({ action: "accept" as const, content: { feedback: "know" } }));
+    const elicit = vi.fn(async () => ({
+      action: "accept" as const,
+      content: { feedback: "know" },
+    }));
     client.setRequestHandler(ElicitRequestSchema, elicit);
     await client.connect(ct);
     await client.callTool({ name: "complete_onboarding", arguments: { topics: { python: 4 } } });
