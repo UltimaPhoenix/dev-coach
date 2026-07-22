@@ -148,12 +148,15 @@ turn**: both bands, the title line, the same prose you passed as `body`, the tip
 final message is the only place the user ever sees the lesson.
 
 `log_lesson` never asks the user anything — it only saves. Feedback is collected as
-text under the card: append the prompt "Did that land? ✅ know · ❌ don't know ·
-⏭ skip" DIRECTLY BENEATH the card's closing band — it is the only line allowed after
-the card, and it may never appear without the card right above it. When the user
-answers in a later turn, call `submit_feedback(id, value)` — but only when confidence
-is below the lesson's band for "know" (within/above band → already calibrated, skip
-the call). Never call `update_knowledge` on top of feedback.
+text under the card: append the prompt "Did that land? ✅ know (y) · ❌ don't know
+(n) · ⏭ skip" DIRECTLY BENEATH the card's closing band — it is the only line allowed
+after the card, and it may never appear without the card right above it. Read the
+user's next message loosely: `y` / `yes` / ✅ → know · `n` / `no` / ❌ →
+dont_know · an explicit "skip"/⏭ — or any reply that simply moves on to something
+else — → no feedback, drop the question silently. On know/dont_know call
+`submit_feedback(id, value)` — but only when confidence is below the lesson's band
+for "know" (within/above band → already calibrated, skip the call). Never call
+`update_knowledge` on top of feedback.
 
 **Starring:** after feedback, if it was `dont_know` on a mid/senior lesson, or
 `get_lessons({search: topic_id})` shows 2+ lessons on the topic, offer *"Want to save
