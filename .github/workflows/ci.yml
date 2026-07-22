@@ -158,7 +158,9 @@ jobs:
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add package.json package-lock.json mcpb/manifest.json \
-            plugin/.claude-plugin/plugin.json plugin/skills/devcoach/SKILL.md plugin/package.json
+            plugin/.claude-plugin/plugin.json plugin/skills/devcoach/SKILL.md plugin/package.json \
+            gemini-extension/gemini-extension.json gemini-extension/package.json \
+            gemini-extension/skills/devcoach/SKILL.md
           # [skip ci] so neither the main push nor the tag push (both made with a real
           # PAT identity, which DOES re-trigger workflows) starts a second run that would
           # double-publish. Publish/release still run in THIS workflow_dispatch run via needs.bump.
