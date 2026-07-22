@@ -1,4 +1,4 @@
-name: ci
+name: CI
 
 # Label each run so builds are identifiable at a glance (ported from the old Python pipeline):
 #   • workflow_dispatch → "CI — New release (<version|bump>)"
