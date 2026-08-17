@@ -149,11 +149,11 @@ final message is the only place the user ever sees the lesson.
 
 `log_lesson` never asks the user anything — it only saves. Feedback is collected as
 text under the card: append the prompt "Did that land? ✅ know (y) · ❌ don't know
-(n) · ⏭ skip" DIRECTLY BENEATH the card's closing band — it is the only line allowed
-after the card, and it may never appear without the card right above it. Read the
-user's next message loosely: `y` / `yes` / ✅ → know · `n` / `no` / ❌ →
-dont_know · an explicit "skip"/⏭ — or any reply that simply moves on to something
-else — → no feedback, drop the question silently. On know/dont_know call
+(n)" DIRECTLY BENEATH the card's closing band — it is the only line allowed after
+the card, and it may never appear without the card right above it. Read the user's
+next message loosely: `y` / `yes` / ✅ → know · `n` / `no` / ❌ → dont_know ·
+anything else — including no reply at all, the user just moving on — → no
+feedback, drop the question silently. On know/dont_know call
 `submit_feedback(id, value)` — but only when confidence is below the lesson's band
 for "know" (within/above band → already calibrated, skip the call). Never call
 `update_knowledge` on top of feedback.
