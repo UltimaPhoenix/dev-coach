@@ -4,6 +4,12 @@ export default defineConfig({
   test: {
     include: ["tests/**/*.test.ts"],
     setupFiles: ["tests/setup.ts"],
+    // The suite writes to real SQLite files (autocommit → one fsync per statement) and spawns
+    // real hook processes; on a slow shared CI runner the whole suite ran 4-5× slower than usual
+    // and an ordinary DB test (~120 writes, 24 ms locally) hit the 5 s default (6.3 s, release run
+    // 32907800503 on Node 26) while seven others sat at 2.3-3 s. 30 s matches the explicit
+    // per-test timeouts already used by tests/hooks-spawn.test.ts.
+    testTimeout: 30_000,
     coverage: {
       provider: "v8",
       reporter: ["text", "lcov"], // lcov → coverage/lcov.info for SonarQube Cloud
