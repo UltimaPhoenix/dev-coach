@@ -1,7 +1,0 @@
-# Temporary stub — the project is Node-only (uv.lock removed in 3c5ce18).
-# Re-added with zero packages so GitHub's dependency graph flushes its stale
-# snapshot (it kept raising Dependabot alerts on the deleted lockfile);
-# removed again in the following commit.
-version = 1
-revision = 3
-requires-python = ">=3.12"
