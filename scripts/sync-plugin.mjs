@@ -5,6 +5,7 @@
 //   • gemini-extension/gemini-extension.json  version  ←  package.json version
 //   • gemini-extension/skills/devcoach/  ←  assets/SKILL.md + assets/references/
 //   • both package.json pins             ←  package.json version
+//   • server.json (MCP Registry) versions ←  package.json version
 // Idempotent: writing the same content twice is a no-op. Run it in the bump job and before packing.
 //   node scripts/sync-plugin.mjs
 import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -50,6 +51,13 @@ const extPkgPath = join(root, "gemini-extension", "package.json");
 const extPkg = readFileSync(extPkgPath, "utf8");
 writeFileSync(extPkgPath, extPkg.replace(/"devcoach": "[^"]+"/, `"devcoach": "${version}"`));
 
+// 5. Pin the MCP Registry manifest (server.json) to this release: the top-level `version` and every
+//    `packages[].version` (the registry validates them against the npm tarball). The `mcp-registry`
+//    CI job refuses to publish when this drifts from the released version.
+const serverJsonPath = join(root, "server.json");
+const serverJson = readFileSync(serverJsonPath, "utf8");
+writeFileSync(serverJsonPath, serverJson.replace(/"version": "[^"]+"/g, `"version": "${version}"`));
+
 console.log(
-  `synced plugin + gemini-extension → version ${version}, SKILL.md copied, devcoach pinned`,
+  `synced plugin + gemini-extension + server.json → version ${version}, SKILL.md copied, devcoach pinned`,
 );

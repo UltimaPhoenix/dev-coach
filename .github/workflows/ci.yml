@@ -157,7 +157,7 @@ jobs:
           node scripts/sync-plugin.mjs
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add package.json package-lock.json mcpb/manifest.json \
+          git add package.json package-lock.json mcpb/manifest.json server.json \
             plugin/.claude-plugin/plugin.json plugin/skills/devcoach/SKILL.md plugin/package.json \
             gemini-extension/gemini-extension.json gemini-extension/package.json \
             gemini-extension/skills/devcoach/SKILL.md
@@ -342,3 +342,41 @@ jobs:
           git add .claude-plugin/marketplace.json
           git diff --staged --quiet || git commit -m "devcoach ${VERSION}"
           git push
+
+  # ── Publish server.json to the official MCP Registry (GitHub OIDC, tokenless) ──
+  # Ownership is proven two ways: the OIDC token binds the run to this repo (namespace
+  # io.github.UltimaPhoenix), and the registry reads `mcpName` from the freshly published npm
+  # tarball. scripts/sync-plugin.mjs pins server.json's versions in the bump commit.
+  mcp-registry:
+    needs: [publish, bump]
+    if: ${{ always() && needs.publish.result == 'success' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # mcp-publisher login github-oidc
+    environment:
+      name: mcp-registry
+      url: https://registry.modelcontextprotocol.io/v0/servers?search=io.github.UltimaPhoenix/devcoach
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.bump.outputs.tag || github.ref }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+      - name: Install mcp-publisher
+        run: |
+          set -euo pipefail
+          curl -fsSL "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
+      - name: Publish devcoach to the MCP Registry
+        run: |
+          set -euo pipefail
+          VERSION="${{ needs.bump.outputs.version || github.ref_name }}"
+          VERSION="${VERSION#v}"
+          # Guard: the committed manifest must be the released version (sync-plugin.mjs pins it in the bump commit).
+          [ "$(node -p 'require("./server.json").version')" = "$VERSION" ] \
+            || { echo "::error::server.json version != ${VERSION} — run 'npm run plugin:sync' and commit."; exit 1; }
+          # The registry validates mcpName from the npm tarball; npm may take a moment to serve a fresh version.
+          for _ in $(seq 1 12); do npm view "devcoach@${VERSION}" mcpName >/dev/null 2>&1 && break || sleep 15; done
+          ./mcp-publisher login github-oidc
+          ./mcp-publisher publish

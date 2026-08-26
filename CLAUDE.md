@@ -223,4 +223,8 @@ Tag `v*` → CI (`.github/workflows/ci.yml`) lints, type-checks, tests on Node 2
 `npm publish --provenance` (OIDC, tokenless). A Node `.mcpb` for Claude Desktop is built via
 `npm run mcpb` (`scripts/build-mcpb.mjs` + `mcpb/manifest.json` + `icon.png`); `npm run mcpb:sign`
 self-signs it. On a `v*` tag, CI builds, signs (with the `MCPB_CERT`/`MCPB_KEY` secrets if present,
-else self-signed), and attaches the `.mcpb` to the GitHub Release.
+else self-signed), and attaches the `.mcpb` to the GitHub Release. The release run also publishes
+`server.json` (root) to the official MCP Registry via `mcp-publisher login github-oidc` (job
+`mcp-registry`, tokenless — ownership = repo OIDC + `mcpName` in the npm tarball);
+`scripts/sync-plugin.mjs` pins `server.json`'s versions in the bump commit and
+`tests/mcp-registry.test.ts` fails on drift, like the plugin/gemini-extension pins.
