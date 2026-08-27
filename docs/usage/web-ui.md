@@ -21,8 +21,9 @@ npx -y devcoach ui              # http://localhost:7860
 npx -y devcoach ui --port 8080  # custom port
 ```
 
-Installed devcoach globally or via Homebrew? Drop the `npx -y` and just run `devcoach ui`. Or let Claude
-open it for you via the MCP tool:
+Installed devcoach globally or via Homebrew? Drop the `npx -y` and just run `devcoach ui`. The dashboard
+binds to `127.0.0.1` only, so it is never reachable from other machines. Or let Claude open it for you
+via the MCP tool:
 
 ```
 open_ui({ port: 7860 })
@@ -31,6 +32,8 @@ open_ui({ port: 7860 })
 ---
 
 ## Pages
+
+The top nav has **Profile** (`/`), **Lessons**, and **Settings**, plus a light/dark theme toggle.
 
 ### Knowledge map (`/`)
 
@@ -53,7 +56,7 @@ Changes save immediately as you edit.
 
 **View mode**: topic names are clickable links that filter the lessons page to show only lessons for that topic.
 
-**Stats bar** (top of page): total lessons, today's count vs. daily limit, this week's count, and current rate-limit status.
+**Stats bar** (top of page): `N lessons total · N / max today · N this week`, then whether a lesson is available now — or why not.
 
 <ThemedShot
   alt="Knowledge map"
@@ -68,23 +71,28 @@ Changes save immediately as you edit.
 Filterable, sortable table of all delivered lessons.
 
 **Filters:**
-- Period (today / week / month / year / all)
-- Category tag
-- Difficulty level
-- Project / repository / branch / commit hash
+- Period — All time / Today / Last 7 days / Last 30 days / Last year / Custom range (the date range
+  accepts an optional time: `2026-04-25T14:30`)
+- Feedback — All feedback / ✓ Known / ✗ Don't know / — No response
+- Level — All levels / 🟢 Junior / 🟡 Mid / 🔴 Senior
+- Filters popover — Category / Project / Repository / Branch / Commit
 - Starred only
-- Feedback (know / dont_know / none)
 - Free-text search
-- Date range (supports optional time: `2026-04-25T14:30`)
 
-**Sort:** by timestamp, level, topic, title, or feedback. Ascending or descending.
+Active filters show as chips above the table; when nothing matches you get "No lessons match the
+current filters."
+
+**Sort:** click the Date, Topic, Title, Level or Feedback column header. Ascending or descending.
+
+**Table columns:** ★, Date, Topic, Title, Level, Categories, Feedback — the feedback cell shows
+`✓ Known` / `✗ Unknown` (or nothing yet).
 
 **Pagination:** 25 per page.
 
-**Actions per lesson:**
+**Actions per row:**
 - `★` — toggle starred
-- Feedback buttons (✓ / ✗ / clear) — record comprehension, adjusts knowledge confidence
-- Lesson ID link — opens the detail page
+- Click a level pill or category chip — filter the table by it
+- Click anywhere else on the row — open the detail page (feedback is recorded there)
 
 <ThemedShot
   alt="Lessons"
@@ -98,18 +106,22 @@ Filterable, sortable table of all delivered lessons.
 
 Full lesson content laid out in reading order:
 
-- **Title row** — star toggle, title, level badge (junior / mid / senior)
-- **Metadata row** — relative date with tooltip, topic ID, category tags, feedback badge + clear button
+- **Title row** — `← Back to lessons`, star toggle, title, level pill (Junior / Mid / Senior)
+- **Metadata row** — relative date with tooltip, topic ID, category chips, feedback badge + Clear
 - **TL;DR callout** — one-sentence summary in a highlighted indigo box, always visible above the body
 - **Lesson body** — full markdown content with syntax-highlighted code blocks
-- **Task context** — the coding task that triggered the lesson (when available)
-- **Git metadata** — clickable context links to jump back to where the lesson came from:
-  - **Project** — the folder name where you were working
-  - **Repository** — clickable link with platform icon (GitHub, GitLab, Bitbucket, or local). Click to open the remote repository in your browser or view local details
-  - **Branch** — the git branch you were on when the lesson was taught
-  - **Commit hash** — the exact commit (clickable to view on GitHub/GitLab/Bitbucket or as a local hash)
-  - **Folder** — clickable `🔗 Open` link that opens the project folder in VS Code, so you can immediately review the code that triggered the lesson
-- **Feedback buttons** — ✓ I know this / ✗ I don't know this (hidden once feedback is recorded)
+- **Task context** — a `Context:` line with the coding task that triggered the lesson (when available)
+- **Git metadata** — a row of lowercase labels, `project · repo · branch · commit · folder`, linking back
+  to where the lesson came from:
+  - **project** — the folder name where you were working
+  - **repo** — link with a platform icon (GitHub, GitLab, Bitbucket, or local). Click to open the remote
+    repository in your browser or view local details
+  - **branch** — the git branch you were on when the lesson was taught
+  - **commit** — the exact commit (clickable to view on GitHub/GitLab/Bitbucket or as a local hash)
+  - **folder** — a VS Code icon link that opens the project folder in VS Code, so you can immediately
+    review the code that triggered the lesson
+- **Feedback buttons** — `✓ I know this` / `✗ I don't know this` (hidden once feedback is recorded)
+- **ID line** — the full lesson ID, for `devcoach lesson <id>` and friends
 
 <Tabs>
   <TabItem value="docker" label="Docker layer caching (Junior)" default>
@@ -153,16 +165,29 @@ Full lesson content laid out in reading order:
 
 ### Settings (`/settings`)
 
-- **Max per day** — maximum lessons in a 24-hour window (1–20)
-- **Min gap** — minimum minutes between lessons (0–1440), input as hours + minutes
-- **Export lessons** — download all lessons as JSON
-- **Import lessons** — upload a previously exported JSON file
-- **Export backup** — download a full zip (settings + knowledge map + lessons + notebook)
-- **Import backup** — restore everything from a backup zip
+Three panels:
 
-**Export / import** here is the dashboard equivalent of the CLI's
+**Coaching** — the five settings, applied with *Save settings*:
+- **Max lessons per day** — maximum lessons in a 24-hour window (1–20; `max_per_day`)
+- **Minimum gap between lessons** — a dropdown: No cooldown, 15 minutes, 30 minutes, 1 hour,
+  1 hour 30 min, 2 hours, 3 hours, 4 hours, 6 hours, 8 hours, 12 hours, 24 hours (`min_gap_minutes`)
+- **Interactions between lessons** — how many interactions pass before a lesson is cued (0–1000;
+  0 = every turn; `nudge_every`)
+- **Count interactions** — *Per chat session* or *Globally* (`nudge_scope`)
+- **UI theme** — 🌓 System / ☀️ Light / 🌙 Dark (`ui_theme`)
+
+**Backup & Restore**:
+- **Download backup** — a full zip (settings + knowledge map + lessons + notebook)
+- **Restore backup** — restore everything from a backup zip
+- **Download lessons** — all lessons as JSON
+- **Import lessons** — upload a previously exported JSON file
+
+**Coaching Notebook** — a read-only view of `~/.devcoach/learning-state.md`, the notes devcoach keeps on
+how you learn, with a Preview / Source toggle, `↓ Download`, and *Open in VS Code*.
+
+**Backup & Restore** is the dashboard equivalent of the CLI's
 [`devcoach backup` / `restore`](./cli.md#backup-export--import) — use it to move your profile to another
-machine or take a snapshot before a big change. (The smaller *Export/Import lessons* buttons handle just
+machine or take a snapshot before a big change. (The smaller *Download/Import lessons* buttons handle just
 the lesson history as JSON.)
 
 <ThemedShot
@@ -170,8 +195,6 @@ the lesson history as JSON.)
   light={require("../screenshots/settings-light.png").default}
   dark={require("../screenshots/settings-dark.png").default}
 />
-
----
 
 ---
 

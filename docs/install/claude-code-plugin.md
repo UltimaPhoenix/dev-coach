@@ -1,3 +1,10 @@
+---
+title: Claude Code plugin
+sidebar_label: Claude Code plugin (Beta)
+description: Install devcoach in Claude Code as a plugin — MCP server, Stop/UserPromptSubmit coaching hooks, and the coaching skill in one click from the marketplace.
+keywords: [devcoach claude code plugin, claude code marketplace, claude code mcp server, claude code hooks, claude code skills]
+---
+
 # Claude Code plugin
 
 :::warning Beta
@@ -86,9 +93,10 @@ skip straight to `node` — and it only re-installs when a plugin update bumps t
 1. **`.mcp.json`** → Claude Code launches the MCP server as a local stdio process
    (`node ${CLAUDE_PLUGIN_ROOT}/scripts/launch.mjs mcp`). It opens `~/.devcoach/coaching.db` (SQLite),
    derived from your home directory.
-2. **`hooks/hooks.json`** → after every turn, Claude Code runs the two `Stop` hooks through the same
-   launcher. They read the same database and either stay silent or nudge the agent to run onboarding /
-   deliver a lesson. This is what makes coaching automatic — and with no `npx` per fire, it's snappy.
+2. **`hooks/hooks.json`** → Claude Code runs the `Stop` hook after every turn and the
+   `UserPromptSubmit` hook on every prompt, both through the same launcher. They read the same
+   database and either stay silent or nudge the agent to run onboarding / deliver a lesson. This is
+   what makes coaching automatic — and with no `npx` per fire, it's snappy.
 3. **`skills/devcoach/SKILL.md`** → the coaching playbook, auto-loaded so the agent knows *how* to
    teach when a hook fires.
 

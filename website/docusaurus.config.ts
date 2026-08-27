@@ -8,7 +8,7 @@ import { themes as prismThemes } from "prism-react-renderer";
 
 const SITE_URL = "https://ultimaphoenix.github.io/dev-coach/";
 const DESCRIPTION =
-  "devcoach is a free, local, open-source MCP server that turns every task your AI agent finishes into one short, in-context lesson — progressive technical coaching for Claude Code, Cursor, and other MCP tools.";
+  "devcoach is a free, local, open-source MCP server that turns every task your AI agent finishes into one short, in-context lesson — progressive technical coaching for Claude Code, Claude Desktop, Gemini CLI, Codex CLI, Cursor, and other MCP tools.";
 
 // Inline plugin (zero-dep): emit /llms-full.txt — the entire docs corpus concatenated into one
 // file for LLM / answer-engine retrieval. It is the companion to the curated static /llms.txt.
@@ -72,7 +72,7 @@ function llmsFullTxtPlugin() {
 
 const config: Config = {
   title: "devcoach",
-  tagline: "Progressive technical coaching, directly in your AI agent",
+  tagline: "Progressive technical coaching, right inside your AI agent",
   favicon: "img/favicon.svg",
 
   future: { v4: true },
@@ -130,14 +130,15 @@ const config: Config = {
             url: SITE_URL,
             applicationCategory: "DeveloperApplication",
             operatingSystem: "macOS, Linux, Windows",
-            softwareRequirements: "Node.js >= 24; an MCP-compatible AI agent (Claude Code, Claude Desktop, Cursor, …)",
+            softwareRequirements:
+              "Node.js >= 24; an MCP-compatible AI agent (Claude Code, Claude Desktop, Gemini CLI, Codex CLI, Cursor, …)",
             downloadUrl: "https://www.npmjs.com/package/devcoach",
             license: "https://www.gnu.org/licenses/agpl-3.0.html",
             isAccessibleForFree: true,
             offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
             author: { "@type": "Person", name: "UltimaPhoenix", url: "https://github.com/UltimaPhoenix" },
             keywords:
-              "MCP server, Model Context Protocol, AI coding coach, Claude Code, Cursor, learn while coding, developer skill retention, technical coaching, local-first",
+              "MCP server, Model Context Protocol, AI coding coach, Claude Code, Claude Desktop, Gemini CLI, Codex CLI, Cursor, learn while coding, developer skill retention, technical coaching, local-first",
             sameAs: ["https://github.com/UltimaPhoenix/dev-coach", "https://www.npmjs.com/package/devcoach"],
           },
           {
@@ -161,15 +162,11 @@ const config: Config = {
     image: "img/og-card.jpg",
     // Extra <meta> for search engines and social cards; Docusaurus dedupes against page frontmatter.
     metadata: [
-      {
-        name: "description",
-        content:
-          "devcoach is a free, local, open-source MCP server that turns every task your AI agent finishes into one short, in-context lesson — progressive technical coaching for Claude Code, Cursor, and other MCP tools.",
-      },
+      { name: "description", content: DESCRIPTION },
       {
         name: "keywords",
         content:
-          "devcoach, MCP server, Model Context Protocol, AI coding coach, Claude Code, Cursor, learn while coding, developer skill retention, technical coaching, AI pair programming, code learning tool",
+          "devcoach, MCP server, Model Context Protocol, AI coding coach, Claude Code, Claude Desktop, Gemini CLI, Codex CLI, Cursor, learn while coding, developer skill retention, technical coaching, AI pair programming, code learning tool",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -211,7 +208,7 @@ const config: Config = {
     prism: {
       theme: prismThemes.github,
       darkTheme: prismThemes.dracula,
-      additionalLanguages: ["bash", "json"],
+      additionalLanguages: ["bash", "json", "sql"],
     },
   } satisfies Preset.ThemeConfig,
 };

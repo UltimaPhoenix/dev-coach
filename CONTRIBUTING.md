@@ -2,6 +2,9 @@
 
 ## Quick start
 
+Requires **Node.js ≥ 24** (devcoach uses the embedded `node:sqlite`); `.node-version` pins 26, which
+is what CI tests alongside 24.
+
 ```bash
 git clone https://github.com/UltimaPhoenix/dev-coach && cd dev-coach
 npm install
@@ -14,7 +17,7 @@ npm run dev -- ui    # run the web dashboard from source
 ```bash
 npm run lint         # Biome check (auto-fix: npm run format)
 npm run typecheck    # TypeScript
-npm run test:cov     # Vitest — coverage must stay ≥ 80% lines
+npm run test:cov     # Vitest — coverage thresholds: 92% lines, 95% functions, 91% statements, 76% branches
 ```
 
 All three must pass before opening a PR.
@@ -25,10 +28,13 @@ See [CLAUDE.md](CLAUDE.md) for the full project structure, stack, and convention
 
 - `core/` must never import from `mcp/`, `cli/`, or `web/`
 - Every DB access must be wrapped in try/catch — never crash the MCP server
-- Paths always derived from `os.homedir()/.devcoach`, never hardcoded
+- Paths always derived from `os.homedir()/.devcoach`, never hardcoded — the only overrides are the
+  `DEVCOACH_DIR` env var (sandboxing) and `DEVCOACH_CLAUDE_DIR`/`CLAUDE_CONFIG_DIR` (where the
+  onboarding scan looks for Claude Code's history)
 - `assets/` is the tracked source of truth (SKILL.md + web static) — edit there, not in `dist/`.
   `plugin/skills/` and `gemini-extension/skills/` are synced mirrors: never edit them directly,
-  run `npm run plugin:sync` (tests assert byte-identity with `assets/`)
+  run `npm run plugin:sync` (tests assert byte-identity with `assets/`; it also pins the
+  plugin, Gemini-extension and `server.json` versions to `package.json`)
 
 ## Submitting a PR
 
@@ -61,8 +67,8 @@ npx @modelcontextprotocol/inspector node dist/bin.js mcp
 ## Sandbox mode (keeps your real `~/.devcoach` safe)
 
 ```bash
-HOME=$(mktemp -d) node dist/bin.js stats
-HOME=$(mktemp -d) npm run dev -- mcp
+DEVCOACH_DIR=$(mktemp -d) node dist/bin.js stats   # relocates coaching.db + the notebook + hook.log
+HOME=$(mktemp -d) npm run dev -- mcp               # or sandbox the whole home dir
 ```
 
 ## Building the Claude Desktop extension

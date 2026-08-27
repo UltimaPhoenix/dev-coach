@@ -6,8 +6,8 @@ sidebar_label: npx / npm CLI
 # npx / npm CLI (any MCP agent)
 
 No install required — `npx` runs devcoach on demand. For **Claude Code** and **Claude Desktop**, one
-command registers the MCP server, wires up automatic lesson delivery (Stop hooks), and installs the
-coaching **skill** into `~/.claude/skills/devcoach/`:
+command registers the MCP server, wires up automatic lesson delivery (the Stop and UserPromptSubmit
+hooks), and installs the coaching **skill** into `~/.claude/skills/devcoach/`:
 
 ```bash
 npx -y devcoach install

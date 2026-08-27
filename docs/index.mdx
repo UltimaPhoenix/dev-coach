@@ -1,7 +1,7 @@
 ---
 title: devcoach
-description: Stay sharp while your AI does the work. devcoach is a free, local, open-source MCP server that delivers one short, in-context lesson after every task your AI agent completes — for Claude Code, Cursor, and other MCP tools.
-keywords: [devcoach, MCP server, AI coding coach, Claude Code, Cursor, Model Context Protocol, learn while coding, developer learning]
+description: Stay sharp while your AI does the work. devcoach is a free, local, open-source MCP server that delivers one short, in-context lesson after every task your AI agent completes — for Claude Code, Claude Desktop, Gemini CLI, Codex CLI, Cursor and other MCP tools.
+keywords: [devcoach, MCP server, AI coding coach, Claude Code, Claude Desktop, Gemini CLI, Codex CLI, Cursor, Model Context Protocol, learn while coding, developer learning]
 hide_table_of_contents: true
 ---
 
@@ -9,7 +9,7 @@ import ThemedShot from "@site/src/components/ThemedShot";
 
 # Stay sharp while your AI does the work.
 
-You're shipping more than ever and understanding less. devcoach fixes that with one lesson at a time, delivered right after your agent completes a task.
+You're shipping more than ever and understanding less. devcoach fixes that with one lesson at a time, delivered right after your agent completes a task — in Claude Code, Claude Desktop, Gemini CLI, Codex CLI, Cursor and other MCP tools.
 
 - **[Install in 30 seconds](./install)** — get started now
 - **[Why it matters](./why)** — read the philosophy
@@ -21,9 +21,8 @@ You're shipping more than ever and understanding less. devcoach fixes that with 
 You work on a task with your AI agent as usual. When it finishes, devcoach appends a lesson:
 
 ```markdown
-🎓 devcoach · TypeScript · Level: Mid
-
-<strong>Promise.allSettled vs Promise.all — don't let one failure sink the batch</strong>
+### ──────── 🎓 devcoach ────────
+**Promise.allSettled vs Promise.all — don't let one failure sink the batch** · TypeScript · Mid
 
 Promise.all rejects the moment any promise rejects, and you lose the results of
 the ones that already succeeded. For independent work (fan-out fetches, batch
@@ -37,7 +36,11 @@ Promise.allSettled always resolves, giving you a status for every promise:
 Use Promise.all when the tasks are genuinely all-or-nothing; reach for
 allSettled when partial success is meaningful and you want to report failures.
 
-Did that land?  ✅ know · ❌ don't know · ⏭ skip
+💡 *Senior tip:* for work that *should* cancel its siblings on failure, a shared
+AbortController gives you all-or-nothing with prompt cancellation.
+### ──────── typescript · mid ────────
+
+Did that land? ✅ know (y) · ❌ don't know (n)
 ```
 
 ---
@@ -73,7 +76,7 @@ Everything's local. No data leaves your machine. One SQLite file.
 
 ---
 
-## The three install methods
+## The main install methods
 
 - **[Homebrew](./install/homebrew)** — macOS/Linux. Get the CLI too.
 - **[Claude Code plugin](./install/claude-code-plugin)** — one-click, bundles everything.
@@ -126,7 +129,7 @@ Everything stays on your machine. No telemetry, no accounts, no calls home. Just
 ## Roadmap & community
 
 - **[Vision & roadmap](./vision)** — free, local, not commercialized; ideas we're exploring next
-- **[GitHub Discussions](https://github.com/UltimaPhoenix/dev-coach/discussions)** — feature requests, feedback, questions
+- **[GitHub Issues](https://github.com/UltimaPhoenix/dev-coach/issues)** — feature requests, feedback and questions: open an issue
 - **[Star on GitHub](https://github.com/UltimaPhoenix/dev-coach)** ⭐
 
 ---

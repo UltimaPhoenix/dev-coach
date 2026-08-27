@@ -25,8 +25,9 @@ brew install devcoach
 devcoach install
 ```
 
-`devcoach install` registers the MCP server, the automatic-coaching Stop hooks, and the coaching
-**skill** (`~/.claude/skills/devcoach/`) with Claude Code, plus the MCP server with Claude Desktop.
+`devcoach install` registers the MCP server, the automatic-coaching hooks (Stop + UserPromptSubmit),
+and the coaching **skill** (`~/.claude/skills/devcoach/`) with Claude Code, plus the MCP server with
+Claude Desktop.
 
 `brew tap` registers the third-party repository; `brew trust --tap` marks it trusted so Homebrew loads its
 formulae when `HOMEBREW_REQUIRE_TAP_TRUST` is set. Both are one-time. Update later with
@@ -34,7 +35,9 @@ formulae when `HOMEBREW_REQUIRE_TAP_TRUST` is set. Both are one-time. Update lat
 reminds you when it's out of date).
 
 Prefer a one-liner? `brew install UltimaPhoenix/tap/devcoach` taps and installs in one go — run
-`brew trust --tap UltimaPhoenix/tap` first if your Homebrew enforces tap trust. The formula declares
-`depends_on "node"`, so Homebrew pulls in a recent Node automatically.
+`brew trust --tap UltimaPhoenix/tap` first if your Homebrew enforces tap trust.
+
+devcoach requires **Node.js ≥ 24**; the formula depends on Homebrew's `node` (`depends_on "node"`), so
+`brew install` pulls in a current Node automatically — no separate Node setup needed.
 
 → Next: **[Coaching in your agent](../usage/coaching.md)**.

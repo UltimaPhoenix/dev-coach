@@ -19,18 +19,20 @@ devcoach --version
 ```
 
 > Prefix any command with `npx -y` if you haven't installed globally (`npm i -g devcoach`).
-> Mutating commands write to `~/.devcoach/coaching.db`; sandbox them with `HOME=$(mktemp -d) devcoach …`.
+> Mutating commands write to `~/.devcoach/coaching.db`; sandbox them with `DEVCOACH_DIR=$(mktemp -d) devcoach …`.
 
 ## Setup & integration
 
 | Command | Description |
 |---|---|
 | `devcoach mcp` | Start the MCP server (stdio) — used by your agent's MCP config |
-| `devcoach install [--claude-code] [--claude-desktop] [--force] [--skip-hook]` | Register the MCP server (user scope) + hooks + skill; repairs stale hook layouts |
+| `devcoach install [--claude-code] [--claude-desktop] [--gemini] [--codex] [--force] [--skip-hook]` | Register the MCP server (user scope) + hooks + skill for the chosen agents; repairs stale hook layouts |
 | `devcoach doctor` | Diagnose the Claude Code wiring and pacing state — explains why the next stop would or wouldn't cue a lesson |
-| `devcoach setup` | Interactive onboarding wizard (import a backup or build a profile) |
-| `devcoach ui [--port <n>]` | Launch the web dashboard (default port 7860) |
-| `devcoach stop-hook` / `prompt-hook` | Claude Code hooks: Stop (onboarding check + lesson cue) and UserPromptSubmit (priming). Exit 0 always; silent or a JSON directive on stdout. Set `DEVCOACH_HOOK_DEBUG=1` to trace decisions in `~/.devcoach/hook.log` |
+| `devcoach setup` | Interactive terminal onboarding wizard in four steps: backup path (or skip) → automatic or manual topics → optional groups → daily limit and minimum gap |
+| `devcoach ui [--port <n>]` | Launch the web dashboard (default port 7860; binds `127.0.0.1` only) |
+| `devcoach stop-hook` / `prompt-hook` | Claude Code hooks (hidden from `--help`): Stop (onboarding check + lesson cue) and UserPromptSubmit (priming). Exit 0 always; silent or a JSON directive on stdout. Trace decisions with `DEVCOACH_HOOK_DEBUG=1` |
+| `devcoach gemini-stop-hook` / `gemini-prompt-hook` | The same pair for Gemini CLI (beta), registered by `install --gemini` |
+| `devcoach codex-stop-hook` / `codex-prompt-hook` | The same pair for Codex (beta), registered by `install --codex` |
 | `devcoach onboard-hook` / `lesson-ready` | Legacy two-entry Stop hooks (still supported; `install` migrates to `stop-hook`) |
 
 ## Knowledge map
@@ -58,9 +60,11 @@ devcoach --version
 | Command | Description |
 |---|---|
 | `devcoach stats` | Lesson counts, rate-limit status, weakest/strongest topics |
-| `devcoach settings` | Show current settings |
+| `devcoach settings` | Show current settings — `max_per_day`, `min_gap_minutes`, `nudge_every`, `nudge_scope` |
 | `devcoach set max_per_day <n>` | Max lessons per 24h (1–20, default 2) |
 | `devcoach set min_gap_minutes <n>` | Minimum minutes between lessons (0–1440, default 240) |
+| `devcoach set nudge_every <n>` | Interactions between lesson cues (0–1000, default 10; 0 = every turn) |
+| `devcoach set nudge_scope <session\|global>` | Count interactions per chat session (default) or globally |
 
 ## Backup, export & import
 
@@ -83,6 +87,14 @@ On restore, your profile and full lesson history are merged in; you can also poi
 [onboarding wizard](./coaching.md#onboarding) at a backup. The same export/import is available in the
 [web dashboard's Settings page](./web-ui.md#settings-settings). For the zip's internal format, see
 [Configuration & data](../reference/configuration.md#backup-strategy).
+
+## Environment variables
+
+| Variable | Effect |
+|---|---|
+| `DEVCOACH_DIR` | Relocate the data directory (default `~/.devcoach`) — sandboxing, tests, a second profile |
+| `DEVCOACH_HOOK_DEBUG=1` | Trace every hook decision to `~/.devcoach/hook.log` |
+| `NO_COLOR` | Disable coloured terminal output |
 
 ## Examples
 

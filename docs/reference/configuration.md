@@ -1,8 +1,25 @@
 # Configuration
 
+## Settings
+
+devcoach has five settings, all stored in the `settings` table of the database:
+
+| Setting | Default | Range / values | Set via |
+|---------|---------|----------------|---------|
+| `max_per_day` | 2 | 1–20 | CLI · MCP tool · web UI |
+| `min_gap_minutes` | 240 | 0–1440 | CLI · MCP tool · web UI |
+| `nudge_every` | 10 | 0–1000 | CLI · MCP tool · web UI |
+| `nudge_scope` | `session` | `session` \| `global` | CLI · MCP tool · web UI |
+| `ui_theme` | `system` | `system` \| `light` \| `dark` | web UI only |
+
+`devcoach set <key> <value>` and the `update_settings` MCP tool accept the first four. `ui_theme` is
+the dashboard's colour scheme and is changed from the web UI's Settings page.
+
+---
+
 ## Rate limits
 
-devcoach has two rate-limit settings to prevent lesson overload:
+Two of the settings rate-limit lesson delivery to prevent overload:
 
 | Setting | Default | Range | Description |
 |---------|---------|-------|-------------|
@@ -32,7 +49,8 @@ Via MCP tool:
 { "key": "min_gap_minutes", "value": "120" }
 ```
 
-Via web UI: `devcoach ui` → Settings page.
+Via web UI: `devcoach ui` → Settings page. The dashboard binds to `127.0.0.1` only (never reachable
+from other machines) and takes a single option, `--port <n>` (default `7860`).
 
 ---
 
@@ -44,7 +62,7 @@ sessions may produce no lesson at all, by design.
 
 | Setting | Default | Values | Description |
 |---------|---------|--------|-------------|
-| `nudge_every` | 10 | 0–∞ | Interactions (agent stops) between lesson cues. `0` = cue on every eligible stop |
+| `nudge_every` | 10 | 0–1000 | Interactions (agent stops) between lesson cues. `0` = cue on every eligible stop |
 | `nudge_scope` | `session` | `session` \| `global` | Count interactions per chat session, or across all sessions |
 
 How the counter behaves:
@@ -57,8 +75,9 @@ How the counter behaves:
 - **An unresolved cue retries sooner**: if the agent neither logs a lesson (`log_lesson`)
   nor declines explicitly (`skip_lesson`), the next cue comes after
   `min(3, nudge_every)` further stops instead of the full threshold.
-- **The card is enforced**: the stop after `log_lesson` verifies the lesson card is
-  visible in the reply and reprints it once if it isn't.
+- **The card is the final message**: `log_lesson` is a pure save whose result carries a
+  `reply_check` self-check reminding the model that tool arguments are invisible to you. The
+  skill calls the tool silently first and writes the lesson card as the last text of the turn.
 
 `devcoach doctor` prints the live counters and explains whether the next stop would cue.
 
@@ -67,25 +86,39 @@ How the counter behaves:
 ## Data location
 
 ```
-~/.devcoach/coaching.db   — SQLite database
+~/.devcoach/coaching.db         — SQLite database
+~/.devcoach/learning-state.md   — coaching notebook (markdown)
+~/.devcoach/hook.log            — hook trace, only when DEVCOACH_HOOK_DEBUG=1 is set
 ```
 
 The database is created automatically on first run. All data is local — nothing is sent to any server.
 
 ---
 
+## Environment variables
+
+| Variable | Effect |
+|----------|--------|
+| `DEVCOACH_DIR` | Relocates the whole `~/.devcoach` directory (database, notebook, hook log). Meant for tests and sandboxing — e.g. `DEVCOACH_DIR=$(mktemp -d) devcoach stats` leaves your real data untouched |
+| `DEVCOACH_HOOK_DEBUG=1` | Traces every hook decision (cue / silent exit and its reason) to `~/.devcoach/hook.log`; the log is truncated once it passes 256 KB |
+| `DEVCOACH_CLAUDE_DIR` / `CLAUDE_CONFIG_DIR` | Relocate the Claude Code history that the onboarding stack scan reads (default `~/.claude`) |
+| `NO_COLOR` | Disables coloured CLI output |
+
+---
+
 ## Database schema (reference)
 
 ```sql
--- Delivered lessons
+-- Delivered lessons (17 columns)
 lessons (
   id                  TEXT PRIMARY KEY,
-  timestamp           TEXT NOT NULL,   -- ISO 8601 UTC
+  timestamp           TEXT NOT NULL,   -- ISO 8601 UTC, always stamped server-side
   topic_id            TEXT NOT NULL,
   categories          TEXT NOT NULL,   -- JSON array
   title               TEXT NOT NULL,
   level               TEXT NOT NULL,   -- junior | mid | senior
   summary             TEXT NOT NULL,
+  body                TEXT,            -- full lesson markdown (optional)
   task_context        TEXT,
   project             TEXT,
   repository          TEXT,
@@ -132,7 +165,7 @@ devcoach backup devcoach-before-reset.zip
 ```
 
 The backup zip contains four files:
-- `settings.json` — rate-limit settings
+- `settings.json` — all five settings
 - `knowledge.json` — topics, confidence scores, and group assignments
 - `lessons.json` — full lesson history
 - `learning-state.md` — the coaching notebook (when present)

@@ -8,9 +8,11 @@ keywords: [install devcoach, devcoach npx, devcoach homebrew, Claude Code plugin
 # Installation
 
 devcoach runs **locally** — a stdio MCP server that stores everything in `~/.devcoach/coaching.db` on the
-machine where your agent runs. It works in **Claude Code**, **Claude Desktop**, **Gemini CLI** *(beta)*, and
-**Codex CLI** *(beta)*, but **not** on claude.ai web (which only supports hosted/remote connectors — see
-[Privacy & security](../reference/privacy.md)). Requires **Node.js ≥ 24**.
+machine where your agent runs. It works in **Claude Code**, **Claude Desktop**, **Gemini CLI** *(beta)*,
+**Codex CLI** *(beta)*, and any other MCP client — including registry-aware ones, via the
+[MCP Registry](./other-agents.md#mcp-registry) — but **not** on claude.ai web (which only supports
+hosted/remote connectors — see [Privacy & security](../reference/privacy.md)); there you can paste the
+skill by hand. Requires **Node.js ≥ 24** (Windows is untested).
 
 ## Which method is right for you?
 
@@ -30,13 +32,14 @@ devcoach works the same whichever way you install it — pick by how you like to
 | Method | Best for | Terminal? | Status |
 |---|---|---|---|
 | **[Homebrew](./homebrew.md)** | **Developers on macOS / Linux who use the CLI** | Yes | Stable |
-| **[npx / npm CLI](./npx.md)** | Any MCP agent · Windows · npm workflows | Yes | Stable |
 | **[Claude Code plugin](./claude-code-plugin.md)** | **Non-expert Claude Code users — one-click setup** | No | Beta |
 | **[Claude Desktop (`.mcpb`)](./claude-desktop.md)** | **Non-expert Claude Desktop users — one-click setup** | No | Beta |
 | **[Gemini CLI](./gemini-cli.md)** | Google Gemini CLI — full loop (hooks + skill) | Yes | Beta |
 | **[Codex CLI](./codex.md)** | OpenAI Codex CLI — full loop (hooks + skill) | Yes | Beta |
+| **[npx / npm CLI](./npx.md)** | Any MCP agent · Windows · npm workflows | Yes | Stable |
 | **[Other MCP agents](./other-agents.md)** | Cursor, Windsurf, Cline, Continue, Zed | Yes | Beta |
-| **[claude.ai web](./claude-ai.md)** | claude.ai (skill-only, no MCP) | — | Beta |
+| **[MCP Registry](./other-agents.md#mcp-registry)** | Any registry-aware client — `io.github.UltimaPhoenix/devcoach` | Depends on the client | Beta |
+| **[claude.ai web](./claude-ai.md)** | claude.ai (manual skill paste, no MCP) | — | Skill only |
 
 Each page below is self-contained: it covers **install *and* connect**.
 

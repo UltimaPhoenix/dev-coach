@@ -32,14 +32,27 @@ file and store them somewhere you trust. See [Backup, export & import](../usage/
 
 ## What devcoach reads
 
-During automatic onboarding devcoach reads project files locally (manifests, lockfiles) and Claude Code's
-own project/activity metadata (never the content of what you typed) to suggest topics. Git metadata —
-project, repository, branch, commit — is auto-detected from your working directory and stored only in
-your local database, purely to give lessons useful context.
+During automatic onboarding devcoach reads a small set of **metadata** sources, locally and read-only,
+to suggest topics — never the content of what you typed:
+
+- the `~/.claude.json` projects map — project paths only;
+- each project's manifests and lockfiles, via a depth-limited directory walk;
+- `~/.claude/history.jsonl` — **only the `project` and `timestamp` fields** of each line, to rank
+  projects by recent activity; the prompt text on those lines is never read;
+- at most 1200 characters of each project's auto-memory `MEMORY.md`.
+
+Only the 15 most recently active projects are scanned, and any failure degrades to an empty scan.
+Git metadata — project, repository, branch, commit — is auto-detected from your working directory and
+stored only in your local database, purely to give lessons useful context. devcoach itself makes no
+network calls; the only subprocesses it runs are `git` (for that metadata) and, for the plugin /
+extension bootstrap, a one-time `npm install` of the pinned package.
 
 **Automatic (Deep) onboarding is the one explicit exception.** It's an opt-in tier you choose at setup
-time, clearly labeled as such — if you pick it, the coaching skill additionally reads real conversation
-text from your local Claude Code session history (`~/.claude/projects/`) to build a more accurate,
-personalized profile and notebook. This still never leaves your machine except as part of your own
-conversation with the model, same as anything else in that session. Standard Automatic and Guided
-onboarding never read this content — only Deep does, and only when you choose it.
+time, clearly labeled as such. If you pick it, the skill first calls `preview_deep_scan` — a
+metadata-only pre-check that lists which projects fall inside the chosen date window and lets you
+narrow it — and only then spawns a separate subagent that reads real conversation text from your local
+Claude Code session history (`~/.claude/projects/<project>/*.jsonl`, at most the 5 most recent
+sessions per project). That subagent returns only synthesized topics, groups, and notebook notes —
+the raw transcripts never enter your main conversation. Nothing leaves your machine except as part of
+your own conversation with the model, same as anything else in that session. Standard Automatic and
+Guided onboarding never read this content — only Deep does, and only when you choose it.

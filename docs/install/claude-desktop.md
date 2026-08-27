@@ -16,14 +16,30 @@ The simplest, no-terminal way to add devcoach to Claude Desktop — one click, r
 runtime.
 :::
 
-A single bundle that runs on Claude Desktop's built-in runtime — no Node or terminal required:
+Every GitHub release ships a prebuilt `devcoach-<version>.mcpb` — a single bundle that runs on Claude
+Desktop's built-in Node runtime, so no Node install or terminal is required:
+
+1. Download `devcoach-<version>.mcpb` from the
+   [latest release](https://github.com/UltimaPhoenix/dev-coach/releases/latest).
+2. In Claude Desktop open **Settings → Extensions → Install Extension…** and pick the downloaded file.
+
+That's it — the `devcoach` tools, resources, and the `devcoach_instructions` prompt are available in
+your next conversation, and the database is created at `~/.devcoach/coaching.db` on first use.
+
+:::note Unverified publisher
+The bundle is **self-signed**, so Claude Desktop shows it as coming from an *unverified publisher*. A
+verified signature needs a real code-signing certificate, which isn't configured — the label is
+expected. Every release also publishes `SHASUMS256.txt` next to the `.mcpb` if you want to verify the
+download.
+:::
+
+## From source
 
 ```bash
 npm run mcpb        # → dist-mcpb/devcoach-<version>.mcpb
-# Claude Desktop → Settings → Extensions → Install Extension… → pick the .mcpb
+npm run mcpb:sign   # self-sign it — installs with the same "unverified publisher" label
 ```
 
-`npm run mcpb:sign` self-signs it (installs as an *unverified publisher*; a real code-signing certificate
-is needed for a verified signature). Prebuilt `.mcpb` releases and a Desktop directory listing are planned.
+Then install the resulting file through the same **Settings → Extensions → Install Extension…** dialog.
 
 → Next: **[Coaching in your agent](../usage/coaching.md)**.

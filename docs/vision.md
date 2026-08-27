@@ -59,5 +59,6 @@ opt-in layer on top, never a change to how the solo tool works.
 ## Shape the roadmap
 
 Have a feature request, a use case the current tool doesn't cover, or thoughts on any of the ideas
-above? Start a thread in
-[GitHub Discussions](https://github.com/UltimaPhoenix/dev-coach/discussions).
+above? Open an issue on
+[GitHub Issues](https://github.com/UltimaPhoenix/dev-coach/issues) — feature requests, feedback
+and questions all live there.

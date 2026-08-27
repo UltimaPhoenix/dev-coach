@@ -36,21 +36,21 @@ AI agents now write much of our code — which makes it easy to ship more while 
 
 ```mermaid
 flowchart TD
-    A([Task completed]) --> B[Check rate limit]
-    B -->|denied| Z([Silent])
-    B -->|allowed| D
+    A([Task completed]) --> B{"stop-hook:<br/>paced + rate limit ok?"}
+    B -->|not yet| Z(["Silent — counter +1"])
+    B -->|due| C["Cue: activate the devcoach skill"]
 
-    subgraph loop["coaching loop"]
-        D[Select topic & depth]
-        E[Compose & deliver]
-        G[log_lesson]
+    subgraph skill["devcoach skill"]
+        C --> D{"Technical work?"}
+        D -->|no| S[skip_lesson]
+        D -->|yes| E[Select topic & depth]
+        E --> G[log_lesson]
+        G --> F[Print lesson card]
     end
 
-    D -->|nothing| Z
-    D -->|found| E
-    E --> G
-    G --> F([Done])
-    G -.->|prompts| U(["You: ✅ ❌ ⏭"])
+    S --> Y(["Silent — pacing re-armed"])
+    F --> H(["Done — counter reset"])
+    F -.->|prompts| U(["You: ✅ / ❌"])
 ```
 
 → [Full decision flow: session startup · lesson selection · depth calibration](docs/how-it-works.md)
@@ -75,6 +75,7 @@ devcoach runs **locally** — a stdio MCP server that stores everything in `~/.d
 
 - **Developer, comfortable in a terminal → [Homebrew](#homebrew-recommended-for-developers)** — one `brew install`, and you get the `devcoach` CLI too.
 - **Prefer a one-click, no-terminal setup → the [Claude Code plugin](#claude-code-plugin-recommended-for-claude-code) or the [`.mcpb` extension](#claude-desktop-extension-mcpb-recommended-for-claude-desktop)**.
+- **Registry-aware MCP client?** devcoach is listed in the official [MCP Registry](https://registry.modelcontextprotocol.io) as `io.github.UltimaPhoenix/devcoach` — install it straight from there.
 - Anything else (npx, manual config, other agents, claude.ai web) is under **[Other install methods](#other-install-methods)**.
 
 ### Homebrew (recommended for developers)
@@ -128,14 +129,16 @@ See [Claude Code plugin](docs/install/claude-code-plugin.md) for how it works.
 
 ### Claude Desktop extension (`.mcpb`) (recommended for Claude Desktop) — **Beta**
 
-A single bundle that runs on Claude Desktop's built-in runtime — no Node or terminal needed:
+A single bundle that runs on Claude Desktop's built-in runtime — no Node or terminal needed. Every GitHub Release ships one:
+
+1. Download `devcoach-<version>.mcpb` from the [latest release](https://github.com/UltimaPhoenix/dev-coach/releases/latest)
+2. Claude Desktop → **Settings → Extensions → Install Extension…** → pick the `.mcpb`
+
+The bundle is **self-signed**, so Claude Desktop installs it as an *unverified publisher* (a real code-signing cert would be needed for a verified signature). Prefer to build it from source?
 
 ```bash
-npm run mcpb        # → dist-mcpb/devcoach-<version>.mcpb
-# Claude Desktop → Settings → Extensions → Install Extension… → pick the .mcpb
+npm run mcpb        # → dist-mcpb/devcoach-<version>.mcpb   (npm run mcpb:sign self-signs it)
 ```
-
-`npm run mcpb:sign` self-signs it (installs as an *unverified publisher*; a real code-signing cert is needed for a verified signature). Prebuilt `.mcpb` releases and a Desktop directory listing are planned.
 
 ### Other install methods — **Beta**
 
@@ -220,7 +223,7 @@ Codex asks you to **trust** the new hooks once on the next run — approve them 
 <details>
 <summary><strong>Other MCP agents</strong> (Cursor, Windsurf, Cline, Continue, Zed…)</summary>
 
-Add this to your agent's MCP config file:
+Add this to your agent's MCP config file (or, if your client browses the [MCP Registry](https://registry.modelcontextprotocol.io), install `io.github.UltimaPhoenix/devcoach` from there):
 
 ```json
 {
@@ -264,64 +267,62 @@ This gives claude.ai the coaching behaviour without the MCP tools (lesson loggin
 
 ## Onboarding
 
-The first time your agent connects to devcoach it detects that your profile isn't set up and walks you through it inline — no separate command needed.
+The first time your agent connects to devcoach it detects that your profile isn't set up and walks you through it inline — no separate command needed. (Prefer the terminal? `devcoach setup` runs the same wizard.)
 
 → [Full onboarding walkthrough](docs/usage/coaching.md)
 
 ### Phase 1 — Choose how to set up your profile
 
+devcoach scans your **full local Claude Code history** (every project the agent has worked in, ranked by recent activity — file and activity metadata only, never prompt text) and offers four ways to build the profile:
+
 ```
-devcoach: Your knowledge profile isn't set up yet.
+devcoach: Your knowledge profile isn't set up yet. I scanned 9 of your Claude Code
+projects and found TypeScript (dev-coach), Java (discordbot), Swift (blueprince).
 
-Do you have an existing devcoach backup to restore?
-If yes, provide the file path — otherwise I'll help you build your profile from scratch.
+  1. Automatic (strongly recommended) — build the profile from that, no questions asked
+  2. Automatic (Deep)   — also read my local session transcripts for a sharper profile
+  3. Guided             — a step-by-step conversation about my stack
+  4. Import backup      — restore a devcoach backup zip
 ```
-
-**Option A — restore from backup:** If you're on a new machine or reinstalling, provide the path to your backup zip and your full profile (knowledge map, lessons, settings) is imported instantly.
-
-**Option B — build from scratch:** Choose between automatic detection or a guided conversation.
 
 ### Phase 2 — Build your profile
 
-#### Automatic (recommended)
+#### Automatic (strongly recommended)
 
-devcoach scans your project files and proposes your stack:
+Builds the whole profile — topics, confidence scores, groups, and the coaching notebook — in **one pass** from the stack detected across your history. No questions: you review and adjust the result afterwards (in chat, with the CLI, or in the dashboard).
 
-```
-I detected these technologies in your project:
+#### Automatic (Deep)
 
-  typescript     → confidence 6  (keep? or enter 0–10 to adjust)
-  docker         → confidence 7  (keep? or enter 0–10 to adjust)
-  github_actions → confidence 6  (keep? or enter 0–10 to adjust)
-  react          → confidence 5  (keep? or enter 0–10 to adjust)
+Opt-in. Everything Automatic does, plus a separate subagent reads the **real conversation text** of your local Claude Code session transcripts (`~/.claude/projects/`) for the most accurate profile and notebook it can produce. A metadata-only pre-check runs first over a rolling 3-month window; if it finds more than 8 projects, devcoach asks whether to narrow the window, proceed with the 25 most recent, or pick specific projects. The agent says so up front: this shares more of your own local history with the model than the metadata scan does — once, on this machine, as a setup step.
 
-Anything I missed? List any tools, languages, or practices you work with regularly.
-```
+#### Guided
 
-You confirm, adjust scores, or add topics the scan missed. Then devcoach proposes logical groups:
+Prefer to describe your stack yourself? devcoach asks about each technology and your confidence level (1–3 still learning · 4–6 comfortable · 7–9 strong · 10 expert), agrees the topic groups with you, then saves the profile.
 
-```
-Here's how I'd organise these:
+#### Import backup
 
-  Languages  → typescript, javascript
-  Frontend   → react, html_css
-  DevOps     → docker, github_actions
-  Databases  → postgresql, redis
-
-Does this look right? Any changes?
-```
-
-#### Guided conversation
-
-If you prefer to describe your stack manually, devcoach asks about each technology and your confidence level (1–3 still learning · 4–6 comfortable · 7–9 strong · 10 expert), then saves the profile.
+On a new machine or reinstalling? Provide the path to your backup zip and your full profile — knowledge map, lessons, settings, and notebook — is restored instantly.
 
 ### Phase 3 — Profile saved, coaching begins
+
+After saving, your agent shows what was set up, grouped the way your knowledge map is organised — for the Automatic modes this is your first look at it, so it's the moment to ask for changes:
 
 ```
 ✓ Profile saved — 24 topics across 6 groups.
 
-From now on I'll deliver a short lesson after technical tasks,
-calibrated to your current confidence on each topic.
+### Languages
+- **typescript** — 7/10
+- **java** — 5/10
+
+### DevOps
+- **docker** — 7/10
+- **github_actions** — 6/10
+
+### Other
+- **regex** — 4/10
+
+Change any of this later in chat ("set my Java confidence to 7"), with the
+`devcoach` CLI, or in `devcoach ui`.
 ```
 
 That's it. You go back to work. Coaching happens silently in the background.
@@ -337,10 +338,8 @@ You: Refactor this endpoint to handle concurrent requests properly.
 
 Agent: [refactors the code, explains the changes]
 
----
-🎓 devcoach · TypeScript · Level: Mid
-
-**Promise.allSettled vs Promise.all — don't let one failure sink the batch**
+### ──────── 🎓 devcoach ────────
+**Promise.allSettled vs Promise.all — don't let one failure sink the batch** · TypeScript · Mid
 
 Promise.all rejects the moment any promise rejects, and you lose the results of
 the ones that already succeeded. For independent work (fan-out fetches, batch
@@ -354,14 +353,15 @@ Promise.allSettled always resolves, giving you a status for every promise:
 Use Promise.all when the tasks are genuinely all-or-nothing; reach for
 allSettled when partial success is meaningful and you want to report failures.
 
-💡 Senior tip: for coordinated work that *should* cancel siblings on failure,
-   an AbortController shared across the requests gives you all-or-nothing with
-   prompt cancellation — the structured-concurrency middle ground.
+💡 *Senior tip:* for coordinated work that *should* cancel siblings on failure,
+an AbortController shared across the requests gives you all-or-nothing with
+prompt cancellation — the structured-concurrency middle ground.
+### ──────── typescript · mid ────────
 
-Did that land?  ✅ know · ❌ don't know · ⏭ skip
+Did that land? ✅ know (y) · ❌ don't know (n)
 ```
 
-Responding adjusts your confidence on that topic and shapes future lessons.
+Reply `y` or `n` (or ✅ / ❌) to adjust your confidence on that topic and shape future lessons — or just move on: no reply means no change.
 
 ---
 
@@ -414,12 +414,12 @@ The CLI is a secondary interface for querying and managing your coaching data. E
 | `devcoach feedback <id> <know\|dont_know\|clear>` | Record comprehension |
 | `devcoach set max_per_day <n>` | Max lessons per day (default 2) |
 | `devcoach set min_gap_minutes <n>` | Minutes between lessons (default 240) |
-| `devcoach backup [file.zip]` | Export knowledge + lessons + settings |
+| `devcoach backup [file.zip]` | Export knowledge + lessons + settings + notebook |
 | `devcoach restore <file.zip>` | Restore from a backup |
 | `devcoach setup` | Run the onboarding wizard in the terminal |
 | `devcoach ui` | Open the web dashboard |
 
-(Prefix with `npx -y` if you haven't installed globally.) Full reference: [docs/cli.md](docs/usage/cli.md)
+(Prefix with `npx -y` if you haven't installed globally.) Full reference: [docs/usage/cli.md](docs/usage/cli.md)
 
 ---
 
@@ -432,7 +432,7 @@ devcoach set max_per_day 5           # more lessons per day
 devcoach set min_gap_minutes 60      # lessons closer together
 ```
 
-Or use the [web dashboard](docs/usage/web-ui.md) Settings page. See [docs/configuration.md](docs/reference/configuration.md) for all options.
+Or use the [web dashboard](docs/usage/web-ui.md) Settings page. See [docs/reference/configuration.md](docs/reference/configuration.md) for all options.
 
 ---
 
@@ -488,7 +488,7 @@ claude mcp remove --scope user devcoach   # remove from Claude Code (install use
 rm -rf ~/.devcoach                 # delete all coaching data (back up first: devcoach backup)
 ```
 
-For Claude Desktop, delete the `devcoach` key from the platform config file (paths in **Manual setup** above). Also remove the two hook entries from `~/.claude/settings.json` → `hooks.Stop`.
+For Claude Desktop, delete the `devcoach` key from the platform config file (paths in **Manual setup** above). Also remove the two hook entries from `~/.claude/settings.json` — one under `hooks.Stop` (`devcoach stop-hook`) and one under `hooks.UserPromptSubmit` (`devcoach prompt-hook`).
 
 ---
 
@@ -510,7 +510,7 @@ For Claude Desktop, delete the `devcoach` key from the platform config file (pat
 ## Community
 
 - **Star the repo** — help others discover it
-- **[GitHub Discussions](https://github.com/UltimaPhoenix/dev-coach/discussions)** — feature requests, feedback, and ideas
+- **[GitHub Issues](https://github.com/UltimaPhoenix/dev-coach/issues)** — feature requests, feedback and questions: open an issue
 
 ---
 

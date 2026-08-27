@@ -5,7 +5,9 @@ sidebar_label: claude.ai web
 
 # claude.ai web (skill copy)
 
-Claude.ai does **not** support MCP servers, so install the coaching **instructions** as a skill instead:
+Claude.ai web cannot run a **local** stdio MCP server like devcoach (it only supports hosted/remote
+connectors), so install the coaching **instructions** as a skill instead — a manual copy, not an
+integration:
 
 1. Copy the content of [`assets/SKILL.md`](https://github.com/UltimaPhoenix/dev-coach/blob/main/assets/SKILL.md)
 2. Go to **claude.ai → Settings → Custom instructions** (or Skills, depending on your plan)

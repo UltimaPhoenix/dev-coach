@@ -11,6 +11,7 @@ MCP server entry. Add this to your agent's MCP config file:
 {
   "mcpServers": {
     "devcoach": {
+      "type": "stdio",
       "command": "npx",
       "args": ["-y", "devcoach", "mcp"]
     }
@@ -26,10 +27,17 @@ MCP server entry. Add this to your agent's MCP config file:
 | **Continue.dev** | `~/.continue/config.json` → `mcpServers` |
 | **Zed** | `.zed/settings.json` → `context_servers` |
 
+## MCP Registry
+
+devcoach is listed in the official [MCP Registry](https://registry.modelcontextprotocol.io) as
+**`io.github.UltimaPhoenix/devcoach`**. If your client can browse or install servers from the
+registry, search for that name (or `devcoach`) and install it from there — the entry points at the
+npm package `devcoach` over stdio, so it runs exactly the same local server as the config above.
+
 :::tip Gemini CLI and Codex CLI have first-class support
 **[Gemini CLI](./gemini-cli.md)** *(beta)* and **[Codex CLI](./codex.md)** *(beta)* get the full
 coaching loop — automatic lesson hooks and the devcoach skill — via `devcoach install --gemini` /
-`--codex`. Use those pages instead of the generic config below.
+`--codex`. Use those pages instead of the generic config above.
 :::
 
 :::note
