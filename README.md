@@ -377,7 +377,7 @@ Reply `y` or `n` (or ✅ / ❌) to adjust your confidence on that topic and shap
 
 Every lesson stores **where it happened** — your project folder, repository, branch, commit hash, editor. You can also personalize your coaching with a **learning notebook** at `~/.devcoach/learning-state.md` that shapes which topics devcoach prioritises and how deep the lessons go.
 
-→ [How to use context & personalization](docs/index.mdx#context--personalization) · [Web dashboard guide](docs/usage/web-ui.md)
+→ [The coaching notebook](docs/index.mdx#the-coaching-notebook) · [Web dashboard guide](docs/usage/web-ui.md)
 
 ---
 
@@ -497,11 +497,13 @@ For Claude Desktop, delete the `devcoach` key from the platform config file (pat
 **Full documentation:** The README is a quick start. For detailed guides, visit the **[official docs](https://ultimaphoenix.github.io/dev-coach/)**:
 
 - **[Why devcoach exists](docs/why.md)** — the philosophy
-- **[How it works](docs/how-it-works.md)** — session startup, coaching loop, lesson selection
+- **[Coaching in your agent](docs/usage/coaching.md)** — onboarding, your first lesson, the feedback loop
 - **[Using the web dashboard](docs/usage/web-ui.md)** — personalise your knowledge map, filter lessons, jump to code context
 - **[CLI reference](docs/usage/cli.md)** — all commands for querying and managing data
-- **[Configuration](docs/reference/configuration.md)** — rate limits, data location, schema
-- **[Privacy & security](docs/reference/privacy.md)** — local-first architecture, what we collect
+- **[Installation](docs/install/index.md)** — every install method, agent by agent
+- **[Configuration](docs/reference/configuration.md)** — rate limits, pacing, data location, schema
+- **[Privacy & security](docs/reference/privacy.md)** — local-first architecture, what is read and stored
+- **[How it works](docs/how-it-works.md)** — session startup, coaching loop, lesson selection
 - **[Vision & roadmap](docs/vision.md)** — free, local, not commercialized; ideas we're exploring next
 - **[Plugin marketplace](docs/install/claude-code-plugin.md#about-the-personal-marketplace)** — UltimaPhoenix plugin collection
 

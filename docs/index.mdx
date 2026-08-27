@@ -12,6 +12,7 @@ import ThemedShot from "@site/src/components/ThemedShot";
 You're shipping more than ever and understanding less. devcoach fixes that with one lesson at a time, delivered right after your agent completes a task — in Claude Code, Claude Desktop, Gemini CLI, Codex CLI, Cursor and other MCP tools.
 
 - **[Install in 30 seconds](./install)** — get started now
+- **[See it in use](./usage/coaching)** — onboarding, your first lesson, the feedback loop
 - **[Why it matters](./why)** — read the philosophy
 
 ---
@@ -45,31 +46,50 @@ Did that land? ✅ know (y) · ❌ don't know (n)
 
 ---
 
-## Context & personalization
+## Using devcoach
 
-Every lesson is tied to **where it happened**: your project folder, repository, branch, commit hash, and which editor you're using (VS Code, etc.). devcoach stores all of this locally, so lessons are tied to their context.
+### Onboarding in one pass
 
-You can also personalize your coaching with a **learning notebook** at `~/.devcoach/learning-state.md`. This file is yours to edit and annotate:
+The first time your agent connects, devcoach scans your **local Claude Code history** — every project you've worked in, file and activity metadata only — and builds your knowledge map (topics, confidence scores, groups) plus your coaching notebook **in one pass, with no questions**. You review the result afterwards, not before. Prefer more control? **Automatic (Deep)** is an opt-in tier that also reads your local session transcripts for a sharper profile; **Guided** walks through your stack in conversation; **Import backup** restores a previous profile.
 
-- **Note what you understand** — mark concepts that have sunk in after a lesson.
-- **Flag areas for deeper work** — if something didn't click, write it down.
-- **Track patterns you see** — if you notice recurring mistakes or gaps, devcoach learns from your notes.
+**[Onboarding, step by step →](./usage/coaching#onboarding)**
 
-The notebook affects your coaching directly:
+### Feedback in one keystroke, coaching that stays quiet
 
-- Lessons prioritise topics you've flagged as needing work
-- Depth is calibrated based on your written notes, not just your emoji feedback
-- devcoach avoids re-teaching angles you've marked as understood
-- It surfaces related concepts when it detects gaps in your notes
+Under every lesson card: `Did that land? ✅ know (y) · ❌ don't know (n)`. Reply `y` or `n` to adjust your confidence on that topic — or just keep working: no reply means no change. By default devcoach delivers **at most 2 lessons a day, at least 4 hours apart**, cues one only every ~10 interactions per chat session, and never during plan-mode turns.
 
-Everything stays private and local. The notebook is optional — devcoach works without it — but it transforms coaching from generic to genuinely personal to your learning journey.
+**[The feedback loop →](./usage/coaching#the-feedback-loop)**
+
+### Your knowledge map, in a dashboard
+
+`devcoach ui` opens a local dashboard: adjust confidence and groups inline, browse and filter your lesson history, tune the pacing and rate limits, back up or restore everything, and read your coaching notebook.
+
+<ThemedShot
+  alt="Knowledge map"
+  light={require("./screenshots/knowledge-map-light.png").default}
+  dark={require("./screenshots/knowledge-map-dark.png").default}
+/>
+
+<ThemedShot
+  alt="Lessons"
+  light={require("./screenshots/lessons-light.png").default}
+  dark={require("./screenshots/lessons-dark.png").default}
+/>
+
+Terminal person? The same data is one command away: `devcoach stats`, `devcoach lessons --period week`, `devcoach backup`.
+
+**[Web dashboard →](./usage/web-ui)** · **[CLI reference →](./usage/cli)**
+
+### The coaching notebook
+
+Every lesson is tied to **where it happened** — project folder, repository, branch, commit — and your agent keeps a **coaching notebook** at `~/.devcoach/learning-state.md`: written at onboarding, refreshed every 10 lessons, and yours to annotate. Flag what didn't click or mark what has sunk in, and the next lessons follow your notes. It stays local and it's optional.
 
 ---
 
 ## How to get started
 
 1. **[Install](./install)** — choose your method (Homebrew, Claude Code plugin, npx, or Claude Desktop)
-2. **[Run onboarding](./usage/coaching.md)** — build your knowledge profile
+2. **[Let onboarding build your profile](./usage/coaching.md)** — one pass, no questions
 3. **Start working** — coaching happens automatically
 
 Everything's local. No data leaves your machine. One SQLite file.
@@ -106,26 +126,6 @@ Everything stays on your machine. No telemetry, no accounts, no calls home. Just
 
 ---
 
-## Screenshots
-
-### Knowledge map
-
-<ThemedShot
-  alt="Knowledge map"
-  light={require("./screenshots/knowledge-map-light.png").default}
-  dark={require("./screenshots/knowledge-map-dark.png").default}
-/>
-
-### Lesson history
-
-<ThemedShot
-  alt="Lessons"
-  light={require("./screenshots/lessons-light.png").default}
-  dark={require("./screenshots/lessons-dark.png").default}
-/>
-
----
-
 ## Roadmap & community
 
 - **[Vision & roadmap](./vision)** — free, local, not commercialized; ideas we're exploring next
@@ -136,11 +136,12 @@ Everything stays on your machine. No telemetry, no accounts, no calls home. Just
 
 ## All guides
 
-- **[How it works](./how-it-works)** — the coaching loop and decision flow
-- **[Coaching in your agent](./usage/coaching)** — your first lesson and the feedback loop
+- **[Coaching in your agent](./usage/coaching)** — onboarding, your first lesson and the feedback loop
 - **[Web dashboard](./usage/web-ui)** — manage your knowledge map
 - **[CLI reference](./usage/cli)** — all commands
-- **[Configuration](./reference/configuration)** — rate limits, data location
+- **[Installation](./install)** — every install method, agent by agent
+- **[How it works](./how-it-works)** — the coaching loop and decision flow
 - **[MCP server reference](./reference/mcp-server)** — all tools and resources
-- **[Contributing](https://github.com/UltimaPhoenix/dev-coach/blob/main/CONTRIBUTING.md)** — fork, develop, submit a PR
+- **[Configuration](./reference/configuration)** — rate limits, pacing, data location
 - **[License & commercial use](./reference/license)** — free & open source (AGPL-3.0), plus the commercial option
+- **[Contributing](https://github.com/UltimaPhoenix/dev-coach/blob/main/CONTRIBUTING.md)** — fork, develop, submit a PR

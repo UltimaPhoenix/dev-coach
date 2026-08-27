@@ -14,6 +14,12 @@ devcoach decides whether to deliver a lesson after each completed task, based on
 - [FAQ](https://ultimaphoenix.github.io/dev-coach/faq): concise answers to common questions — what it is, who it's for, supported agents, privacy, pricing, install.
 - [Vision & roadmap](https://ultimaphoenix.github.io/dev-coach/vision): free, local, not commercialized; what's being explored next.
 
+## Using devcoach
+
+- [Coaching in your agent](https://ultimaphoenix.github.io/dev-coach/usage/coaching): your first lesson, onboarding (Automatic, Automatic (Deep), Guided, Import backup), and the feedback loop.
+- [Web dashboard](https://ultimaphoenix.github.io/dev-coach/usage/web-ui): manage your knowledge map locally.
+- [CLI reference](https://ultimaphoenix.github.io/dev-coach/usage/cli): all CLI subcommands.
+
 ## Install
 
 - [Install overview](https://ultimaphoenix.github.io/dev-coach/install): choose a method.
@@ -24,12 +30,6 @@ devcoach decides whether to deliver a lesson after each completed task, based on
 - [Codex CLI (beta)](https://ultimaphoenix.github.io/dev-coach/install/codex): `npx -y devcoach install --codex`.
 - [npx (no install)](https://ultimaphoenix.github.io/dev-coach/install/npx): `npx -y devcoach install` — no global install needed.
 - [Other MCP agents](https://ultimaphoenix.github.io/dev-coach/install/other-agents): Cursor, Windsurf, Cline, Continue, Zed and any MCP-compatible client.
-
-## Using devcoach
-
-- [Coaching in your agent](https://ultimaphoenix.github.io/dev-coach/usage/coaching): your first lesson, onboarding (Automatic, Automatic (Deep), Guided, Import backup), and the feedback loop.
-- [CLI reference](https://ultimaphoenix.github.io/dev-coach/usage/cli): all CLI subcommands.
-- [Web dashboard](https://ultimaphoenix.github.io/dev-coach/usage/web-ui): manage your knowledge map locally.
 
 ## Reference
 

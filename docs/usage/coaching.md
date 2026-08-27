@@ -5,6 +5,10 @@ sidebar_label: Coaching in your agent
 
 # Coaching in your agent
 
+:::tip Not installed yet?
+Pick a method in **[Installation](../install/index.md)** — it takes about 30 seconds — then come back here.
+:::
+
 This is devcoach's main job: **automatic, in-context coaching** while you work with your AI agent. After
 your agent finishes a technical task, devcoach appends one short lesson about something that task touched —
 calibrated to what you already know. There's nothing to open and no command to run; it happens in the

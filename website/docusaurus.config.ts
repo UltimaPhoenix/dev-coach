@@ -188,9 +188,9 @@ const config: Config = {
         {
           title: "Docs",
           items: [
-            { label: "Installation", to: "/install" },
             { label: "Coaching in your agent", to: "/usage/coaching" },
-            { label: "CLI reference", to: "/usage/cli" },
+            { label: "Web dashboard", to: "/usage/web-ui" },
+            { label: "Installation", to: "/install" },
             { label: "MCP server", to: "/reference/mcp-server" },
           ],
         },
