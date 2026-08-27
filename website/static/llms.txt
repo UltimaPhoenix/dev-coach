@@ -36,7 +36,7 @@ devcoach decides whether to deliver a lesson after each completed task, based on
 - [MCP server reference](https://ultimaphoenix.github.io/dev-coach/reference/mcp-server): the 15 tools, 11 resources and the prompt exposed over MCP.
 - [Configuration](https://ultimaphoenix.github.io/dev-coach/reference/configuration): rate limits, pacing, UI theme, data location, environment variables.
 - [Privacy & security](https://ultimaphoenix.github.io/dev-coach/reference/privacy): local-first design, what is and isn't read or stored.
-- [License & commercial use](https://ultimaphoenix.github.io/dev-coach/reference/license): AGPL-3.0, dual-license.
+- [License & commercial use](https://ultimaphoenix.github.io/dev-coach/reference/license): AGPL-3.0; no commercial license offered today — closed-source embedding only on request, case by case.
 
 ## Optional
 

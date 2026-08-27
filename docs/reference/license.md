@@ -35,7 +35,7 @@ or host** that modified devcoach.
 | I use devcoach inside Claude Code while building my closed-source startup app. | ✅ Free. Your app stays proprietary, zero obligations. |
 | My whole team installs devcoach to get coaching on our internal/commercial repos. | ✅ Free. Using the unmodified tool at a company is fine. |
 | I fork devcoach, add a feature, and publish the package or host its dashboard as a public service. | ⚠️ You must release **your modified devcoach** source under the AGPL. |
-| I want to embed devcoach in my paid product and keep my changes closed. | 💼 You need a commercial license. |
+| I want to embed devcoach in my paid product and keep my changes closed. | 💼 The AGPL doesn't allow that — you'd need a commercial license, which isn't offered today: ask first. |
 
 :::note Keep it a separate tool
 Use devcoach as a tool/executable (the `devcoach` command / MCP server), not as a library you `import`
@@ -44,14 +44,17 @@ into your own code, and the AGPL never reaches your project.
 
 ## Commercial license
 
-A separate **commercial license** is available for proprietary or closed use without the AGPL's
-copyleft obligations — for example, embedding devcoach in a closed-source product or reselling a
-derivative. [Open an issue](https://github.com/UltimaPhoenix/dev-coach/issues) to enquire.
+There is **no commercial license on offer today** — devcoach is distributed under the AGPL only, and
+that covers every ordinary use, at home or at work. A commercial license would only matter for the
+one thing the AGPL forbids: embedding devcoach in a **closed-source product** or shipping a
+proprietary derivative without releasing its source. If that is genuinely your case,
+[open an issue](https://github.com/UltimaPhoenix/dev-coach/issues) describing it and we'll talk —
+requests are handled case by case, with no guarantee one will be granted.
 
 ## Contributing
 
-Contributions are welcome under the AGPL. Because devcoach is offered under both AGPL and a commercial
-license, contributors sign a lightweight
+Contributions are welcome under the AGPL. So that a commercial license *can* be granted case by case
+without re-asking every contributor, contributors sign a lightweight
 [Contributor License Agreement](https://github.com/UltimaPhoenix/dev-coach/blob/main/CLA.md) — handled
 automatically by a bot on your first pull request. See
 [CONTRIBUTING](https://github.com/UltimaPhoenix/dev-coach/blob/main/CONTRIBUTING.md) to get started.

@@ -24,8 +24,9 @@ If anything is ever sold, it would be a **separate, derivative product** built a
 never a paywall bolted onto the tool you already use. There is nothing to buy today, and the
 roadmap below is a set of ideas we're exploring, not products with price tags.
 
-The one existing paid path is purely a licensing matter, unrelated to the tool's features:
-embedding devcoach inside a **closed-source product** requires a commercial license. See
+There is no paid path at all today — not even a commercial license. The only thing the AGPL rules
+out is embedding devcoach inside a **closed-source product**; if that is ever your case, ask by
+opening an issue and it will be considered case by case. See
 [License & commercial use](./reference/license) for the details — ordinary use, at home or at work,
 is always free.
 
