@@ -49,10 +49,10 @@ Keep PRs focused. A change that fixes a bug and adds a feature should be two PRs
 
 ## Licensing & the CLA
 
-devcoach is licensed under **AGPL-3.0**. No commercial license is offered today, but one may be
-granted case by case for closed-source use on request — so that such a grant never requires
-re-asking every contributor, every contributor signs a lightweight
-[Contributor License Agreement](CLA.md): you confirm you have the right to contribute and you grant
+devcoach is licensed under **AGPL-3.0**. No commercial license is offered today; if one is ever
+granted for a closed-source use, the maintainer must hold the right to relicense *every*
+contribution — so every contributor signs a lightweight
+[Contributor License Agreement](CLA.md) once: you confirm you have the right to contribute and you grant
 the maintainer the right to license your contribution under **both** AGPL and commercial terms. The
 [CLA Assistant](.github/workflows/cla.yml) bot handles this automatically on your first PR.
 

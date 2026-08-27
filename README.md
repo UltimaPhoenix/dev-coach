@@ -558,9 +558,8 @@ Copyright (C) 2026 [UltimaPhoenix](https://github.com/UltimaPhoenix)
 devcoach is licensed under the [GNU Affero General Public License v3.0](LICENSE) (`AGPL-3.0-only`).
 You may use, modify, and distribute it — **provided that any modified version you distribute, or run
 as a network service, is also released as open source under the AGPL**. There is **no commercial
-license on offer today**; if you genuinely need one — embedding devcoach in a closed-source product
-or shipping a proprietary derivative — [open an issue](https://github.com/UltimaPhoenix/dev-coach/issues)
-describing your case and it will be considered case by case.
+license on offer today**; if you need to embed devcoach in a closed-source product,
+[open an issue](https://github.com/UltimaPhoenix/dev-coach/issues) and ask.
 
 ### Licensing FAQ
 
@@ -575,6 +574,6 @@ like querying an AGPL-licensed database. Your own projects keep whatever license
 - ✅ *"I use devcoach inside Claude Code while building my closed-source startup app."* — Free. Your app stays proprietary, zero obligations.
 - ✅ *"My whole team installs devcoach to get coaching on our internal/commercial repos."* — Free. Using the unmodified tool at a company is fine.
 - ⚠️ *"I fork devcoach, add a feature, and publish the package or host its dashboard as a public service."* — You must release **your modified devcoach** source under the AGPL.
-- 💼 *"I want to embed devcoach in my paid product and keep my changes closed."* — The AGPL doesn't allow that; a commercial license isn't offered today — ask first via an issue.
+- 💼 *"I want to embed devcoach in my paid product and keep my changes closed."* — Not covered by the AGPL — ask first by opening an issue.
 
 Keep using devcoach as a tool/executable (not as an imported library) and the AGPL never reaches your own code.
