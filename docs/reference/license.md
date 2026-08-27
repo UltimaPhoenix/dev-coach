@@ -37,9 +37,10 @@ or host** that modified devcoach.
 | I fork devcoach, add a feature, and publish the package or host its dashboard as a public service. | ⚠️ You must release **your modified devcoach** source under the AGPL. |
 | I want to embed devcoach in my paid product and keep my changes closed. | 💼 Not covered by the AGPL — ask first by opening an issue. |
 
-:::note[Keep it a separate tool]
-Use devcoach as a tool/executable (the `devcoach` command / MCP server), not as a library you `import`
-into your own code, and the AGPL never reaches your project.
+:::note[Using devcoach is always free]
+Using devcoach — the `devcoach` command / MCP server running next to your code — is and stays free,
+whatever license your own project has. Embedding devcoach in your product, or reselling a derivative
+of it, is what requires a commercial license.
 :::
 
 ## Commercial license
