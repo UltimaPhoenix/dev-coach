@@ -5,7 +5,7 @@ sidebar_label: Coaching in your agent
 
 # Coaching in your agent
 
-:::tip Not installed yet?
+:::tip[Not installed yet?]
 Pick a method in **[Installation](../install/index.md)** — it takes about 30 seconds — then come back here.
 :::
 

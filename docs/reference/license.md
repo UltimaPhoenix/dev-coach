@@ -13,7 +13,7 @@ devcoach is **free and open source**, licensed under the
 You may use, modify, and distribute it — **provided that any modified version you distribute, or run
 as a network service, is also released as open source under the AGPL**.
 
-:::tip devcoach is and stays 100% free
+:::tip[devcoach is and stays 100% free]
 Free to download, install, and use — for everyone, forever, including at work and on commercial
 projects. AGPL is *not* a price tag: you only ever pay if you want to ship a **proprietary/closed
 derivative of devcoach itself** without complying with the AGPL.
@@ -37,7 +37,7 @@ or host** that modified devcoach.
 | I fork devcoach, add a feature, and publish the package or host its dashboard as a public service. | ⚠️ You must release **your modified devcoach** source under the AGPL. |
 | I want to embed devcoach in my paid product and keep my changes closed. | 💼 The AGPL doesn't allow that — you'd need a commercial license, which isn't offered today: ask first. |
 
-:::note Keep it a separate tool
+:::note[Keep it a separate tool]
 Use devcoach as a tool/executable (the `devcoach` command / MCP server), not as a library you `import`
 into your own code, and the AGPL never reaches your project.
 :::

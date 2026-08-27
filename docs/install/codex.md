@@ -11,7 +11,7 @@ devcoach runs the **full coaching loop** in OpenAI's Codex CLI: the MCP server, 
 cues after each task (Codex's `Stop`/`UserPromptSubmit` hooks use the same wire protocol as Claude
 Code's), and the devcoach **agent skill**. Requires **Node.js ≥ 24** and Codex CLI ≥ 0.114 (hooks).
 
-:::info Beta
+:::info[Beta]
 The Codex CLI integration is **beta**: the coaching engine is the same battle-tested core used with
 Claude Code, but the Codex hook wiring is newer. Please report anything odd on
 [GitHub issues](https://github.com/UltimaPhoenix/dev-coach/issues).
@@ -33,7 +33,7 @@ This registers everything devcoach needs:
 - **Skill** — the devcoach coaching skill into `~/.agents/skills/devcoach/` (Codex's user-level
   [Agent Skills](https://developers.openai.com/codex/skills) directory)
 
-:::note Trust the hooks once
+:::note[Trust the hooks once]
 Codex asks you to **trust** newly configured hooks the first time they run — approve the devcoach
 hooks on your next `codex` session or they stay inert.
 :::

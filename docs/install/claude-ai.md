@@ -17,7 +17,7 @@ This gives claude.ai the coaching *behaviour* only — the MCP tools (lesson log
 work, because there's no local server. See [Privacy & security](../reference/privacy.md) for why a hosted
 connector isn't possible.
 
-:::note Keep the skill current
+:::note[Keep the skill current]
 For Claude Code / Claude Desktop the skill is served automatically and is always up to date. If you copied
 it manually to claude.ai, re-paste the latest `SKILL.md` after each devcoach update.
 :::

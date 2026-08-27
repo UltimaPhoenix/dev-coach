@@ -5,13 +5,13 @@ sidebar_label: Claude Desktop (.mcpb)
 
 # Claude Desktop extension (`.mcpb`)
 
-:::warning Beta
+:::warning[Beta]
 The `.mcpb` extension format is currently in beta. It works well for most users, but report any issues
 to [GitHub Issues](https://github.com/UltimaPhoenix/dev-coach/issues). For the most stable experience,
 use [Homebrew](./homebrew.md) or [npm/npx](./npx.md).
 :::
 
-:::tip Recommended for Claude Desktop
+:::tip[Recommended for Claude Desktop]
 The simplest, no-terminal way to add devcoach to Claude Desktop — one click, runs on Desktop's built-in
 runtime.
 :::
@@ -26,7 +26,7 @@ Desktop's built-in Node runtime, so no Node install or terminal is required:
 That's it — the `devcoach` tools, resources, and the `devcoach_instructions` prompt are available in
 your next conversation, and the database is created at `~/.devcoach/coaching.db` on first use.
 
-:::note Unverified publisher
+:::note[Unverified publisher]
 The bundle is **self-signed**, so Claude Desktop shows it as coming from an *unverified publisher*. A
 verified signature needs a real code-signing certificate, which isn't configured — the label is
 expected. Every release also publishes `SHASUMS256.txt` next to the `.mcpb` if you want to verify the

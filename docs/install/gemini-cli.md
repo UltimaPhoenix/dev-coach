@@ -12,7 +12,7 @@ automatic lesson cues after each task (Gemini's `AfterAgent`/`BeforeAgent` hooks
 Stop/UserPromptSubmit), and the devcoach **agent skill**. Requires **Node.js ≥ 24** and Gemini CLI
 with hooks support.
 
-:::info Beta
+:::info[Beta]
 The Gemini CLI integration is **beta**: the coaching engine is the same battle-tested core used with
 Claude Code, but the Gemini hook wiring is newer. Please report anything odd on
 [GitHub issues](https://github.com/UltimaPhoenix/dev-coach/issues).
@@ -46,7 +46,7 @@ The devcoach extension bundles the MCP server, hooks, and skill in one package. 
 gemini extensions install <path-to-unzipped-folder>
 ```
 
-:::warning Pick ONE option
+:::warning[Pick ONE option]
 Install the extension **or** run `devcoach install --gemini` — not both. Both register the same
 hooks, and a double registration would double-count your interactions (devcoach detects the
 extension and skips the duplicate hooks, but keep it to one on purpose). `devcoach doctor` warns
