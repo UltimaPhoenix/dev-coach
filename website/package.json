@@ -12,7 +12,8 @@
     "serve": "docusaurus serve",
     "write-translations": "docusaurus write-translations",
     "write-heading-ids": "docusaurus write-heading-ids",
-    "typecheck": "tsc"
+    "typecheck": "tsc",
+    "og-card": "npx --yes playwright screenshot --viewport-size=1200,630 \"file://$PWD/scripts/og-card.html\" static/img/og-card.jpg"
   },
   "dependencies": {
     "@docusaurus/core": "3.10.2",
@@ -45,6 +46,6 @@
     ]
   },
   "engines": {
-    "node": ">=20.0"
+    "node": ">=24"
   }
 }
