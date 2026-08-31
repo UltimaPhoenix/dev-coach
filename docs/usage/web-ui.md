@@ -29,6 +29,10 @@ via the MCP tool:
 open_ui({ port: 7860 })
 ```
 
+Using the [Claude Code plugin](../install/claude-code-plugin.md)? It ships a shortcut for exactly that —
+type `/devcoach:ui` (optionally with a port, e.g. `/devcoach:ui 8080`) and Claude starts the dashboard
+and hands you the URL. No install, no PATH needed.
+
 ---
 
 ## Pages

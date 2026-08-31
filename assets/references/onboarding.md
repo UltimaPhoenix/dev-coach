@@ -214,4 +214,4 @@ Then tell the user **how to change any of it later**, across all three surfaces:
   [--group <Group>]` to add/update; `devcoach knowledge-remove <topic>` to remove;
   `devcoach group-add` / `devcoach group-assign` to organise groups.
 - **UI** — `devcoach ui` (web dashboard at http://localhost:7860), or ask me to open
-  it (the `open_ui` tool).
+  it (the `open_ui` tool; plugin installs also get the `/devcoach:ui` command).

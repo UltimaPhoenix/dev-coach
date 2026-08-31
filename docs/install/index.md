@@ -24,7 +24,8 @@ devcoach works the same whichever way you install it — pick by how you like to
   `devcoach ui`. *(On Windows, or if you prefer npm, [npx / npm](./npx.md) is the equivalent.)*
 - **Prefer the simplest, no-terminal setup → the [Claude Code plugin](./claude-code-plugin.md)** *(Beta)*
   (one-click from the marketplace) or, on Claude Desktop, the **[`.mcpb` extension](./claude-desktop.md)** *(Beta)*.
-  Nothing to configure — install and go. *(These don't add the `devcoach` CLI; run CLI commands with
+  Nothing to configure — install and go. *(These don't add the `devcoach` CLI — open the
+  [dashboard](../usage/web-ui.md) with `/devcoach:ui` or by asking Claude; run CLI commands with
   `npx -y devcoach …` if you ever need them. For the most stable experience, use Homebrew or npm.)*
 
 ## All methods

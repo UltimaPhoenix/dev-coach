@@ -105,17 +105,23 @@ skip straight to `node` — and it only re-installs when a plugin update bumps t
 ## Running the CLI & web dashboard
 
 The plugin gives Claude Code everything it needs to coach you, but it keeps devcoach inside its own data
-dir — it does **not** put the `devcoach` **CLI** on your `PATH`. So to open the
-[web dashboard](../usage/web-ui.md) or use any [CLI command](../usage/cli.md), prefix it with `npx -y`:
+dir — it does **not** put the `devcoach` **CLI** on your `PATH`. You still have three ways in, from
+zero-install to full CLI:
 
-```bash
-npx -y devcoach ui        # open the web dashboard
-npx -y devcoach stats     # any other command works the same way
-```
+1. **From inside Claude Code — nothing to install.** Type `/devcoach:ui` (optionally with a port,
+   e.g. `/devcoach:ui 8080`), or just ask — *"open the devcoach dashboard"*. Either way Claude calls
+   the `open_ui` tool, which starts the [web dashboard](../usage/web-ui.md) from the plugin's own
+   copy and gives you the URL (default http://localhost:7860).
+2. **From a terminal, without installing** — prefix any [CLI command](../usage/cli.md) with `npx -y`:
 
-Prefer a bare `devcoach` command? Install the npm package globally (`npm install -g devcoach`) or via
-[Homebrew](./homebrew.md) — running it alongside the plugin is fine. The plugin owns the coaching hooks;
-the global binary just adds the CLI.
+   ```bash
+   npx -y devcoach ui        # open the web dashboard
+   npx -y devcoach stats     # any other command works the same way
+   ```
+
+3. **A bare `devcoach` command** — install the npm package globally (`npm install -g devcoach`) or via
+   [Homebrew](./homebrew.md) — running it alongside the plugin is fine. The plugin owns the coaching
+   hooks; the global binary just adds the CLI.
 
 ## Runs locally only
 

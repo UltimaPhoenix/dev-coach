@@ -108,7 +108,7 @@ The simplest way to add devcoach to **Claude Code** — one click, nothing to co
 /plugin install devcoach@ultimaphoenix
 ```
 
-The MCP server, hooks, and skill activate on install — no restart needed. The plugin **does not** add the `devcoach` CLI, so run the dashboard or CLI with `npx -y devcoach ui` (or use Homebrew / `npm i -g devcoach` for a bare `devcoach`).
+The MCP server, hooks, and skill activate on install — no restart needed. Open the [web dashboard](#web-dashboard) right from Claude Code with `/devcoach:ui` (or just ask — the `open_ui` tool). The plugin **does not** add the `devcoach` CLI, so for terminal use run `npx -y devcoach ui` (or use Homebrew / `npm i -g devcoach` for a bare `devcoach`).
 
 <details>
 <summary><strong>Other ways to install the plugin</strong> (straight from the repo · offline zip)</summary>
@@ -388,6 +388,8 @@ Open the dashboard at any time to review your progress, edit your profile, or ma
 ```bash
 npx -y devcoach ui   # → http://localhost:7860
 ```
+
+Using the Claude Code plugin? Type `/devcoach:ui` in Claude Code instead — no install needed.
 
 | Page | What you can do |
 |------|-----------------|
