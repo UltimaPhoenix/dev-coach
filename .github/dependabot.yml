@@ -10,6 +10,9 @@ updates:
     directories:
       - "/"
       - "/website"
+    # Bump the requirement in package.json alongside the lockfile (keeps the ^caret style), so the
+    # manifest and the lock never drift — the default for a published library only widens ranges.
+    versioning-strategy: increase
     schedule:
       interval: weekly
       day: monday
