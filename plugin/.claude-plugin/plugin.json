@@ -1,7 +1,7 @@
 {
   "name": "devcoach",
   "description": "Progressive technical coach for Claude Code: one lesson at a time, based on what you actually build. Knowledge map, coaching notebook, web dashboard, all local. Bundles the devcoach MCP server, the Stop hooks and the coaching skill.",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "author": {
     "name": "UltimaPhoenix",
     "url": "https://github.com/UltimaPhoenix"
