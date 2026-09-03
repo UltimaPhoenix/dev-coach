@@ -38,7 +38,17 @@ describe("claude code plugin packaging", () => {
     const server = mcp.mcpServers.devcoach;
     expect(server.type).toBe("stdio");
     expect(server.command).toBe("node");
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: literal plugin-root placeholder, not a template
     expect(server.args).toEqual(["${CLAUDE_PLUGIN_ROOT}/scripts/launch.mjs", "mcp"]);
+  });
+
+  it("ships the /devcoach:ui command wired to the open_ui tool", () => {
+    const cmd = read("plugin", "commands", "ui.md");
+    expect(cmd).toMatch(/^---\ndescription: .+/);
+    // Plugin MCP tools are namespaced mcp__plugin_<plugin>_<server>__<tool>; the bare
+    // mcp__devcoach__ name only exists when devcoach is wired as a plain MCP server.
+    expect(cmd).toContain("allowed-tools: mcp__plugin_devcoach_devcoach__open_ui");
+    expect(cmd).toContain("open_ui");
   });
 
   it("ships the merged stop-hook + prompt-hook, each with a timeout", () => {

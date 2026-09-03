@@ -1,6 +1,7 @@
 # devcoach — Claude Code plugin
 
 Install: `/plugin marketplace add UltimaPhoenix/dev-coach`, then `/plugin install devcoach@devcoach`.
+Open the web dashboard any time with `/devcoach:ui`.
 Docs: https://ultimaphoenix.github.io/dev-coach/install/claude-code-plugin
 
 **Maintainers:** `skills/devcoach/` and the version/pin stamps in this folder are **synced

@@ -31,6 +31,7 @@ describe("gemini cli extension packaging (beta)", () => {
     const manifest = readJson("gemini-extension", "gemini-extension.json");
     const server = manifest.mcpServers.devcoach;
     expect(server.command).toBe("node");
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: literal Gemini placeholder, not a template
     expect(server.args).toEqual(["${extensionPath}/scripts/launch.mjs", "mcp"]);
   });
 

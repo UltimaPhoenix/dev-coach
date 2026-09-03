@@ -60,7 +60,7 @@ dev-coach/
 ├── scripts/screenshots.mjs # Playwright capture of docs/screenshots from scripts/screenshots/fixture.zip
 ├── mcpb/                   # Claude Desktop Extension: manifest.json (v0.4, server.type node) + icon.png/svg
 ├── scripts/build-mcpb.mjs  # stage → validate → pack the .mcpb via @anthropic-ai/mcpb (--sign to self-sign)
-├── plugin/                 # Claude Code plugin (pinned npm launcher + hooks + skill mirror) — synced, never hand-edited
+├── plugin/                 # Claude Code plugin (pinned npm launcher + hooks + /devcoach:ui command + skill mirror — skills/ synced, never hand-edited)
 ├── gemini-extension/       # Gemini CLI extension (same launcher pattern, AfterAgent/BeforeAgent hooks) — synced
 ├── server.json             # MCP Registry manifest (io.github.UltimaPhoenix/devcoach) — version pinned by sync
 └── docs/  website/  .github/workflows/{ci,docs,update-screenshots,cla}.yml
