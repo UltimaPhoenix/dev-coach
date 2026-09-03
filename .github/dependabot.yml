@@ -1,5 +1,9 @@
 version: 2
 
+# One PR per ecosystem, not one per package: every npm bump (root + website, minor/patch AND
+# major) lands in a single grouped PR, and security bumps land in a single grouped PR of their
+# own — Dependabot keeps version updates and security updates in separate groups by design
+# (`applies-to`), and never mixes ecosystems.
 updates:
   # Node dependencies (npm / package.json) — root package + the Docusaurus docs site
   - package-ecosystem: npm
@@ -12,12 +16,12 @@ updates:
       time: "06:00"
       timezone: "Europe/Rome"
     groups:
-      # Group all non-breaking updates together to minimise PR noise.
-      # Breaking updates (major bumps) are kept separate per package.
-      non-breaking:
-        update-types:
-          - minor
-          - patch
+      npm:
+        applies-to: version-updates
+        patterns: ["*"]
+      npm-security:
+        applies-to: security-updates
+        patterns: ["*"]
     open-pull-requests-limit: 10
     commit-message:
       prefix: "deps"
@@ -34,6 +38,10 @@ updates:
       timezone: "Europe/Rome"
     groups:
       github-actions:
+        applies-to: version-updates
+        patterns: ["*"]
+      github-actions-security:
+        applies-to: security-updates
         patterns: ["*"]
     commit-message:
       prefix: "ci"
