@@ -452,6 +452,15 @@ The compounding effect: developers who keep learning while tools get stronger st
 
 devcoach requires Node.js ≥ 24. Check your version: `node --version`. If you're below 24, upgrade: `brew upgrade node` (Homebrew) or `nvm install 24` (if using nvm).
 
+**"Failed to install plugin devcoach@ultimaphoenix: … invalid manifest … repository: expected string"**
+
+Plugin releases up to 1.0.1 shipped a manifest that current Claude Code rejects, so the install stopped before copying anything. Refresh the marketplace so it points at the latest release, then install again:
+
+```bash
+/plugin marketplace update ultimaphoenix
+/plugin install devcoach@ultimaphoenix
+```
+
 **"MCP server not connecting"**
 
 Run `devcoach install` to re-register the server with Claude Code or Claude Desktop, then restart the agent. If the issue persists, check `~/.claude.json` (Claude Code) and confirm the `devcoach` entry is present and the command is correct.

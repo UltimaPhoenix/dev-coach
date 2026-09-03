@@ -56,6 +56,15 @@ jobs:
       - run: npm run typecheck
       - run: npm run test:cov
       - run: npm run build
+      # Claude Code's own manifest validator — the same check `claude plugin install` runs.
+      # v1.0.1 shipped a plugin.json it rejects (repository as an object) and every marketplace
+      # install failed; running it here, strict and against the current Claude Code, turns the
+      # next schema drift into a red build instead of a broken install. Once per matrix is enough.
+      - name: Validate the Claude Code plugin + self-marketplace
+        if: matrix.node == '24'
+        run: |
+          npx -y @anthropic-ai/claude-code@latest plugin validate plugin --strict
+          npx -y @anthropic-ai/claude-code@latest plugin validate .claude-plugin/marketplace.json --strict
       # Hand the lcov report to the sonar job so it doesn't re-install + re-test.
       - uses: actions/upload-artifact@v7
         if: matrix.node == '24'

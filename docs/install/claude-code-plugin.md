@@ -64,6 +64,8 @@ The **UltimaPhoenix marketplace** (`UltimaPhoenix/claude-plugins-marketplace`) i
 
 This updates your local plugin registry without reinstalling — only new versions are fetched if they've been updated since you last added the marketplace.
 
+**Install fails with "invalid manifest … repository: expected string"?** Plugin releases up to 1.0.1 shipped a manifest that current Claude Code rejects. Run `/plugin marketplace update ultimaphoenix` so the marketplace points at the latest release, then `/plugin install devcoach@ultimaphoenix` again.
+
 **Switching methods:** If you added devcoach straight from the repo (`UltimaPhoenix/dev-coach`) and later want to switch to the marketplace, remove the old one and add the marketplace:
 
 ```bash

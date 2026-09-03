@@ -16,6 +16,20 @@ describe("claude code plugin packaging", () => {
     expect(manifest.version).toBe(pkg.version);
   });
 
+  it("plugin manifest satisfies Claude Code's schema (`claude plugin validate`)", () => {
+    const manifest = readJson("plugin", ".claude-plugin", "plugin.json");
+    // `repository` must be a plain URL string. Up to v1.0.1 it was the npm-style {type, url}
+    // object, which Claude Code's validator rejects — so every marketplace install failed with
+    // "repository: Invalid input: expected string, received object". CI also runs the real
+    // validator (--strict) so the next schema drift fails the build, not the install.
+    expect(manifest.repository).toBe("https://github.com/UltimaPhoenix/dev-coach");
+    expect(manifest.description).toEqual(expect.any(String));
+    expect(manifest.author).toEqual({ name: "UltimaPhoenix", url: expect.any(String) });
+    expect(manifest.homepage).toMatch(/^https:\/\//);
+    expect(manifest.license).toEqual(expect.any(String));
+    expect(manifest.keywords).toEqual(expect.arrayContaining(["mcp"]));
+  });
+
   it("bundled skill dir is identical to assets/ (single source of truth)", () => {
     expect(read("plugin", "skills", "devcoach", "SKILL.md")).toBe(read("assets", "SKILL.md"));
     for (const ref of readdirSync(join(root, "assets", "references"))) {
@@ -31,6 +45,8 @@ describe("claude code plugin packaging", () => {
     const entry = market.plugins.find((p: { name: string }) => p.name === "devcoach");
     expect(entry).toBeDefined();
     expect(entry.source).toBe("./plugin");
+    // `claude plugin validate --strict` (run in CI) warns on a marketplace without one.
+    expect(market.description).toEqual(expect.any(String));
   });
 
   it("registers the devcoach MCP server over stdio via pinned node install", () => {
