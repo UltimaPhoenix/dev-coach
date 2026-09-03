@@ -56,7 +56,8 @@ dev-coach/
 ├── tests/                  # Vitest (13 files: core, db-extra, coach/git/claude-history, mcp, web, cli,
 │                           #   setup-wizard, hooks, hooks-spawn, plugin, gemini-extension, mcp-registry)
 ├── scripts/e2e-claude.mjs  # local-only e2e: real `claude -p` sessions (npm run test:e2e)
-├── scripts/sync-plugin.mjs # pins plugin/, gemini-extension/, server.json to package.json + copies the skill
+├── scripts/sync-plugin.mjs # pins plugin/, gemini-extension/, server.json + self-marketplace to package.json; copies the skill + LICENSE
+├── scripts/marketplace-entry.mjs # the devcoach marketplace entry, derived from plugin.json (+ category/tags); used by update-marketplace.mjs
 ├── scripts/screenshots.mjs # Playwright capture of docs/screenshots from scripts/screenshots/fixture.zip
 ├── mcpb/                   # Claude Desktop Extension: manifest.json (v0.4, server.type node) + icon.png/svg
 ├── scripts/build-mcpb.mjs  # stage → validate → pack the .mcpb via @anthropic-ai/mcpb (--sign to self-sign)
@@ -199,8 +200,9 @@ hook (verified empirically) — hence priming-first design; blocks are the rare 
   `DEVCOACH_CLAUDE_DIR`/`CLAUDE_CONFIG_DIR` (`core/claude-history.ts`) to relocate the
   Claude Code history the onboarding scan reads.
 - `assets/` is the tracked source of truth (SKILL.md + web static) — `package.json` `files` ships it.
-  `plugin/skills/` and `gemini-extension/skills/` are byte-checked mirrors: never edit them, run
-  `npm run plugin:sync` (it also pins every manifest version to `package.json`).
+  `plugin/skills/`, `gemini-extension/skills/` and both `LICENSE` copies are byte-checked mirrors: never
+  edit them, run `npm run plugin:sync` (it also pins every manifest version to `package.json`).
+  Marketplace entries (public tap + self-marketplace) mirror `plugin.json`'s metadata — change it there.
 - Prefer a Node built-in over a dependency; pin deps at latest stable.
 
 ---

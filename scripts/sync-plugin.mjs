@@ -6,9 +6,11 @@
 //   • gemini-extension/skills/devcoach/  ←  assets/SKILL.md + assets/references/
 //   • both package.json pins             ←  package.json version
 //   • server.json (MCP Registry) versions ←  package.json version
+//   • .claude-plugin/marketplace.json version ←  package.json version (self-marketplace entry)
+//   • plugin/LICENSE + gemini-extension/LICENSE  ←  LICENSE (AGPL text ships with every install)
 // Idempotent: writing the same content twice is a no-op. Run it in the bump job and before packing.
 //   node scripts/sync-plugin.mjs
-import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -58,6 +60,18 @@ const serverJsonPath = join(root, "server.json");
 const serverJson = readFileSync(serverJsonPath, "utf8");
 writeFileSync(serverJsonPath, serverJson.replace(/"version": "[^"]+"/g, `"version": "${version}"`));
 
+// 6. Pin the self-marketplace entry (the repo doubles as a one-plugin marketplace for
+//    `claude plugin marketplace add UltimaPhoenix/dev-coach`); its only "version" is the entry's.
+const selfMarketPath = join(root, ".claude-plugin", "marketplace.json");
+const selfMarket = readFileSync(selfMarketPath, "utf8");
+writeFileSync(selfMarketPath, selfMarket.replace(/"version": "[^"]+"/, `"version": "${version}"`));
+
+// 7. Ship the license text with both extensions — an install from the marketplace, the offline
+//    zips and the Gemini extension never see the npm tarball, which is where LICENSE otherwise lives.
+for (const dir of ["plugin", "gemini-extension"]) {
+  copyFileSync(join(root, "LICENSE"), join(root, dir, "LICENSE"));
+}
+
 console.log(
-  `synced plugin + gemini-extension + server.json → version ${version}, SKILL.md copied, devcoach pinned`,
+  `synced plugin + gemini-extension + server.json + self-marketplace → version ${version}, SKILL.md + LICENSE copied, devcoach pinned`,
 );

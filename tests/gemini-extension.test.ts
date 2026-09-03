@@ -56,4 +56,8 @@ describe("gemini cli extension packaging (beta)", () => {
     const launcher = read("gemini-extension", "scripts", "launch.mjs");
     expect(launcher).toContain('join(homedir(), ".devcoach", "gemini-ext")');
   });
+
+  it("ships the AGPL license text with the extension (synced from LICENSE)", () => {
+    expect(read("gemini-extension", "LICENSE")).toBe(read("LICENSE"));
+  });
 });

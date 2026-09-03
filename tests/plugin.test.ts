@@ -1,4 +1,6 @@
-import { readdirSync, readFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -47,6 +49,82 @@ describe("claude code plugin packaging", () => {
     expect(entry.source).toBe("./plugin");
     // `claude plugin validate --strict` (run in CI) warns on a marketplace without one.
     expect(market.description).toEqual(expect.any(String));
+  });
+
+  it("self-marketplace entry mirrors plugin.json metadata + the marketplace-only fields", () => {
+    const pkg = readJson("package.json");
+    const manifest = readJson("plugin", ".claude-plugin", "plugin.json");
+    const market = readJson(".claude-plugin", "marketplace.json");
+    const entry = market.plugins.find((p: { name: string }) => p.name === "devcoach");
+    expect(market.owner).toEqual({ name: "UltimaPhoenix", url: expect.stringMatching(/^https/) });
+    // Pinned by `npm run plugin:sync` like every other manifest.
+    expect(entry.version).toBe(pkg.version);
+    // What Claude Code shows in the plugin browser comes from plugin.json — never diverge.
+    for (const key of ["description", "author", "homepage", "repository", "license", "keywords"]) {
+      expect(entry[key], key).toEqual(manifest[key]);
+    }
+    // category/tags belong to the marketplace entry only (plugin.json rejects them in strict mode).
+    expect(entry.category).toBe("learning");
+    expect(entry.tags).toEqual(expect.arrayContaining(["coaching", "mcp"]));
+  });
+
+  it("update-marketplace.mjs enriches only the devcoach entry of the shared tap catalog", () => {
+    const manifest = readJson("plugin", ".claude-plugin", "plugin.json");
+    const dir = mkdtempSync(join(tmpdir(), "devcoach-mkt-"));
+    const file = join(dir, ".claude-plugin", "marketplace.json");
+    mkdirSync(dirname(file), { recursive: true });
+    writeFileSync(
+      file,
+      JSON.stringify({
+        name: "ultimaphoenix",
+        owner: { name: "UltimaPhoenix" },
+        plugins: [
+          { name: "other", description: "untouched", source: "./other" },
+          { name: "devcoach", version: "0.3.63", description: "old", source: { source: "git" } },
+        ],
+      }),
+    );
+    execFileSync(process.execPath, [
+      join(root, "scripts", "update-marketplace.mjs"),
+      "9.9.9",
+      "v9.9.9",
+      file,
+    ]);
+    const market = JSON.parse(readFileSync(file, "utf8"));
+    expect(market.plugins[0]).toEqual({
+      name: "other",
+      description: "untouched",
+      source: "./other",
+    });
+    expect(market.plugins[1]).toEqual({
+      name: "devcoach",
+      version: "9.9.9",
+      description: manifest.description,
+      author: manifest.author,
+      homepage: manifest.homepage,
+      repository: manifest.repository,
+      license: manifest.license,
+      category: "learning",
+      keywords: manifest.keywords,
+      tags: expect.arrayContaining(["coaching"]),
+      source: {
+        source: "git-subdir",
+        url: "https://github.com/UltimaPhoenix/dev-coach.git",
+        path: "plugin",
+        ref: "v9.9.9",
+      },
+    });
+    // Marketplace-level metadata is filled in when missing, never overwritten.
+    expect(market.description).toEqual(expect.any(String));
+    expect(market.owner).toEqual({
+      name: "UltimaPhoenix",
+      url: "https://github.com/UltimaPhoenix",
+    });
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("ships the AGPL license text with the plugin (synced from LICENSE)", () => {
+    expect(read("plugin", "LICENSE")).toBe(read("LICENSE"));
   });
 
   it("registers the devcoach MCP server over stdio via pinned node install", () => {

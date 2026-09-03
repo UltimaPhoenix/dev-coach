@@ -23,6 +23,7 @@ rmSync(stage, { recursive: true, force: true });
 mkdirSync(stage, { recursive: true });
 cpSync(join(root, "dist"), join(stage, "dist"), { recursive: true });
 cpSync(join(root, "assets"), join(stage, "assets"), { recursive: true });
+cpSync(join(root, "LICENSE"), join(stage, "LICENSE")); // AGPL text ships inside the bundle
 
 const manifest = JSON.parse(readFileSync(join(root, "mcpb", "manifest.json"), "utf8"));
 manifest.version = version; // keep in sync with package.json
