@@ -4,6 +4,13 @@ Notable changes to devcoach. Versions follow [Semantic Versioning](https://semve
 
 ---
 
+## [2.0.1] — 2026-09-06
+
+### Fixed
+- **Claude Desktop extension manifest**: declares the Node runtime floor (`runtimes.node ">=24"`, for
+  `node:sqlite`), mirrored from `package.json` `engines` and pinned by the packaging test, so Claude
+  Desktop can refuse an older bundled runtime up front instead of failing at startup.
+
 ## [2.0.0] — 2026-09-06
 
 ### Changed
@@ -24,8 +31,7 @@ Notable changes to devcoach. Versions follow [Semantic Versioning](https://semve
   contained, so the server could not start. The `.mcpb` is now a single self-contained `dist/bin.js`
   (`tsup.mcpb.config.ts`, every dependency inlined); the build refuses to pack unless the bundle has no
   bare-specifier imports and, run from a temp directory outside the repo, starts the CLI and answers an
-  MCP `initialize`. CI runs that build on every push. The manifest now declares the Node runtime floor
-  (`>=24`, for `node:sqlite`).
+  MCP `initialize`. CI runs that build on every push.
 - **Release pipeline**: the bump commit now also pins the self-marketplace entry
   (`.claude-plugin/marketplace.json`) and the synced LICENSE mirrors; 1.0.3 had left the marketplace
   pin at 1.0.2.
