@@ -4,6 +4,39 @@ Notable changes to devcoach. Versions follow [Semantic Versioning](https://semve
 
 ---
 
+## [2.0.0] — 2026-09-06
+
+### Changed
+- **MCP SDK v2**: the server now runs on `@modelcontextprotocol/server` 2.0 (the monolithic
+  `@modelcontextprotocol/sdk` 1.x is retired upstream); `@modelcontextprotocol/client` is used only by
+  the in-memory tests. Tool schemas are `z.object()` Standard Schema objects. The wire contract is
+  unchanged: the same 15 tools, 11 resources and prompt, with the same descriptions, defaults,
+  `structuredContent` and `isError` shapes, and the same protocol negotiation with Claude Code and
+  other 2024–2025-era clients (verified with the `claude -p` e2e suite). No user-facing API change;
+  the major bump marks the dependency swap.
+- **Runtime dependency tree: 95 packages → 7.** Ninety of them existed only because the v1 SDK pulled
+  in express, ajv, jose, eventsource, cors and friends — the source of most Dependabot security PRs on
+  the lockfile and of the plugin launcher's slow first install.
+
+### Fixed
+- **Claude Desktop extension (.mcpb)**: the bundle shipped the code-split npm `dist/`, whose chunks
+  import the SDK, Hono, Commander, Zod and fflate from `node_modules` that the extension never
+  contained, so the server could not start. The `.mcpb` is now a single self-contained `dist/bin.js`
+  (`tsup.mcpb.config.ts`, every dependency inlined); the build refuses to pack unless the bundle has no
+  bare-specifier imports and, run from a temp directory outside the repo, starts the CLI and answers an
+  MCP `initialize`. CI runs that build on every push. The manifest now declares the Node runtime floor
+  (`>=24`, for `node:sqlite`).
+- **Release pipeline**: the bump commit now also pins the self-marketplace entry
+  (`.claude-plugin/marketplace.json`) and the synced LICENSE mirrors; 1.0.3 had left the marketplace
+  pin at 1.0.2.
+
+## [1.0.0] – [1.0.3] — 2026-08-27 → 2026-09-03
+
+Release notes for the 1.0 line live in the
+[GitHub Releases](https://github.com/UltimaPhoenix/dev-coach/releases): 1.0 GA, AGPL dual license,
+Claude Code plugin marketplace with `/devcoach:ui`, Gemini CLI and Codex CLI (beta) integrations,
+MCP Registry publishing, Dependabot grouping.
+
 ## [0.7.0] — 2026-06-25
 
 No functional changes. A re-release published while hardening the release pipeline; identical in

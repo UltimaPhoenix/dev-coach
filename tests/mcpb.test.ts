@@ -18,6 +18,9 @@ describe("Claude Desktop extension manifest (mcpb/manifest.json)", () => {
     expect(manifest.display_name).toBe("devcoach");
     expect(manifest.version).toBe(pkg.version);
     expect(manifest.license).toBe(pkg.license);
+    // The .mcpb is a self-contained bundle that still needs the host's Node (node:sqlite) — the
+    // runtime floor Claude Desktop checks must match the package's engines floor.
+    expect(manifest.compatibility.runtimes.node).toBe(pkg.engines.node);
     // biome-ignore lint/suspicious/noTemplateCurlyInString: literal mcpb placeholder, not a template
     expect(manifest.server.mcp_config.args).toEqual(["${__dirname}/dist/bin.js", "mcp"]);
   });
