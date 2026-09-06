@@ -1,8 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import { ElicitRequestSchema } from "@modelcontextprotocol/sdk/types.js";
+import { Client, InMemoryTransport } from "@modelcontextprotocol/client";
 import { describe, expect, it, vi } from "vitest";
 import * as db from "../src/core/db";
 import { createServer } from "../src/mcp/server";
@@ -239,7 +237,7 @@ describe("mcp server", () => {
       action: "accept" as const,
       content: { feedback: "know" },
     }));
-    client.setRequestHandler(ElicitRequestSchema, elicit);
+    client.setRequestHandler("elicitation/create", elicit);
     await client.connect(ct);
     await client.callTool({ name: "complete_onboarding", arguments: { topics: { python: 4 } } });
 

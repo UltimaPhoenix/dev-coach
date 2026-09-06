@@ -1,11 +1,22 @@
-// Stage the bundled Node server + assets + manifest into mcpb/build/, validate, then pack the .mcpb
-// with the official @anthropic-ai/mcpb CLI (npx fetches it). Run after `npm run build`.
+// Bundle a self-contained Node server (tsup.mcpb.config.ts: every dependency inlined — the .mcpb
+// ships no node_modules) + assets + manifest into mcpb/build/, prove it resolves outside the repo,
+// validate, then pack the .mcpb with the official @anthropic-ai/mcpb CLI (npx fetches it).
 //   node scripts/build-mcpb.mjs            →  dist-mcpb/devcoach-<version>.mcpb  (unsigned)
 //   node scripts/build-mcpb.mjs --sign     →  also self-sign it (writes cert.pem/key.pem in mcpb/, gitignored)
 // For a real distribution signature, sign with your own cert instead:
 //   npx @anthropic-ai/mcpb sign dist-mcpb/devcoach-<version>.mcpb -c cert.pem -k key.pem
-import { execFileSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { execFileSync, spawnSync } from "node:child_process";
+import {
+  cpSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { builtinModules } from "node:module";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -14,14 +25,11 @@ const version = JSON.parse(readFileSync(join(root, "package.json"), "utf8")).ver
 const stage = join(root, "mcpb", "build");
 const out = join(root, "dist-mcpb");
 
-if (!existsSync(join(root, "dist", "bin.js"))) {
-  console.error("Run `npm run build` first (dist/bin.js missing).");
-  process.exit(1);
-}
-
 rmSync(stage, { recursive: true, force: true });
 mkdirSync(stage, { recursive: true });
-cpSync(join(root, "dist"), join(stage, "dist"), { recursive: true });
+// One self-contained file: the npm dist/ imports its dependencies, which the extension cannot install.
+execFileSync("npx", ["tsup", "--config", "tsup.mcpb.config.ts"], { cwd: root, stdio: "inherit" });
+const bundle = join(stage, "dist", "bin.js");
 cpSync(join(root, "assets"), join(stage, "assets"), { recursive: true });
 cpSync(join(root, "LICENSE"), join(stage, "LICENSE")); // AGPL text ships inside the bundle
 
@@ -31,6 +39,43 @@ writeFileSync(join(stage, "manifest.json"), `${JSON.stringify(manifest, null, 2)
 if (existsSync(join(root, "mcpb", "icon.png"))) {
   cpSync(join(root, "mcpb", "icon.png"), join(stage, "icon.png"));
 }
+
+// Guard 1 — no bare-specifier import may survive in the bundle (unresolvable inside Claude Desktop).
+// ESM statements only: esbuild emits externals as `import … from "x"` / `import("x")`; `require("…")`
+// text also occurs inside inlined libraries (ajv's code generator) and is not a module reference.
+const builtins = new Set(builtinModules.flatMap((m) => [m, `node:${m}`]));
+const bare = [
+  ...readFileSync(bundle, "utf8").matchAll(/(?:\bfrom\s*|\bimport\s*\(\s*)["']([^"'\n]+)["']/g),
+]
+  .map((m) => m[1])
+  .filter((s) => /^(node:)?[@a-z0-9][\w./@-]*$/i.test(s) && !s.startsWith(".") && !builtins.has(s));
+if (bare.length) {
+  console.error(`mcpb bundle still imports packages: ${[...new Set(bare)].join(", ")}`);
+  process.exit(1);
+}
+// Guard 2 — run the staged tree from OUTSIDE the repo (the root node_modules would mask a missing
+// package): the CLI must start, and the MCP server must answer an initialize handshake.
+const probe = mkdtempSync(join(tmpdir(), "devcoach-mcpb-"));
+cpSync(stage, probe, { recursive: true });
+const probeEnv = { ...process.env, DEVCOACH_DIR: join(probe, "data") };
+execFileSync(process.execPath, [join(probe, "dist", "bin.js"), "--help"], {
+  cwd: probe,
+  env: probeEnv,
+  stdio: ["ignore", "ignore", "inherit"],
+});
+const init = spawnSync(process.execPath, [join(probe, "dist", "bin.js"), "mcp"], {
+  cwd: probe,
+  env: probeEnv,
+  input: `${JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "mcpb-smoke", version: "0.0.0" } } })}\n`,
+  encoding: "utf8",
+  timeout: 15000,
+});
+rmSync(probe, { recursive: true, force: true });
+if (!init.stdout?.includes('"serverInfo"')) {
+  console.error(`mcpb bundle: MCP initialize handshake failed\n${init.stderr || ""}`);
+  process.exit(1);
+}
+console.log("mcpb bundle: self-contained (no package imports), CLI + MCP handshake OK");
 
 // Validate the staged manifest against the official schema before packing (fail fast).
 execFileSync("npx", ["-y", "@anthropic-ai/mcpb", "validate", join(stage, "manifest.json")], {

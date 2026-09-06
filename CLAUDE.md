@@ -18,7 +18,10 @@ local web dashboard. Everything is local — one SQLite file at `~/.devcoach/coa
 ## Stack
 
 - **Node.js ≥ 24** (required for the embedded `node:sqlite`), ESM, TypeScript
-- **`@modelcontextprotocol/sdk`** — official MCP SDK (`McpServer`, `StdioServerTransport`)
+- **`@modelcontextprotocol/server`** — official MCP TypeScript SDK **v2** (`McpServer`, `ResourceTemplate`;
+  `StdioServerTransport` from `@modelcontextprotocol/server/stdio`); `@modelcontextprotocol/client` is a
+  dev dependency for the in-memory tests only. Runtime dependency tree: 7 packages (the v1 monolith
+  dragged in ~90 — express, ajv, jose, …)
 - **`node:sqlite`** (`DatabaseSync`) — zero-dependency embedded SQLite at `~/.devcoach/coaching.db`
 - **Zod** — schema validation + tool `inputSchema`/`outputSchema`
 - **Hono** + `@hono/node-server` — web dashboard (server-rendered `hono/html`, vendored Tailwind/Alpine/HTMX)
@@ -36,7 +39,7 @@ local web dashboard. Everything is local — one SQLite file at `~/.devcoach/coa
 ```
 dev-coach/
 ├── package.json            # bin: devcoach → dist/bin.js; engines.node >=24; ESM
-├── tsconfig.json  biome.json  vitest.config.ts  tsup.config.ts  .node-version (26)
+├── tsconfig.json  biome.json  vitest.config.ts  tsup.config.ts  tsup.mcpb.config.ts  .node-version (26)
 ├── assets/                 # tracked single source of truth
 │   ├── SKILL.md            # coaching instructions (slim body; served as the MCP prompt)
 │   ├── references/         # skill progressive disclosure: onboarding.md, calibration.md, review.md
@@ -60,7 +63,8 @@ dev-coach/
 ├── scripts/marketplace-entry.mjs # the devcoach marketplace entry, derived from plugin.json (+ category/tags); used by update-marketplace.mjs
 ├── scripts/screenshots.mjs # Playwright capture of docs/screenshots from scripts/screenshots/fixture.zip
 ├── mcpb/                   # Claude Desktop Extension: manifest.json (v0.4, server.type node) + icon.png/svg
-├── scripts/build-mcpb.mjs  # stage → validate → pack the .mcpb via @anthropic-ai/mcpb (--sign to self-sign)
+├── scripts/build-mcpb.mjs  # self-contained bundle (tsup.mcpb.config.ts, deps inlined) → guards (no bare imports;
+│                           #   CLI + MCP initialize from outside the repo) → validate → pack via @anthropic-ai/mcpb
 ├── plugin/                 # Claude Code plugin (pinned npm launcher + hooks + /devcoach:ui command + skill mirror — skills/ synced, never hand-edited)
 ├── gemini-extension/       # Gemini CLI extension (same launcher pattern, AfterAgent/BeforeAgent hooks) — synced
 ├── server.json             # MCP Registry manifest (io.github.UltimaPhoenix/devcoach) — version pinned by sync

@@ -1,4 +1,4 @@
-// MCP server on the official @modelcontextprotocol/sdk.
+// MCP server on the official MCP TypeScript SDK v2 (@modelcontextprotocol/server).
 // 15 tools, 11 resources, and the devcoach_instructions prompt. Tools follow the build-mcp-server
 // review: title + hint annotations, tight Zod schemas with .describe(), outputSchema/structuredContent
 // for model returns, isError on failure. log_lesson is a pure save (never elicits);
@@ -6,8 +6,8 @@
 import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
-import { McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { McpServer, ResourceTemplate } from "@modelcontextprotocol/server";
+import { StdioServerTransport } from "@modelcontextprotocol/server/stdio";
 import { z } from "zod";
 import { scanClaudeHistory, scanRecentProjectWindow } from "../core/claude-history";
 import * as coach from "../core/coach";
@@ -37,9 +37,9 @@ const structured = (v: Record<string, unknown>) => ({
   structuredContent: v,
 });
 
-// ── Output schemas (plain shapes; no transforms — describe the JSON Claude sees) ─
+// ── Output schemas (z.object, no transforms — they describe the JSON Claude sees) ─
 
-const lessonOutputShape = {
+const lessonOutput = z.object({
   id: z.string(),
   timestamp: z.string(),
   topic_id: z.string(),
@@ -57,16 +57,15 @@ const lessonOutputShape = {
   repository_platform: RepositoryPlatformSchema.nullable(),
   starred: z.boolean(),
   feedback: FeedbackSchema.nullable(),
-};
+});
 
 // log_lesson's output adds a model-facing self-check. It must live in
 // structuredContent: when a tool returns structured output, Claude Code surfaces
 // THAT to the model and drops the plain-text content blocks — an instruction
 // placed there is never seen (verified via session transcripts).
-const logLessonOutputShape = {
-  ...lessonOutputShape,
+const logLessonOutput = lessonOutput.extend({
   reply_check: z.string(),
-};
+});
 
 const CARD_REPLY_CHECK =
   "Saved — but saving does NOT display anything. The user sees ONLY plain text you " +
@@ -76,20 +75,20 @@ const CARD_REPLY_CHECK =
   "plain reply text, outside any tool call? If yes: output nothing. If no: write the " +
   "card now, as the final text of your reply. Never write it twice.";
 
-const profileOutputShape = {
+const profileOutput = z.object({
   knowledge: z.array(z.object({ topic: z.string(), confidence: z.number().int() })),
   groups: z.array(z.object({ name: z.string(), topics: z.array(z.string()) })),
-};
+});
 
-const settingsOutputShape = {
+const settingsOutput = z.object({
   max_per_day: z.number().int(),
   min_gap_minutes: z.number().int(),
   ui_theme: UiThemeSchema,
   nudge_every: z.number().int(),
   nudge_scope: NudgeScopeSchema,
-};
+});
 
-const deepScanOutputShape = {
+const deepScanOutput = z.object({
   window_months: z.number().int(),
   cutoff: z.string(),
   candidate_count: z.number().int(),
@@ -102,7 +101,7 @@ const deepScanOutputShape = {
       prompt_count: z.number().int(),
     }),
   ),
-};
+});
 
 // ── JSON resource helper ─────────────────────────────────────────────────────
 
@@ -135,7 +134,7 @@ export function createServer(): McpServer {
         "commit_hash, folder, repository_platform) is auto-detected from the workspace when omitted. " +
         "timestamp is always stamped server-side with the current time — there is no argument for it. " +
         "Returns the saved Lesson with all resolved fields.",
-      inputSchema: {
+      inputSchema: z.object({
         id: z.string().describe("Unique lesson id (uuid or random string)"),
         topic_id: z.string().describe("Primary topic id, e.g. 'python'"),
         categories: z.array(z.string()).describe("Category tags, e.g. ['python','performance']"),
@@ -159,8 +158,8 @@ export function createServer(): McpServer {
         repository_platform: RepositoryPlatformSchema.nullish().describe(
           "github | gitlab | bitbucket | local (auto-detected if omitted)",
         ),
-      },
-      outputSchema: logLessonOutputShape,
+      }),
+      outputSchema: logLessonOutput,
       annotations: {
         title: "Log Lesson",
         destructiveHint: false,
@@ -232,10 +231,10 @@ export function createServer(): McpServer {
       description:
         "Adjust the confidence score for a topic by delta (e.g. +1 or -1). Returns the new " +
         "confidence (0-10). Creates the topic at confidence 5 if it does not exist.",
-      inputSchema: {
+      inputSchema: z.object({
         topic: z.string().describe("Topic id, e.g. 'python'"),
         delta: z.number().int().describe("Signed change to apply, e.g. +1 or -1"),
-      },
+      }),
       annotations: {
         title: "Update Knowledge",
         destructiveHint: false,
@@ -260,7 +259,7 @@ export function createServer(): McpServer {
       description:
         "Query the coaching lesson history. All filters combine. period defaults to all; " +
         "date_from/date_to override period; limit caps results newest-first (0 = all).",
-      inputSchema: {
+      inputSchema: z.object({
         period: z.enum(["today", "week", "month", "year", "all"]).nullish().describe("Time window"),
         category: z.string().nullish().describe("Filter by a category tag, e.g. 'python'"),
         level: z.enum(["junior", "mid", "senior"]).nullish().describe("Filter by difficulty level"),
@@ -283,7 +282,7 @@ export function createServer(): McpServer {
           .nullish()
           .describe("ISO date/datetime upper bound (date-only = end-of-day)"),
         limit: z.number().int().default(10).describe("Max lessons, newest first. Pass 0 for all."),
-      },
+      }),
       annotations: {
         title: "Get Lessons",
         readOnlyHint: true,
@@ -325,10 +324,10 @@ export function createServer(): McpServer {
       title: "Star Lesson",
       description:
         "Set the starred (favourite) flag on a lesson. Returns true if found and updated. Idempotent.",
-      inputSchema: {
+      inputSchema: z.object({
         lesson_id: z.string().describe("Lesson id"),
         starred: z.boolean().describe("true to favourite, false to unmark"),
-      },
+      }),
       annotations: {
         title: "Star Lesson",
         destructiveHint: false,
@@ -351,7 +350,7 @@ export function createServer(): McpServer {
     {
       title: "Delete Lesson",
       description: "Permanently delete a lesson by id. Returns true if found and deleted.",
-      inputSchema: { lesson_id: z.string().describe("Lesson id to delete") },
+      inputSchema: z.object({ lesson_id: z.string().describe("Lesson id to delete") }),
       annotations: {
         title: "Delete Lesson",
         destructiveHint: true,
@@ -377,10 +376,10 @@ export function createServer(): McpServer {
         "Record comprehension feedback for a lesson and adjust knowledge confidence. " +
         "know = +1, dont_know = -1, clear = remove feedback (no confidence change). " +
         "Idempotent — the same feedback twice adjusts confidence only once.",
-      inputSchema: {
+      inputSchema: z.object({
         lesson_id: z.string().describe("Lesson id"),
         feedback: z.enum(["know", "dont_know", "clear"]).describe("know | dont_know | clear"),
-      },
+      }),
       annotations: {
         title: "Submit Feedback",
         destructiveHint: false,
@@ -419,12 +418,12 @@ export function createServer(): McpServer {
         "completed work does not warrant one (pure questions, chat, nothing technical). " +
         "Re-arms the pacing counter so the cue is not repeated immediately. " +
         "Never call it after delivering a lesson — log_lesson already resolves the cue.",
-      inputSchema: {
+      inputSchema: z.object({
         reason: z
           .string()
           .min(1)
           .describe("One line: why no lesson was warranted (shown in `devcoach doctor`)"),
-      },
+      }),
       annotations: {
         title: "Skip Lesson",
         destructiveHint: false,
@@ -449,13 +448,13 @@ export function createServer(): McpServer {
       description:
         "Add a topic to the knowledge map, or update its confidence if it exists. Optionally assign " +
         "to a group (auto-created). Prefer a single-word topic id. Idempotent.",
-      inputSchema: {
+      inputSchema: z.object({
         topic: z.string().describe("Topic id — prefer a single word, max 3 words"),
         confidence: confidenceInputSchema
           .default(5)
           .describe("Initial confidence 0-10 (default 5)"),
         group: z.string().nullish().describe("Optional group name; 'Other' if omitted"),
-      },
+      }),
       annotations: {
         title: "Add Topic",
         destructiveHint: false,
@@ -482,7 +481,7 @@ export function createServer(): McpServer {
     {
       title: "Remove Topic",
       description: "Remove a topic from the knowledge map entirely. Returns true if it existed.",
-      inputSchema: { topic: z.string().describe("Topic id to remove") },
+      inputSchema: z.object({ topic: z.string().describe("Topic id to remove") }),
       annotations: {
         title: "Remove Topic",
         destructiveHint: true,
@@ -506,7 +505,7 @@ export function createServer(): McpServer {
       title: "Add Group",
       description:
         "Create a new (initially empty) knowledge group. Idempotent — returns true either way.",
-      inputSchema: { name: z.string().describe("Group name, e.g. 'Machine Learning'") },
+      inputSchema: z.object({ name: z.string().describe("Group name, e.g. 'Machine Learning'") }),
       annotations: {
         title: "Add Group",
         destructiveHint: false,
@@ -530,7 +529,7 @@ export function createServer(): McpServer {
       title: "Remove Group",
       description:
         "Delete a knowledge group. Its topics move to Other. Returns true if it existed.",
-      inputSchema: { name: z.string().describe("Group name to delete") },
+      inputSchema: z.object({ name: z.string().describe("Group name to delete") }),
       annotations: {
         title: "Remove Group",
         destructiveHint: true,
@@ -556,15 +555,15 @@ export function createServer(): McpServer {
         "Update a coaching setting. max_per_day: integer 1-20. min_gap_minutes: integer 0-1440 " +
         "(0 = no cooldown). nudge_every: integer 0-1000 interactions between lesson cues " +
         "(0 = cue every turn). nudge_scope: 'session' | 'global'. Returns the full updated Settings.",
-      inputSchema: {
+      inputSchema: z.object({
         key: z
           .enum(["max_per_day", "min_gap_minutes", "nudge_every", "nudge_scope"])
           .describe("Setting key"),
         value: z
           .string()
           .describe("New value (integer string; or 'session'|'global' for nudge_scope)"),
-      },
-      outputSchema: settingsOutputShape,
+      }),
+      outputSchema: settingsOutput,
       annotations: {
         title: "Update Settings",
         destructiveHint: false,
@@ -606,7 +605,9 @@ export function createServer(): McpServer {
     {
       title: "Open UI",
       description: "Launch the devcoach web dashboard in the background. port must be 1024-65535.",
-      inputSchema: { port: z.number().int().default(7860).describe("Port (default 7860)") },
+      inputSchema: z.object({
+        port: z.number().int().default(7860).describe("Port (default 7860)"),
+      }),
       annotations: {
         title: "Open UI",
         destructiveHint: false,
@@ -639,14 +640,14 @@ export function createServer(): McpServer {
         "(a placeholder if needed) — there is no notebook argument here. Write the real personalized " +
         "notebook yourself right after, directly to the path in devcoach://onboarding's notebook_path " +
         "field. Returns the updated Profile.",
-      inputSchema: {
+      inputSchema: z.object({
         topics: z.record(z.string(), confidenceInputSchema).describe("{topic_id: confidence 0-10}"),
         groups: z
           .record(z.string(), z.array(z.string()))
           .optional()
           .describe("{group_name: [topic_id, ...]}"),
-      },
-      outputSchema: profileOutputShape,
+      }),
+      outputSchema: profileOutput,
       annotations: {
         title: "Complete Onboarding",
         destructiveHint: true,
@@ -699,7 +700,7 @@ export function createServer(): McpServer {
         "project paths and activity timestamps. Call this BEFORE spawning the deep-read subagent: " +
         "over_soft_limit true means there are enough candidates that the user should be asked " +
         "whether to narrow the window, proceed anyway, or pick specific projects.",
-      inputSchema: {
+      inputSchema: z.object({
         months: z
           .number()
           .int()
@@ -707,8 +708,8 @@ export function createServer(): McpServer {
           .max(24)
           .default(3)
           .describe("Rolling window size in months, counting back from now"),
-      },
-      outputSchema: deepScanOutputShape,
+      }),
+      outputSchema: deepScanOutput,
       annotations: {
         title: "Preview Deep Scan",
         readOnlyHint: true,

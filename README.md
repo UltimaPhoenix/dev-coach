@@ -546,7 +546,7 @@ npm run mcpb              # build the Claude Desktop .mcpb (npm run mcpb:sign to
 ```
 
 - **MCP Inspector:** `npx @modelcontextprotocol/inspector node dist/bin.js mcp`
-- **Stack:** `@modelcontextprotocol/sdk` · `node:sqlite` · Hono · Commander · Zod · Biome · Vitest · tsup
+- **Stack:** `@modelcontextprotocol/server` (MCP SDK v2) · `node:sqlite` · Hono · Commander · Zod · Biome · Vitest · tsup
 
 ### Publishing a release
 
