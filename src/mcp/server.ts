@@ -1,5 +1,5 @@
 // MCP server on the official MCP TypeScript SDK v2 (@modelcontextprotocol/server).
-// 15 tools, 11 resources, and the devcoach_instructions prompt. Tools follow the build-mcp-server
+// 18 tools, 11 resources, and the devcoach_instructions prompt. Tools follow the build-mcp-server
 // review: title + hint annotations, tight Zod schemas with .describe(), outputSchema/structuredContent
 // for model returns, isError on failure. log_lesson is a pure save (never elicits);
 // feedback arrives next turn via submit_feedback.
@@ -111,6 +111,88 @@ function jsonResource(uri: URL, payload: unknown) {
   };
 }
 
+// ── State payloads (shared by the get_* tools and the devcoach:// resources) ──
+// The skill reads state through the tools: every client resolves tool names on its own,
+// while a resource read needs the client-specific server name (plugin:devcoach:devcoach
+// under the Claude Code plugin, devcoach as a plain MCP entry) — a model guessing it
+// wrong fails the read. Builders never throw; failures come back as { error }.
+
+type Payload = Record<string, unknown>;
+
+function profilePayload(): Payload {
+  try {
+    return { ...db.withConnection((c) => coach.getProfile(c)) };
+  } catch (err) {
+    return { error: String(err) };
+  }
+}
+
+function briefingPayload(): Payload {
+  try {
+    let notebook = "";
+    try {
+      if (existsSync(db.LEARNING_STATE_PATH))
+        notebook = readFileSync(db.LEARNING_STATE_PATH, "utf8");
+    } catch {
+      // notebook unreadable — deliver the rest of the briefing without it
+    }
+    const data = db.withConnection((c) => {
+      const knowledgeReady = db.isOnboardingComplete(c).knowledge_ready;
+      const notebookReady = notebook.length > 0;
+      const rate = coach.checkRateLimit(c);
+      const rateLimit: Record<string, unknown> = {
+        allowed: rate.allowed,
+        total_lessons: db.countFilteredLessons(c),
+      };
+      if (rate.reason != null) rateLimit.reason = rate.reason;
+      return {
+        onboarding: {
+          knowledge_ready: knowledgeReady,
+          notebook_ready: notebookReady,
+          needs_onboarding: !(knowledgeReady && notebookReady),
+        },
+        rate_limit: rateLimit,
+        taught_topics: coach.listTaughtTopics(c),
+        profile: coach.getProfile(c),
+      };
+    });
+    return { ...data, notebook, notebook_path: db.LEARNING_STATE_PATH };
+  } catch (err) {
+    return { error: String(err) };
+  }
+}
+
+function onboardingPayload(): Payload {
+  try {
+    const status = db.withConnection((c) => db.isOnboardingComplete(c));
+    const knowledgeReady = status.knowledge_ready;
+    const notebookReady =
+      existsSync(db.LEARNING_STATE_PATH) && statSync(db.LEARNING_STATE_PATH).size > 0;
+    const git = detectGitContext();
+    const scan = scanClaudeHistory();
+    const detected = mergeStacks(detectStack(git.folder ?? process.cwd()), scan.detected_stack);
+    return {
+      knowledge_ready: knowledgeReady,
+      notebook_ready: notebookReady,
+      needs_onboarding: !(knowledgeReady && notebookReady),
+      detected_stack: detected,
+      detected_projects: scan.projects,
+      scanned_projects: scan.scanned_projects,
+      default_topics: db.DEFAULT_PROFILE,
+      context_ready: git.branch !== null,
+      notebook_path: db.LEARNING_STATE_PATH,
+    };
+  } catch (err) {
+    return { error: String(err) };
+  }
+}
+
+/** Tool result for a state payload: { error } becomes an isError result, anything else is structured. */
+const stateResult = (tool: string, payload: Payload) =>
+  typeof payload.error === "string"
+    ? errResult(`${tool} failed: ${payload.error}`)
+    : structured(payload);
+
 // ── Server ───────────────────────────────────────────────────────────────────
 
 export function createServer(): McpServer {
@@ -119,7 +201,9 @@ export function createServer(): McpServer {
     {
       instructions:
         "Progressive technical coaching server. " +
-        "Use the devcoach_instructions prompt for full coaching behaviour guidelines.",
+        "Use the devcoach_instructions prompt for full coaching behaviour guidelines. " +
+        "Read coaching state with the get_briefing / get_onboarding / get_profile tools; the " +
+        "devcoach:// resources expose the same data for clients that browse resources.",
     },
   );
 
@@ -727,6 +811,58 @@ export function createServer(): McpServer {
     },
   );
 
+  // ── State reads — tools, not resources (tool names resolve in every client) ──
+
+  const readOnly = (title: string) => ({
+    title,
+    readOnlyHint: true,
+    destructiveHint: false,
+    idempotentHint: true,
+    openWorldHint: false,
+  });
+
+  server.registerTool(
+    "get_briefing",
+    {
+      title: "Lesson Briefing",
+      description:
+        "Everything needed before delivering a lesson, in ONE call: onboarding status, rate limit, " +
+        "taught topics, knowledge profile, the coaching notebook text and its notebook_path. Same " +
+        "data as the devcoach://briefing resource — call the tool, it needs no server name.",
+      inputSchema: z.object({}),
+      annotations: readOnly("Lesson Briefing"),
+    },
+    () => stateResult("get_briefing", briefingPayload()),
+  );
+
+  server.registerTool(
+    "get_onboarding",
+    {
+      title: "Onboarding Status & Detected Stack",
+      description:
+        "Onboarding status (knowledge_ready, notebook_ready, needs_onboarding), the stack detected " +
+        "across the full Claude Code history with per-project provenance, the default topics and " +
+        "the notebook_path. Same data as the devcoach://onboarding resource.",
+      inputSchema: z.object({}),
+      annotations: readOnly("Onboarding Status & Detected Stack"),
+    },
+    () => stateResult("get_onboarding", onboardingPayload()),
+  );
+
+  server.registerTool(
+    "get_profile",
+    {
+      title: "Knowledge Profile",
+      description:
+        "Current knowledge map: topics with confidence 0–10 and their groups. Same data as the " +
+        "devcoach://profile resource.",
+      inputSchema: z.object({}),
+      outputSchema: profileOutput,
+      annotations: readOnly("Knowledge Profile"),
+    },
+    () => stateResult("get_profile", profilePayload()),
+  );
+
   // ── Resources ────────────────────────────────────────────────────────────
 
   const meta = (title: string, description: string) => ({
@@ -739,16 +875,7 @@ export function createServer(): McpServer {
     "profile",
     "devcoach://profile",
     meta("Knowledge Profile", "Current knowledge map — topics, confidence scores, and groups."),
-    (uri) => {
-      try {
-        return jsonResource(
-          uri,
-          db.withConnection((c) => coach.getProfile(c)),
-        );
-      } catch (err) {
-        return jsonResource(uri, { error: String(err) });
-      }
-    },
+    (uri) => jsonResource(uri, profilePayload()),
   );
 
   server.registerResource(
@@ -869,40 +996,7 @@ export function createServer(): McpServer {
       "Everything needed before delivering a lesson in ONE read: onboarding status, " +
         "rate limit, taught topics, knowledge profile, and the coaching notebook.",
     ),
-    (uri) => {
-      try {
-        let notebook = "";
-        try {
-          if (existsSync(db.LEARNING_STATE_PATH))
-            notebook = readFileSync(db.LEARNING_STATE_PATH, "utf8");
-        } catch {
-          // notebook unreadable — deliver the rest of the briefing without it
-        }
-        const data = db.withConnection((c) => {
-          const knowledgeReady = db.isOnboardingComplete(c).knowledge_ready;
-          const notebookReady = notebook.length > 0;
-          const rate = coach.checkRateLimit(c);
-          const rateLimit: Record<string, unknown> = {
-            allowed: rate.allowed,
-            total_lessons: db.countFilteredLessons(c),
-          };
-          if (rate.reason != null) rateLimit.reason = rate.reason;
-          return {
-            onboarding: {
-              knowledge_ready: knowledgeReady,
-              notebook_ready: notebookReady,
-              needs_onboarding: !(knowledgeReady && notebookReady),
-            },
-            rate_limit: rateLimit,
-            taught_topics: coach.listTaughtTopics(c),
-            profile: coach.getProfile(c),
-          };
-        });
-        return jsonResource(uri, { ...data, notebook, notebook_path: db.LEARNING_STATE_PATH });
-      } catch (err) {
-        return jsonResource(uri, { error: String(err) });
-      }
-    },
+    (uri) => jsonResource(uri, briefingPayload()),
   );
 
   server.registerResource(
@@ -928,30 +1022,7 @@ export function createServer(): McpServer {
       "Onboarding status, the stack detected across the full Claude Code history " +
         "(with per-project provenance), and project topic defaults.",
     ),
-    (uri) => {
-      try {
-        const status = db.withConnection((c) => db.isOnboardingComplete(c));
-        const knowledgeReady = status.knowledge_ready;
-        const notebookReady =
-          existsSync(db.LEARNING_STATE_PATH) && statSync(db.LEARNING_STATE_PATH).size > 0;
-        const git = detectGitContext();
-        const scan = scanClaudeHistory();
-        const detected = mergeStacks(detectStack(git.folder ?? process.cwd()), scan.detected_stack);
-        return jsonResource(uri, {
-          knowledge_ready: knowledgeReady,
-          notebook_ready: notebookReady,
-          needs_onboarding: !(knowledgeReady && notebookReady),
-          detected_stack: detected,
-          detected_projects: scan.projects,
-          scanned_projects: scan.scanned_projects,
-          default_topics: db.DEFAULT_PROFILE,
-          context_ready: git.branch !== null,
-          notebook_path: db.LEARNING_STATE_PATH,
-        });
-      } catch (err) {
-        return jsonResource(uri, { error: String(err) });
-      }
-    },
+    (uri) => jsonResource(uri, onboardingPayload()),
   );
 
   server.registerResource(

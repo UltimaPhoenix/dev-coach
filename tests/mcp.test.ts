@@ -16,16 +16,45 @@ async function connect() {
 const text = (r: any): string => r.content[0].text;
 
 describe("mcp server", () => {
-  it("lists 15 tools, 10 resources + 1 template, 1 prompt", async () => {
+  it("lists 18 tools, 10 resources + 1 template, 1 prompt", async () => {
     const { client, server } = await connect();
     const tools = (await client.listTools()).tools;
-    expect(tools).toHaveLength(15);
+    expect(tools).toHaveLength(18);
     const names = tools.map((t: any) => t.name);
     expect(names).toContain("preview_deep_scan");
+    // State reads are tools: tool names resolve in every client, resource reads need the
+    // client-specific server name (plugin:devcoach:devcoach vs devcoach).
+    for (const name of ["get_briefing", "get_onboarding", "get_profile"]) {
+      const tool = tools.find((t: any) => t.name === name);
+      expect(tool?.annotations?.readOnlyHint).toBe(true);
+    }
     expect(names).not.toContain("update_notebook");
     expect((await client.listResources()).resources).toHaveLength(10);
     expect((await client.listResourceTemplates()).resourceTemplates).toHaveLength(1);
     expect((await client.listPrompts()).prompts[0].name).toBe("devcoach_instructions");
+    await client.close();
+    await server.close();
+  });
+
+  it("get_briefing / get_onboarding / get_profile return exactly what the resources return", async () => {
+    const { client, server } = await connect();
+    await client.callTool({ name: "complete_onboarding", arguments: { topics: { python: 4 } } });
+    const read = async (uri: string) =>
+      JSON.parse(((await client.readResource({ uri })) as any).contents[0].text);
+    const briefing: any = await client.callTool({ name: "get_briefing", arguments: {} });
+    expect(briefing.isError).toBeFalsy();
+    const briefingRes = await read("devcoach://briefing");
+    expect(Object.keys(briefing.structuredContent).sort()).toEqual(Object.keys(briefingRes).sort());
+    expect(briefing.structuredContent.notebook_path).toBe(briefingRes.notebook_path);
+    expect(briefing.structuredContent.onboarding.knowledge_ready).toBe(true);
+    const profile: any = await client.callTool({ name: "get_profile", arguments: {} });
+    expect(profile.structuredContent).toEqual(await read("devcoach://profile"));
+    const onboarding: any = await client.callTool({ name: "get_onboarding", arguments: {} });
+    const onboardingRes = await read("devcoach://onboarding");
+    expect(Object.keys(onboarding.structuredContent).sort()).toEqual(
+      Object.keys(onboardingRes).sort(),
+    );
+    expect(onboarding.structuredContent.detected_stack).toEqual(onboardingRes.detected_stack);
     await client.close();
     await server.close();
   });

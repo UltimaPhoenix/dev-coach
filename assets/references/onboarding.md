@@ -1,6 +1,6 @@
 # devcoach — Onboarding flow
 
-Read this file when `devcoach://onboarding` reports `knowledge_ready: false` or
+Read this file when `get_onboarding` reports `knowledge_ready: false` or
 `notebook_ready: false`, or when the user explicitly asks to (re-)initialise their
 profile ("setup devcoach", "redo onboarding", "reset my topics").
 
@@ -8,7 +8,7 @@ The onboarding flow runs inline, immediately before delivering a lesson, wheneve
 it is needed. There is no separate session startup phase — this makes the skill
 robust to context compaction and plan-mode transitions.
 
-Check `knowledge_ready` and `notebook_ready` from `devcoach://onboarding` independently
+Check `knowledge_ready` and `notebook_ready` from `get_onboarding` independently
 — each step can run alone:
 
 ```
@@ -23,7 +23,8 @@ always re-runs Steps 1–4 regardless of `knowledge_ready`.
 
 ## Step 1 — Ask how to set up (strongly recommend Automatic; never pick for the user)
 
-Read `devcoach://onboarding` FIRST — its `detected_stack`, `detected_projects`,
+Call `get_onboarding` FIRST (older server without the tool: read the `devcoach://onboarding`
+resource) — its `detected_stack`, `detected_projects`,
 `scanned_projects`, and `notebook_path` come from a scan of the user's **full Claude
 Code history** (every project Claude has worked in, ranked by recent activity), not
 just the current folder. Keep `notebook_path` in scope — Step 4 needs it and there is
@@ -57,8 +58,8 @@ depend on `scanClaudeHistory`'s metadata scan). Do **not** default to Automatic
 silently — surface the choice and wait for the user's answer before proceeding.
 
 **If Import backup:** ask for the file path and call `restore` (CLI) with it. Restore
-brings back knowledge entries automatically — no further DB steps needed. Re-read
-`devcoach://onboarding` after restore; if `knowledge_ready` is now true, skip to the
+brings back knowledge entries automatically — no further DB steps needed. Call
+`get_onboarding` again after restore; if `knowledge_ready` is now true, skip to the
 notebook-composition part of Step 4. If `notebook_ready` is also true, proceed normally.
 
 ## Step 2 — Build the topic list for the chosen mode
@@ -153,7 +154,7 @@ Automatic tiers; after the user confirms in Guided mode):
    { "topics": { "lang_a": 7, "tool_b": 8 }, "groups": { "Languages": ["lang_a"], "DevOps": ["tool_b"] } }
    ```
 2. **Immediately after**, write the real personalized notebook markdown directly to
-   `notebook_path` (from Step 1's `devcoach://onboarding` read) using your own file
+   `notebook_path` (from Step 1's `get_onboarding` call) using your own file
    tools — overwrite the placeholder right away, don't leave it standing. If
    `notebook_path` already has real content (re-onboarding, or restoring), read it first
    and fold prior notes in rather than discarding them.

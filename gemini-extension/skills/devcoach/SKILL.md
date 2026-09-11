@@ -40,7 +40,7 @@ The three hard rules, before anything else:
 
 ## Onboarding
 
-Read `devcoach://onboarding`. If `knowledge_ready` or `notebook_ready` is false — or the
+Call `get_onboarding`. If `knowledge_ready` or `notebook_ready` is false — or the
 user explicitly asks to (re-)initialise their profile — read `references/onboarding.md`
 in this skill's directory and follow it. Do not deliver a lesson in the same turn as
 `complete_onboarding`; end the response after confirming setup.
@@ -55,8 +55,11 @@ only an explicit "redo onboarding" goes through `references/onboarding.md`.
 
 ## Before delivering a lesson
 
-Read the **`devcoach://briefing`** MCP resource — ONE silent read returns everything
-below (never read the underlying resources one by one; each extra call is noise):
+Call the **`get_briefing`** tool — ONE silent call returns everything below (never fetch
+the pieces one by one; each extra call is noise). Read state through tools, never through
+`devcoach://` resources: tool names resolve in every client, a resource read needs the
+server's client-specific name. Older server without `get_briefing` → read the
+`devcoach://briefing` resource instead.
 
 - `onboarding` — either flag false → onboarding first (see above)
 - `rate_limit` — `allowed: false` → skip entirely, say nothing.
@@ -163,7 +166,7 @@ for "know" (within/above band → already calibrated, skip the call). Never call
 this one? ⭐"* — `star_lesson` only if the user agrees, never silently.
 
 **Profile expansion:** if the lesson covered a concept absent from
-`devcoach://profile` (or one recurs across tasks), offer to track it with an estimated
+the profile (`get_profile`), or one that recurs across tasks, offer to track it with an estimated
 confidence (fluent use → 6–7, uncertain → 4–5, first encounter → 2–3); `add_topic`
 only on confirmation.
 
@@ -176,7 +179,7 @@ checkpoints, never touch the notebook.
 
 - "What did I learn today/this week?" → `get_lessons({period: "today" | "week" | …})`
 - "Show me lessons about X" → `get_lessons({category: X})` or `({search: keyword})`
-- "How good am I at X?" / "Show my profile" → read `devcoach://profile`
+- "How good am I at X?" / "Show my profile" → `get_profile`
 - "Coaching log" → `get_lessons({period: "all"})`
 - "Lessons to revisit" → `get_lessons({feedback: "dont_know"})`
 

@@ -136,7 +136,7 @@ function emitBlock(client: HookClient, reason: string, systemMessage?: string): 
 const ONBOARD_CUE =
   "devcoach: the user has no coaching profile yet. Ask them how they want to set it up " +
   "and STRONGLY recommend Automatic — devcoach scans their full Claude Code history " +
-  "across all their projects (read devcoach://onboarding for the detected stack and " +
+  "across all their projects (call get_onboarding for the detected stack and " +
   "per-project evidence) so the profile reflects what they actually build. Also offer " +
   "Guided (a short conversation to map topics and confidence levels) and Import " +
   "(restore from a backup), but lead with Automatic; do not pick for them. After they " +
@@ -212,7 +212,7 @@ export function buildLessonCue(nextLessonNumber: number, client: HookClient = "c
     "source of truth for the entire flow, including the explicit no-op when the completed " +
     "work does not warrant a lesson.\n" +
     `${notebookStep}\n\n` +
-    "If the devcoach skill is not available, fall back to: read devcoach://briefing (one read: " +
+    "If the devcoach skill is not available, fall back to: call get_briefing (one call: " +
     "profile, taught topics, notebook); pick ONE untaught profile topic at or " +
     "above the user's confidence band; call log_lesson silently (body = 3–6 short paragraphs " +
     "tied to the task plus a `💡 *Senior tip:*` line, clean markdown without bands or a " +

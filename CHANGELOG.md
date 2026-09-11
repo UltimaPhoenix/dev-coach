@@ -4,6 +4,18 @@ Notable changes to devcoach. Versions follow [Semantic Versioning](https://semve
 
 ---
 
+## [2.0.2] — Unreleased
+
+### Fixed
+- **Coaching flow no longer depends on the MCP server's name.** The skill used to read
+  `devcoach://briefing` / `devcoach://onboarding` / `devcoach://profile` as resources, and a resource
+  read needs the client-specific server name (`plugin:devcoach:devcoach` under the Claude Code plugin,
+  `devcoach` as a plain MCP entry) — a model guessing `devcoach` under the plugin failed the read.
+  The same data is now exposed by three read-only tools, `get_briefing`, `get_onboarding` and
+  `get_profile`, which every client resolves by name; the skill, its references and the hook cues
+  call the tools (with a fallback to the resources for an older server). The resources stay for
+  clients that browse them. Tool count 15 → 18.
+
 ## [2.0.1] — 2026-09-06
 
 ### Fixed

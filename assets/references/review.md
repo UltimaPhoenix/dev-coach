@@ -17,7 +17,8 @@ redo onboarding / reset topics    →  references/onboarding.md, Steps 1–4 (co
 
 ## Review
 
-1. Read `devcoach://briefing` — one silent read returns the profile, the taught
+1. Call `get_briefing` (older server without the tool: read the `devcoach://briefing`
+   resource) — one silent call returns the profile, the taught
    topics, the notebook, and its `notebook_path`.
 2. Walk the user through the profile **grouped, not topic-by-topic**: show each
    group with its topics and confidences, and ask what looks wrong. Apply
@@ -33,9 +34,9 @@ redo onboarding / reset topics    →  references/onboarding.md, Steps 1–4 (co
 
 Re-derive the notebook from real data; the knowledge map is untouched.
 
-1. Read `devcoach://onboarding` — `detected_projects` carries the history-wide
+1. Call `get_onboarding` — `detected_projects` carries the history-wide
    evidence: per-project stacks, activity volume and recency, and auto-memory
-   excerpts (and its `notebook_path`). Read `devcoach://briefing` for the
+   excerpts (and its `notebook_path`). Call `get_briefing` for the
    current notebook and profile, and `get_lessons({period: "all"})` for
    feedback history (`dont_know` lessons are open gaps).
 2. Compose a fresh notebook (structure in `references/onboarding.md`'s notebook
@@ -47,7 +48,7 @@ Re-derive the notebook from real data; the knowledge map is untouched.
 
 ## New tech check (keep the profile curated)
 
-Compare `detected_stack` + `detected_projects` (from `devcoach://onboarding`)
+Compare `detected_stack` + `detected_projects` (from `get_onboarding`)
 against the current profile:
 
 - Candidate = a detected topic **absent from the profile** that appears in **2+
@@ -60,7 +61,7 @@ against the current profile:
   appear in **no** scanned project. Offer `remove_topic`; keeping them is fine.
 - Nothing qualifies → say so in one line and stop. An overcrowded topic list
   dilutes lesson choice — fewer, real topics beat completeness.
-- `devcoach://onboarding` unreachable, or `detected_projects` empty → derive
+- `get_onboarding` failing, or `detected_projects` empty → derive
   candidates from lesson history instead (`get_lessons`: recurring stacks in
   `task_context` that lack a matching topic), tell the user the evidence is
   history-only, and defer the retirement pass — never guess retirements

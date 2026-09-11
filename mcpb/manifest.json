@@ -41,6 +41,18 @@
       "description": "Metadata-only pre-check for Automatic (Deep) onboarding"
     },
     {
+      "name": "get_briefing",
+      "description": "Everything needed before a lesson, in one call"
+    },
+    {
+      "name": "get_onboarding",
+      "description": "Onboarding status and the detected stack"
+    },
+    {
+      "name": "get_profile",
+      "description": "Current knowledge map"
+    },
+    {
       "name": "update_knowledge",
       "description": "Adjust confidence for a topic"
     },

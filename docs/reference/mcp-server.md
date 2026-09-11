@@ -27,13 +27,16 @@ clients can look it up by that name and install it directly; the entry resolves 
 `npx -y devcoach mcp` command as the manual configuration above, so both paths run the identical
 local server.
 
-## Tools (15)
+## Tools (18)
 
 | Tool | Purpose | Annotation |
 |---|---|---|
 | `log_lesson` | Save a delivered lesson — a **pure save** that never elicits feedback. Auto-fills git context, stamps the timestamp server-side, resets the pacing counters, and returns the saved lesson plus a `reply_check` self-check reminding the model that tool arguments are invisible to the user and the card must be written as the final text of the turn | write |
 | `skip_lesson` | Decline a lesson cue with a one-line reason; re-arms the pacing counter | write |
 | `preview_deep_scan` | Metadata-only pre-check for Automatic (Deep) onboarding: `months` (1–24, default 3) sets a rolling window; returns `window_months`, `cutoff`, `candidate_count`, `over_soft_limit` (more than 8 candidates — ask the user to narrow the window) and `candidates[]` (`name`, `path`, `last_activity`, `prompt_count`). Reads no conversation text | read-only |
+| `get_briefing` | Everything needed before a lesson in one call: onboarding status, rate limit, taught topics, profile, notebook text and `notebook_path` (same data as `devcoach://briefing`) | read |
+| `get_onboarding` | Onboarding status, the stack detected across the full Claude Code history with per-project provenance, default topics, `notebook_path` (same data as `devcoach://onboarding`) | read |
+| `get_profile` | The current knowledge map — topics, confidence, groups (same data as `devcoach://profile`) | read |
 | `update_knowledge` | Adjust a topic's confidence by a delta (clamped 0–10) | write |
 | `get_lessons` | Query lesson history (period, category, level, git, starred, feedback, search, date range); `limit` defaults to 10, `0` = all | read-only |
 | `star_lesson` | Star / unstar a lesson | write |
@@ -53,6 +56,8 @@ Feedback is never collected inline: the text line under the lesson card is recor
 `submit_feedback`.
 
 ## Resources (11)
+
+The coaching skill reads state through the `get_briefing` / `get_onboarding` / `get_profile` **tools**, which return the same payloads as the resources below: tool names resolve in every client, whereas reading a resource needs the client-specific server name (`plugin:devcoach:devcoach` under the Claude Code plugin, `devcoach` as a plain MCP entry). The resources stay for clients and users that browse them.
 
 `devcoach://briefing` · `profile` · `notebook` (text/markdown) · `settings` · `lessons/recent` ·
 `stats` · `taught-topics` · `rate-limit` ·

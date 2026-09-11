@@ -53,7 +53,7 @@ dev-coach/
 │   │   ├── coach.ts        # rate limit, cue engine (evaluateCue/explainCue), profile, stats
 │   │   ├── git.ts  detect.ts  prompts.ts   # prompts.ts renders the lesson card (formatLessonForDisplay)
 │   │   ├── claude-history.ts   # cross-project stack scan of ~/.claude (projects map, manifests, activity, memories)
-│   ├── mcp/server.ts       # McpServer: 15 tools + 11 resources + devcoach_instructions prompt
+│   ├── mcp/server.ts       # McpServer: 18 tools + 11 resources + devcoach_instructions prompt
 │   ├── cli/commands.ts     # Commander dispatcher (30 subcommands: 22 visible + 8 hidden hooks) + term.ts
 │   └── web/app.ts          # Hono app (20 routes) + views.ts (hono/html pages)
 ├── tests/                  # Vitest (13 files: core, db-extra, coach/git/claude-history, mcp, web, cli,
@@ -73,11 +73,11 @@ dev-coach/
 
 ---
 
-## Exposed MCP tools (15)
+## Exposed MCP tools (18)
 
 `log_lesson`, `skip_lesson`, `update_knowledge`, `get_lessons`, `star_lesson`, `delete_lesson`,
 `submit_feedback`, `add_topic`, `remove_topic`, `add_group`, `remove_group`, `update_settings`,
-`open_ui`, `complete_onboarding`, `preview_deep_scan`.
+`open_ui`, `complete_onboarding`, `preview_deep_scan`, `get_briefing`, `get_onboarding`, `get_profile`.
 
 Every tool registers a `title` + read-only/destructive annotations, a tight Zod `inputSchema` with
 `.describe()` on each param, `outputSchema`/`structuredContent` for model-shaped returns
@@ -109,6 +109,13 @@ real rolling date window, not `scanClaudeHistory`'s top-N-by-recency cap) used b
 references/onboarding.md` for the full flow and its privacy tradeoff.
 
 ## MCP resources (11)
+
+**The skill reads state through the `get_briefing` / `get_onboarding` / `get_profile` tools**, built
+from the same payload builders as the resources (`profilePayload`/`briefingPayload`/`onboardingPayload`
+in `mcp/server.ts`): tool names resolve in every client, whereas a resource read needs the
+client-specific server name (`plugin:devcoach:devcoach` under the plugin vs `devcoach` as a plain MCP
+entry) — a model once guessed `devcoach` under the plugin and the read failed. Resources stay for
+clients that browse them; never hardcode a server name in the skill.
 
 `devcoach://briefing` (**the pre-lesson read** — one call returns onboarding status, rate limit,
 taught topics, profile, and the notebook; SKILL.md prescribes this single read instead of five),
