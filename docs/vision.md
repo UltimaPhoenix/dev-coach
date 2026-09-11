@@ -35,6 +35,12 @@ is always free.
 These are directions we find interesting, written down to invite discussion — not a committed plan
 and not a price list:
 
+- **Lesson sharing** — the next thing we want to build. A lesson that landed for you is worth
+  handing to a teammate: export a card as a portable file (markdown plus its metadata), import it
+  into another devcoach where it joins the coaching log as a shared lesson (topic, level and
+  feedback tracked as usual, pacing untouched), and, later, curated collections of lessons per
+  stack that a team or a community can maintain. Sharing is always explicit — nothing leaves your
+  machine unless you send it.
 - **Gap-driven learning paths** — devcoach already learns where you're weak (topics you score low
   on, concepts you keep marking ❌, patterns the notebook flags). Connecting those gaps to a
   structured progression — the next thing to learn, in order — is a natural extension of that.

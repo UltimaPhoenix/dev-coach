@@ -4,7 +4,7 @@ Notable changes to devcoach. Versions follow [Semantic Versioning](https://semve
 
 ---
 
-## [2.0.2] — Unreleased
+## [2.0.2] — 2026-09-11
 
 ### Fixed
 - **Coaching flow no longer depends on the MCP server's name.** The skill used to read
