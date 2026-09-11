@@ -54,11 +54,13 @@ const seedProfile = (): void =>
 describe("hooks in-process (runHook dispatcher + payload-injected entrypoints)", () => {
   it("runHook dispatches every hook; unknown commands exit 0 silently", () => {
     // No DB yet: stop-hook and onboard-hook cue onboarding, the others stay silent.
-    expect(capture(() => runHook("stop-hook")).out).toContain("complete_onboarding");
-    expect(capture(() => runHook("onboard-hook")).out).toContain("complete_onboarding");
-    expect(capture(() => runHook("prompt-hook"))).toEqual({ out: "", code: 0 });
-    expect(capture(() => runHook("lesson-ready"))).toEqual({ out: "", code: 0 });
-    expect(capture(() => runHook("frobnicate"))).toEqual({ out: "", code: 0 });
+    // Explicit payloads: never let an in-process hook read the worker's stdin (see runHook).
+    const fresh = payload({ session_id: null });
+    expect(capture(() => runHook("stop-hook", fresh)).out).toContain("complete_onboarding");
+    expect(capture(() => runHook("onboard-hook", fresh)).out).toContain("complete_onboarding");
+    expect(capture(() => runHook("prompt-hook", fresh))).toEqual({ out: "", code: 0 });
+    expect(capture(() => runHook("lesson-ready", fresh))).toEqual({ out: "", code: 0 });
+    expect(capture(() => runHook("frobnicate", fresh))).toEqual({ out: "", code: 0 });
   });
 
   it("stop-hook without a DB is silent on forced continuations and in plan mode", () => {
@@ -143,11 +145,13 @@ describe("hooks in-process (runHook dispatcher + payload-injected entrypoints)",
   });
 
   it("runHook dispatches the per-client subcommands", () => {
-    // stdin is a TTY here → empty payload → fresh stop; profile exists → both cue.
-    expect(JSON.parse(capture(() => runHook("gemini-stop-hook")).out).decision).toBe("deny");
-    expect(JSON.parse(capture(() => runHook("codex-stop-hook")).out).decision).toBe("block");
-    expect(capture(() => runHook("gemini-prompt-hook")).out).toContain("BeforeAgent");
-    expect(capture(() => runHook("codex-prompt-hook")).out).toContain("UserPromptSubmit");
+    // Pass the payload explicitly: the worker's stdin is a socket vitest keeps open, so letting
+    // runHook read it would block forever (it did under vitest 5). Fresh stop; profile exists → cue.
+    const fresh = payload({ session_id: null });
+    expect(JSON.parse(capture(() => runHook("gemini-stop-hook", fresh)).out).decision).toBe("deny");
+    expect(JSON.parse(capture(() => runHook("codex-stop-hook", fresh)).out).decision).toBe("block");
+    expect(capture(() => runHook("gemini-prompt-hook", fresh)).out).toContain("BeforeAgent");
+    expect(capture(() => runHook("codex-prompt-hook", fresh)).out).toContain("UserPromptSubmit");
   });
 
   it("a broken DB never breaks a hook: every entrypoint exits 0 silently", () => {

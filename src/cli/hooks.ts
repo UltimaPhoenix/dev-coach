@@ -375,32 +375,37 @@ export function cmdPromptHook(
   process.exit(0);
 }
 
-/** Argv dispatcher for src/bin.ts's lean hook path. */
-export function runHook(cmd: string): void {
+/**
+ * Argv dispatcher for src/bin.ts's lean hook path. `payload` is a test seam: in-process tests pass
+ * one explicitly instead of letting the hook read the worker's stdin (a socket that vitest keeps
+ * open — a blocking read there never returns). Production always reads the real stdin, lazily.
+ */
+export function runHook(cmd: string, payload?: HookPayload): void {
+  const p = () => payload ?? readHookPayload();
   switch (cmd) {
     case "stop-hook":
-      cmdStopHook();
+      cmdStopHook(p());
       break;
     case "gemini-stop-hook":
-      cmdStopHook(readHookPayload(), "gemini");
+      cmdStopHook(p(), "gemini");
       break;
     case "codex-stop-hook":
-      cmdStopHook(readHookPayload(), "codex");
+      cmdStopHook(p(), "codex");
       break;
     case "prompt-hook":
-      cmdPromptHook();
+      cmdPromptHook(p());
       break;
     case "gemini-prompt-hook":
-      cmdPromptHook(readHookPayload(), "gemini");
+      cmdPromptHook(p(), "gemini");
       break;
     case "codex-prompt-hook":
-      cmdPromptHook(readHookPayload(), "codex");
+      cmdPromptHook(p(), "codex");
       break;
     case "onboard-hook":
-      cmdOnboardHook();
+      cmdOnboardHook(p());
       break;
     case "lesson-ready":
-      cmdLessonReady();
+      cmdLessonReady(p());
       break;
     default:
       process.exit(0);
