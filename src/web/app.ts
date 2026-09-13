@@ -4,16 +4,33 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, extname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { serve } from "@hono/node-server";
-import { Hono } from "hono";
+import { type Context, Hono } from "hono";
 import * as coach from "../core/coach";
 import * as db from "../core/db";
-import type { KnowledgeEntry } from "../core/models";
+import { detectGitUserName } from "../core/git";
+import type { KnowledgeEntry, Lesson } from "../core/models";
 import {
+  buildSharePayload,
+  decodeShareCode,
+  renderShareLink,
+  renderShareMarkdownFile,
+  renderShareText,
+  resolveSharedBy,
+  type SharedLesson,
+  ShareInputError,
+  sharedLessonFilename,
+} from "../core/share";
+import { fetchSharedInput, isHttpUrl } from "../core/share-fetch";
+import { VERSION } from "../version";
+import {
+  importPage,
   type LessonsSelected,
   lessonDetailPage,
   lessonsPage,
   profilePage,
+  type ShareState,
   settingsPage,
+  shareFragment,
 } from "./views";
 
 const PER_PAGE = 25;
@@ -52,6 +69,57 @@ const CONTENT_TYPES: Record<string, string> = {
   ".ico": "image/x-icon",
 };
 
+// The docs site's share page may only talk to the dashboard through this one endpoint: it probes
+// GET /ping to say "your dashboard is running". The headers are the whole CORS surface of the app.
+const SHARE_SITE_ORIGIN = "https://ultimaphoenix.github.io";
+const PING_HEADERS = {
+  "access-control-allow-origin": SHARE_SITE_ORIGIN,
+  "access-control-allow-methods": "GET, OPTIONS",
+  "access-control-allow-private-network": "true",
+  "cache-control": "no-store",
+  vary: "Origin",
+};
+
+/**
+ * Same-origin guard for the import POST: the share page and any other site can only *link* to
+ * the read-only preview, never submit the form. A missing header (curl, older browsers, tests)
+ * is allowed — the dashboard is bound to 127.0.0.1.
+ */
+function isCrossSite(c: { req: { header(name: string): string | undefined } }): boolean {
+  const site = c.req.header("sec-fetch-site");
+  return site !== undefined && site !== "same-origin" && site !== "none";
+}
+
+function shareState(
+  lesson: Lesson,
+  o: { name?: string | null; includeContext?: boolean; open?: boolean },
+): ShareState {
+  const setting = db.withConnection((c) => db.getSettings(c).share_name);
+  const sharedBy = resolveSharedBy({
+    explicit: o.name ?? null,
+    setting,
+    gitUserName: detectGitUserName(),
+  });
+  const includeContext = o.includeContext ?? false;
+  const payload = buildSharePayload(lesson, { includeContext, sharedBy });
+  return {
+    id: lesson.id,
+    open: o.open ?? false,
+    name: sharedBy ?? "",
+    includeContext,
+    text: renderShareText(payload),
+    link: renderShareLink(payload),
+    filename: sharedLessonFilename(payload),
+    markdown: renderShareMarkdownFile(payload),
+  };
+}
+
+function rememberShareName(name: string | undefined): void {
+  if (name === undefined) return;
+  const trimmed = name.trim().slice(0, 80);
+  db.withConnection((c) => db.setSetting(c, "share_name", trimmed));
+}
+
 function uiTheme(): string {
   try {
     return db.withConnection((c) => db.getSettings(c).ui_theme);
@@ -78,6 +146,10 @@ export function createApp(): Hono {
       return c.notFound();
     }
   });
+
+  // ── Ping (the docs site's share page asks "is a dashboard running?") ─────
+  app.get("/ping", (c) => c.json({ ok: true, version: VERSION }, 200, PING_HEADERS));
+  app.options("/ping", (c) => c.body(null, 204, PING_HEADERS));
 
   // ── Profile ──────────────────────────────────────────────────────────────
   app.get("/", (c) => {
@@ -166,20 +238,58 @@ export function createApp(): Hono {
     });
   });
 
+  // One import endpoint for everything: the settings page's lessons.json upload (legacy, answered
+  // with the settings flash), the lessons page's paste box / file picker / drop, and the
+  // "Add to my lessons" button of the preview page. A URL in `text` is fetched server-side.
   app.post("/lessons/import", async (c) => {
-    const file = (await c.req.parseBody()).file;
-    let records: unknown;
+    const body = await c.req.parseBody();
+    const fromLessons = textField(body, "from") === "lessons";
+    const invalid = (reason: "invalid" | "cross") =>
+      c.redirect(
+        fromLessons
+          ? `/lessons?import=1&error=${reason}`
+          : "/settings?imported=0&skipped=0&invalid=1",
+        303,
+      );
+    if (isCrossSite(c)) return invalid("cross");
+    // A browser posts an untouched <input type=file> as a zero-byte File — that is "no file".
+    const file = body.file;
+    const upload = file instanceof File && file.size > 0 ? await file.text() : null;
+    let text = upload ?? textField(body, "text").trim();
     try {
-      records = JSON.parse(file instanceof File ? await file.text() : String(file));
-    } catch {
-      return c.redirect("/settings?imported=0&skipped=0&invalid=1", 303);
+      if (isHttpUrl(text) && !text.includes("#devcoach:lesson:"))
+        text = await fetchSharedInput(text);
+      const r = db.withConnection((conn) => coach.importSharedInput(conn, text));
+      if (r.kind === "lessons" || !r.lesson) {
+        return c.redirect(
+          `/settings?imported=${r.inserted}&skipped=${r.duplicated}&invalid=${r.invalid}`,
+          303,
+        );
+      }
+      return c.redirect(
+        `/lessons/${encodeURIComponent(r.lesson.id)}?imported=${r.inserted ? "1" : "dup"}`,
+        303,
+      );
+    } catch (err) {
+      if (err instanceof ShareInputError) return invalid("invalid");
+      throw err;
     }
-    if (!Array.isArray(records)) return c.redirect("/settings?imported=0&skipped=0&invalid=1", 303);
-    const r = db.withConnection((conn) => db.importLessons(conn, records as unknown[]));
-    return c.redirect(
-      `/settings?imported=${r.inserted}&skipped=${r.duplicated}&invalid=${r.invalid}`,
-      303,
-    );
+  });
+
+  // Deep link from the docs site's share page (and a plain paste form): renders a preview and
+  // NEVER writes — the lesson is stored only by the same-origin POST above.
+  app.get("/lessons/import", (c) => {
+    const code = (c.req.query("code") ?? "").trim();
+    let preview: SharedLesson | null = null;
+    let error: string | null = null;
+    if (code) {
+      try {
+        preview = decodeShareCode(code);
+      } catch (err) {
+        error = err instanceof ShareInputError ? err.message : "That code could not be read.";
+      }
+    }
+    return c.html(importPage({ code, preview, error, uiTheme: uiTheme() }));
   });
 
   app.get("/lessons", (c) => {
@@ -243,8 +353,11 @@ export function createApp(): Hono {
       order,
     };
 
+    const importError = q.error === "invalid" || q.error === "cross" ? q.error : null;
     return c.html(
       lessonsPage({
+        importOpen: q.import === "1",
+        importError,
         lessons: data.lessons,
         allCategories: data.allCategories,
         allProjects: data.allProjects,
@@ -275,10 +388,53 @@ export function createApp(): Hono {
     return c.redirect(safeRedirect(textField(body, "next") || undefined), 303);
   });
 
+  // Share payloads: `?format=text|link` → text/plain, `md` → the .devcoach.md attachment,
+  // no format → the #share-payloads fragment (HTMX re-render when name/context change).
+  // POST carries name + include_context from the popover form and remembers the name.
+  app.on(["GET", "POST"], "/lessons/:lesson_id/share", async (c: Context) => {
+    const lesson = db.withConnection((conn) =>
+      db.getLessonById(conn, c.req.param("lesson_id") ?? ""),
+    );
+    if (!lesson) return c.text("Lesson not found", 404);
+    let name: string | undefined;
+    let includeContext: boolean;
+    if (c.req.method === "POST") {
+      const body = await c.req.parseBody();
+      name = textField(body, "name");
+      includeContext = textField(body, "include_context") === "1";
+    } else {
+      name = c.req.query("name");
+      includeContext = c.req.query("include_context") === "1";
+    }
+    rememberShareName(name);
+    const state = shareState(lesson, { name, includeContext });
+    const format = c.req.query("format");
+    if (format === "text") return c.text(state.text);
+    if (format === "link") return c.text(state.link);
+    if (format === "md") {
+      return new Response(state.markdown, {
+        headers: {
+          "content-type": "text/markdown; charset=utf-8",
+          "content-disposition": `attachment; filename="${state.filename}"`,
+        },
+      });
+    }
+    return c.html(shareFragment(state));
+  });
+
   app.get("/lessons/:lesson_id", (c) => {
     const lesson = db.withConnection((conn) => db.getLessonById(conn, c.req.param("lesson_id")));
     if (!lesson) return c.html("<h1>Lesson not found</h1>", 404);
-    return c.html(lessonDetailPage({ lesson, uiTheme: uiTheme() }));
+    const q = c.req.query();
+    const imported = q.imported === "1" ? "new" : q.imported === "dup" ? "dup" : null;
+    return c.html(
+      lessonDetailPage({
+        lesson,
+        uiTheme: uiTheme(),
+        share: shareState(lesson, { open: q.share === "1" }),
+        imported,
+      }),
+    );
   });
 
   // ── Settings ───────────────────────────────────────────────────────────────
@@ -340,6 +496,7 @@ export function createApp(): Hono {
       db.setSetting(conn, "ui_theme", theme);
       db.setSetting(conn, "nudge_every", String(nudgeEvery));
       db.setSetting(conn, "nudge_scope", nudgeScope);
+      db.setSetting(conn, "share_name", textField(body, "share_name").trim().slice(0, 80));
     });
     return c.redirect("/settings", 303);
   });

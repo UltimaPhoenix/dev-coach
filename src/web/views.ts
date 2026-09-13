@@ -4,6 +4,7 @@
 import { html, raw } from "hono/html";
 import type { HtmlEscapedString } from "hono/utils/html";
 import type { KnowledgeEntry, Lesson, Settings } from "../core/models";
+import type { SharedLesson } from "../core/share";
 
 type Html = HtmlEscapedString | Promise<HtmlEscapedString>;
 
@@ -281,6 +282,9 @@ export interface LessonsSelected {
 }
 
 export interface LessonsData {
+  /** `?import=1` — open the import popover (after an error, or from a deep link). */
+  importOpen: boolean;
+  importError: "invalid" | "cross" | null;
   lessons: Lesson[];
   allCategories: string[];
   allProjects: string[];
@@ -506,6 +510,19 @@ export function lessonsPage(d: LessonsData): Html {
     }
 
     ${anyFilter ? html`<a href="/lessons" class="ml-auto text-xs text-gray-400 hover:text-gray-700 dark:hover:text-white transition">Clear all</a>` : ""}
+
+    <div class="relative ${anyFilter ? "" : "ml-auto"}" x-data="{ open: ${String(d.importOpen)} }" @click.outside="open = false" @keydown.escape="open = false">
+      <button type="button" @click="open = !open" title="Import a lesson someone shared" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-indigo-400">＋ Import</button>
+      <div x-show="open" x-transition:enter="transition ease-out duration-100" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100" class="absolute right-0 top-full mt-1 z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg w-80 p-3 space-y-2.5" style="display:none">
+        <p class="text-xs text-gray-500 dark:text-gray-400">Paste the lesson code, the link, a URL or the whole text — or drop a <code>.devcoach.md</code> anywhere on this page.</p>
+        ${d.importError === "invalid" ? html`<p class="text-xs text-rose-600 dark:text-rose-400">That doesn't look like a devcoach lesson — copy the whole text again.</p>` : d.importError === "cross" ? html`<p class="text-xs text-rose-600 dark:text-rose-400">Imports only work from this dashboard — paste the lesson here.</p>` : ""}
+        <textarea name="text" form="import-form" rows="4" placeholder="devcoach:lesson:1:…" autocomplete="off" class="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono" x-ref="importText" x-effect="if (open) $nextTick(() => $refs.importText.focus())"></textarea>
+        <div class="flex items-center gap-2">
+          <label class="cursor-pointer text-xs text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition">📄 Choose file<input id="import-file" type="file" name="file" form="import-form" accept=".md,.json,.txt" class="hidden" onchange="document.getElementById('import-form').submit()" /></label>
+          <button type="submit" form="import-form" class="ml-auto bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg px-3 py-1.5 text-xs font-medium transition">Import</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   ${
@@ -526,6 +543,8 @@ export function lessonsPage(d: LessonsData): Html {
       : ""
   }
 </form>
+<form id="import-form" method="post" action="/lessons/import" enctype="multipart/form-data" class="hidden"><input type="hidden" name="from" value="lessons" /></form>
+<div id="drop-hint" class="hidden fixed inset-0 z-[60] bg-indigo-500/10 border-4 border-dashed border-indigo-400 pointer-events-none items-center justify-center"><p class="bg-white dark:bg-gray-900 text-indigo-700 dark:text-indigo-300 font-semibold rounded-xl px-6 py-3 shadow-lg">Drop to import the lesson</p></div>
 
 ${
   d.lessons.length
@@ -540,6 +559,7 @@ ${
         ${sortTh("Level", "level")}
         <th class="px-3 py-3 hidden lg:table-cell">Categories</th>
         ${sortTh("Feedback", "feedback", "hidden xl:table-cell")}
+        <th class="px-2 py-3 w-8"><span class="sr-only">Share</span></th>
       </tr>
     </thead>
     <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
@@ -564,6 +584,7 @@ ${
         <td class="px-3 py-3" onclick="event.stopPropagation()" onkeydown="event.stopPropagation()"><a href="${lessonsQs(s, { level: lesson.level })}" class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${levelTextColor[lesson.level] ?? ""} hover:ring-2 hover:ring-current hover:ring-offset-1 transition-shadow">${lesson.level}</a></td>
         <td class="px-3 py-3 hidden lg:table-cell" onclick="event.stopPropagation()" onkeydown="event.stopPropagation()"><div class="flex flex-wrap gap-1">${lesson.categories.map((cat) => html`<a href="${lessonsQs(s, { category: cat })}" class="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors">${cat}</a>`)}</div></td>
         <td class="px-3 py-3 hidden xl:table-cell" onclick="event.stopPropagation()" onkeydown="event.stopPropagation()">${lesson.feedback === "know" ? html`<span class="text-xs text-teal-600 dark:text-teal-400 font-medium">✓ Known</span>` : lesson.feedback === "dont_know" ? html`<span class="text-xs text-rose-500 dark:text-rose-400 font-medium">✗ Unknown</span>` : ""}</td>
+        <td class="px-2 py-3 text-center" onclick="event.stopPropagation()" onkeydown="event.stopPropagation()"><a href="/lessons/${encodeURIComponent(lesson.id)}?share=1" title="Share this lesson" class="text-gray-300 dark:text-gray-600 hover:text-indigo-500 dark:hover:text-indigo-400 transition text-base leading-none">↗</a></td>
       </tr>`;
       })}
     </tbody>
@@ -604,6 +625,7 @@ ${
 
   const scripts = html`<script src="/static/vendor/flatpickr.min.js"></script>
 <script src="/static/relative-time.js"></script>
+<script src="/static/share.js"></script>
 <script>
 function periodPicker() {
   return {
@@ -674,8 +696,44 @@ const REPO_DOMAINS: Record<string, string> = {
   bitbucket: "bitbucket.org",
 };
 
-export function lessonDetailPage(d: { lesson: Lesson; uiTheme: string }): Html {
+/** Everything the share popover needs, pre-rendered server-side for the current name/context. */
+export interface ShareState {
+  id: string;
+  open: boolean;
+  name: string;
+  includeContext: boolean;
+  text: string;
+  link: string;
+  markdown: string;
+  filename: string;
+}
+
+/**
+ * The popover's action row: the payloads travel as data-* attributes so a click copies
+ * synchronously (Safari refuses clipboard writes after an await). Re-rendered by HTMX
+ * whenever the name or the context checkbox changes.
+ */
+export function shareFragment(sh: ShareState): Html {
+  const dl = `/lessons/${encodeURIComponent(sh.id)}/share?format=md&name=${encodeURIComponent(sh.name)}&include_context=${sh.includeContext ? "1" : "0"}`;
+  return html`<div id="share-payloads" data-text="${sh.text}" data-link="${sh.link}" class="space-y-2">
+  <div class="flex flex-wrap gap-2">
+    <button type="button" onclick="copyShare('text', this)" class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-gray-100 dark:bg-gray-800 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 text-gray-700 dark:text-gray-200 hover:text-indigo-700 dark:hover:text-indigo-300 transition">📋 Copy text</button>
+    <button type="button" onclick="copyShare('link', this)" class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-gray-100 dark:bg-gray-800 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 text-gray-700 dark:text-gray-200 hover:text-indigo-700 dark:hover:text-indigo-300 transition">🔗 Copy link</button>
+    <a href="${dl}" class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-gray-100 dark:bg-gray-800 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 text-gray-700 dark:text-gray-200 hover:text-indigo-700 dark:hover:text-indigo-300 transition">⬇ Download .md</a>
+  </div>
+  <p class="text-[11px] text-gray-400 dark:text-gray-500">${sh.name ? html`Shared by <span class="text-gray-600 dark:text-gray-300">${sh.name}</span>` : "Shared anonymously"} · ${sh.includeContext ? "includes project, branch and commit" : "only the lesson travels — no paths, no project"}.</p>
+</div>`;
+}
+
+export function lessonDetailPage(d: {
+  lesson: Lesson;
+  uiTheme: string;
+  share: ShareState;
+  /** Flash after POST /lessons/import: freshly stored, or already in the log. */
+  imported: "new" | "dup" | null;
+}): Html {
   const l = d.lesson;
+  const sh = d.share;
   const levelClass =
     l.level === "junior"
       ? "text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/30 border-green-300 dark:border-green-700"
@@ -706,6 +764,11 @@ export function lessonDetailPage(d: { lesson: Lesson; uiTheme: string }): Html {
 
   const body = html`
 <div class="mb-4"><a href="/lessons" class="text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-white text-sm transition">← Back to lessons</a></div>
+${
+  d.imported
+    ? html`<div class="mb-4 px-4 py-2 rounded-lg border text-sm bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-700 text-green-700 dark:text-green-300">${d.imported === "new" ? html`✓ Imported “${l.title}”${l.shared_by ? html`, shared by ${l.shared_by}` : ""}. It's in your log now — feedback works as usual and it never counts against your daily limit.` : html`“${l.title}” was already in your log — nothing changed.`}</div>`
+    : ""
+}
 <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-6">
   <div class="flex flex-wrap items-center gap-3 mb-2">
     <form id="lesson-star" method="post" action="/lessons/${encodeURIComponent(l.id)}/star" hx-post="/lessons/${encodeURIComponent(l.id)}/star" hx-target="#lesson-star" hx-select="#lesson-star" hx-swap="outerHTML">
@@ -715,12 +778,27 @@ export function lessonDetailPage(d: { lesson: Lesson; uiTheme: string }): Html {
     </form>
     <h1 class="text-xl font-bold text-gray-900 dark:text-white flex-1 min-w-0">${l.title}</h1>
     <a href="/lessons?level=${l.level}" class="text-xs font-semibold px-2 py-0.5 rounded-full border ${levelClass} shrink-0 hover:ring-2 hover:ring-current hover:ring-offset-1 transition-shadow">${l.level}</a>
+    <div class="relative shrink-0" x-data="{ open: ${String(sh.open)} }" @click.outside="open = false" @keydown.escape="open = false">
+      <button type="button" @click="open = !open" title="Share this lesson" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-indigo-400 !text-xs !px-2.5 !py-1">↗ Share</button>
+      <div x-show="open" x-transition:enter="transition ease-out duration-100" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100" class="absolute right-0 top-full mt-1 z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg w-80 p-4 space-y-3" style="display:none">
+        <p class="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">Share this lesson</p>
+        <form method="post" action="/lessons/${encodeURIComponent(l.id)}/share" hx-post="/lessons/${encodeURIComponent(l.id)}/share" hx-target="#share-payloads" hx-swap="outerHTML" hx-trigger="input delay:300ms, change" onsubmit="return false" class="space-y-2.5">
+          <div>
+            <label for="share-name" class="block text-xs text-gray-400 dark:text-gray-500 mb-1">Your name</label>
+            <input id="share-name" type="text" name="name" value="${sh.name}" maxlength="80" placeholder="anonymous" autocomplete="off" class="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
+          <label class="flex items-start gap-2 text-xs text-gray-600 dark:text-gray-300 cursor-pointer"><input type="checkbox" name="include_context" value="1" ${sh.includeContext ? "checked" : ""} class="mt-0.5" /><span>Include where it happened <span class="text-gray-400 dark:text-gray-500">(project, branch, commit — never local paths)</span></span></label>
+        </form>
+        ${shareFragment(sh)}
+      </div>
+    </div>
   </div>
   <div id="lesson-meta" class="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-500 dark:text-gray-400 mb-5">
     <span class="relative group/date cursor-default">🗓 <span data-ts="${l.timestamp}">${date}</span>
       <span class="absolute z-10 bottom-full left-0 mb-1 px-2 py-1 rounded bg-gray-800 dark:bg-gray-700 text-white text-xs whitespace-nowrap pointer-events-none opacity-0 group-hover/date:opacity-100 transition-opacity duration-150">${tip}</span>
     </span>
     <span>🏷 <span class="text-cyan-600 dark:text-cyan-400">${l.topic_id}</span></span>
+    ${l.imported ? html`<span title="This lesson was shared with you">🤝 shared by <span class="text-gray-700 dark:text-gray-200">${l.shared_by ?? "anonymous"}</span></span>` : ""}
     ${l.categories.map((cat) => html`<a href="/lessons?category=${encodeURIComponent(cat)}" class="inline-block bg-gray-100 dark:bg-gray-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/50 text-gray-600 dark:text-gray-300 text-xs rounded px-2 py-0.5 transition border border-gray-200 dark:border-gray-700 hover:border-indigo-400 dark:hover:border-indigo-600">${cat}</a>`)}
     ${
       l.feedback
@@ -765,6 +843,7 @@ export function lessonDetailPage(d: { lesson: Lesson; uiTheme: string }): Html {
   const scripts = html`<script src="/static/vendor/highlight.min.js"></script>
 <script src="/static/vendor/marked.min.js"></script>
 <script src="/static/relative-time.js"></script>
+<script src="/static/share.js"></script>
 <script>
   updateHljsTheme();
   marked.setOptions({
@@ -780,6 +859,104 @@ export function lessonDetailPage(d: { lesson: Lesson; uiTheme: string }): Html {
 
   return layout({
     title: `${l.title} — devcoach`,
+    currentPath: "/lessons",
+    uiTheme: d.uiTheme,
+    head,
+    body,
+    scripts,
+  });
+}
+
+// ── Import (GET /lessons/import) ─────────────────────────────────────────────
+
+const LEVEL_BADGE: Record<string, string> = {
+  junior:
+    "text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/30 border-green-300 dark:border-green-700",
+  mid: "text-yellow-700 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/30 border-yellow-300 dark:border-yellow-700",
+  senior:
+    "text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/30 border-red-300 dark:border-red-700",
+};
+
+/**
+ * The receiving end of a share link (the docs page sends the browser here with `?code=`) and
+ * the plain paste form. Rendering is read-only: the lesson is stored only when the visitor
+ * clicks "Add to my lessons", a same-origin POST.
+ */
+export function importPage(d: {
+  code: string;
+  preview: SharedLesson | null;
+  error: string | null;
+  uiTheme: string;
+}): Html {
+  const p = d.preview;
+  const pasteForm = html`<form id="import-form" method="post" action="/lessons/import" enctype="multipart/form-data" class="space-y-3">
+  <input type="hidden" name="from" value="lessons" />
+  <textarea name="text" rows="5" placeholder="devcoach:lesson:1:… — or the link, a URL, or the whole card" autocomplete="off" class="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono"></textarea>
+  <div class="flex items-center gap-3">
+    <label class="cursor-pointer text-xs text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition">📄 Choose a .devcoach.md file<input id="import-file" type="file" name="file" accept=".md,.json,.txt" class="hidden" onchange="document.getElementById('import-form').submit()" /></label>
+    <button type="submit" class="ml-auto bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-lg px-4 py-2 text-sm transition">Import</button>
+  </div>
+  <p class="text-xs text-gray-400 dark:text-gray-500">You can also drop the file anywhere on this page.</p>
+</form>`;
+
+  const body = html`
+<div class="mb-4"><a href="/lessons" class="text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-white text-sm transition">← Back to lessons</a></div>
+<div class="max-w-3xl mx-auto bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-6">
+  <p class="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500 mb-4">${p ? "Someone shared a lesson with you" : "Import a shared lesson"}</p>
+  ${d.error ? html`<div class="mb-4 px-4 py-2 rounded-lg border text-sm bg-rose-50 dark:bg-rose-900/20 border-rose-200 dark:border-rose-700 text-rose-700 dark:text-rose-300">${d.error}</div>` : ""}
+  ${
+    p
+      ? html`<div class="flex flex-wrap items-center gap-3 mb-2">
+    <h1 class="text-xl font-bold text-gray-900 dark:text-white flex-1 min-w-0">${p.lesson.title}</h1>
+    <span class="text-xs font-semibold px-2 py-0.5 rounded-full border ${LEVEL_BADGE[p.lesson.level] ?? ""} shrink-0">${p.lesson.level}</span>
+  </div>
+  <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-500 dark:text-gray-400 mb-5">
+    <span>🏷 <span class="text-cyan-600 dark:text-cyan-400">${p.lesson.topic_id}</span></span>
+    ${p.lesson.categories.map((cat) => html`<span class="inline-block bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 text-xs rounded px-2 py-0.5 border border-gray-200 dark:border-gray-700">${cat}</span>`)}
+    <span>🤝 shared by <span class="text-gray-700 dark:text-gray-200">${p.shared_by ?? "anonymous"}</span> · ${p.shared_at.slice(0, 10)}</span>
+  </div>
+  <div class="my-5 pl-4 border-l-4 border-indigo-400 dark:border-indigo-500 bg-indigo-50 dark:bg-indigo-950/40 rounded-r-lg py-3 pr-4">
+    <p class="text-xs font-semibold uppercase tracking-wide text-indigo-500 dark:text-indigo-400 mb-1">TL;DR</p>
+    <div id="summary-content" class="markdown-body text-sm text-indigo-900 dark:text-indigo-100"></div>
+  </div>
+  <details class="group" ${p.lesson.body ? "" : "hidden"}>
+    <summary class="cursor-pointer text-sm text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 select-none">Read the full lesson</summary>
+    <div id="body-content" class="markdown-body mt-3"></div>
+  </details>
+  ${p.lesson.task_context ? html`<div class="mt-6 pt-4 border-t border-gray-100 dark:border-gray-800 text-sm text-gray-500 dark:text-gray-400"><span class="text-gray-400 dark:text-gray-500">Context:</span> ${p.lesson.task_context}</div>` : ""}
+  <form method="post" action="/lessons/import" class="mt-6 pt-4 border-t border-gray-100 dark:border-gray-800 flex flex-wrap items-center gap-3">
+    <input type="hidden" name="from" value="lessons" />
+    <input type="hidden" name="text" value="${d.code}" />
+    <button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-lg px-4 py-2 text-sm transition">＋ Add to my lessons</button>
+    <p class="text-xs text-gray-400 dark:text-gray-500">Nothing is saved until you click. It joins your log like your own lessons and never counts against the daily limit.</p>
+  </form>`
+      : pasteForm
+  }
+</div>`;
+
+  const head = html`<link id="hljs-theme" rel="stylesheet" href="/static/vendor/hljs-dark.min.css" />`;
+  const scripts = html`<script src="/static/vendor/highlight.min.js"></script>
+<script src="/static/vendor/marked.min.js"></script>
+<script src="/static/share.js"></script>
+<script>
+  updateHljsTheme();
+  marked.setOptions({
+    highlight: function(code, lang) {
+      const language = lang && hljs.getLanguage(lang) ? lang : 'plaintext';
+      return hljs.highlight(code, { language }).value;
+    },
+    breaks: true, gfm: true,
+  });
+  ${
+    p
+      ? raw(`document.getElementById('summary-content').innerHTML = marked.parse(${jsonForScript(p.lesson.summary)});
+  document.getElementById('body-content').innerHTML = marked.parse(${jsonForScript(p.lesson.body ?? "")});`)
+      : ""
+  }
+</script>`;
+
+  return layout({
+    title: p ? `${p.lesson.title} — devcoach` : "Import a lesson — devcoach",
     currentPath: "/lessons",
     uiTheme: d.uiTheme,
     head,
@@ -869,6 +1046,11 @@ ${
           </select>
           <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">Per-chat or across all sessions.</p>
         </div>
+      </div>
+      <div>
+        <label for="share-name" class="block text-sm text-gray-600 dark:text-gray-400 mb-1">Your name (for sharing)</label>
+        <input id="share-name" type="text" name="share_name" maxlength="80" value="${d.settings.share_name ?? ""}" placeholder="git user.name when empty" autocomplete="off" class="w-full bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white rounded px-3 py-2 text-sm focus:outline-none focus:border-indigo-500" />
+        <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">Proposed as the sender when you share a lesson. Empty → your git name.</p>
       </div>
       <fieldset class="border-0 p-0 m-0">
         <legend class="block text-sm text-gray-600 dark:text-gray-400 mb-1">UI theme</legend>
