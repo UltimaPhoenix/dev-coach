@@ -798,7 +798,9 @@ describe("cli share / import", () => {
     expect((await run(["set", "share_name", ""])).out).toContain("Cleared");
     expect((await run(["set", "share_name", "x".repeat(81)])).code).toBe(1);
     // no setting left → falls back to git user.name, or anonymous when git has none
-    expect((await run(["share", "s2"])).out).toMatch(/Shared (by [^\n]+ with devcoach|anonymously)/);
+    expect((await run(["share", "s2"])).out).toMatch(
+      /Shared (by [^\n]+ with devcoach|anonymously)/,
+    );
   });
 
   it("import takes a code, a file, stdin, a URL — duplicates and junk are reported, not thrown", async () => {

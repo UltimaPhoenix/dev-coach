@@ -10,7 +10,10 @@ description: >
   or whether new tech from their recent work should be tracked; (3) a devcoach
   hook cue requests a lesson; (4) you just completed substantial technical work
   (code, review, commit, debugging, config, queries, infra) — then evaluate
-  silently whether ONE lesson is due, even when coaching is never mentioned.
+  silently whether ONE lesson is due, even when coaching is never mentioned;
+  (5) the user wants to share a lesson with someone, or hands you a lesson they
+  were given — a `devcoach:lesson:` code, a share link, a URL, or a
+  `.devcoach.md` file — to import.
   Do NOT use for ordinary development tasks on code, apps, or documents that
   merely contain words like profile, lessons, or notebook — only when the subject
   is the user's own coaching data.
@@ -165,6 +168,17 @@ for "know" (within/above band → already calibrated, skip the call). Never call
 `get_lessons({search: topic_id})` shows 2+ lessons on the topic, offer *"Want to save
 this one? ⭐"* — `star_lesson` only if the user agrees, never silently.
 
+**Sharing:** only when the user asks — never offer it. "Share this / the last lesson"
+→ `share_lesson({lesson_id})` (`get_lessons` first when the lesson isn't obvious; ask if
+ambiguous); "as a link" / "as a file" picks the `transport`. `include_context` (project,
+branch, commit, task) only when the user explicitly asks — local paths never travel.
+The reply is exactly what `reply_check` says: the code line goes in a fenced block,
+verbatim, never wrapped or paraphrased. The sender name comes from the `share_name`
+setting, then git; if the user spells a name, offer once to remember it via
+`update_settings({key: "share_name"})`. A lesson the user was given — code, link, URL,
+card text or `.devcoach.md` contents — goes to `import_lesson({payload})` verbatim; a
+duplicate is a normal outcome, not an error.
+
 **Profile expansion:** if the lesson covered a concept absent from
 the profile (`get_profile`), or one that recurs across tasks, offer to track it with an estimated
 confidence (fluent use → 6–7, uncertain → 4–5, first encounter → 2–3); `add_topic`
@@ -182,6 +196,11 @@ checkpoints, never touch the notebook.
 - "How good am I at X?" / "Show my profile" → `get_profile`
 - "Coaching log" → `get_lessons({period: "all"})`
 - "Lessons to revisit" → `get_lessons({feedback: "dont_know"})`
+- "Share this / the last lesson" / "share the lesson about X" → `get_lessons` then
+  `share_lesson({lesson_id})` (see Sharing)
+- "Import this lesson" / a pasted `devcoach:lesson:` code, link or URL →
+  `import_lesson({payload})` verbatim
+- "Lessons shared with me" → `get_lessons({imported: true})`
 
 ## Operating notes
 
@@ -193,3 +212,5 @@ checkpoints, never touch the notebook.
 - The lesson must feel natural and contextual, not a mechanical add-on
 - Nothing interesting to teach → `skip_lesson` (if cued) or stay silent. Better
   nothing than forced.
+- A share or import the user asked for is an ordinary reply, not a lesson: no card
+  bands, no feedback prompt — just what `reply_check` asks for.
