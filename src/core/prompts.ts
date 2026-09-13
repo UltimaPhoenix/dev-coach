@@ -1,6 +1,12 @@
 // Lesson display formatting and level-based prompt templates.
 import type { Lesson } from "./models";
 
+/** The fields the card needs — a full Lesson or a shared-lesson payload both qualify. */
+export type LessonCard = Pick<
+  Lesson,
+  "title" | "categories" | "level" | "topic_id" | "summary" | "body"
+>;
+
 // Visual width of a band's "<dashes> title <dashes>" region (excludes the "### " heading marker).
 const BAND_WIDTH = 34;
 
@@ -18,7 +24,7 @@ function band(title: string): string {
  * multi-paragraph bodies and fenced code — and a bottom band echoing topic · level.
  * Must stay in sync with the card format described in assets/SKILL.md §4.
  */
-export function formatLessonForDisplay(lesson: Lesson): string {
+export function formatLessonForDisplay(lesson: LessonCard): string {
   const levelLabel = lesson.level.charAt(0).toUpperCase() + lesson.level.slice(1);
   const categoryStr = lesson.categories.join(" · ");
   return [

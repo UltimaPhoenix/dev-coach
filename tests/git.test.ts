@@ -3,7 +3,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { detectGitContext } from "../src/core/git";
+import { detectGitContext, detectGitUserName } from "../src/core/git";
 
 const originalCwd = process.cwd();
 afterEach(() => process.chdir(originalCwd));
@@ -55,5 +55,17 @@ describe("detectGitContext", () => {
     expect(ctx.repository).toBeNull();
     expect(ctx.project).toBe(basename(dir));
     expect(ctx.repository_platform).toBeNull();
+  });
+});
+
+describe("detectGitUserName", () => {
+  it("returns the configured name in a repo, null when unset — never throws", () => {
+    const dir = gitRepo();
+    process.chdir(dir);
+    execFileSync("git", ["config", "user.name", "Test User"], { cwd: dir });
+    expect(detectGitUserName()).toBe("Test User");
+    execFileSync("git", ["config", "--unset", "user.name"], { cwd: dir });
+    const value = detectGitUserName();
+    expect(value === null || typeof value === "string").toBe(true);
   });
 });

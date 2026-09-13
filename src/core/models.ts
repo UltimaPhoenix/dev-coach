@@ -85,6 +85,10 @@ export const LessonSchema = z.object({
   repository_platform: RepositoryPlatformSchema.nullish().transform((v) => v ?? null),
   starred: z.boolean().default(false),
   feedback: FeedbackSchema.nullish().transform((v) => v ?? null),
+  // Shared lessons: imported from another devcoach. Stored like our own, but the flag keeps
+  // them out of the rate limit / min-gap, and shared_by names the sender (null = anonymous).
+  imported: z.boolean().default(false),
+  shared_by: nullableStr,
 });
 export type Lesson = z.infer<typeof LessonSchema>;
 
@@ -120,6 +124,8 @@ export const SettingsSchema = z.object({
   nudge_every: z.number().int().min(0).default(10),
   // Count interactions per chat session, or globally across sessions.
   nudge_scope: NudgeScopeSchema.default("session"),
+  // Sender name proposed when sharing a lesson (null = not set → git user.name, then anonymous).
+  share_name: z.string().nullable().default(null),
 });
 export type Settings = z.infer<typeof SettingsSchema>;
 

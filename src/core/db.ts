@@ -71,6 +71,7 @@ export const DEFAULT_SETTINGS: Record<string, string> = {
   ui_theme: "system",
   nudge_every: "10",
   nudge_scope: "session",
+  share_name: "",
 };
 
 /** Cap on how many session rows nudge_state keeps (pruned hard on every bump). */
@@ -108,7 +109,7 @@ export function getConnection(dbPath: string = DB_PATH): DatabaseSync {
  * idempotent statements). Bump it whenever initSchema/migrate changes. The legacy Python
  * runtime ignores user_version, so stamping is safe on the shared DB.
  */
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 export function getInitializedConnection(dbPath: string = DB_PATH): DatabaseSync {
   const db = getConnection(dbPath);
@@ -168,7 +169,9 @@ export function initSchema(db: DatabaseSync): void {
         folder              TEXT,
         feedback            TEXT,
         repository_platform TEXT,
-        starred             INTEGER NOT NULL DEFAULT 0
+        starred             INTEGER NOT NULL DEFAULT 0,
+        imported            INTEGER NOT NULL DEFAULT 0,
+        shared_by           TEXT
     );
 
     CREATE TABLE IF NOT EXISTS knowledge (
@@ -219,10 +222,16 @@ export function initSchema(db: DatabaseSync): void {
 }
 
 function migrate(db: DatabaseSync): void {
-  try {
-    db.exec("ALTER TABLE lessons ADD COLUMN body TEXT");
-  } catch {
-    // column already exists
+  for (const ddl of [
+    "ALTER TABLE lessons ADD COLUMN body TEXT",
+    "ALTER TABLE lessons ADD COLUMN imported INTEGER NOT NULL DEFAULT 0",
+    "ALTER TABLE lessons ADD COLUMN shared_by TEXT",
+  ]) {
+    try {
+      db.exec(ddl);
+    } catch {
+      // column already exists
+    }
   }
 }
 
@@ -237,8 +246,8 @@ function seedDefaults(db: DatabaseSync): void {
 const INSERT_COLUMNS =
   "(id, timestamp, topic_id, categories, title, level, summary, body, " +
   "task_context, project, repository, branch, commit_hash, folder, " +
-  "repository_platform, starred, feedback)";
-const INSERT_PLACEHOLDERS = "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+  "repository_platform, starred, feedback, imported, shared_by)";
+const INSERT_PLACEHOLDERS = "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
 function lessonInsertParams(lesson: Lesson): SqlParam[] {
   return [
@@ -259,6 +268,8 @@ function lessonInsertParams(lesson: Lesson): SqlParam[] {
     lesson.repository_platform,
     lesson.starred ? 1 : 0,
     lesson.feedback,
+    lesson.imported ? 1 : 0,
+    lesson.shared_by,
   ];
 }
 
@@ -268,6 +279,16 @@ export function insertLesson(db: DatabaseSync, lesson: Lesson): void {
     `INSERT OR REPLACE INTO lessons ${INSERT_COLUMNS} VALUES ${INSERT_PLACEHOLDERS}`,
     ...lessonInsertParams(lesson),
   );
+}
+
+/** Insert unless a lesson with the same id exists (never overwrites); true when inserted. */
+export function insertLessonIfAbsent(db: DatabaseSync, lesson: Lesson): boolean {
+  const changes = runSql(
+    db,
+    `INSERT OR IGNORE INTO lessons ${INSERT_COLUMNS} VALUES ${INSERT_PLACEHOLDERS}`,
+    ...lessonInsertParams(lesson),
+  );
+  return changes > 0;
 }
 
 export interface LessonFilters {
@@ -283,6 +304,8 @@ export interface LessonFilters {
   feedback?: string | null;
   date_from?: string | null;
   date_to?: string | null;
+  /** true = only lessons shared to you, false = only your own. */
+  imported?: boolean | null;
 }
 
 type AddClause = (clause: string, ...vals: SqlParam[]) => void;
@@ -325,6 +348,7 @@ function lessonWhere(f: LessonFilters): { where: string; params: SqlParam[] } {
     if (v != null) add(`${col} LIKE ?`, `%${v}%`);
   }
   if (f.starred != null) add("starred = ?", f.starred ? 1 : 0);
+  if (f.imported != null) add("imported = ?", f.imported ? 1 : 0);
   if (f.search != null) {
     const like = `%${f.search}%`;
     add(
@@ -415,12 +439,7 @@ export function importLessons(
       invalid += 1;
       continue;
     }
-    const changes = runSql(
-      db,
-      `INSERT OR IGNORE INTO lessons ${INSERT_COLUMNS} VALUES ${INSERT_PLACEHOLDERS}`,
-      ...lessonInsertParams(lesson),
-    );
-    if (changes > 0) inserted += 1;
+    if (insertLessonIfAbsent(db, lesson)) inserted += 1;
     else duplicated += 1;
   }
   return { inserted, duplicated, invalid };
@@ -453,13 +472,22 @@ export function getTaughtTopicIds(db: DatabaseSync): string[] {
   return allRows(db, "SELECT DISTINCT topic_id FROM lessons").map((r) => r.topic_id as string);
 }
 
+// Pacing counters look at OWN lessons only: a lesson someone shared with you must not eat your
+// daily budget or trip the min-gap (imported = 1 rows are excluded here, but still count as taught).
 export function countLessonsSince(db: DatabaseSync, since: string): number {
-  const r = getRow(db, "SELECT COUNT(*) AS n FROM lessons WHERE timestamp >= ?", since);
+  const r = getRow(
+    db,
+    "SELECT COUNT(*) AS n FROM lessons WHERE timestamp >= ? AND imported = 0",
+    since,
+  );
   return Number(r?.n ?? 0);
 }
 
 export function getLastLessonTimestamp(db: DatabaseSync): string | null {
-  const r = getRow(db, "SELECT timestamp FROM lessons ORDER BY timestamp DESC LIMIT 1");
+  const r = getRow(
+    db,
+    "SELECT timestamp FROM lessons WHERE imported = 0 ORDER BY timestamp DESC LIMIT 1",
+  );
   return r ? (r.timestamp as string) : null;
 }
 
@@ -579,6 +607,7 @@ export function getSettings(db: DatabaseSync): Settings {
     ui_theme: theme,
     nudge_every: Number.isFinite(nudgeEvery) && nudgeEvery >= 0 ? nudgeEvery : 10,
     nudge_scope: nudgeScope,
+    share_name: data.share_name?.trim() || null,
   };
 }
 
@@ -713,7 +742,7 @@ export function getUsageDefaults(db: DatabaseSync): Record<string, string | null
   for (const col of ["project", "repository", "branch", "repository_platform"]) {
     const r = getRow(
       db,
-      `SELECT ${col} AS v, COUNT(*) AS c FROM lessons WHERE ${col} IS NOT NULL GROUP BY ${col} ORDER BY c DESC LIMIT 1`,
+      `SELECT ${col} AS v, COUNT(*) AS c FROM lessons WHERE ${col} IS NOT NULL AND imported = 0 GROUP BY ${col} ORDER BY c DESC LIMIT 1`,
     );
     result[col] = r ? (r.v as string) : null;
   }
@@ -774,6 +803,7 @@ function restoreSettingsSection(db: DatabaseSync, unzipped: Unzipped, result: Re
   if (s.nudge_scope === "session" || s.nudge_scope === "global") {
     setSetting(db, "nudge_scope", s.nudge_scope);
   }
+  if (typeof s.share_name === "string") setSetting(db, "share_name", s.share_name);
   result.settings = 1;
 }
 
@@ -871,5 +901,10 @@ function rowToLesson(row: Row): Lesson {
   } catch {
     categories = [];
   }
-  return parseLesson({ ...row, categories, starred: Boolean(row.starred) });
+  return parseLesson({
+    ...row,
+    categories,
+    starred: Boolean(row.starred),
+    imported: Boolean(row.imported),
+  });
 }

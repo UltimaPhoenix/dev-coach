@@ -51,6 +51,11 @@ function parseRemote(remote: string | null): [string | null, string | null] {
   return [remote, "local"];
 }
 
+/** The committer name git is configured with here (null when unset or git is unavailable). */
+export function detectGitUserName(): string | null {
+  return run("config", "user.name");
+}
+
 export function detectGitContext(): GitContext {
   const folder = process.cwd();
   let branch = run("rev-parse", "--abbrev-ref", "HEAD");

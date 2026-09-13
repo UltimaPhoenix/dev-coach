@@ -9,6 +9,7 @@ import { detectStack, mergeStacks } from "../src/core/detect";
 import { detectGitContext } from "../src/core/git";
 import { normalizeTimestamp, parseLesson } from "../src/core/models";
 import { buildPromptForLevel, formatLessonForDisplay } from "../src/core/prompts";
+import { buildSharePayload, renderShareText, ShareInputError } from "../src/core/share";
 
 function freshDb(): DatabaseSync {
   return db.getInitializedConnection(join(mkdtempSync(join(tmpdir(), "dc-db-")), "c.db"));
@@ -125,6 +126,7 @@ describe("db knowledge + groups + settings", () => {
       ui_theme: "system",
       nudge_every: 10,
       nudge_scope: "session",
+      share_name: null,
     });
     db.setSetting(c, "max_per_day", "5");
     db.setSetting(c, "ui_theme", "dark");
@@ -355,5 +357,124 @@ describe("detect + git", () => {
     expect(ctx).toHaveProperty("folder");
     expect(ctx).toHaveProperty("repository_platform");
     expect(typeof ctx.folder).toBe("string");
+  });
+});
+
+describe("lesson sharing — storage & pacing", () => {
+  let c: DatabaseSync | undefined;
+  afterEach(() => c?.close());
+
+  const payloadFor = (id: string, sharedBy: string | null = "Ada") =>
+    buildSharePayload(lesson({ id, topic_id: "docker", title: `Shared ${id}` }), {
+      includeContext: false,
+      sharedBy,
+    });
+
+  it("migrates a v2 database in place: new columns, user_version 3, imports work", () => {
+    const path = join(mkdtempSync(join(tmpdir(), "dc-db-")), "old.db");
+    const old = db.getInitializedConnection(path);
+    old.exec("ALTER TABLE lessons DROP COLUMN imported");
+    old.exec("ALTER TABLE lessons DROP COLUMN shared_by");
+    old.exec("PRAGMA user_version = 2");
+    old.close();
+    c = db.getInitializedConnection(path);
+    const cols = (c.prepare("PRAGMA table_info(lessons)").all() as { name: string }[]).map(
+      (r) => r.name,
+    );
+    expect(cols).toContain("imported");
+    expect(cols).toContain("shared_by");
+    expect((c.prepare("PRAGMA user_version").get() as { user_version: number }).user_version).toBe(
+      3,
+    );
+    expect(coach.importSharedLesson(c, payloadFor("m1")).inserted).toBe(1);
+  });
+
+  it("an imported lesson is ours (taught topic, feedback works) but never touches pacing", () => {
+    c = freshDb();
+    db.setSetting(c, "max_per_day", "1");
+    const r = coach.importSharedLesson(c, payloadFor("p1"));
+    expect(r).toMatchObject({ kind: "shared", inserted: 1, duplicated: 0, topic_tracked: false });
+    expect(r.lesson).toMatchObject({
+      id: "p1",
+      imported: true,
+      shared_by: "Ada",
+      feedback: null,
+      starred: false,
+    });
+    // dated "now" yet invisible to the daily budget and the min-gap…
+    expect(coach.checkRateLimit(c)).toEqual({ allowed: true });
+    expect(db.getLastLessonTimestamp(c)).toBeNull();
+    expect(coach.getStats(c)).toMatchObject({
+      total_lessons: 1,
+      lessons_today: 0,
+      imported_lessons: 1,
+    });
+    // …but taught, and feedback calibrates the profile as for any lesson.
+    expect(db.getTaughtTopicIds(c)).toEqual(["docker"]);
+    expect(coach.recordFeedback(c, "p1", "know")).toBe("docker");
+    expect(db.getAllKnowledge(c).docker).toBe(6);
+    // an own lesson right after still counts as usual
+    db.insertLesson(c, lesson({ id: "own", timestamp: new Date() }));
+    expect(coach.checkRateLimit(c).allowed).toBe(false);
+  });
+
+  it("re-importing the same share is a duplicate; an own lesson with the same slug is never clobbered", () => {
+    c = freshDb();
+    db.insertLesson(c, lesson({ id: "same-slug", title: "My own lesson" }));
+    const first = coach.importSharedLesson(c, payloadFor("same-slug"));
+    expect(first.inserted).toBe(1);
+    expect(first.lesson?.id).toBe("same-slug-shared");
+    expect(db.getLessonById(c, "same-slug")?.title).toBe("My own lesson");
+    const again = coach.importSharedLesson(c, payloadFor("same-slug"));
+    expect(again).toMatchObject({ inserted: 0, duplicated: 1 });
+    expect(again.lesson?.id).toBe("same-slug-shared");
+    // the same slug from a different sender is a different lesson
+    const other = coach.importSharedLesson(c, payloadFor("same-slug", "Bob"));
+    expect(other.inserted).toBe(1);
+    expect(other.lesson?.id).toBe("same-slug-shared-2");
+    expect(
+      db
+        .getLessons(c, { imported: true })
+        .map((l) => l.id)
+        .sort(),
+    ).toEqual(["same-slug-shared", "same-slug-shared-2"]);
+    expect(db.getLessons(c, { imported: false }).map((l) => l.id)).toEqual(["same-slug"]);
+  });
+
+  it("importSharedInput takes any encoding, keeps the legacy JSON array path, and rejects junk", () => {
+    c = freshDb();
+    const p = payloadFor("via-text");
+    expect(coach.importSharedInput(c, renderShareText(p)).lesson?.id).toBe("via-text");
+    expect(coach.importSharedInput(c, JSON.stringify([lesson({ id: "legacy" })]))).toMatchObject({
+      kind: "lessons",
+      inserted: 1,
+      lesson: null,
+      topic_tracked: null,
+    });
+    expect(db.getLessonById(c, "legacy")?.imported).toBe(false);
+    expect(() => coach.importSharedInput(c, "hello there")).toThrow(ShareInputError);
+  });
+
+  it("usage defaults for log_lesson ignore imported context; backups round-trip the flag and sender", () => {
+    c = freshDb();
+    db.setSetting(c, "share_name", "Ada");
+    const withContext = buildSharePayload(
+      lesson({
+        id: "ctx",
+        project: "their-project",
+        repository: "them/repo",
+        repository_platform: "github",
+      }),
+      { includeContext: true, sharedBy: "Bob" },
+    );
+    coach.importSharedLesson(c, withContext);
+    expect(db.getUsageDefaults(c).project).toBeNull();
+    const zip = db.createBackupZip(c);
+    const c2 = freshDb();
+    db.restoreBackupZip(c2, zip);
+    const restored = db.getLessonById(c2, "ctx");
+    expect(restored).toMatchObject({ imported: true, shared_by: "Bob", project: "their-project" });
+    expect(db.getSettings(c2).share_name).toBe("Ada");
+    c2.close();
   });
 });
