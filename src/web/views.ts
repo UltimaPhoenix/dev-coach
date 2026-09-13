@@ -842,6 +842,7 @@ ${
   const head = html`<link id="hljs-theme" rel="stylesheet" href="/static/vendor/hljs-dark.min.css" />`;
   const scripts = html`<script src="/static/vendor/highlight.min.js"></script>
 <script src="/static/vendor/marked.min.js"></script>
+<script src="/static/vendor/purify.min.js"></script>
 <script src="/static/relative-time.js"></script>
 <script src="/static/share.js"></script>
 <script>
@@ -853,8 +854,8 @@ ${
     },
     breaks: true, gfm: true,
   });
-  document.getElementById('summary-content').innerHTML = marked.parse(${raw(jsonForScript(l.summary))});
-  document.getElementById('body-content').innerHTML = marked.parse(${raw(jsonForScript(l.body))});
+  document.getElementById('summary-content').innerHTML = DOMPurify.sanitize(marked.parse(${raw(jsonForScript(l.summary))}));
+  document.getElementById('body-content').innerHTML = DOMPurify.sanitize(marked.parse(${raw(jsonForScript(l.body))}));
 </script>`;
 
   return layout({
@@ -937,6 +938,7 @@ export function importPage(d: {
   const head = html`<link id="hljs-theme" rel="stylesheet" href="/static/vendor/hljs-dark.min.css" />`;
   const scripts = html`<script src="/static/vendor/highlight.min.js"></script>
 <script src="/static/vendor/marked.min.js"></script>
+<script src="/static/vendor/purify.min.js"></script>
 <script src="/static/share.js"></script>
 <script>
   updateHljsTheme();
@@ -949,8 +951,8 @@ export function importPage(d: {
   });
   ${
     p
-      ? raw(`document.getElementById('summary-content').innerHTML = marked.parse(${jsonForScript(p.lesson.summary)});
-  document.getElementById('body-content').innerHTML = marked.parse(${jsonForScript(p.lesson.body ?? "")});`)
+      ? raw(`document.getElementById('summary-content').innerHTML = DOMPurify.sanitize(marked.parse(${jsonForScript(p.lesson.summary)}));
+  document.getElementById('body-content').innerHTML = DOMPurify.sanitize(marked.parse(${jsonForScript(p.lesson.body ?? "")}));`)
       : ""
   }
 </script>`;
@@ -1120,6 +1122,7 @@ ${
 </div>`;
 
   const scripts = html`<script src="/static/vendor/marked.min.js"></script>
+<script src="/static/vendor/purify.min.js"></script>
 <script>
 function updateLabel(inputId, labelId, submitId) {
   var input = document.getElementById(inputId);
@@ -1127,7 +1130,7 @@ function updateLabel(inputId, labelId, submitId) {
   document.getElementById(submitId).disabled = !input.files.length;
 }
 marked.setOptions({ breaks: true, gfm: true });
-document.getElementById('notebook-preview-settings').innerHTML = marked.parse(${raw(jsonForScript(d.notebookContent))});
+document.getElementById('notebook-preview-settings').innerHTML = DOMPurify.sanitize(marked.parse(${raw(jsonForScript(d.notebookContent))}));
 </script>`;
 
   return layout({

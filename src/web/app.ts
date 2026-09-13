@@ -90,6 +90,14 @@ function isCrossSite(c: { req: { header(name: string): string | undefined } }): 
   return site !== undefined && site !== "same-origin" && site !== "none";
 }
 
+// `git config user.name` is a subprocess; it does not change while the dashboard runs, so it is
+// read once per process instead of on every lesson page view.
+let gitUserNameCache: string | null | undefined;
+function gitUserName(): string | null {
+  if (gitUserNameCache === undefined) gitUserNameCache = detectGitUserName();
+  return gitUserNameCache;
+}
+
 function shareState(
   lesson: Lesson,
   o: { name?: string | null; includeContext?: boolean; open?: boolean },
@@ -98,7 +106,7 @@ function shareState(
   const sharedBy = resolveSharedBy({
     explicit: o.name ?? null,
     setting,
-    gitUserName: detectGitUserName(),
+    gitUserName: gitUserName(),
   });
   const includeContext = o.includeContext ?? false;
   const payload = buildSharePayload(lesson, { includeContext, sharedBy });
@@ -390,8 +398,11 @@ export function createApp(): Hono {
 
   // Share payloads: `?format=text|link` → text/plain, `md` → the .devcoach.md attachment,
   // no format → the #share-payloads fragment (HTMX re-render when name/context change).
-  // POST carries name + include_context from the popover form and remembers the name.
+  // POST carries name + include_context from the popover form and remembers the name; the GET
+  // variants (fragment, formats, the download link) render with the name they carry but never
+  // persist it. Same-origin only: a page elsewhere must not read a share or rename the sender.
   app.on(["GET", "POST"], "/lessons/:lesson_id/share", async (c: Context) => {
+    if (isCrossSite(c)) return c.text("Forbidden", 403);
     const lesson = db.withConnection((conn) =>
       db.getLessonById(conn, c.req.param("lesson_id") ?? ""),
     );
@@ -402,11 +413,11 @@ export function createApp(): Hono {
       const body = await c.req.parseBody();
       name = textField(body, "name");
       includeContext = textField(body, "include_context") === "1";
+      rememberShareName(name);
     } else {
       name = c.req.query("name");
       includeContext = c.req.query("include_context") === "1";
     }
-    rememberShareName(name);
     const state = shareState(lesson, { name, includeContext });
     const format = c.req.query("format");
     if (format === "text") return c.text(state.text);

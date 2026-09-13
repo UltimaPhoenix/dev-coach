@@ -1,3 +1,4 @@
+import dns from "node:dns";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { Client, InMemoryTransport } from "@modelcontextprotocol/client";
@@ -573,6 +574,9 @@ describe("mcp lesson sharing", () => {
       arguments: { lesson_id: "share-me" },
     });
     await client.callTool({ name: "delete_lesson", arguments: { lesson_id: "share-me" } });
+    const dnsSpy = vi
+      .spyOn(dns.promises, "lookup")
+      .mockResolvedValue([{ address: "93.184.216.34", family: 4 }] as never);
     const fetchSpy = vi
       .spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(new Response(shared.structuredContent.code, { status: 200 }))
@@ -590,8 +594,18 @@ describe("mcp lesson sharing", () => {
       });
       expect(gone.isError).toBe(true);
       expect(text(gone)).toContain("404");
+      // a prompt-injected loopback / private URL is refused before any request is made
+      const calls = fetchSpy.mock.calls.length;
+      const local: any = await client.callTool({
+        name: "import_lesson",
+        arguments: { payload: "http://127.0.0.1:7860/settings" },
+      });
+      expect(local.isError).toBe(true);
+      expect(text(local)).toContain("Only public");
+      expect(fetchSpy.mock.calls.length).toBe(calls);
     } finally {
       fetchSpy.mockRestore();
+      dnsSpy.mockRestore();
     }
     await client.close();
     await server.close();

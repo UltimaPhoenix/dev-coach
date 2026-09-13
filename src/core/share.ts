@@ -5,7 +5,7 @@
 // The receiving side (`parseSharedInput`) accepts any of them — a bare code, the whole copied card,
 // the link, the file text, or a legacy lessons JSON array — so the user never has to know which
 // one they were handed. Pure module: no I/O, no DB.
-import { deflateSync, inflateSync, strFromU8, strToU8 } from "fflate";
+import { deflateSync, Inflate, strFromU8, strToU8 } from "fflate";
 import { z } from "zod";
 import { VERSION } from "../version";
 import {
@@ -126,6 +126,37 @@ export function encodeShareCode(payload: SharedLesson): string {
 
 const CODE_RE = /devcoach:lesson:(\d+):([A-Za-z0-9_-]+)/;
 
+/** A real lesson code is ~1–3 K chars; this bounds the compressed input before anything is inflated. */
+export const MAX_CODE_CHARS = 64_000;
+const INFLATE_SLICE = 512;
+
+class TooLargeError extends Error {}
+
+/**
+ * Inflate with a byte budget: the input is fed in small slices to fflate's streaming Inflate and
+ * the running output is checked after each one, so a "zip bomb" code is rejected after at most
+ * ~0.5 MB of output (a slice inflates to ≤ ~1032× its size) instead of being fully expanded first.
+ */
+function inflateBounded(data: Uint8Array, limit: number): Uint8Array {
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  const inflater = new Inflate((chunk) => {
+    total += chunk.length;
+    if (total > limit) throw new TooLargeError("too large");
+    chunks.push(chunk);
+  });
+  for (let i = 0; i < data.length; i += INFLATE_SLICE) {
+    inflater.push(data.subarray(i, i + INFLATE_SLICE), i + INFLATE_SLICE >= data.length);
+  }
+  const out = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    out.set(chunk, offset);
+    offset += chunk.length;
+  }
+  return out;
+}
+
 export function decodeShareCode(code: string): SharedLesson {
   const m = new RegExp(`^${CODE_RE.source}$`).exec(code.trim());
   if (!m) throw new ShareInputError("That is not a devcoach lesson code.");
@@ -134,12 +165,21 @@ export function decodeShareCode(code: string): SharedLesson {
       `This lesson was shared by a newer devcoach (format ${m[1]}) — upgrade to import it.`,
     );
   }
+  const encoded = m[2] ?? "";
+  if (encoded.length > MAX_CODE_CHARS) {
+    throw new ShareInputError("This lesson code is too large to be a lesson.");
+  }
   let json: string;
   try {
-    const bytes = inflateSync(new Uint8Array(Buffer.from(m[2] ?? "", "base64url")));
-    if (bytes.length > MAX_DECODED_BYTES) throw new Error("too large");
+    const bytes = inflateBounded(
+      new Uint8Array(Buffer.from(encoded, "base64url")),
+      MAX_DECODED_BYTES,
+    );
     json = strFromU8(bytes);
-  } catch {
+  } catch (err) {
+    if (err instanceof TooLargeError) {
+      throw new ShareInputError("This lesson code is too large to be a lesson.");
+    }
     throw new ShareInputError("This lesson code is damaged or incomplete — copy it again.");
   }
   return parsePayloadJson(json);
@@ -227,6 +267,31 @@ export function renderShareMarkdownFile(payload: SharedLesson): string {
   return lines.join("\n");
 }
 
+/** Split a YAML flow list body on the commas that are outside JSON-quoted strings. */
+function splitFlowList(inner: string): string[] {
+  const items: string[] = [];
+  let current = "";
+  let quoted = false;
+  for (let i = 0; i < inner.length; i++) {
+    const ch = inner[i] ?? "";
+    if (quoted) {
+      current += ch;
+      if (ch === "\\") current += inner[++i] ?? "";
+      else if (ch === '"') quoted = false;
+    } else if (ch === '"') {
+      quoted = true;
+      current += ch;
+    } else if (ch === ",") {
+      items.push(current);
+      current = "";
+    } else {
+      current += ch;
+    }
+  }
+  items.push(current);
+  return items;
+}
+
 function parseYamlValue(raw: string): unknown {
   const v = raw.trim();
   if (v === "null" || v === "") return null;
@@ -234,7 +299,7 @@ function parseYamlValue(raw: string): unknown {
   if (v.startsWith("[") && v.endsWith("]")) {
     const inner = v.slice(1, -1).trim();
     if (!inner) return [];
-    return inner.split(",").map((item) => parseYamlValue(item));
+    return splitFlowList(inner).map((item) => parseYamlValue(item));
   }
   return v;
 }
@@ -376,10 +441,17 @@ export function sharedLessonToLesson(payload: SharedLesson, id: string, now = ne
   });
 }
 
+/** How many different lessons may share one origin id before an import is refused. */
+export const MAX_ID_CANDIDATES = 50;
+
 /** Candidate local ids for an import: the sender's id first, then collision-safe suffixes. */
-export function sharedLessonIdCandidates(payload: SharedLesson): string[] {
+export function sharedLessonIdCandidates(payload: SharedLesson, max = MAX_ID_CANDIDATES): string[] {
   const base = payload.origin.id;
-  return [base, `${base}-shared`, `${base}-shared-2`, `${base}-shared-3`];
+  const candidates = [base];
+  for (let n = 1; candidates.length < max; n++) {
+    candidates.push(n === 1 ? `${base}-shared` : `${base}-shared-${n}`);
+  }
+  return candidates;
 }
 
 /** True when an existing row is this very shared lesson (a re-import), not a different lesson. */

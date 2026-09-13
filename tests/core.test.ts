@@ -441,6 +441,21 @@ describe("lesson sharing — storage & pacing", () => {
     expect(db.getLessons(c, { imported: false }).map((l) => l.id)).toEqual(["same-slug"]);
   });
 
+  it("many senders sharing the same slug all import (suffixes are generated, not a fixed list)", () => {
+    c = freshDb();
+    const ids = ["Ann", "Bob", "Cid", "Dee", "Eve", "Fay"].map(
+      (who) => coach.importSharedLesson(c, payloadFor("popular", who)).lesson?.id,
+    );
+    expect(ids).toEqual([
+      "popular",
+      "popular-shared",
+      "popular-shared-2",
+      "popular-shared-3",
+      "popular-shared-4",
+      "popular-shared-5",
+    ]);
+  });
+
   it("importSharedInput takes any encoding, keeps the legacy JSON array path, and rejects junk", () => {
     c = freshDb();
     const p = payloadFor("via-text");

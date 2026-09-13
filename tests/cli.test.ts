@@ -1,3 +1,4 @@
+import dns from "node:dns";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -844,6 +845,9 @@ describe("cli share / import", () => {
     globalThis.fetch = (async () => {
       throw new Error("must not fetch a share link");
     }) as typeof fetch;
+    const dnsSpy = vi
+      .spyOn(dns.promises, "lookup")
+      .mockResolvedValue([{ address: "93.184.216.34", family: 4 }] as never);
     try {
       expect((await run(["import", link])).out).toContain('✓ Imported "Layer cache s6"');
       globalThis.fetch = (async () => new Response(stdinText, { status: 200 })) as typeof fetch;
@@ -852,6 +856,7 @@ describe("cli share / import", () => {
       );
     } finally {
       globalThis.fetch = realFetch;
+      dnsSpy.mockRestore();
     }
     // legacy lessons array + junk
     expect(

@@ -1,3 +1,4 @@
+import dns from "node:dns";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import * as db from "../src/core/db";
 import { parseLesson } from "../src/core/models";
@@ -393,8 +394,8 @@ describe("web lesson sharing", () => {
     expect(body).toContain('shared_by: "Phoenix"');
     expect(body).toContain("project:");
     expect(body).not.toContain("secret");
-    // the name is remembered as the share_name setting
-    expect(db.withConnection((c) => db.getSettings(c).share_name)).toBe("Phoenix");
+    // a GET renders with the name it carries but never persists it (only the popover POST does)
+    expect(db.withConnection((c) => db.getSettings(c).share_name)).toBeNull();
 
     expect((await get("/lessons/nope/share")).status).toBe(404);
   });
@@ -409,6 +410,57 @@ describe("web lesson sharing", () => {
     const anon = await (await postForm("/lessons/sh1/share", { name: "" })).text();
     expect(anon).toContain("Shared anonymously");
     expect(db.withConnection((c) => db.getSettings(c).share_name)).toBeNull();
+  });
+
+  it("share endpoint refuses cross-site requests, so another site cannot rename the sender", async () => {
+    await postForm("/lessons/sh1/share", { name: "Ada" });
+    const cross = await app.fetch(
+      new Request("http://localhost/lessons/sh1/share?name=Attacker&format=text", {
+        headers: { "sec-fetch-site": "cross-site" },
+      }),
+    );
+    expect(cross.status).toBe(403);
+    const crossPost = await postForm(
+      "/lessons/sh1/share",
+      { name: "Attacker" },
+      { "sec-fetch-site": "cross-site" },
+    );
+    expect(crossPost.status).toBe(403);
+    expect(db.withConnection((c) => db.getSettings(c).share_name)).toBe("Ada");
+  });
+
+  it("markdown from lessons is sanitized before it reaches innerHTML (detail, preview, settings)", async () => {
+    seed("xss", "Boom");
+    db.withConnection((c) => db.deleteLesson(c, "xss"));
+    const stored = parseLesson({
+      id: "xss",
+      timestamp: "2026-06-16T10:00:00Z",
+      topic_id: "sqlite",
+      categories: ["sqlite"],
+      title: "Boom",
+      level: "mid",
+      summary: "s",
+      body: '<img src=x onerror="alert(1)">',
+    });
+    db.withConnection((c) => db.insertLesson(c, stored));
+    const detail = await (await get("/lessons/xss")).text();
+    expect(detail).toContain("/static/vendor/purify.min.js");
+    expect(detail).toMatch(/innerHTML = DOMPurify\.sanitize\(marked\.parse\(/);
+    expect(detail).not.toMatch(/innerHTML = marked\.parse\(/);
+    const code = (await (await get("/lessons/xss/share?format=text")).text())
+      .trim()
+      .split("\n")
+      .at(-1);
+    const preview = await (
+      await get(`/lessons/import?code=${encodeURIComponent(code ?? "")}`)
+    ).text();
+    expect(preview).toContain("/static/vendor/purify.min.js");
+    expect(preview).toMatch(/innerHTML = DOMPurify\.sanitize\(marked\.parse\(/);
+    expect(preview).not.toMatch(/innerHTML = marked\.parse\(/);
+    const settings = await (await get("/settings")).text();
+    expect(settings).toContain("/static/vendor/purify.min.js");
+    expect(settings).not.toMatch(/innerHTML = marked\.parse\(/);
+    expect((await get("/static/vendor/purify.min.js")).status).toBe(200);
   });
 
   it("import from the paste box: new → detail banner, again → dup, junk → invalid", async () => {
@@ -454,6 +506,9 @@ describe("web lesson sharing", () => {
     expect(r.headers.get("location")).toBe("/lessons/sh1?imported=1");
 
     db.withConnection((c) => db.deleteLesson(c, "sh1"));
+    const dnsSpy = vi
+      .spyOn(dns.promises, "lookup")
+      .mockResolvedValue([{ address: "93.184.216.34", family: 4 }] as never);
     const fetchSpy = vi
       .spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(new Response(md, { status: 200 }));
@@ -465,6 +520,7 @@ describe("web lesson sharing", () => {
       expect(viaUrl.headers.get("location")).toBe("/lessons/sh1?imported=1");
     } finally {
       fetchSpy.mockRestore();
+      dnsSpy.mockRestore();
     }
   });
 

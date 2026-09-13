@@ -55,7 +55,17 @@ export default function LessonPage(): ReactNode {
   useEffect(() => {
     let cancelled = false;
     const run = async () => {
-      const raw = decodeURIComponent(window.location.hash.replace(/^#/, "")).trim();
+      let raw: string;
+      try {
+        raw = decodeURIComponent(window.location.hash.replace(/^#/, "")).trim();
+      } catch {
+        // A malformed percent-escape in the fragment throws URIError — show the paste form, not a spinner.
+        setCode("");
+        setLesson(null);
+        setError("This link is malformed — ask for it again, or paste the code below.");
+        setStatus("error");
+        return;
+      }
       if (!raw) {
         setStatus("empty");
         setLesson(null);
