@@ -7,7 +7,7 @@
 </p>
 
 [![npm](https://img.shields.io/npm/v/devcoach?logo=npm)](https://www.npmjs.com/package/devcoach)
-[![CI](https://github.com/UltimaPhoenix/dev-coach/actions/workflows/ci.yml/badge.svg)](https://github.com/UltimaPhoenix/dev-coach/actions/workflows/ci.yml)
+[![CI](https://github.com/UltimaPhoenix/dev-coach/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/UltimaPhoenix/dev-coach/actions/workflows/ci.yml?query=branch%3Adevelop)
 [![Quality Gate](https://sonarcloud.io/api/project_badges/measure?project=UltimaPhoenix_dev-coach&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=UltimaPhoenix_dev-coach)
 [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=UltimaPhoenix_dev-coach&metric=coverage)](https://sonarcloud.io/summary/new_code?id=UltimaPhoenix_dev-coach)
 [![Node](https://img.shields.io/badge/node-%E2%89%A524-brightgreen?logo=node.js)](https://nodejs.org/)
@@ -152,6 +152,8 @@ npx -y devcoach install
 ```
 
 Restart your agent afterward. Prefer a global binary? `npm install -g devcoach`, then run `devcoach install` (and drop the `npx -y` prefix everywhere). After upgrading devcoach, re-run `devcoach install` to refresh the skill — `devcoach stats` reminds you when it's out of date.
+
+**Canary builds:** every change merged into the `develop` branch is published to npm under the `next` tag — `npx -y devcoach@next` (or `npm install -g devcoach@next`) runs the unreleased version, documented at [ultimaphoenix.github.io/dev-coach/next](https://ultimaphoenix.github.io/dev-coach/next/). `latest` stays the last release.
 
 </details>
 
@@ -550,17 +552,17 @@ npm run mcpb              # build the Claude Desktop .mcpb (npm run mcpb:sign to
 - **MCP Inspector:** `npx @modelcontextprotocol/inspector node dist/bin.js mcp`
 - **Stack:** `@modelcontextprotocol/server` (MCP SDK v2) · `node:sqlite` · Hono · Commander · Zod · Biome · Vitest · tsup
 
-### Publishing a release
+### Branches & releases
 
-Tag a commit with `v*`:
-
-```bash
-git tag v1.2.3 && git push origin v1.2.3
-```
-
-CI lints, type-checks, tests (Node 24 & 26), builds, and publishes to npm via **OIDC provenance**
-(`npm publish --provenance`). First-time setup: configure a Trusted Publisher on npmjs.com for the
-`devcoach` package (GitHub Actions, repo `UltimaPhoenix/dev-coach`, workflow `ci.yml`).
+- `develop` is the integration branch: every PR targets it, and each merge publishes a **canary**
+  (`npx -y devcoach@next`, docs at `/next/`).
+- `main` only receives releases and is always the last published version (the Claude Code
+  self-marketplace installs from it).
+- A release is one click: run the **CI** workflow (*Run workflow* → patch / minor / major) on
+  `develop`. CI bumps the version on `develop`, tags it, fast-forwards `main`, then publishes to npm via
+  **OIDC provenance**, attaches the `.mcpb` + plugin zips to a GitHub Release, and updates the Homebrew
+  tap, the plugin marketplace and the MCP Registry. First-time setup: configure a Trusted Publisher on
+  npmjs.com for the `devcoach` package (GitHub Actions, repo `UltimaPhoenix/dev-coach`, workflow `ci.yml`).
 
 ---
 

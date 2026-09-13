@@ -14,13 +14,19 @@ run-name: >-
     && format('CI - PR {0}', github.event.pull_request.title)
     || format('CI — {0}', github.event.head_commit.message))) }}
 
-# Three scenarios (mirrors the old pipeline):
-#  1. Push to main / pull request  → lint + typecheck + test + build + sonar
-#  2. Tag push (v*)                → … + publish (npm) + GitHub Release (.mcpb) + Homebrew bump
-#  3. workflow_dispatch (Release)  → bump version → tag → publish + Release + Homebrew
+# Branching model: `develop` is the integration branch (every PR, Dependabot, screenshots);
+# `main` only ever receives release commits, fast-forwarded by the bump job, so it is always the
+# last release — which matters because the self-marketplace (`/plugin marketplace add
+# UltimaPhoenix/dev-coach`) clones the default branch. Four scenarios:
+#  1. Push to develop / pull request → lint + typecheck + test + build + sonar; a green push to
+#     develop also publishes a canary (npm dist-tag `next` + rolling GitHub prerelease `next`)
+#  2. Tag push (v*)                  → … + publish (npm) + GitHub Release (.mcpb) + Homebrew + marketplace + registry
+#  3. workflow_dispatch (Release) on develop → bump version on develop → tag → fast-forward main
+#     → publish + Release + Homebrew + marketplace + registry
+#  4. workflow_dispatch (Release) on main    → hotfix release: bump on main only (merge main into develop after)
 on:
   push:
-    branches: [main]
+    branches: [main, develop]
     tags: ["v*"]
   pull_request:
   workflow_dispatch:
@@ -115,6 +121,65 @@ jobs:
         with:
           args: -Dsonar.projectVersion=${{ env.PKG_VERSION }}
 
+  # ── Canary: every green push to develop → npm dist-tag `next` + rolling GitHub prerelease ──
+  # The version is computed in the runner (next minor after the last v* tag + run number + sha) and
+  # is never committed nor tagged with a v* tag: the release preflight derives versions from v* tags
+  # only, so canaries cannot skew it. No secrets involved: npm OIDC trusted publishing (the same
+  # workflow file the release uses — deliberately no `environment:` key, which would change the OIDC
+  # subject) + GITHUB_TOKEN for the prerelease.
+  prerelease:
+    needs: check
+    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+    runs-on: ubuntu-latest
+    # A newer push supersedes a canary still in flight.
+    concurrency:
+      group: prerelease
+      cancel-in-progress: true
+    permissions:
+      contents: write # rolling `next` tag + prerelease
+      id-token: write # npm provenance / OIDC trusted publishing (tokenless)
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # tags → last release → canary base version
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          registry-url: https://registry.npmjs.org
+          cache: npm
+      - run: npm ci
+      - name: Compute the canary version
+        id: ver
+        run: |
+          set -euo pipefail
+          LAST="$(git describe --tags --abbrev=0 --match 'v*' 2>/dev/null || echo v0.0.0)"
+          BASE="$(node -e 'const [M, m] = process.argv[1].replace(/^v/, "").split(".").map(Number); console.log(`${M}.${m + 1}.0`)' "$LAST")"
+          VERSION="${BASE}-next.${GITHUB_RUN_NUMBER}.g$(git rev-parse --short=7 HEAD)"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Canary ${VERSION} (last release ${LAST})"
+      - name: Pin the manifests to the canary version (runner only — nothing is committed)
+        run: |
+          set -euo pipefail
+          npm version "${{ steps.ver.outputs.version }}" --no-git-tag-version
+          NEW="${{ steps.ver.outputs.version }}" node -e 'const fs=require("fs"),f="mcpb/manifest.json";fs.writeFileSync(f,fs.readFileSync(f,"utf8").replace(/"version": "[^"]+"/,`"version": "${process.env.NEW}"`))'
+          node scripts/sync-plugin.mjs
+      - run: npm run build
+      - run: npm publish --access public --tag next
+      - run: npm run mcpb:sign && npm run plugin:zip && npm run gemini:zip
+      - name: Publish the rolling GitHub prerelease `next`
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          set -euo pipefail
+          # Recreate rather than update: assets are version-named, so an update would accumulate them.
+          gh release delete next --yes --cleanup-tag 2>/dev/null || true
+          git tag -f next
+          git push --force origin refs/tags/next
+          NOTES="$(printf 'Canary build **%s** from `develop` @ %s — unreleased, may break.\n\nInstall: `npx -y devcoach@next` · docs: https://ultimaphoenix.github.io/dev-coach/next/' "$VERSION" "$GITHUB_SHA")"
+          gh release create next --prerelease --title "next (canary)" --notes "$NOTES" \
+            dist-mcpb/*.mcpb dist-plugin/*.zip dist-gemini/*.zip
+
   # ── Version bump → commit → tag (workflow_dispatch only) ───────────────────
   bump:
     if: github.event_name == 'workflow_dispatch'
@@ -135,14 +200,27 @@ jobs:
         with:
           # Full history + tags so the preflight guards (last tag, "nothing to release") work.
           fetch-depth: 0
-          # Admin PAT (fine-grained, dev-coach only, Contents: RW) so the push to the
-          # protected main branch bypasses branch protection (enforce_admins is off).
+          # Admin PAT (fine-grained, dev-coach only, Contents: RW) so the pushes to the
+          # protected develop + main branches bypass branch protection (enforce_admins is off).
           # The default GITHUB_TOKEN runs as github-actions[bot], which is not an admin
           # and would be rejected by the required CLA check.
           token: ${{ secrets.RELEASE_TOKEN }}
       - uses: actions/setup-node@v7
         with:
           node-version-file: .node-version
+      - name: Preflight — release from develop (or main for a hotfix)
+        run: |
+          set -euo pipefail
+          git fetch --quiet origin main
+          case "$GITHUB_REF_NAME" in
+            develop)
+              # main must be an ancestor so the fast-forward below can land; otherwise a hotfix
+              # went to main and was never merged back.
+              git merge-base --is-ancestor origin/main HEAD \
+                || { echo "::error::main has commits that are not in develop — merge main into develop first."; exit 1; } ;;
+            main) echo "Hotfix release from main — remember to merge main into develop afterwards." ;;
+            *) echo "::error::Run the Release on develop (or on main for a hotfix), not on $GITHUB_REF_NAME."; exit 1 ;;
+          esac
       - name: Preflight — refuse an empty release
         run: |
           set -euo pipefail
@@ -176,14 +254,20 @@ jobs:
             gemini-extension/gemini-extension.json gemini-extension/package.json \
             gemini-extension/skills/devcoach/SKILL.md \
             .claude-plugin/marketplace.json plugin/LICENSE gemini-extension/LICENSE
-          # [skip ci] so neither the main push nor the tag push (both made with a real
-          # PAT identity, which DOES re-trigger workflows) starts a second run that would
-          # double-publish. Publish/release still run in THIS workflow_dispatch run via needs.bump.
+          # [skip ci] so neither the branch pushes nor the tag push (all made with a real
+          # PAT identity, which DOES re-trigger workflows) start a second run that would
+          # double-publish or cut a canary. Publish/release still run in THIS workflow_dispatch
+          # run via needs.bump.
           git commit -m "chore: release v${NEW} [skip ci]"
           git tag "v${NEW}"
-          # --atomic: main commit and tag land together or not at all — no half-state where
-          # main got the bump but the tag push failed (which silently skips a version).
-          git push --atomic origin HEAD:main "v${NEW}"
+          # --atomic: the bump commit on develop, the fast-forward of main and the tag land
+          # together or not at all — no half-state where a branch got the bump but the tag push
+          # failed (which silently skips a version), and a non-fast-forward main rejects everything.
+          if [ "$GITHUB_REF_NAME" = develop ]; then
+            git push --atomic origin HEAD:refs/heads/develop HEAD:refs/heads/main "refs/tags/v${NEW}"
+          else
+            git push --atomic origin HEAD:refs/heads/main "refs/tags/v${NEW}"
+          fi
           echo "version=${NEW}" >> "$GITHUB_OUTPUT"
           echo "tag=v${NEW}" >> "$GITHUB_OUTPUT"
 

@@ -7,6 +7,10 @@ import { themes as prismThemes } from "prism-react-renderer";
 // Runs in Node.js — no client-side code here.
 
 const SITE_URL = "https://ultimaphoenix.github.io/dev-coach/";
+// DOCS_NEXT=1 builds the same tree for the unreleased `develop` branch; .github/workflows/docs.yml
+// deploys it under /next/ next to the released docs: noindex, no sitemap, no JSON-LD, a banner.
+const NEXT = process.env.DOCS_NEXT === "1";
+const NEXT_URL = `${SITE_URL}next/`;
 const DESCRIPTION =
   "devcoach is a free, local, open-source MCP server that turns every task your AI agent finishes into one short, in-context lesson — progressive technical coaching for Claude Code, Claude Desktop, Gemini CLI, Codex CLI, Cursor, and other MCP tools.";
 
@@ -78,10 +82,11 @@ const config: Config = {
   future: { v4: true },
 
   url: "https://ultimaphoenix.github.io",
-  baseUrl: "/dev-coach/",
+  baseUrl: NEXT ? "/dev-coach/next/" : "/dev-coach/",
   organizationName: "UltimaPhoenix",
   projectName: "dev-coach",
   trailingSlash: false,
+  noIndex: NEXT, // every /next/ page carries <meta name="robots" content="noindex, nofollow">
 
   onBrokenLinks: "warn",
 
@@ -105,7 +110,7 @@ const config: Config = {
         },
         blog: false,
         // Help search engines crawl every page; the classic preset auto-emits sitemap.xml.
-        sitemap: { changefreq: "weekly", priority: 0.5, filename: "sitemap.xml" },
+        sitemap: NEXT ? false : { changefreq: "weekly", priority: 0.5, filename: "sitemap.xml" },
         theme: { customCss: "./src/css/custom.css" },
       } satisfies Preset.Options,
     ],
@@ -113,8 +118,11 @@ const config: Config = {
 
   plugins: [llmsFullTxtPlugin],
 
-  // Site-wide JSON-LD so search & answer engines model devcoach as a free developer tool.
-  headTags: [
+  // Site-wide JSON-LD so search & answer engines model devcoach as a free developer tool
+  // (released docs only — the /next/ copy must not duplicate the @ids).
+  headTags: NEXT
+    ? []
+    : [
     {
       tagName: "script",
       attributes: { type: "application/ld+json" },
@@ -158,6 +166,17 @@ const config: Config = {
   ],
 
   themeConfig: {
+    ...(NEXT
+      ? {
+          announcementBar: {
+            id: "next-docs",
+            content: `You are reading the docs for the unreleased <strong>develop</strong> branch (<code>npx -y devcoach@next</code>) — <a href="${SITE_URL}">released docs</a>`,
+            backgroundColor: "#4f46e5",
+            textColor: "#ffffff",
+            isCloseable: false,
+          },
+        }
+      : {}),
     // Social/OG card shown in link previews (Docusaurus also emits twitter:card=summary_large_image).
     image: "img/og-card.jpg",
     // Extra <meta> for search engines and social cards; Docusaurus dedupes against page frontmatter.
@@ -178,6 +197,9 @@ const config: Config = {
       title: "devcoach",
       logo: { alt: "devcoach", src: "img/favicon.svg" },
       items: [
+        NEXT
+          ? { href: SITE_URL, label: "stable docs", position: "right" }
+          : { href: NEXT_URL, label: "next", position: "right" },
         { href: "https://www.npmjs.com/package/devcoach", label: "npm", position: "right" },
         { href: "https://github.com/UltimaPhoenix/dev-coach", label: "GitHub", position: "right" },
       ],

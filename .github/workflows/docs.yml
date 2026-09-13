@@ -1,8 +1,12 @@
 name: Docs
 
+# Two versions of the site from one GitHub Pages deployment:
+#   • main    → https://ultimaphoenix.github.io/dev-coach/       (released docs)
+#   • develop → https://ultimaphoenix.github.io/dev-coach/next/  (unreleased: noindex, no sitemap, banner)
+# Both branches are rebuilt whichever one triggered the run, so the deployment is always complete.
 on:
   push:
-    branches: [main]
+    branches: [main, develop]
     paths: ["docs/**", "website/**", ".github/workflows/docs.yml"]
   workflow_dispatch:
 
@@ -19,21 +23,34 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: website
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: main
+          path: release
+      - uses: actions/checkout@v7
+        with:
+          ref: develop
+          path: next
       - uses: actions/setup-node@v7
         with:
-          node-version-file: .node-version
+          node-version-file: release/.node-version
           cache: npm
-          cache-dependency-path: website/package-lock.json
-      - run: npm ci
-      - run: npm run build
+          cache-dependency-path: |
+            release/website/package-lock.json
+            next/website/package-lock.json
+      - name: Build the released docs (main)
+        working-directory: release/website
+        run: npm ci && npm run build
+      - name: Build the next docs (develop) under /next/
+        working-directory: next/website
+        env:
+          DOCS_NEXT: "1"
+        run: npm ci && npm run build
+      - run: cp -r next/website/build release/website/build/next
       - uses: actions/upload-pages-artifact@v5
         with:
-          path: website/build
+          path: release/website/build
 
   deploy:
     needs: build
