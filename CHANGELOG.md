@@ -4,6 +4,40 @@ Notable changes to devcoach. Versions follow [Semantic Versioning](https://semve
 
 ---
 
+## [2.1.0] — Unreleased
+
+### Added
+- **Lesson sharing.** Hand a lesson to another person and import theirs — from the dashboard, the CLI
+  and the agent — over one portable payload with three transports the receiver never has to tell
+  apart: **copyable text** (the card plus one `devcoach:lesson:1:…` line), a **server-less link**
+  (`https://ultimaphoenix.github.io/dev-coach/lesson#…` — the lesson lives in the URL fragment, decoded
+  in the browser, never sent to a server) and a **`.devcoach.md` file** (YAML front matter + markdown,
+  renders on GitHub).
+  - Dashboard: **↗ Share** popover on a lesson (name, *Include where it happened*, Copy text / Copy
+    link / Download .md), **＋ Import** box on the Lessons page (paste anything, pick a file, or drop a
+    `.devcoach.md` anywhere), a read-only preview page (`/lessons/import?code=…`) with one *Add to
+    my lessons* button, `GET /ping` for the docs page's best-effort "your dashboard is running"
+    check, and *Your name (for sharing)* in Settings.
+  - CLI: `devcoach share [id|--last] [--link] [--file] [--with-context] [--by|--anonymous]` and
+    `devcoach import [source]` (code, card, link, URL, file, `-`; no argument reads the clipboard);
+    `devcoach lessons --imported`; `devcoach set share_name`.
+  - MCP: `share_lesson` and `import_lesson` tools (18 → 20); `get_lessons` gains an `imported`
+    filter, `update_settings` accepts `share_name`; the skill handles "share the last lesson" /
+    "import this devcoach lesson".
+  - Docs site: `/lesson` share page (decodes the fragment locally, sanitized rendering, one-click
+    import into the local dashboard, `noindex`).
+- **Privacy defaults for sharing.** Only the lesson travels unless context is explicitly included; a
+  local folder path is never exported and a repository name only for remote hosts; the sender name
+  comes from `share_name` → git `user.name` and can be anonymous; nothing is saved on the receiving
+  side until confirmed.
+
+### Changed
+- **Schema v3** (additive, automatic): `lessons` gains `imported INTEGER NOT NULL DEFAULT 0` and
+  `shared_by TEXT`. An imported lesson is stored like your own — its topic counts as taught and
+  feedback calibrates the profile — but it is **excluded from `max_per_day` and `min_gap_minutes`**
+  and never resets the pacing counters. Backups round-trip the new fields; older backups restore
+  with `imported = 0`.
+
 ## [2.0.2] — 2026-09-11
 
 ### Fixed

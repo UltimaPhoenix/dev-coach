@@ -52,12 +52,14 @@ dev-coach/
 │   │   ├── db.ts           # node:sqlite schema + migrations + query helpers + DEFAULT_PROFILE
 │   │   ├── coach.ts        # rate limit, cue engine (evaluateCue/explainCue), profile, stats
 │   │   ├── git.ts  detect.ts  prompts.ts   # prompts.ts renders the lesson card (formatLessonForDisplay)
+│   │   ├── share.ts  share-fetch.ts   # lesson sharing: payload, code/link/.devcoach.md codecs, parseSharedInput; URL fetch
 │   │   ├── claude-history.ts   # cross-project stack scan of ~/.claude (projects map, manifests, activity, memories)
-│   ├── mcp/server.ts       # McpServer: 18 tools + 11 resources + devcoach_instructions prompt
-│   ├── cli/commands.ts     # Commander dispatcher (30 subcommands: 22 visible + 8 hidden hooks) + term.ts
-│   └── web/app.ts          # Hono app (20 routes) + views.ts (hono/html pages)
-├── tests/                  # Vitest (13 files: core, db-extra, coach/git/claude-history, mcp, web, cli,
-│                           #   setup-wizard, hooks, hooks-spawn, plugin, gemini-extension, mcp-registry)
+│   ├── mcp/server.ts       # McpServer: 20 tools + 11 resources + devcoach_instructions prompt
+│   ├── cli/commands.ts     # Commander dispatcher (32 subcommands: 24 visible + 8 hidden hooks) + term.ts
+│   └── web/app.ts          # Hono app (24 routes) + views.ts (hono/html pages); assets/static/share.js
+├── tests/                  # Vitest (16 files: core, db-extra, coach/git/claude-history, share, mcp, mcpb, web,
+│                           #   cli, setup-wizard, hooks, hooks-spawn, plugin, gemini-extension, mcp-registry, …)
+├── website/src/pages/lesson.tsx  # the share link's landing page (+ src/lib/shareCode.ts: browser decoder)
 ├── scripts/e2e-claude.mjs  # local-only e2e: real `claude -p` sessions (npm run test:e2e)
 ├── scripts/sync-plugin.mjs # pins plugin/, gemini-extension/, server.json + self-marketplace to package.json; copies the skill + LICENSE
 ├── scripts/marketplace-entry.mjs # the devcoach marketplace entry, derived from plugin.json (+ category/tags); used by update-marketplace.mjs
@@ -73,11 +75,12 @@ dev-coach/
 
 ---
 
-## Exposed MCP tools (18)
+## Exposed MCP tools (20)
 
 `log_lesson`, `skip_lesson`, `update_knowledge`, `get_lessons`, `star_lesson`, `delete_lesson`,
 `submit_feedback`, `add_topic`, `remove_topic`, `add_group`, `remove_group`, `update_settings`,
-`open_ui`, `complete_onboarding`, `preview_deep_scan`, `get_briefing`, `get_onboarding`, `get_profile`.
+`open_ui`, `complete_onboarding`, `preview_deep_scan`, `get_briefing`, `get_onboarding`, `get_profile`,
+`share_lesson`, `import_lesson`.
 
 Every tool registers a `title` + read-only/destructive annotations, a tight Zod `inputSchema` with
 `.describe()` on each param, `outputSchema`/`structuredContent` for model-shaped returns
@@ -163,13 +166,14 @@ to re-run `install` when the installed skill is missing/outdated (e.g. after `br
 
 ## DB schema (shared `~/.devcoach/coaching.db`)
 
-`lessons` (17 cols incl. `categories` JSON, `feedback`, `starred`, git metadata, `body`),
+`lessons` (19 cols incl. `categories` JSON, `feedback`, `starred`, git metadata, `body`,
+`imported` + `shared_by` — schema v3, see Lesson sharing below),
 `knowledge` (topic, confidence 0–10, updated_at), `settings`, `knowledge_group_names`,
 `knowledge_groups` (composite PK), `nudge_state` (per-session lesson-cue counter) and `cue_state`
 (single row: `pending`, `last_cue_at`, `last_skip_reason` — cue lifecycle; both runtime only,
 never backed up), plus 4 indexes. All DDL is `CREATE … IF NOT EXISTS` + `INSERT OR IGNORE`
 (idempotent). Connections set `PRAGMA busy_timeout = 3000` (concurrent hook + MCP writers).
-`DEFAULT_SETTINGS`: `max_per_day=2`, `min_gap_minutes=240`, `ui_theme=system`,
+`DEFAULT_SETTINGS`: `max_per_day=2`, `min_gap_minutes=240`, `ui_theme=system`, `share_name=""`,
 `nudge_every=10` (interactions between lesson cues; 0 = every turn), `nudge_scope=session` (count
 per chat session, or `global`) — the quiet session-scoped pacing is an explicit product decision;
 never raise cue frequency by default.
@@ -181,6 +185,32 @@ table reliably means onboarding hasn't run).
 1. Count lessons in the last 24h → if ≥ `max_per_day`: denied.
 2. Last lesson timestamp → if elapsed < `min_gap_minutes`: denied (reason includes remaining time).
 3. Otherwise allowed. Graceful: returns `allowed: true` on any error.
+
+Both steps count **own lessons only** (`imported = 0`): a shared lesson never uses the daily budget,
+never starts the gap (`getLastLessonTimestamp`), and never resets the pacing (`log_lesson` alone does).
+
+## Lesson sharing (`core/share.ts`, `core/share-fetch.ts`)
+
+One payload (`SharedLessonSchema`: format `devcoach.lesson`, version 1, the lesson minus every local
+path, `origin {id, timestamp}`, `shared_by`, `shared_at`, `app_version`), three encodings of it:
+the **code** `devcoach:lesson:1:<base64url(raw deflate JSON)>` (`encodeShareCode`/`decodeShareCode`,
+fflate level 9 — decodable in a browser with `DecompressionStream("deflate-raw")`, which is what
+`website/src/lib/shareCode.ts` does), the **text** (`formatLessonForDisplay` card + a hint line + the
+code as the LAST line), the **link** (`SHARE_PAGE_URL#code` — must equal the docs site's
+`url + baseUrl + "lesson"`) and the **`.devcoach.md` file** (strict YAML-subset front matter +
+markdown body, no YAML dependency). `parseSharedInput` accepts all of them plus a legacy lessons JSON
+array, finds the code anywhere in a card/link, and re-joins email-wrapped codes. Privacy rules live
+in `buildSharePayload`: `folder` never, `repository` only for github/gitlab/bitbucket, the other
+context keys only with `includeContext`. `resolveSharedBy`: explicit → anonymous → `share_name`
+setting → git `user.name` → null. Storage: `coach.importSharedLesson` keeps the sender's id, suffixes
+`-shared`/`-shared-2`… only on collision with a different lesson, and reports a re-import of the same
+share as `duplicated` (`isSameSharedLesson`: imported + same title/topic/sender — no `LIKE`).
+Surfaces: CLI `share`/`import` (no arg = clipboard), MCP `share_lesson`/`import_lesson`
+(`reply_check`: code verbatim in a fenced block), dashboard (`/lessons/:id/share`,
+`POST /lessons/import` with a `Sec-Fetch-Site` guard, read-only `GET /lessons/import?code=`,
+`/ping` = the app's only CORS route, locked to the docs origin + `Access-Control-Allow-Private-Network`),
+and the docs page `website/src/pages/lesson.tsx`. Roadmap, not built: short links (secret Gist) and
+ephemeral one-use links.
 
 ## Cue engine (`core/coach.ts`)
 

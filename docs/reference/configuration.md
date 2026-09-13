@@ -2,7 +2,7 @@
 
 ## Settings
 
-devcoach has five settings, all stored in the `settings` table of the database:
+devcoach has six settings, all stored in the `settings` table of the database:
 
 | Setting | Default | Range / values | Set via |
 |---------|---------|----------------|---------|
@@ -10,9 +10,10 @@ devcoach has five settings, all stored in the `settings` table of the database:
 | `min_gap_minutes` | 240 | 0–1440 | CLI · MCP tool · web UI |
 | `nudge_every` | 10 | 0–1000 | CLI · MCP tool · web UI |
 | `nudge_scope` | `session` | `session` \| `global` | CLI · MCP tool · web UI |
+| `share_name` | *(empty)* | ≤ 80 chars; empty → git `user.name` | CLI · MCP tool · web UI |
 | `ui_theme` | `system` | `system` \| `light` \| `dark` | web UI only |
 
-`devcoach set <key> <value>` and the `update_settings` MCP tool accept the first four. `ui_theme` is
+`devcoach set <key> <value>` and the `update_settings` MCP tool accept the first five. `ui_theme` is
 the dashboard's colour scheme and is changed from the web UI's Settings page.
 
 ---
@@ -25,6 +26,10 @@ Two of the settings rate-limit lesson delivery to prevent overload:
 |---------|---------|-------|-------------|
 | `max_per_day` | 2 | 1–20 | Maximum lessons in a rolling 24-hour window |
 | `min_gap_minutes` | 240 | 0–1440 | Minimum minutes between consecutive lessons |
+
+Both count **your own** lessons only: a lesson someone
+[shared with you](../usage/web-ui.md#sharing-a-lesson) (`imported = 1`) never uses up the daily
+budget, never starts the gap, and never resets the pacing counter.
 
 **Examples:**
 
@@ -109,7 +114,7 @@ The database is created automatically on first run. All data is local — nothin
 ## Database schema (reference)
 
 ```sql
--- Delivered lessons (17 columns)
+-- Delivered lessons (19 columns)
 lessons (
   id                  TEXT PRIMARY KEY,
   timestamp           TEXT NOT NULL,   -- ISO 8601 UTC, always stamped server-side
@@ -127,7 +132,9 @@ lessons (
   folder              TEXT,
   feedback            TEXT,            -- know | dont_know | NULL
   repository_platform TEXT,            -- github | gitlab | bitbucket | local
-  starred             INTEGER NOT NULL DEFAULT 0
+  starred             INTEGER NOT NULL DEFAULT 0,
+  imported            INTEGER NOT NULL DEFAULT 0,  -- 1 = shared by someone else (ignored by the rate limit)
+  shared_by           TEXT             -- the sender's name; NULL = anonymous / not imported
 )
 
 -- Knowledge map

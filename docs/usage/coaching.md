@@ -105,6 +105,24 @@ Answer on the line under the card — a bare `y` or `n` is enough — and your r
 - **❌ don't know** (`n`, `no`) — lowers it by one; devcoach revisits the area sooner.
 - **Anything else, or no reply** — no change; the question is dropped silently and you carry on.
 
+## Sharing a lesson with a teammate
+
+A lesson that landed for you is worth handing over. Ask your agent in plain words:
+
+> share the last lesson · share the lesson about WAL mode as a link · share it as a file
+
+The agent calls `share_lesson` and replies with the card plus a single `devcoach:lesson:1:…` line
+(or the link, or writes the `.devcoach.md` file). Paste that anywhere. Only the lesson travels —
+project, branch and commit are included only if you ask ("with context"), and a local folder path never
+leaves your machine. Your name comes from the `share_name` setting, then git; say "anonymously" to
+drop it.
+
+On the receiving end, hand the agent what you were given — the code, the whole card, the link, a URL
+or the file's contents — and say **"import this devcoach lesson"**. It joins your log like your own
+lessons (feedback works as usual) but never counts against your daily limit. The
+[dashboard](./web-ui.md#sharing-a-lesson) and the [CLI](./cli.md#sharing-a-lesson) accept the same
+inputs.
+
 ## Staying unobtrusive
 
 Coaching is paced: a lesson is cued at most once every `nudge_every` interactions (default 10) per chat

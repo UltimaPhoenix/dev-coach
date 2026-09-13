@@ -394,7 +394,7 @@ Using the Claude Code plugin? Type `/devcoach:ui` in Claude Code instead — no 
 | Page | What you can do |
 |------|-----------------|
 | **Knowledge map** | See all topics with confidence bars; adjust scores directly |
-| **Lessons** | Browse and filter your full lesson history; star lessons to revisit |
+| **Lessons** | Browse and filter your full lesson history; star lessons to revisit; share a lesson with a teammate or import theirs |
 | **Settings** | Change rate limits, import/export your profile, take a backup |
 
 Full reference: [docs/usage/web-ui.md](docs/usage/web-ui.md)
@@ -414,6 +414,8 @@ The CLI is a secondary interface for querying and managing your coaching data. E
 | `devcoach lesson <id>` | Show a single lesson in full |
 | `devcoach star <id>` | Mark a lesson as starred |
 | `devcoach feedback <id> <know\|dont_know\|clear>` | Record comprehension |
+| `devcoach share [id] [--last] [--link] [--file]` | Hand a lesson to a teammate (copyable text, link or `.devcoach.md`) |
+| `devcoach import [source]` | Add a shared lesson — code, link, URL or file; no argument reads the clipboard |
 | `devcoach set max_per_day <n>` | Max lessons per day (default 2) |
 | `devcoach set min_gap_minutes <n>` | Minutes between lessons (default 240) |
 | `devcoach backup [file.zip]` | Export knowledge + lessons + settings + notebook |
