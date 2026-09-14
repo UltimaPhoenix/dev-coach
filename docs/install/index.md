@@ -22,7 +22,7 @@ devcoach works the same whichever way you install it — pick by how you like to
   `brew install` sets up devcoach **and** the `devcoach` CLI, so you also get the
   [command line](../usage/cli.md) and can launch the [dashboard](../usage/web-ui.md) with a bare
   `devcoach ui`. *(On Windows, or if you prefer npm, [npx / npm](./npx.md) is the equivalent.)*
-- **Prefer the simplest, no-terminal setup → the [Claude Code plugin](./claude-code-plugin.md)** *(Beta)*
+- **Prefer the simplest, no-terminal setup → the [Claude Code plugin](./claude-code-plugin.md)**
   (one-click from the marketplace) or, on Claude Desktop, the **[`.mcpb` extension](./claude-desktop.md)** *(Beta)*.
   Nothing to configure — install and go. *(These don't add the `devcoach` CLI — open the
   [dashboard](../usage/web-ui.md) with `/devcoach:ui` or by asking Claude; run CLI commands with
@@ -33,7 +33,7 @@ devcoach works the same whichever way you install it — pick by how you like to
 | Method | Best for | Terminal? | Status |
 |---|---|---|---|
 | **[Homebrew](./homebrew.md)** | **Developers on macOS / Linux who use the CLI** | Yes | Stable |
-| **[Claude Code plugin](./claude-code-plugin.md)** | **Non-expert Claude Code users — one-click setup** | No | Beta |
+| **[Claude Code plugin](./claude-code-plugin.md)** | **Non-expert Claude Code users — one-click setup** | No | Stable |
 | **[Claude Desktop (`.mcpb`)](./claude-desktop.md)** | **Non-expert Claude Desktop users — one-click setup** | No | Beta |
 | **[Gemini CLI](./gemini-cli.md)** | Google Gemini CLI — full loop (hooks + skill) | Yes | Beta |
 | **[Codex CLI](./codex.md)** | OpenAI Codex CLI — full loop (hooks + skill) | Yes | Beta |
