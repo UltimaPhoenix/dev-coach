@@ -136,13 +136,22 @@ describe("claude code plugin packaging", () => {
     expect(server.args).toEqual(["${CLAUDE_PLUGIN_ROOT}/scripts/launch.mjs", "mcp"]);
   });
 
-  it("ships the /devcoach:ui command wired to the open_ui tool", () => {
-    const cmd = read("plugin", "commands", "ui.md");
+  // Plugin MCP tools are namespaced mcp__plugin_<plugin>_<server>__<tool>; the bare
+  // mcp__devcoach__ name only exists when devcoach is wired as a plain MCP server — every
+  // command allows both spellings of the tools it needs.
+  it.each([
+    ["ui", ["open_ui"]],
+    ["share", ["share_lesson", "get_lessons"]],
+    ["import", ["import_lesson", "add_topic"]],
+  ])("ships the /devcoach:%s command wired to its tools", (name, tools) => {
+    const cmd = read("plugin", "commands", `${name}.md`);
     expect(cmd).toMatch(/^---\ndescription: .+/);
-    // Plugin MCP tools are namespaced mcp__plugin_<plugin>_<server>__<tool>; the bare
-    // mcp__devcoach__ name only exists when devcoach is wired as a plain MCP server.
-    expect(cmd).toContain("allowed-tools: mcp__plugin_devcoach_devcoach__open_ui");
-    expect(cmd).toContain("open_ui");
+    const allowed = cmd.match(/^allowed-tools: (.+)$/m)?.[1] ?? "";
+    for (const tool of tools) {
+      expect(allowed).toContain(`mcp__plugin_devcoach_devcoach__${tool}`);
+      expect(allowed).toContain(`mcp__devcoach__${tool}`);
+      expect(cmd.split("---")[2]).toContain(tool);
+    }
   });
 
   it("ships the merged stop-hook + prompt-hook, each with a timeout", () => {

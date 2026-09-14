@@ -76,6 +76,22 @@ import Head from "@docusaurus/Head";
             text: 'Run `npx -y devcoach install` — it registers the MCP server, the coaching hooks and the skill with Claude Code / Claude Desktop. To wire it up by hand instead, add the server to your MCP config: { "mcpServers": { "devcoach": { "command": "npx", "args": ["-y", "devcoach", "mcp"] } } } (`npx -y devcoach mcp` only starts the stdio server). devcoach is also listed in the MCP Registry as io.github.UltimaPhoenix/devcoach. Homebrew, a Claude Code plugin, and a Claude Desktop extension are also available.',
           },
         },
+        {
+          "@type": "Question",
+          name: "Can I share a devcoach lesson with a colleague?",
+          acceptedAnswer: {
+            "@type": "Answer",
+            text: "Yes. From the dashboard, the CLI (devcoach share) or your agent, a lesson can be handed over as copyable text, a server-less link or a .devcoach.md file. The receiver pastes, clicks or drops it into their own devcoach; nothing is uploaded to any server, and only the lesson travels unless the sender opts to include project context.",
+          },
+        },
+        {
+          "@type": "Question",
+          name: "Does an imported lesson count against my daily limit?",
+          acceptedAnswer: {
+            "@type": "Answer",
+            text: "No. A lesson shared with you joins your coaching log attributed to the sender: its topic counts as taught and feedback works as usual, but it never counts against max_per_day or the minimum gap, and it never resets the pacing counter.",
+          },
+        },
       ],
     })}
   </script>
@@ -143,6 +159,19 @@ devcoach is completely free and open source under AGPL-3.0. There are no paid ti
 usage fees, and no commercial license is offered today; only if you need to embed devcoach in a
 closed-source product can you ask for one, case by case, by opening an issue. See
 [License & commercial use](./reference/license.md).
+
+## Can I share a devcoach lesson with a colleague?
+
+Yes. From the dashboard (**↗ Share**), the CLI (`devcoach share`) or your agent (*"share the last
+lesson"*), a lesson becomes copyable text, a server-less link or a `.devcoach.md` file. The receiver
+pastes, clicks or drops it into their own devcoach. Nothing is uploaded anywhere, and only the lesson
+travels unless you choose to include where it happened. See [Sharing lessons](./usage/sharing.md).
+
+## Does an imported lesson count against my daily limit?
+
+No. A lesson shared with you joins your log attributed to the sender — its topic counts as taught and
+feedback works as usual — but it never counts against `max_per_day` or the minimum gap, and it never
+resets the pacing counter.
 
 ## How do I install devcoach?
 

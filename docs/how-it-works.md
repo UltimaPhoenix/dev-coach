@@ -36,6 +36,9 @@ flowchart LR
 
 ---
 
+Lessons can also arrive from other people: a [shared lesson](./usage/sharing.md) is imported into
+the same log, marked as shared by its sender, counts as taught, and is ignored by the rate limit.
+
 ## Coaching loop
 
 The loop is driven by two Claude Code hooks. `prompt-hook` (UserPromptSubmit) peeks at

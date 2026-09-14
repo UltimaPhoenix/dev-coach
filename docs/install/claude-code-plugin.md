@@ -103,7 +103,9 @@ dir — it does **not** put the `devcoach` **CLI** on your `PATH`. You still hav
 zero-install to full CLI:
 
 1. **From inside Claude Code — nothing to install.** Type `/devcoach:ui` (optionally with a port,
-   e.g. `/devcoach:ui 8080`), or just ask — *"open the devcoach dashboard"*. Either way Claude calls
+   e.g. `/devcoach:ui 8080`), or just ask — *"open the devcoach dashboard"*. The plugin also ships
+   `/devcoach:share [last | <id> | about <topic>] [as link|file]` and `/devcoach:import <code or link>`
+   for [sharing lessons](../usage/sharing.md). Either way Claude calls
    the `open_ui` tool, which starts the [web dashboard](../usage/web-ui.md) from the plugin's own
    copy and gives you the URL (default http://localhost:7860).
 2. **From a terminal, without installing** — prefix any [CLI command](../usage/cli.md) with `npx -y`:

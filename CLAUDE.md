@@ -42,7 +42,7 @@ dev-coach/
 ├── tsconfig.json  biome.json  vitest.config.ts  tsup.config.ts  tsup.mcpb.config.ts  .node-version (26)
 ├── assets/                 # tracked single source of truth
 │   ├── SKILL.md            # coaching instructions (slim body; served as the MCP prompt)
-│   ├── references/         # skill progressive disclosure: onboarding.md, calibration.md, review.md
+│   ├── references/         # skill progressive disclosure: onboarding.md, calibration.md, review.md, sharing.md
 │   └── static/             # vendored web bundle (tailwind.js, alpinejs, htmx, flatpickr, …)
 ├── src/
 │   ├── bin.ts              # #!/usr/bin/env node → runCli()
@@ -67,7 +67,7 @@ dev-coach/
 ├── mcpb/                   # Claude Desktop Extension: manifest.json (v0.4, server.type node) + icon.png/svg
 ├── scripts/build-mcpb.mjs  # self-contained bundle (tsup.mcpb.config.ts, deps inlined) → guards (no bare imports;
 │                           #   CLI + MCP initialize from outside the repo) → validate → pack via @anthropic-ai/mcpb
-├── plugin/                 # Claude Code plugin (pinned npm launcher + hooks + /devcoach:ui command + skill mirror — skills/ synced, never hand-edited)
+├── plugin/                 # Claude Code plugin (pinned npm launcher + hooks + /devcoach:ui, /devcoach:share, /devcoach:import commands + skill mirror — skills/ synced, never hand-edited)
 ├── gemini-extension/       # Gemini CLI extension (same launcher pattern, AfterAgent/BeforeAgent hooks) — synced
 ├── server.json             # MCP Registry manifest (io.github.UltimaPhoenix/devcoach) — version pinned by sync
 └── docs/  website/  .github/workflows/{ci,docs,update-screenshots,cla}.yml
@@ -209,7 +209,10 @@ setting → git `user.name` → null. Storage: `coach.importSharedLesson` keeps 
 `-shared`/`-shared-2`… only on collision with a different lesson, and reports a re-import of the same
 share as `duplicated` (`isSameSharedLesson`: imported + same title/topic/sender — no `LIKE`).
 Surfaces: CLI `share`/`import` (no arg = clipboard), MCP `share_lesson`/`import_lesson`
-(`reply_check`: code verbatim in a fenced block), dashboard (`/lessons/:id/share`,
+(`reply_check`: code verbatim in a fenced block), the skill (`assets/references/sharing.md` holds the
+flows: pick lesson → transport → privacy → verbatim reply; import outcomes; "show me the lesson X
+shared" = card without `log_lesson`; the ONE unprompted offer, right after `star_lesson`), the plugin
+commands `/devcoach:share` + `/devcoach:import` (`plugin/commands/`), the user guide `docs/usage/sharing.md`, dashboard (`/lessons/:id/share`,
 `POST /lessons/import` with a `Sec-Fetch-Site` guard (the share route too; it persists `share_name`
 only when the popover posts `persist=1`, set by Alpine on the name input's `change`, not per keystroke),
 read-only `GET /lessons/import?code=`,
