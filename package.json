@@ -59,8 +59,8 @@
     "@modelcontextprotocol/server": "^2.0.0",
     "commander": "^15.0.0",
     "fflate": "^0.8.3",
-    "hono": "^4.13.5",
-    "zod": "^4.4.3"
+    "hono": "^4.13.7",
+    "zod": "^4.6.2"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.12",
