@@ -120,3 +120,59 @@ export async function decodeShareCode(code: string): Promise<SharedLesson> {
   }
   return payload;
 }
+
+// ── .devcoach.md (mirror of renderShareMarkdownFile / sharedLessonFilename in src/core/share.ts) ──
+// Keep byte-compatible with the CLI/dashboard parser: a strict YAML subset (JSON-quoted strings,
+// flow lists, `null`), then the lesson body.
+
+export const SHARE_FILE_SUFFIX = ".devcoach.md";
+
+export function slugify(s: string): string {
+  return (
+    s
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 60) || "lesson"
+  );
+}
+
+export function sharedLessonFilename(payload: SharedLesson): string {
+  return `${slugify(payload.origin.id)}${SHARE_FILE_SUFFIX}`;
+}
+
+const PLAIN_SCALAR = /^[A-Za-z0-9_.+:@/-]+$/;
+const yamlScalar = (v: string): string => (PLAIN_SCALAR.test(v) ? v : JSON.stringify(v));
+const yamlList = (items: string[]): string => `[${items.map(yamlScalar).join(", ")}]`;
+
+export function renderShareMarkdownFile(payload: SharedLesson): string {
+  const l = payload.lesson;
+  const lines = [
+    "---",
+    `format: ${payload.format}`,
+    `version: ${payload.version}`,
+    `title: ${JSON.stringify(l.title)}`,
+    `topic_id: ${yamlScalar(l.topic_id)}`,
+    `level: ${l.level}`,
+    `categories: ${yamlList(l.categories)}`,
+    `summary: ${JSON.stringify(l.summary)}`,
+    `origin_id: ${yamlScalar(payload.origin.id)}`,
+    `origin_timestamp: ${payload.origin.timestamp}`,
+    `shared_by: ${payload.shared_by == null ? "null" : JSON.stringify(payload.shared_by)}`,
+    `shared_at: ${payload.shared_at}`,
+    `app_version: ${yamlScalar(payload.app_version)}`,
+  ];
+  for (const key of [
+    "task_context",
+    "project",
+    "repository",
+    "branch",
+    "commit_hash",
+    "repository_platform",
+  ] as const) {
+    const v = l[key];
+    if (v != null) lines.push(`${key}: ${JSON.stringify(v)}`);
+  }
+  lines.push("---", "", l.body ?? l.summary, "");
+  return lines.join("\n");
+}
