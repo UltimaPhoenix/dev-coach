@@ -4,7 +4,26 @@ Notable changes to devcoach. Versions follow [Semantic Versioning](https://semve
 
 ---
 
-## [2.1.0] — Unreleased
+## [Unreleased]
+
+### Added
+- **`devcoach uninstall`** — the inverse of `install`: removes the MCP registration, devcoach's hook
+  entries and the skill directories for Claude Code / Claude Desktop (default), Gemini CLI and Codex
+  CLI (`--gemini`, `--codex`, `--all`). Coaching data is never deleted unless `--data` is given (asks
+  first). The Homebrew formula's caveats now point to it, since `brew uninstall` cannot run it.
+- **Sharing in the skill and the plugin**: `assets/references/sharing.md` (transport choice, privacy,
+  verbatim codes, import outcomes, showing a shared lesson as a card, the single share offer right
+  after a star); plugin slash commands `/devcoach:share` and `/devcoach:import`; a *Sharing lessons*
+  guide in the docs (`usage/sharing`), with FAQ, homepage and README entries.
+- **Share page**: two-column layout with a sticky action panel and a **Download .devcoach.md** button;
+  the dashboard's import preview is wider and shows the full lesson.
+
+### Changed
+- Docs: the Claude Code plugin is no longer marked Beta; the `.mcpb` extension is marked Beta in the
+  sidebar as well.
+- CI: the Homebrew job polls npm for the release tarball for up to 15 minutes (2.1.0 needed a re-run).
+
+## [2.1.0] — 2026-09-14
 
 ### Added
 - **Lesson sharing.** Hand a lesson to another person and import theirs — from the dashboard, the CLI

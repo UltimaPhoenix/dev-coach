@@ -278,6 +278,10 @@ export default function LessonPage(): ReactNode {
                   No devcoach yet? <Link to="/install">Install it</Link> in a minute — or paste the code into
                   your agent: <em>import this devcoach lesson:</em> <code>{SHARE_CODE_PREFIX}…</code>
                 </p>
+                <p className={styles.hint}>
+                  <Link to="/usage/sharing">What is this?</Link> — how devcoach lessons are shared, what
+                  travels, and what never does.
+                </p>
               </div>
             </aside>
             </div>

@@ -192,9 +192,8 @@ path is never exported), and three ways to hand it over — all carrying the sam
 | **Copy link** | `https://ultimaphoenix.github.io/dev-coach/lesson#devcoach:lesson:1:…` | Messaging: the receiver sees the lesson in the browser and imports it with one click |
 | **Download .md** | `<lesson-id>.devcoach.md` — YAML front matter + the markdown body | Files, pull requests, wikis — renders on GitHub, opens in any editor |
 
-The link is **server-less**: the lesson travels in the URL fragment, which the browser never sends to
-the site. The page decodes it locally, renders it, checks whether your dashboard is running
-(`GET /ping` on `127.0.0.1`, best-effort) and offers **Import into my devcoach**.
+What travels, how the link works and what an imported lesson does to your pacing are in the
+[Sharing lessons](./sharing.md) guide.
 
 <ThemedShot
   alt="Share popover"
@@ -218,9 +217,8 @@ the site. The page decodes it locally, renders it, checks whether your dashboard
   dark={require("../screenshots/lesson-import-preview-dark.png").default}
 />
 
-An imported lesson joins your log like one of your own — its topic counts as taught, ✓/✗ feedback
-calibrates your profile as usual — but it **never counts against your daily limit** or the minimum gap,
-and it never resets the pacing. Importing the same share twice is reported as *already in your log*.
+An imported lesson shows a **🤝 shared by** line in its metadata and never counts against your daily
+limit — see [How an imported lesson behaves](./sharing.md#how-an-imported-lesson-behaves).
 
 ---
 

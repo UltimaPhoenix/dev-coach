@@ -32,7 +32,7 @@ file and store them somewhere you trust. See [Backup, export & import](../usage/
 
 ## Sharing is explicit
 
-[Sharing a lesson](../usage/web-ui.md#sharing-a-lesson) is the only way a lesson leaves your machine,
+[Sharing a lesson](../usage/sharing.md) is the only way a lesson leaves your machine,
 and it only happens when you ask for it:
 
 - **Only the lesson travels by default** — title, summary, body, topic, categories and level. Project,

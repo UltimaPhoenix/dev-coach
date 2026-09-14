@@ -166,18 +166,13 @@ for "know" (within/above band → already calibrated, skip the call). Never call
 
 **Starring:** after feedback, if it was `dont_know` on a mid/senior lesson, or
 `get_lessons({search: topic_id})` shows 2+ lessons on the topic, offer *"Want to save
-this one? ⭐"* — `star_lesson` only if the user agrees, never silently.
+this one? ⭐"* — `star_lesson` only if the user agrees, never silently. A star is also
+the one moment to offer sharing (see `references/sharing.md`).
 
-**Sharing:** only when the user asks — never offer it. "Share this / the last lesson"
-→ `share_lesson({lesson_id})` (`get_lessons` first when the lesson isn't obvious; ask if
-ambiguous); "as a link" / "as a file" picks the `transport`. `include_context` (project,
-branch, commit, task) only when the user explicitly asks — local paths never travel.
-The reply is exactly what `reply_check` says: the code line goes in a fenced block,
-verbatim, never wrapped or paraphrased. The sender name comes from the `share_name`
-setting, then git; if the user spells a name, offer once to remember it via
-`update_settings({key: "share_name"})`. A lesson the user was given — code, link, URL,
-card text or `.devcoach.md` contents — goes to `import_lesson({payload})` verbatim; a
-duplicate is a normal outcome, not an error.
+**Sharing:** user-initiated — the user asks to share a lesson, hands you one to import,
+or asks to see one they were given; the only unprompted offer is the one after a star.
+Before the first share/import of a session, read `references/sharing.md` in this skill's
+directory and follow it (transport, privacy, verbatim codes, what to say on a duplicate).
 
 **Profile expansion:** if the lesson covered a concept absent from
 the profile (`get_profile`), or one that recurs across tasks, offer to track it with an estimated
@@ -201,6 +196,8 @@ checkpoints, never touch the notebook.
 - "Import this lesson" / a pasted `devcoach:lesson:` code, link or URL →
   `import_lesson({payload})` verbatim
 - "Lessons shared with me" → `get_lessons({imported: true})`
+- "Show me the lesson X shared" → `get_lessons({imported: true, search})` → the card,
+  without `log_lesson` or the feedback line (see `references/sharing.md`)
 
 ## Operating notes
 

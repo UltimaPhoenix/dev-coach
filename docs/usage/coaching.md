@@ -119,9 +119,11 @@ drop it.
 
 On the receiving end, hand the agent what you were given — the code, the whole card, the link, a URL
 or the file's contents — and say **"import this devcoach lesson"**. It joins your log like your own
-lessons (feedback works as usual) but never counts against your daily limit. The
-[dashboard](./web-ui.md#sharing-a-lesson) and the [CLI](./cli.md#sharing-a-lesson) accept the same
-inputs.
+lessons (feedback works as usual) but never counts against your daily limit; *"show me the lesson Ada
+shared"* renders it as a card. With the Claude Code plugin the same flows are one command away:
+`/devcoach:share last as link`, `/devcoach:import <code>`. The coach never brings sharing up itself,
+except once, right after you star a lesson. Everything else — transports, privacy, the file format —
+is in [Sharing lessons](./sharing.md).
 
 ## Staying unobtrusive
 

@@ -108,7 +108,7 @@ The simplest way to add devcoach to **Claude Code** — one click, nothing to co
 /plugin install devcoach@ultimaphoenix
 ```
 
-The MCP server, hooks, and skill activate on install — no restart needed. Open the [web dashboard](#web-dashboard) right from Claude Code with `/devcoach:ui` (or just ask — the `open_ui` tool). The plugin **does not** add the `devcoach` CLI, so for terminal use run `npx -y devcoach ui` (or use Homebrew / `npm i -g devcoach` for a bare `devcoach`).
+The MCP server, hooks, and skill activate on install — no restart needed. Open the [web dashboard](#web-dashboard) right from Claude Code with `/devcoach:ui` (or just ask — the `open_ui` tool); `/devcoach:share` and `/devcoach:import` hand lessons around. The plugin **does not** add the `devcoach` CLI, so for terminal use run `npx -y devcoach ui` (or use Homebrew / `npm i -g devcoach` for a bare `devcoach`).
 
 <details>
 <summary><strong>Other ways to install the plugin</strong> (straight from the repo · offline zip)</summary>
@@ -400,6 +400,19 @@ Using the Claude Code plugin? Type `/devcoach:ui` in Claude Code instead — no 
 | **Settings** | Change rate limits, import/export your profile, take a backup |
 
 Full reference: [docs/usage/web-ui.md](docs/usage/web-ui.md)
+
+---
+
+## Sharing lessons
+
+A lesson that landed for you is one action away from a teammate — as copyable text (the card plus one `devcoach:lesson:1:…` line), a server-less link, or a `.devcoach.md` file. The receiver pastes, clicks or drops it into their own devcoach, where it joins the log as *shared by you* and never touches their daily limit. Only the lesson travels unless you include where it happened; a local path never does.
+
+```bash
+devcoach share --last            # or --link / --file, --with-context, --by "Ada" / --anonymous
+devcoach import                  # reads the clipboard; or pass a code, link, URL, file, or - for stdin
+```
+
+From the dashboard: **↗ Share** on a lesson and **＋ Import** on the Lessons page (drop a `.devcoach.md` anywhere). From your agent: *"share the last lesson"*, *"import this devcoach lesson: …"* — with the plugin, `/devcoach:share` and `/devcoach:import`. Full guide: [docs/usage/sharing.md](docs/usage/sharing.md)
 
 ---
 

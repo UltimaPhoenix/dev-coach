@@ -17,6 +17,7 @@ devcoach decides whether to deliver a lesson after each completed task, based on
 ## Using devcoach
 
 - [Coaching in your agent](https://ultimaphoenix.github.io/dev-coach/usage/coaching): your first lesson, onboarding (Automatic, Automatic (Deep), Guided, Import backup), and the feedback loop.
+- [Sharing lessons](https://ultimaphoenix.github.io/dev-coach/usage/sharing): hand a lesson to a teammate as copyable text, a server-less link or a .devcoach.md file; import from the dashboard, the CLI or the agent; what travels and how an imported lesson behaves.
 - [Web dashboard](https://ultimaphoenix.github.io/dev-coach/usage/web-ui): manage your knowledge map locally.
 - [CLI reference](https://ultimaphoenix.github.io/dev-coach/usage/cli): all CLI subcommands.
 

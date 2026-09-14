@@ -77,7 +77,7 @@ tool call.
 ## Prompt
 
 `devcoach_instructions` returns the full coaching instructions (`assets/SKILL.md` plus its reference
-files, inlined). MCP prompts are surfaced as user-invocable slash commands (Claude Code, Claude
+files — `onboarding.md`, `calibration.md`, `review.md`, `sharing.md` — inlined). MCP prompts are surfaced as user-invocable slash commands (Claude Code, Claude
 Desktop) — they are **not** auto-injected into context. In Claude Code, coaching is driven by the
 `stop-hook`/`prompt-hook` pair: the Stop cue invokes the devcoach **skill** deterministically (with a
 compact self-contained fallback when the skill isn't installed), and the model can decline via

@@ -114,11 +114,10 @@ devcoach import https://…             # a share link, or any URL whose body is
 pbpaste | devcoach import -           # stdin
 ```
 
-The lesson joins your log like your own (`devcoach lessons --imported` lists the shared ones): its
-topic counts as taught and `feedback` works as usual, but it never counts against `max_per_day` or the
-minimum gap. Importing the same share twice reports *Already in your log*. Only the lesson travels by
-default — context is opt-in with `--with-context`, and a local path never leaves your machine.
-`--by` is remembered as `share_name` the first time (change it with `devcoach set share_name`).
+`devcoach lessons --imported` lists the lessons shared with you. What travels, the `.devcoach.md`
+format and how an imported lesson behaves (it never counts against `max_per_day`) are in the
+[Sharing lessons](./sharing.md) guide. `--by` is remembered as `share_name` the first time (change it
+with `devcoach set share_name`).
 
 ## Environment variables
 
