@@ -13,9 +13,11 @@ import { useCallback, useEffect, useState } from "react";
 import {
   decodeShareCode,
   extractShareCodeCandidates,
+  renderShareMarkdownFile,
   SHARE_CODE_PREFIX,
   ShareCodeError,
   type SharedLesson,
+  sharedLessonFilename,
 } from "../lib/shareCode";
 import styles from "./lesson.module.css";
 
@@ -152,6 +154,19 @@ export default function LessonPage(): ReactNode {
     setStatus("error");
   }, [paste]);
 
+  const downloadMarkdown = useCallback(() => {
+    if (!lesson) return;
+    const blob = new Blob([renderShareMarkdownFile(lesson)], { type: "text/markdown;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = sharedLessonFilename(lesson);
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }, [lesson]);
+
   const importUrl = `http://127.0.0.1:${port}/lessons/import?code=${encodeURIComponent(code)}`;
   const tooLongForLink = code.length > MAX_LINK_CODE;
 
@@ -171,6 +186,7 @@ export default function LessonPage(): ReactNode {
         {status === "ready" && lesson && (
           <>
             <p className={styles.eyebrow}>Someone shared a devcoach lesson with you</p>
+            <div className={styles.layout}>
             <article className={styles.card}>
               <div className={styles.titleRow}>
                 <h1 className={styles.title}>{lesson.lesson.title}</h1>
@@ -203,8 +219,11 @@ export default function LessonPage(): ReactNode {
                   <strong>Context:</strong> {lesson.lesson.task_context}
                 </div>
               )}
+            </article>
 
-              <div className={styles.actions}>
+            <aside className={styles.aside}>
+              <div className={styles.panel}>
+                <p className={styles.panelTitle}>Add it to your devcoach</p>
                 <p className={`${styles.status} ${dashboard === "up" ? styles.up : ""}`}>
                   {dashboard === "up" && "✓ Your devcoach dashboard is running — one click adds this lesson to your log."}
                   {dashboard === "down" && (
@@ -215,16 +234,30 @@ export default function LessonPage(): ReactNode {
                   )}
                   {dashboard === "unknown" && "Looking for your dashboard…"}
                 </p>
-                {!tooLongForLink && (
-                  <a className="button button--primary" href={importUrl}>
-                    ＋ Import into my devcoach
-                  </a>
-                )}
-                <button type="button" className="button button--secondary" onClick={copyCode}>
-                  {copied ? "✓ Copied" : "Copy code"}
-                </button>
+                <div className={styles.buttons}>
+                  {!tooLongForLink && (
+                    <a className={`button button--primary button--block ${styles.mainButton}`} href={importUrl}>
+                      ＋ Import into my devcoach
+                    </a>
+                  )}
+                  <button
+                    type="button"
+                    className="button button--secondary button--block"
+                    onClick={copyCode}
+                  >
+                    {copied ? "✓ Copied" : "Copy code"}
+                  </button>
+                  <button
+                    type="button"
+                    className="button button--secondary button--block"
+                    onClick={downloadMarkdown}
+                    title="Download as a .devcoach.md file (importable by devcoach, renders on GitHub)"
+                  >
+                    ⬇ Download .devcoach.md
+                  </button>
+                </div>
                 <label className={styles.portField}>
-                  port
+                  Dashboard port
                   <input
                     type="number"
                     min={1}
@@ -234,19 +267,20 @@ export default function LessonPage(): ReactNode {
                     aria-label="Dashboard port"
                   />
                 </label>
-              </div>
-              {tooLongForLink && (
+                {tooLongForLink && (
+                  <p className={styles.hint}>
+                    This lesson is too long for a one-click link — copy the code and paste it into your
+                    dashboard's <strong>＋ Import</strong> box, or tell your agent{" "}
+                    <em>"import this devcoach lesson"</em> followed by the code.
+                  </p>
+                )}
                 <p className={styles.hint}>
-                  This lesson is too long for a one-click link — copy the code and paste it into your dashboard's{" "}
-                  <strong>＋ Import</strong> box, or tell your agent <em>"import this devcoach lesson"</em> followed by
-                  the code.
+                  No devcoach yet? <Link to="/install">Install it</Link> in a minute — or paste the code into
+                  your agent: <em>import this devcoach lesson:</em> <code>{SHARE_CODE_PREFIX}…</code>
                 </p>
-              )}
-              <p className={styles.hint}>
-                No devcoach yet? <Link to="/install">Install it</Link> in a minute — or paste the code into your
-                agent: <em>import this devcoach lesson:</em> <code>{SHARE_CODE_PREFIX}…</code>
-              </p>
-            </article>
+              </div>
+            </aside>
+            </div>
             <p className={styles.footer}>
               made with{" "}
               <Link to="/">

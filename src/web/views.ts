@@ -901,7 +901,7 @@ export function importPage(d: {
 
   const body = html`
 <div class="mb-4"><a href="/lessons" class="text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-white text-sm transition">← Back to lessons</a></div>
-<div class="max-w-3xl mx-auto bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-6">
+<div class="${p ? "max-w-5xl" : "max-w-3xl"} mx-auto bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-6">
   <p class="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500 mb-4">${p ? "Someone shared a lesson with you" : "Import a shared lesson"}</p>
   ${d.error ? html`<div class="mb-4 px-4 py-2 rounded-lg border text-sm bg-rose-50 dark:bg-rose-900/20 border-rose-200 dark:border-rose-700 text-rose-700 dark:text-rose-300">${d.error}</div>` : ""}
   ${
@@ -919,8 +919,8 @@ export function importPage(d: {
     <p class="text-xs font-semibold uppercase tracking-wide text-indigo-500 dark:text-indigo-400 mb-1">TL;DR</p>
     <div id="summary-content" class="markdown-body text-sm text-indigo-900 dark:text-indigo-100"></div>
   </div>
-  <details class="group" ${p.lesson.body ? "" : "hidden"}>
-    <summary class="cursor-pointer text-sm text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 select-none">Read the full lesson</summary>
+  <details class="group" open ${p.lesson.body ? "" : "hidden"}>
+    <summary class="cursor-pointer text-sm text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 select-none">Full lesson</summary>
     <div id="body-content" class="markdown-body mt-3"></div>
   </details>
   ${p.lesson.task_context ? html`<div class="mt-6 pt-4 border-t border-gray-100 dark:border-gray-800 text-sm text-gray-500 dark:text-gray-400"><span class="text-gray-400 dark:text-gray-500">Context:</span> ${p.lesson.task_context}</div>` : ""}
