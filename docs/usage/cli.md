@@ -27,6 +27,7 @@ devcoach --version
 |---|---|
 | `devcoach mcp` | Start the MCP server (stdio) — used by your agent's MCP config |
 | `devcoach install [--claude-code] [--claude-desktop] [--gemini] [--codex] [--force] [--skip-hook]` | Register the MCP server (user scope) + hooks + skill for the chosen agents; repairs stale hook layouts |
+| `devcoach uninstall [--claude-code] [--claude-desktop] [--gemini] [--codex] [--all] [--data] [--yes]` | The inverse of `install`: removes the MCP registration, the devcoach hook entries and the skill dirs (user hooks untouched); `--data` also deletes `~/.devcoach` after a prompt. Run it before `brew uninstall` / `npm uninstall -g` |
 | `devcoach doctor` | Diagnose the Claude Code wiring and pacing state — explains why the next stop would or wouldn't cue a lesson |
 | `devcoach setup` | Interactive terminal onboarding wizard in four steps: backup path (or skip) → automatic or manual topics → optional groups → daily limit and minimum gap |
 | `devcoach ui [--port <n>]` | Launch the web dashboard (default port 7860; binds `127.0.0.1` only) |

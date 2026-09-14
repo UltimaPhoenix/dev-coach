@@ -40,4 +40,19 @@ Prefer a one-liner? `brew install UltimaPhoenix/tap/devcoach` taps and installs 
 devcoach requires **Node.js ≥ 24**; the formula depends on Homebrew's `node` (`depends_on "node"`), so
 `brew install` pulls in a current Node automatically — no separate Node setup needed.
 
+## Uninstall
+
+Homebrew formulae have no uninstall hook, so `brew uninstall` cannot undo what `devcoach install` wired
+into your agents' config files. Run devcoach's own uninstaller first, then remove the package:
+
+```bash
+devcoach uninstall                 # MCP server + hooks + skill (Claude Code + Claude Desktop; --all for every agent)
+devcoach uninstall --data          # optional: also delete ~/.devcoach (lessons, profile, notebook) — asks first
+brew uninstall devcoach
+brew untap UltimaPhoenix/tap       # optional: drop the tap too
+```
+
+`brew info devcoach` prints the same reminder. If you skipped it and the hooks now error on every turn
+(`devcoach: command not found`), reinstall, run `devcoach uninstall`, then uninstall again.
+
 → Next: **[Coaching in your agent](../usage/coaching.md)**.

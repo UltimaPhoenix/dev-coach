@@ -897,3 +897,114 @@ describe("cli share / import", () => {
     expect((await run([])).out).toContain("share / import");
   });
 });
+
+describe("cli uninstall", () => {
+  const home = () => process.env.HOME as string;
+
+  it("removes the MCP entry, the devcoach hooks and the skill — user hooks and other keys survive", async () => {
+    const savedPath = process.env.PATH;
+    process.env.PATH = ""; // no `claude` CLI → the JSON path for both install and uninstall
+    try {
+      const settings = cleanClaudeSettings();
+      await run(["install", "--claude-code", "--force"]);
+      const before = JSON.parse(readFileSync(settings, "utf8"));
+      before.hooks.Stop.push({ hooks: [{ type: "command", command: "my-other-tool --check" }] });
+      before.theme = "dark";
+      writeFileSync(settings, JSON.stringify(before));
+      const codeConfig = join(home(), ".claude.json");
+      const cfg = JSON.parse(readFileSync(codeConfig, "utf8"));
+      cfg.mcpServers.other = { command: "x" };
+      writeFileSync(codeConfig, JSON.stringify(cfg));
+      const skillDir = join(home(), ".claude", "skills", "devcoach");
+      expect(existsSync(join(skillDir, "SKILL.md"))).toBe(true);
+
+      const r = await run(["uninstall", "--claude-code"]);
+      expect(r.out).toContain("Removed from");
+      expect(r.out).toContain("Hooks removed from");
+      expect(r.out).toContain("Removed " + skillDir);
+      expect(r.out).toContain("still in"); // data kept by default
+      const after = JSON.parse(readFileSync(settings, "utf8"));
+      expect(after.theme).toBe("dark");
+      expect(after.hooks.UserPromptSubmit).toBeUndefined();
+      expect(after.hooks.Stop).toHaveLength(1);
+      expect(after.hooks.Stop[0].hooks[0].command).toBe("my-other-tool --check");
+      const cfgAfter = JSON.parse(readFileSync(codeConfig, "utf8"));
+      expect(cfgAfter.mcpServers.devcoach).toBeUndefined();
+      expect(cfgAfter.mcpServers.other).toEqual({ command: "x" });
+      expect(existsSync(skillDir)).toBe(false);
+
+      // idempotent: a second run reports nothing to remove and exits cleanly
+      const again = await run(["uninstall", "--claude-code"]);
+      expect(again.code).toBeNull();
+      expect(again.out).toContain("Not registered");
+      expect(again.out).toContain("No devcoach hooks");
+      expect(again.out).toContain("Not installed");
+    } finally {
+      process.env.PATH = savedPath;
+    }
+  });
+
+  it("unregisters through a present `claude` CLI and clears the Desktop config", async () => {
+    const savedPath = process.env.PATH;
+    process.env.PATH = fakeBin("claude", "#!/bin/sh\nexit 0\n");
+    try {
+      await run(["install", "--claude-desktop", "--force"]);
+      const r = await run(["uninstall"]);
+      expect(r.out).toContain("Removed via `claude mcp remove`");
+      expect(r.out).toContain("Claude Desktop");
+      expect(r.out).toContain("Removed from");
+      expect(r.out).toContain("Restart Claude Desktop");
+    } finally {
+      process.env.PATH = savedPath;
+    }
+  });
+
+  it("--all covers Gemini/Codex (manual TOML note without codex) and keeps the shared skill while in use", async () => {
+    const savedPath = process.env.PATH;
+    process.env.PATH = "";
+    try {
+      await run(["install", "--gemini", "--force"]);
+      await run(["install", "--codex", "--force"]);
+      const shared = join(home(), ".agents", "skills", "devcoach");
+      expect(existsSync(join(shared, "SKILL.md"))).toBe(true);
+      // removing only Gemini keeps the skill Codex still reads
+      const g = await run(["uninstall", "--gemini"]);
+      expect(g.out).toContain("Gemini CLI");
+      expect(g.out).toContain("Kept");
+      expect(existsSync(join(shared, "SKILL.md"))).toBe(true);
+      const all = await run(["uninstall", "--all"]);
+      expect(all.out).toContain("Manual step"); // no codex CLI → TOML left to the user
+      expect(all.out).toContain("Removed " + shared);
+      expect(existsSync(shared)).toBe(false);
+      const codexHooks = JSON.parse(readFileSync(join(home(), ".codex", "hooks.json"), "utf8"));
+      expect(codexHooks.hooks).toBeUndefined();
+    } finally {
+      process.env.PATH = savedPath;
+    }
+  });
+
+  it("--data needs --yes outside a terminal, then deletes the data dir; malformed settings are left alone", async () => {
+    const savedPath = process.env.PATH;
+    process.env.PATH = "";
+    try {
+      const settings = join(home(), ".claude", "settings.json");
+      mkdirSync(dirname(settings), { recursive: true });
+      writeFileSync(settings, "{ bad json,, }");
+      const dataDir = db.DEVCOACH_DIR;
+      db.withConnection((c) => c.exec("SELECT 1")); // make sure the data dir exists
+      expect(existsSync(dataDir)).toBe(true);
+      const noYes = await run(["uninstall", "--claude-code", "--data"]);
+      expect(noYes.out).toContain("is not valid JSON");
+      expect(noYes.out).toContain("pass --yes");
+      expect(existsSync(dataDir)).toBe(true);
+      expect(readFileSync(settings, "utf8")).toBe("{ bad json,, }");
+      const yes = await run(["uninstall", "--claude-code", "--data", "--yes"]);
+      expect(yes.out).toContain("Deleted " + dataDir);
+      expect(existsSync(dataDir)).toBe(false);
+      // the store recreates itself on the next use
+      expect(db.withConnection((c) => db.getSettings(c).max_per_day)).toBe(2);
+    } finally {
+      process.env.PATH = savedPath;
+    }
+  });
+});

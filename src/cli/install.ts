@@ -5,9 +5,18 @@
 // file; what differs per client is only the file path, the event names, and the
 // timeout unit (Claude/Codex: seconds, Gemini: milliseconds).
 import { spawnSync } from "node:child_process";
-import { accessSync, constants, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import {
+  accessSync,
+  constants,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { homedir, platform } from "node:os";
 import { dirname, join } from "node:path";
+import { createInterface } from "node:readline/promises";
 import * as coach from "../core/coach";
 import * as db from "../core/db";
 import { readSkill, readSkillReferences } from "../skill";
@@ -713,4 +722,193 @@ export function cmdDoctor(): void {
     bad(`database check failed: ${err}`);
   }
   log();
+}
+
+// ── Uninstall ────────────────────────────────────────────────────────────────
+// The exact inverse of `install`: every devcoach-owned entry (MCP registration, hook
+// entries, skill dirs) is removed from each client, user content is never touched, and
+// the coaching data survives unless --data is given. Homebrew formulae have no uninstall
+// hook, so `brew uninstall` cannot run this — the formula's caveats point here instead.
+
+/** Remove `mcpServers.devcoach` from a JSON config file; other keys are untouched. */
+function removeMcpEntry(path: string): string {
+  if (!existsSync(path)) return `${c.yellow("Not registered")} (${path} does not exist)`;
+  const read = readJsonFile<McpConfig>(path);
+  if (!read.ok) return read.error;
+  const servers = read.data.mcpServers;
+  if (!servers?.devcoach) return `${c.yellow("Not registered")} in ${path}`;
+  delete servers.devcoach;
+  writeFileSync(path, `${JSON.stringify(read.data, null, 2)}\n`);
+  return `${c.green("✓")} Removed from ${path}`;
+}
+
+/** Unregister through a client's own CLI; "" when the binary is not on PATH (caller falls back). */
+function removeViaClientCli(bin: string, removeArgs: string[]): string {
+  if (!onPath(bin)) return "";
+  const res = spawnSync(bin, removeArgs, { encoding: "utf8" });
+  const combined = `${res.stderr ?? ""}${res.stdout ?? ""}`.toLowerCase();
+  if (res.status === 0) return `${c.green("✓")} Removed via \`${bin} mcp remove\``;
+  if (/not found|no .*server|does not exist|no such/.test(combined)) {
+    return `${c.yellow("Not registered")} in ${bin}`;
+  }
+  return `${c.red(`${bin} mcp remove failed:`)} ${(res.stderr || res.stdout || "").trim()}`;
+}
+
+/** Drop every devcoach-owned hook entry from a client's JSON hooks file; user hooks stay. */
+function removeOwnedHooks(path: string): string {
+  if (!existsSync(path)) return `${c.yellow("No hooks")} (${path} does not exist)`;
+  const read = readJsonFile<HooksFile>(path);
+  if (!read.ok) return read.error;
+  const hooks = read.data.hooks ?? {};
+  const cleared: string[] = [];
+  for (const [event, list] of Object.entries(hooks)) {
+    if (!list) continue;
+    const kept = list.filter(
+      (e) => !(e.hooks ?? []).some((h) => isDevcoachHookCommand(h.command ?? "")),
+    );
+    if (kept.length === list.length) continue;
+    cleared.push(event);
+    if (kept.length) hooks[event] = kept;
+    else delete hooks[event];
+  }
+  if (cleared.length === 0) return `${c.yellow("No devcoach hooks")} in ${path}`;
+  if (Object.keys(hooks).length === 0) delete read.data.hooks;
+  writeFileSync(path, `${JSON.stringify(read.data, null, 2)}\n`);
+  return `${c.green("✓")} Hooks removed from ${path} (${cleared.join(" + ")})`;
+}
+
+/** Delete a devcoach-owned skill directory (only ever one devcoach writes itself). */
+function removeSkillDir(dir: string): string {
+  if (!existsSync(join(dir, "SKILL.md"))) return `${c.yellow("Not installed")} (${dir})`;
+  rmSync(dir, { recursive: true, force: true });
+  return `${c.green("✓")} Removed ${dir}`;
+}
+
+export interface UninstallOpts {
+  claudeCode: boolean;
+  claudeDesktop: boolean;
+  gemini: boolean;
+  codex: boolean;
+  all: boolean;
+  data: boolean;
+  yes: boolean;
+}
+
+async function confirmDeleteData(yes: boolean): Promise<boolean> {
+  if (yes) return true;
+  if (!process.stdin.isTTY) {
+    log(
+      `${c.yellow("→")} Not a terminal — pass --yes to delete ${db.DEVCOACH_DIR} without a prompt.`,
+    );
+    return false;
+  }
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  try {
+    const answer = await rl.question(
+      `Delete ${db.DEVCOACH_DIR} — every lesson, your profile and the notebook? [y/N] `,
+    );
+    return /^y(es)?$/i.test(answer.trim());
+  } finally {
+    rl.close();
+  }
+}
+
+export async function cmdUninstall(o: UninstallOpts): Promise<void> {
+  // Bare `devcoach uninstall` mirrors bare `install`: the Claude pair. --all covers every client.
+  const anyExplicit = o.claudeCode || o.claudeDesktop || o.gemini || o.codex;
+  const doCode = o.all || o.claudeCode || !anyExplicit;
+  const doDesktop = o.all || o.claudeDesktop || !anyExplicit;
+  const doGemini = o.all || o.gemini;
+  const doCodex = o.all || o.codex;
+
+  log(c.bold("Removing devcoach from your agents"));
+  log();
+
+  if (doCode) {
+    log(c.bold("Claude Code"));
+    const settings = readJsonFile<HooksFile>(CLAUDE_CODE_SETTINGS);
+    if (settings.ok && pluginHooksActive(settings.data)) {
+      log(
+        `  ${c.yellow("→")} The devcoach plugin is enabled — its hooks, skill and MCP server go away with ` +
+          "/plugin uninstall devcoach; only user-level entries are removed here.",
+      );
+    }
+    let msg = removeViaClientCli("claude", ["mcp", "remove", "--scope", "user", "devcoach"]);
+    if (!msg) msg = removeMcpEntry(join(homedir(), ".claude.json"));
+    log(`  MCP server…  ${msg}`);
+    log(`  Hooks…       ${removeOwnedHooks(CLAUDE_CODE_SETTINGS)}`);
+    log(`  Skill…       ${removeSkillDir(CLAUDE_CODE_SKILL_DIR)}`);
+    log();
+  }
+
+  if (doDesktop) {
+    log(c.bold("Claude Desktop"));
+    log(`  MCP server…  ${removeMcpEntry(claudeDesktopConfigPath())}`);
+    log(`  ${c.yellow("→")} Restart Claude Desktop to drop the server.`);
+    log();
+  }
+
+  if (doGemini) {
+    log(c.bold("Gemini CLI (beta)"));
+    let msg = removeViaClientCli("gemini", ["mcp", "remove", "-s", "user", "devcoach"]);
+    if (!msg) msg = removeMcpEntry(GEMINI_SETTINGS);
+    log(`  MCP server…  ${msg}`);
+    log(`  Hooks…       ${removeOwnedHooks(GEMINI_SETTINGS)}`);
+    if (geminiExtensionActive()) {
+      log(
+        `  ${c.yellow("→")} The devcoach Gemini extension is installed — remove it with: gemini extensions uninstall devcoach`,
+      );
+    }
+    log();
+  }
+
+  if (doCodex) {
+    log(c.bold("Codex CLI (beta)"));
+    let msg = removeViaClientCli("codex", ["mcp", "remove", "devcoach"]);
+    if (!msg) {
+      // devcoach never writes Codex's TOML, so it never edits it either.
+      msg = `${c.yellow("Manual step")} — codex CLI not found. Delete the [mcp_servers.devcoach] table from ${CODEX_CONFIG_TOML}`;
+    }
+    log(`  MCP server…  ${msg}`);
+    log(`  Hooks…       ${removeOwnedHooks(CODEX_HOOKS_JSON)}`);
+    log();
+  }
+
+  if (doGemini || doCodex) {
+    // Gemini and Codex share ~/.agents/skills/devcoach: keep it while the other client still uses it.
+    const stillUsed =
+      (!doGemini && hasDevcoachHooks(GEMINI_SETTINGS, "AfterAgent")) ||
+      (!doCodex && hasDevcoachHooks(CODEX_HOOKS_JSON, "Stop"));
+    log(c.bold("Shared skill (Gemini + Codex)"));
+    log(
+      `  Skill…       ${stillUsed ? `${c.yellow("Kept")} — still used by the other client (${AGENTS_SKILL_DIR})` : removeSkillDir(AGENTS_SKILL_DIR)}`,
+    );
+    log();
+  }
+
+  if (o.data) {
+    log(c.bold("Coaching data"));
+    if (!existsSync(db.DEVCOACH_DIR)) {
+      log(`  ${c.yellow("Nothing to delete")} (${db.DEVCOACH_DIR} does not exist)`);
+    } else if (await confirmDeleteData(o.yes)) {
+      rmSync(db.DEVCOACH_DIR, { recursive: true, force: true });
+      log(`  ${c.green("✓")} Deleted ${db.DEVCOACH_DIR}`);
+    } else {
+      log(`  ${c.yellow("Kept")} ${db.DEVCOACH_DIR}`);
+    }
+    log();
+  } else {
+    log(
+      c.dim(
+        `Your lessons, profile and notebook are still in ${db.DEVCOACH_DIR} — keep them for a\n` +
+          "reinstall, or delete them with: devcoach uninstall --data  (devcoach backup first).",
+      ),
+    );
+  }
+  log(
+    c.dim(
+      "Then remove the program itself: brew uninstall devcoach · npm uninstall -g devcoach\n" +
+        "(npx: nothing to remove).",
+    ),
+  );
 }
