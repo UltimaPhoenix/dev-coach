@@ -396,8 +396,10 @@ jobs:
           VERSION="${{ needs.bump.outputs.version || github.ref_name }}"
           VERSION="${VERSION#v}"
           URL="https://registry.npmjs.org/devcoach/-/devcoach-${VERSION}.tgz"
-          # npm may take a moment to serve a freshly-published version
-          for _ in $(seq 1 12); do curl -fsSL "$URL" -o pkg.tgz && break || sleep 15; done
+          # npm's CDN can take several minutes to serve a freshly published tarball (2.1.0 took
+          # > 3 min and this job failed) — poll for up to 15 minutes, then fail loudly.
+          for _ in $(seq 1 60); do curl -fsSL "$URL" -o pkg.tgz && break || sleep 15; done
+          [ -s pkg.tgz ] || { echo "::error::npm never served $URL — re-run this job once the tarball is available."; exit 1; }
           SHA="$(shasum -a 256 pkg.tgz | awk '{print $1}')"
           git clone --depth 1 "https://x-access-token:${TAP_TOKEN}@github.com/UltimaPhoenix/homebrew-tap.git" tap
           mkdir -p tap/Formula
