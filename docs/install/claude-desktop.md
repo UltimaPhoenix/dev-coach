@@ -1,6 +1,6 @@
 ---
 title: Claude Desktop (.mcpb)
-sidebar_label: Claude Desktop (.mcpb)
+sidebar_label: Claude Desktop (.mcpb) (Beta)
 ---
 
 # Claude Desktop extension (`.mcpb`)
