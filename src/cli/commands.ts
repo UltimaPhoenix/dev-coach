@@ -20,7 +20,7 @@ import {
 } from "../core/share";
 import { fetchSharedInput, isHttpUrl } from "../core/share-fetch";
 import { VERSION } from "../version";
-import { cmdDoctor, cmdInstall, skillHint } from "./install";
+import { cmdDoctor, cmdInstall, cmdUninstall, skillHint } from "./install";
 import {
   type Column,
   c,
@@ -736,6 +736,10 @@ function printWelcome(): void {
     ["ui [--port N]", "Launch the web dashboard  (default port: 7860)"],
     ["setup", "First-run wizard: import backup or build your knowledge profile"],
     ["install", "Register MCP server + hooks + skill (Claude default; --gemini/--codex beta)"],
+    [
+      "uninstall",
+      "Remove the MCP server, hooks and skill (--all: every agent; --data: wipe ~/.devcoach)",
+    ],
     ["onboard-hook", "Claude Code Stop hook: cue onboarding when no profile exists"],
     ["lesson-ready", "Claude Code Stop hook: cue a lesson when one is due"],
     ["doctor", "Diagnose the agent wiring — explains why a lesson would(n't) fire"],
@@ -992,6 +996,41 @@ function buildProgram(): Command {
           codex: Boolean(opts.codex),
           force: Boolean(opts.force),
           skipHook: Boolean(opts.skipHook),
+        }),
+    );
+
+  program
+    .command("uninstall")
+    .description(
+      "Remove devcoach's MCP server, hooks and skill from Claude Code / Claude Desktop " +
+        "(default), Gemini CLI (--gemini), Codex CLI (--codex) or every agent (--all). " +
+        "Coaching data is kept unless --data is given. Run it before brew/npm uninstall.",
+    )
+    .option("--claude-code", "Target Claude Code only")
+    .option("--claude-desktop", "Target Claude Desktop only")
+    .option("--gemini", "Also remove from Google Gemini CLI (beta)")
+    .option("--codex", "Also remove from OpenAI Codex CLI (beta)")
+    .option("--all", "Every agent: Claude Code, Claude Desktop, Gemini CLI, Codex CLI")
+    .option("--data", "Also delete ~/.devcoach (lessons, profile, notebook) — asks first")
+    .option("--yes", "Do not ask before deleting the data (with --data)")
+    .action(
+      async (opts: {
+        claudeCode?: boolean;
+        claudeDesktop?: boolean;
+        gemini?: boolean;
+        codex?: boolean;
+        all?: boolean;
+        data?: boolean;
+        yes?: boolean;
+      }) =>
+        cmdUninstall({
+          claudeCode: Boolean(opts.claudeCode),
+          claudeDesktop: Boolean(opts.claudeDesktop),
+          gemini: Boolean(opts.gemini),
+          codex: Boolean(opts.codex),
+          all: Boolean(opts.all),
+          data: Boolean(opts.data),
+          yes: Boolean(opts.yes),
         }),
     );
 

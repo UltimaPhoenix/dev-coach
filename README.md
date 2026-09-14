@@ -496,14 +496,16 @@ devcoach writes to `~/.devcoach/coaching.db`. If you get a permission error, che
 
 ## Uninstallation
 
+One command undoes everything `devcoach install` wired up — the MCP registration, the hook entries and the skill — for Claude Code and Claude Desktop (add `--gemini`, `--codex` or `--all` for the beta agents). Your coaching data stays unless you ask for it to go:
+
 ```bash
-npm uninstall -g devcoach          # if installed globally (npx: nothing to remove)
-brew uninstall devcoach            # if installed via Homebrew (brew untap UltimaPhoenix/tap to drop the tap)
-claude mcp remove --scope user devcoach   # remove from Claude Code (install uses user scope)
-rm -rf ~/.devcoach                 # delete all coaching data (back up first: devcoach backup)
+devcoach uninstall                 # remove MCP server + hooks + skill (Claude Code + Claude Desktop)
+devcoach uninstall --all --data    # every agent, and delete ~/.devcoach (asks first; devcoach backup before)
+npm uninstall -g devcoach          # then remove the program (npx: nothing to remove)
+brew uninstall devcoach            # or, via Homebrew (brew untap UltimaPhoenix/tap to drop the tap)
 ```
 
-For Claude Desktop, delete the `devcoach` key from the platform config file (paths in **Manual setup** above). Also remove the two hook entries from `~/.claude/settings.json` — one under `hooks.Stop` (`devcoach stop-hook`) and one under `hooks.UserPromptSubmit` (`devcoach prompt-hook`).
+Run `devcoach uninstall` **before** `brew uninstall` / `npm uninstall`: Homebrew formulae have no uninstall hook, and once the binary is gone the hooks left in `~/.claude/settings.json` would error on every turn. Using the Claude Code plugin instead? `/plugin uninstall devcoach` removes its hooks, skill and server in one go.
 
 ---
 

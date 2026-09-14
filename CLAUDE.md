@@ -55,7 +55,7 @@ dev-coach/
 │   │   ├── share.ts  share-fetch.ts   # lesson sharing: payload, code/link/.devcoach.md codecs, parseSharedInput; URL fetch
 │   │   ├── claude-history.ts   # cross-project stack scan of ~/.claude (projects map, manifests, activity, memories)
 │   ├── mcp/server.ts       # McpServer: 20 tools + 11 resources + devcoach_instructions prompt
-│   ├── cli/commands.ts     # Commander dispatcher (32 subcommands: 24 visible + 8 hidden hooks) + term.ts
+│   ├── cli/commands.ts     # Commander dispatcher (33 subcommands: 25 visible + 8 hidden hooks) + term.ts
 │   └── web/app.ts          # Hono app (24 routes) + views.ts (hono/html pages); assets/static/share.js
 ├── tests/                  # Vitest (16 files: core, db-extra, coach/git/claude-history, share, mcp, mcpb, web,
 │                           #   cli, setup-wizard, hooks, hooks-spawn, plugin, gemini-extension, mcp-registry, …)
@@ -159,7 +159,10 @@ user-invocable slash commands, **not** auto-injected — so coaching is driven b
 The Claude Code **skill**: `devcoach install` copies `assets/SKILL.md` + `references/` to
 `~/.claude/skills/devcoach/` with a `.devcoach-version` stamp; the welcome screen and `stats` hint
 to re-run `install` when the installed skill is missing/outdated (e.g. after `brew upgrade`).
-`devcoach doctor` diagnoses the whole wiring and explains why the next stop would(n't) cue;
+`devcoach uninstall` is the exact inverse of `install` (MCP registration, devcoach-owned hook
+entries, skill dirs; user hooks untouched; `--data` wipes `~/.devcoach` after a prompt) — it exists
+because Homebrew formulae have no uninstall hook, so the formula's `caveats` tell users to run it before
+`brew uninstall`. `devcoach doctor` diagnoses the whole wiring and explains why the next stop would(n't) cue;
 `DEVCOACH_HOOK_DEBUG=1` traces every hook decision to `~/.devcoach/hook.log`.
 
 ---
