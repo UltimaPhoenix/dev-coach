@@ -192,6 +192,7 @@ jobs:
       cancel-in-progress: false
     permissions:
       contents: write
+      actions: write # dispatch the Docs workflow after the fast-forward (see the last step)
     outputs:
       tag: ${{ steps.bump.outputs.tag }}
       version: ${{ steps.bump.outputs.version }}
@@ -270,6 +271,13 @@ jobs:
           fi
           echo "version=${NEW}" >> "$GITHUB_OUTPUT"
           echo "tag=v${NEW}" >> "$GITHUB_OUTPUT"
+      - name: Deploy the docs for the new release
+        # The release pushes carry [skip ci], so the Docs workflow never sees main move on its
+        # own (2.2.0 shipped with the site still on 2.1.0) — dispatch it explicitly. It rebuilds
+        # main (released docs) and develop (/next/) from one run.
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run docs.yml --ref main
 
   # ── Publish to npm (OIDC provenance) ───────────────────────────────────────
   publish:
