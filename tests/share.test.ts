@@ -28,7 +28,9 @@ import {
   fetchSharedInput,
   isHttpUrl,
   isPrivateAddress,
-  pinnedDispatcher,
+  nodeTransport,
+  type SharedResponse,
+  type SharedTransport,
 } from "../src/core/share-fetch";
 
 const lesson = (over: Partial<Lesson> = {}): Lesson =>
@@ -346,6 +348,30 @@ describe("fetchSharedInput", () => {
   const publicLookup = async () => ["93.184.216.34"];
   afterEach(() => vi.restoreAllMocks());
 
+  /** A canned transport response; `body` may be a string or any async/sync iterable of bytes. */
+  const reply = (
+    status: number,
+    body: string | Iterable<Uint8Array> | AsyncIterable<Uint8Array> = "",
+    headers: { location?: string; contentLength?: number } = {},
+  ): SharedResponse => ({
+    status,
+    location: headers.location ?? null,
+    contentLength: headers.contentLength ?? null,
+    body: typeof body === "string" ? [new TextEncoder().encode(body)] : body,
+    abort: vi.fn(),
+  });
+  /** A transport that answers the canned replies in order and records what it was asked. */
+  const fakeTransport = (...replies: SharedResponse[]) => {
+    const calls: { url: string; address: string }[] = [];
+    const transport: SharedTransport = async (url, address) => {
+      calls.push({ url: url.href, address });
+      const next = replies.shift();
+      if (!next) throw new Error("no more canned replies");
+      return next;
+    };
+    return { transport, calls };
+  };
+
   it("classifies private, loopback, link-local and unique-local addresses", () => {
     for (const ip of [
       "127.0.0.1",
@@ -378,8 +404,8 @@ describe("fetchSharedInput", () => {
     }
   });
 
-  it("refuses loopback / private / localhost hosts without fetching (SSRF guard)", async () => {
-    const fetchSpy = vi.spyOn(globalThis, "fetch");
+  it("refuses loopback / private / localhost hosts without any request (SSRF guard)", async () => {
+    const { transport, calls } = fakeTransport();
     for (const url of [
       "http://127.0.0.1:5432/",
       "http://[::1]:7860/lessons",
@@ -388,90 +414,123 @@ describe("fetchSharedInput", () => {
       "http://169.254.169.254/latest/meta-data/",
       "http://10.0.0.7/",
     ]) {
-      await expect(fetchSharedInput(url), url).rejects.toThrow(/Only public/);
+      await expect(fetchSharedInput(url, { transport }), url).rejects.toThrow(/Only public/);
     }
     // a public-looking name that resolves to a private address is refused too
     await expect(
-      fetchSharedInput("https://internal.example.test/x", { lookup: async () => ["10.0.0.9"] }),
+      fetchSharedInput("https://internal.example.test/x", {
+        transport,
+        lookup: async () => ["10.0.0.9"],
+      }),
     ).rejects.toThrow(/Only public/);
     await expect(
       fetchSharedInput("https://mixed.example.test/x", {
+        transport,
         lookup: async () => ["93.184.216.34", "192.168.0.2"],
       }),
     ).rejects.toThrow(/Only public/);
-    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(calls).toHaveLength(0);
     // the default resolver is dns.promises.lookup
     vi.spyOn(dns.promises, "lookup").mockResolvedValue([
       { address: "127.0.0.1", family: 4 },
     ] as never);
-    await expect(fetchSharedInput("https://evil.example.test/x")).rejects.toThrow(/Only public/);
-    expect(fetchSpy).not.toHaveBeenCalled();
+    await expect(fetchSharedInput("https://evil.example.test/x", { transport })).rejects.toThrow(
+      /Only public/,
+    );
+    expect(calls).toHaveLength(0);
+  });
+
+  it("hands the transport the address the guard resolved, for every hop", async () => {
+    const { transport, calls } = fakeTransport(
+      reply(302, "", { location: "/moved" }),
+      reply(200, "devcoach:lesson:1:abc"),
+    );
+    expect(
+      await fetchSharedInput("https://example.test/raw", { transport, lookup: publicLookup }),
+    ).toBe("devcoach:lesson:1:abc");
+    expect(calls).toEqual([
+      { url: "https://example.test/raw", address: "93.184.216.34" },
+      { url: "https://example.test/moved", address: "93.184.216.34" },
+    ]);
   });
 
   it("follows redirects by hand, re-checking every hop, up to a limit", async () => {
-    const fetchSpy = vi
-      .spyOn(globalThis, "fetch")
-      .mockResolvedValueOnce(new Response(null, { status: 302, headers: { location: "/moved" } }))
-      .mockResolvedValueOnce(new Response("devcoach:lesson:1:abc", { status: 200 }));
-    expect(await fetchSharedInput("https://example.test/raw", { lookup: publicLookup })).toBe(
-      "devcoach:lesson:1:abc",
-    );
-    expect(String(fetchSpy.mock.calls[1]?.[0])).toBe("https://example.test/moved");
-
-    fetchSpy.mockReset();
-    fetchSpy.mockResolvedValueOnce(
-      new Response(null, { status: 301, headers: { location: "http://10.0.0.1/secret" } }),
-    );
+    const toPrivate = fakeTransport(reply(301, "", { location: "http://10.0.0.1/secret" }));
     await expect(
-      fetchSharedInput("https://example.test/raw", { lookup: publicLookup }),
+      fetchSharedInput("https://example.test/raw", {
+        transport: toPrivate.transport,
+        lookup: publicLookup,
+      }),
     ).rejects.toThrow(/Only public/);
+    expect(toPrivate.calls).toHaveLength(1);
 
-    fetchSpy.mockReset();
-    fetchSpy.mockResolvedValue(new Response(null, { status: 302, headers: { location: "/loop" } }));
+    const loop = fakeTransport(
+      reply(302, "", { location: "/loop" }),
+      reply(302, "", { location: "/loop" }),
+      reply(302, "", { location: "/loop" }),
+    );
     await expect(
-      fetchSharedInput("https://example.test/raw", { lookup: publicLookup, maxRedirects: 2 }),
+      fetchSharedInput("https://example.test/raw", {
+        transport: loop.transport,
+        lookup: publicLookup,
+        maxRedirects: 2,
+      }),
     ).rejects.toThrow(/too many times/);
   });
 
-  it("pins the socket to the address the guard resolved — DNS cannot rebind it", async () => {
-    // A server on 127.0.0.1 answers; the URL's hostname would never resolve there. Only the
-    // pinned dispatcher can reach it, and the Host header still names the URL's host.
+  it("the real transport pins the socket to the given address — DNS cannot rebind it", async () => {
+    // A server on 127.0.0.1 answers; the URL's hostname would never resolve there. Only the pinned
+    // lookup can reach it, and the Host header still names the URL's host.
     const server = http.createServer((req, res) => res.end(`host=${req.headers.host}`));
     await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
     const port = (server.address() as AddressInfo).port;
-    const dispatcher = pinnedDispatcher("127.0.0.1");
     try {
-      const res = await fetch(`http://rebind.example.test:${port}/x`, {
-        dispatcher,
-      } as RequestInit);
-      expect(await res.text()).toBe(`host=rebind.example.test:${port}`);
+      const res = await nodeTransport(
+        new URL(`http://rebind.example.test:${port}/x`),
+        "127.0.0.1",
+        new AbortController().signal,
+      );
+      expect(res.status).toBe(200);
+      const chunks: Uint8Array[] = [];
+      for await (const c of res.body) chunks.push(c);
+      expect(Buffer.concat(chunks).toString()).toBe(`host=rebind.example.test:${port}`);
+      // and the whole pipeline works end to end through it (the guard is bypassed by the lookup)
+      const viaPipeline = fetchSharedInput(`http://rebind.example.test:${port}/x`, {
+        lookup: async () => ["127.0.0.1"],
+      });
+      await expect(viaPipeline).rejects.toThrow(/Only public/); // 127.0.0.1 is never public
     } finally {
-      await dispatcher.close();
       server.close();
     }
-    // fetchSharedInput always fetches through such a dispatcher (one per hop)
-    const fetchSpy = vi
-      .spyOn(globalThis, "fetch")
-      .mockResolvedValueOnce(new Response("devcoach:lesson:1:abc", { status: 200 }));
-    await fetchSharedInput("https://example.test/raw", { lookup: publicLookup });
-    const init = fetchSpy.mock.calls[0]?.[1] as { dispatcher?: unknown } | undefined;
-    expect(init?.dispatcher).toBeDefined();
   });
 
   it("caps the body while streaming, not after buffering it", async () => {
     const chunk = new TextEncoder().encode("x".repeat(1000));
     let pulled = 0;
-    const body = new ReadableStream<Uint8Array>({
-      pull(controller) {
+    async function* endless() {
+      for (;;) {
         pulled++;
-        controller.enqueue(chunk);
-      },
-    });
-    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(new Response(body, { status: 200 }));
+        yield chunk;
+      }
+    }
+    const res = reply(200, endless());
     await expect(
-      fetchSharedInput("https://example.test/big", { lookup: publicLookup, maxBytes: 4096 }),
+      fetchSharedInput("https://example.test/big", {
+        transport: async () => res,
+        lookup: publicLookup,
+        maxBytes: 4096,
+      }),
     ).rejects.toThrow(/too large/);
     expect(pulled).toBeLessThan(20); // stopped early — an endless body never gets buffered
+    expect(res.abort).toHaveBeenCalled();
+    // a declared oversize Content-Length is refused before reading anything
+    const declared = reply(200, "tiny", { contentLength: 10_000_000 });
+    await expect(
+      fetchSharedInput("https://example.test/big", {
+        transport: async () => declared,
+        lookup: publicLookup,
+      }),
+    ).rejects.toThrow(/too large/);
   });
 
   it("only http(s), with timeout and size caps, mapped to friendly errors", async () => {
@@ -481,35 +540,35 @@ describe("fetchSharedInput", () => {
     expect(isHttpUrl("https://x.y/z")).toBe(true);
     expect(isHttpUrl("ftp://x")).toBe(false);
     await expect(fetchSharedInput("file:///etc/passwd")).rejects.toThrow(/Only http/);
-    const realFetch = globalThis.fetch;
-    try {
-      globalThis.fetch = (async () =>
-        new Response("devcoach:lesson:1:abc", { status: 200 })) as typeof fetch;
-      expect(await fetchSharedInput("https://example.test/raw")).toBe("devcoach:lesson:1:abc");
-      globalThis.fetch = (async () => new Response("nope", { status: 404 })) as typeof fetch;
-      await expect(fetchSharedInput("https://example.test/raw")).rejects.toThrow(/answered 404/);
-      globalThis.fetch = (async () =>
-        new Response("x".repeat(10), { status: 200 })) as typeof fetch;
-      await expect(fetchSharedInput("https://example.test/raw", { maxBytes: 5 })).rejects.toThrow(
-        /too large/,
-      );
-      globalThis.fetch = (async (_u: unknown, init?: RequestInit) =>
-        new Promise<Response>((_, reject) => {
-          init?.signal?.addEventListener("abort", () =>
-            reject(Object.assign(new Error("aborted"), { name: "AbortError" })),
-          );
-        })) as typeof fetch;
-      await expect(
-        fetchSharedInput("https://example.test/slow", { timeoutMs: 20 }),
-      ).rejects.toThrow(/timed out/);
-      globalThis.fetch = (async () => {
-        throw new Error("ECONNREFUSED");
-      }) as typeof fetch;
-      await expect(fetchSharedInput("https://example.test/down")).rejects.toThrow(
-        /could not be reached/,
-      );
-    } finally {
-      globalThis.fetch = realFetch;
-    }
+    expect(
+      await fetchSharedInput("https://example.test/raw", {
+        transport: async () => reply(200, "devcoach:lesson:1:abc"),
+      }),
+    ).toBe("devcoach:lesson:1:abc");
+    await expect(
+      fetchSharedInput("https://example.test/raw", { transport: async () => reply(404, "nope") }),
+    ).rejects.toThrow(/answered 404/);
+    await expect(
+      fetchSharedInput("https://example.test/raw", {
+        transport: async () => reply(200, "x".repeat(10)),
+        maxBytes: 5,
+      }),
+    ).rejects.toThrow(/too large/);
+    const slow: SharedTransport = (_u, _a, signal) =>
+      new Promise((_, reject) => {
+        signal.addEventListener("abort", () =>
+          reject(Object.assign(new Error("aborted"), { name: "AbortError" })),
+        );
+      });
+    await expect(
+      fetchSharedInput("https://example.test/slow", { transport: slow, timeoutMs: 20 }),
+    ).rejects.toThrow(/timed out/);
+    await expect(
+      fetchSharedInput("https://example.test/down", {
+        transport: async () => {
+          throw new Error("ECONNREFUSED");
+        },
+      }),
+    ).rejects.toThrow(/could not be reached/);
   });
 });

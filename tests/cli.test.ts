@@ -1,4 +1,3 @@
-import dns from "node:dns";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -7,7 +6,13 @@ import { describe, expect, it, vi } from "vitest";
 import { parseHookPayload, runCli } from "../src/cli/commands";
 import * as db from "../src/core/db";
 import { parseLesson } from "../src/core/models";
+import { fetchSharedInput } from "../src/core/share-fetch";
 import { VERSION } from "../src/version";
+
+vi.mock("../src/core/share-fetch", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../src/core/share-fetch")>();
+  return { ...actual, fetchSharedInput: vi.fn(actual.fetchSharedInput) };
+});
 
 // Drop a fake executable on a throwaway PATH dir so install can exercise the `claude` CLI branch.
 function fakeBin(name: string, script: string): string {
@@ -841,22 +846,18 @@ describe("cli share / import", () => {
     seed("s6");
     const link = (await run(["share", "s6", "--anonymous", "--link"])).out.trim();
     db.withConnection((c) => c.exec("DELETE FROM lessons WHERE id = 's6'"));
-    const realFetch = globalThis.fetch;
-    globalThis.fetch = (async () => {
+    const fetchSpy = vi.mocked(fetchSharedInput).mockImplementation(async () => {
       throw new Error("must not fetch a share link");
-    }) as typeof fetch;
-    const dnsSpy = vi
-      .spyOn(dns.promises, "lookup")
-      .mockResolvedValue([{ address: "93.184.216.34", family: 4 }] as never);
+    });
     try {
       expect((await run(["import", link])).out).toContain('✓ Imported "Layer cache s6"');
-      globalThis.fetch = (async () => new Response(stdinText, { status: 200 })) as typeof fetch;
+      expect(fetchSpy).not.toHaveBeenCalled();
+      fetchSpy.mockResolvedValueOnce(stdinText);
       expect((await run(["import", "https://example.test/raw"])).out).toContain(
         "Already in your log",
       );
     } finally {
-      globalThis.fetch = realFetch;
-      dnsSpy.mockRestore();
+      fetchSpy.mockReset();
     }
     // legacy lessons array + junk
     expect(

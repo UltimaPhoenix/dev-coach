@@ -5,12 +5,16 @@
 // The URL is untrusted (it may come from a prompt injection via the import_lesson tool), so only
 // public hosts are fetched: loopback, private, link-local and unique-local addresses are refused
 // after DNS resolution, redirects are followed by hand with the same check on every hop, and the
-// body is read with a byte budget instead of trusting Content-Length. The socket is pinned to the
-// address the guard validated (a per-request dispatcher whose DNS lookup answers with it), so a
-// DNS-rebinding record cannot hand fetch() a different, private address a moment later.
+// body is read with a byte budget instead of trusting Content-Length. The request goes through
+// Node's own http/https client with a `lookup` that answers with the address the guard validated,
+// so the socket is pinned to it: a DNS-rebinding record cannot hand the connection a different,
+// private address a moment later (global fetch offers no such hook — and a third-party dispatcher
+// is not interoperable with the fetch bundled in every supported Node version).
 import dns from "node:dns";
+import http from "node:http";
+import https from "node:https";
 import { isIP, type LookupFunction } from "node:net";
-import { Agent, type Dispatcher } from "undici";
+import { VERSION } from "../version";
 import { ShareInputError } from "./share";
 
 export interface FetchSharedOptions {
@@ -19,7 +23,26 @@ export interface FetchSharedOptions {
   maxRedirects?: number;
   /** DNS resolver (all addresses of a host); injectable for tests. */
   lookup?: (hostname: string) => Promise<string[]>;
+  /** The HTTP transport; injectable for tests (defaults to `nodeTransport`). */
+  transport?: SharedTransport;
 }
+
+/** What the transport hands back: just enough to follow redirects and stream the body. */
+export interface SharedResponse {
+  status: number;
+  location: string | null;
+  contentLength: number | null;
+  body: AsyncIterable<Uint8Array>;
+  /** Stop reading and release the socket (redirects, oversize bodies). */
+  abort(): void;
+}
+
+/** GET `url`, connecting to `address` (the guard's verdict for the URL's host), abortable via `signal`. */
+export type SharedTransport = (
+  url: URL,
+  address: string,
+  signal: AbortSignal,
+) => Promise<SharedResponse>;
 
 const TOO_LARGE = "That URL is too large to be a lesson.";
 const NOT_PUBLIC = "Only public http(s) URLs can be imported.";
@@ -88,39 +111,58 @@ async function resolvePublicHost(
 }
 
 /**
- * A dispatcher whose sockets always connect to `address`, whatever DNS says at connect time:
- * the guard's resolution and the connection cannot be split by a rebinding record. Host header
- * and TLS server name still come from the URL, so the request looks normal to the server.
+ * The real transport: Node's http/https client with a `lookup` pinned to `address`. The URL's
+ * hostname still goes into the Host header and the TLS server name, so the request looks normal to
+ * the server; only the socket's destination is fixed.
  */
-export function pinnedDispatcher(address: string): Dispatcher {
-  const family = isIP(address) === 6 ? 6 : 4;
-  const lookup: LookupFunction = (_hostname, options, callback) => {
-    if (options.all) callback(null, [{ address, family }]);
-    else callback(null, address, family);
-  };
-  return new Agent({ connect: { lookup } });
-}
+export const nodeTransport: SharedTransport = (url, address, signal) =>
+  new Promise((resolve, reject) => {
+    const family = isIP(address) === 6 ? 6 : 4;
+    const lookup: LookupFunction = (_hostname, options, callback) => {
+      if (options.all) callback(null, [{ address, family }]);
+      else callback(null, address, family);
+    };
+    const client = url.protocol === "https:" ? https : http;
+    const req = client.request(
+      url,
+      {
+        method: "GET",
+        lookup,
+        signal,
+        headers: {
+          accept: "text/plain, text/markdown, application/json;q=0.9, */*;q=0.5",
+          "user-agent": `devcoach/${VERSION}`,
+        },
+      },
+      (res) => {
+        const declared = res.headers["content-length"];
+        resolve({
+          status: res.statusCode ?? 0,
+          location: res.headers.location ?? null,
+          contentLength: declared === undefined ? null : Number(declared),
+          body: res,
+          abort: () => res.destroy(),
+        });
+      },
+    );
+    req.on("error", reject);
+    req.end();
+  });
 
-async function readBounded(res: Response, maxBytes: number): Promise<string> {
-  const declared = Number(res.headers.get("content-length") ?? 0);
-  if (declared > maxBytes) throw new ShareInputError(TOO_LARGE);
-  if (!res.body) {
-    const text = await res.text();
-    if (text.length > maxBytes) throw new ShareInputError(TOO_LARGE);
-    return text;
+async function readBounded(res: SharedResponse, maxBytes: number): Promise<string> {
+  if (res.contentLength !== null && res.contentLength > maxBytes) {
+    res.abort();
+    throw new ShareInputError(TOO_LARGE);
   }
-  const reader = res.body.getReader();
   const chunks: Uint8Array[] = [];
   let total = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    total += value.byteLength;
+  for await (const chunk of res.body) {
+    total += chunk.byteLength;
     if (total > maxBytes) {
-      await reader.cancel().catch(() => undefined);
+      res.abort();
       throw new ShareInputError(TOO_LARGE);
     }
-    chunks.push(value);
+    chunks.push(chunk);
   }
   return Buffer.concat(chunks).toString("utf8");
 }
@@ -133,6 +175,7 @@ export async function fetchSharedInput(
   const maxBytes = opts.maxBytes ?? 256 * 1024;
   const maxRedirects = opts.maxRedirects ?? 3;
   const lookup = opts.lookup ?? defaultLookup;
+  const transport = opts.transport ?? nodeTransport;
   if (!isHttpUrl(url)) throw new ShareInputError("Only http(s) URLs can be imported.");
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -140,31 +183,23 @@ export async function fetchSharedInput(
     let current = new URL(url.trim());
     for (let hop = 0; ; hop++) {
       const address = await resolvePublicHost(current, lookup);
-      const dispatcher = pinnedDispatcher(address);
-      try {
-        const res = await fetch(current, {
-          signal: controller.signal,
-          redirect: "manual",
-          dispatcher,
-        } as RequestInit);
-        if (REDIRECT_STATUSES.has(res.status)) {
-          const location = res.headers.get("location");
-          if (!location || hop >= maxRedirects) {
-            throw new ShareInputError(
-              "The URL redirects too many times — copy the lesson text instead.",
-            );
-          }
-          current = new URL(location, current);
-          if (!/^https?:$/.test(current.protocol)) throw new ShareInputError(NOT_PUBLIC);
-          continue;
+      const res = await transport(current, address, controller.signal);
+      if (REDIRECT_STATUSES.has(res.status)) {
+        res.abort();
+        if (!res.location || hop >= maxRedirects) {
+          throw new ShareInputError(
+            "The URL redirects too many times — copy the lesson text instead.",
+          );
         }
-        if (!res.ok) {
-          throw new ShareInputError(`The URL answered ${res.status} — nothing to import there.`);
-        }
-        return await readBounded(res, maxBytes);
-      } finally {
-        await dispatcher.close().catch(() => undefined);
+        current = new URL(res.location, current);
+        if (!/^https?:$/.test(current.protocol)) throw new ShareInputError(NOT_PUBLIC);
+        continue;
       }
+      if (res.status < 200 || res.status >= 300) {
+        res.abort();
+        throw new ShareInputError(`The URL answered ${res.status} — nothing to import there.`);
+      }
+      return await readBounded(res, maxBytes);
     }
   } catch (err) {
     if (err instanceof ShareInputError) throw err;

@@ -20,10 +20,8 @@ local web dashboard. Everything is local — one SQLite file at `~/.devcoach/coa
 - **Node.js ≥ 24** (required for the embedded `node:sqlite`), ESM, TypeScript
 - **`@modelcontextprotocol/server`** — official MCP TypeScript SDK **v2** (`McpServer`, `ResourceTemplate`;
   `StdioServerTransport` from `@modelcontextprotocol/server/stdio`); `@modelcontextprotocol/client` is a
-  dev dependency for the in-memory tests only. Runtime dependency tree: 8 packages (the v1 monolith
-  dragged in ~90 — express, ajv, jose, …); `undici` is the eighth — only for the pinned-address
-  dispatcher of `share-fetch.ts` (the `.mcpb` bundle inlines it, hence the `createRequire` shim in
-  `tsup.mcpb.config.ts`'s banner)
+  dev dependency for the in-memory tests only. Runtime dependency tree: 7 packages (the v1 monolith
+  dragged in ~90 — express, ajv, jose, …)
 - **`node:sqlite`** (`DatabaseSync`) — zero-dependency embedded SQLite at `~/.devcoach/coaching.db`
 - **Zod** — schema validation + tool `inputSchema`/`outputSchema`
 - **Hono** + `@hono/node-server` — web dashboard (server-rendered `hono/html`, vendored Tailwind/Alpine/HTMX)
@@ -217,8 +215,10 @@ and the docs page `website/src/pages/lesson.tsx`. Hardening (from two ultrarevie
 markdown from lessons is always `DOMPurify.sanitize`d before `innerHTML` (dashboard) / rendered
 through `marked` + DOMPurify (docs page); `decodeShareCode` caps the input at `MAX_CODE_CHARS` and
 inflates with a byte budget (`inflateBounded`; the docs decoder streams the same way); `fetchSharedInput`
-refuses non-public hosts after DNS resolution, pins the socket to the resolved address (`pinnedDispatcher`,
-undici — defeats DNS rebinding), follows ≤ 3 redirects by hand and reads the body with a byte cap;
+refuses non-public hosts after DNS resolution, pins the socket to the resolved address (`nodeTransport`:
+Node's http/https client with a `lookup` that answers the validated IP — defeats DNS rebinding; global
+fetch has no such hook and an undici Agent from npm is NOT interoperable with the fetch bundled in Node 24,
+tried and reverted), follows ≤ 3 redirects by hand and reads the body with a byte cap;
 `share_name` is normalised by one helper (`normalizeShareName`, `SHARE_NAME_MAX`). Roadmap, not built:
 short links (secret Gist) and ephemeral one-use links.
 

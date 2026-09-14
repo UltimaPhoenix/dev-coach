@@ -1,8 +1,13 @@
-import dns from "node:dns";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import * as db from "../src/core/db";
 import { parseLesson } from "../src/core/models";
+import { fetchSharedInput } from "../src/core/share-fetch";
 import { createApp } from "../src/web/app";
+
+vi.mock("../src/core/share-fetch", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../src/core/share-fetch")>();
+  return { ...actual, fetchSharedInput: vi.fn(actual.fetchSharedInput) };
+});
 
 const app = createApp();
 const get = (path: string) => app.fetch(new Request(`http://localhost${path}`));
@@ -525,12 +530,7 @@ describe("web lesson sharing", () => {
     expect(r.headers.get("location")).toBe("/lessons/sh1?imported=1");
 
     db.withConnection((c) => db.deleteLesson(c, "sh1"));
-    const dnsSpy = vi
-      .spyOn(dns.promises, "lookup")
-      .mockResolvedValue([{ address: "93.184.216.34", family: 4 }] as never);
-    const fetchSpy = vi
-      .spyOn(globalThis, "fetch")
-      .mockResolvedValueOnce(new Response(md, { status: 200 }));
+    const fetchSpy = vi.mocked(fetchSharedInput).mockResolvedValueOnce(md);
     try {
       const viaUrl = await postForm("/lessons/import", {
         from: "lessons",
@@ -538,8 +538,7 @@ describe("web lesson sharing", () => {
       });
       expect(viaUrl.headers.get("location")).toBe("/lessons/sh1?imported=1");
     } finally {
-      fetchSpy.mockRestore();
-      dnsSpy.mockRestore();
+      fetchSpy.mockReset();
     }
   });
 

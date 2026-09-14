@@ -1,10 +1,16 @@
-import dns from "node:dns";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { Client, InMemoryTransport } from "@modelcontextprotocol/client";
 import { describe, expect, it, vi } from "vitest";
 import * as db from "../src/core/db";
+import { ShareInputError } from "../src/core/share";
+import { fetchSharedInput } from "../src/core/share-fetch";
 import { createServer } from "../src/mcp/server";
+
+vi.mock("../src/core/share-fetch", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../src/core/share-fetch")>();
+  return { ...actual, fetchSharedInput: vi.fn(actual.fetchSharedInput) };
+});
 
 async function connect() {
   const [ct, st] = InMemoryTransport.createLinkedPair();
@@ -574,13 +580,12 @@ describe("mcp lesson sharing", () => {
       arguments: { lesson_id: "share-me" },
     });
     await client.callTool({ name: "delete_lesson", arguments: { lesson_id: "share-me" } });
-    const dnsSpy = vi
-      .spyOn(dns.promises, "lookup")
-      .mockResolvedValue([{ address: "93.184.216.34", family: 4 }] as never);
     const fetchSpy = vi
-      .spyOn(globalThis, "fetch")
-      .mockResolvedValueOnce(new Response(shared.structuredContent.code, { status: 200 }))
-      .mockResolvedValueOnce(new Response("gone", { status: 404 }));
+      .mocked(fetchSharedInput)
+      .mockResolvedValueOnce(shared.structuredContent.code)
+      .mockRejectedValueOnce(
+        new ShareInputError("The URL answered 404 — nothing to import there."),
+      );
     try {
       const ok: any = await client.callTool({
         name: "import_lesson",
@@ -594,18 +599,15 @@ describe("mcp lesson sharing", () => {
       });
       expect(gone.isError).toBe(true);
       expect(text(gone)).toContain("404");
-      // a prompt-injected loopback / private URL is refused before any request is made
-      const calls = fetchSpy.mock.calls.length;
+      // a prompt-injected loopback / private URL is refused by the real guard before any request
       const local: any = await client.callTool({
         name: "import_lesson",
         arguments: { payload: "http://127.0.0.1:7860/settings" },
       });
       expect(local.isError).toBe(true);
       expect(text(local)).toContain("Only public");
-      expect(fetchSpy.mock.calls.length).toBe(calls);
     } finally {
-      fetchSpy.mockRestore();
-      dnsSpy.mockRestore();
+      fetchSpy.mockReset();
     }
     await client.close();
     await server.close();

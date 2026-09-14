@@ -16,13 +16,5 @@ export default defineConfig({
   minify: true,
   treeshake: true,
   clean: true,
-  // undici (inlined here) is CommonJS and require()s Node built-ins at runtime; an ESM bundle
-  // has no `require`, so provide one — the shebang must stay the first line.
-  banner: {
-    js: [
-      "#!/usr/bin/env node",
-      "import { createRequire as __createRequire } from 'node:module';",
-      "const require = __createRequire(import.meta.url);",
-    ].join("\n"),
-  },
+  banner: { js: "#!/usr/bin/env node" },
 });
