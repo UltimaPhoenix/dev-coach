@@ -4,6 +4,8 @@
 
 User-agent: *
 Allow: /
+# Unreleased docs (the develop branch) — every page there is also noindex.
+Disallow: /next/
 
 # --- AI / answer-engine crawlers & training signals (explicit opt-in) ---
 

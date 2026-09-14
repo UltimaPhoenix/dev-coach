@@ -12,9 +12,10 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          # Admin PAT so the screenshots commit can push to the protected main branch
-          # (the default GITHUB_TOKEN bot is blocked by the required CLA check). The
-          # commit message already carries [skip ci], so this push doesn't re-trigger CI.
+          # Admin PAT so the screenshots commit can push to the protected branch it was
+          # dispatched on — run it on develop (the default GITHUB_TOKEN bot is blocked by the
+          # required CLA check). The commit message already carries [skip ci], so this push
+          # doesn't re-trigger CI (nor a canary).
           token: ${{ secrets.RELEASE_TOKEN }}
       - uses: actions/setup-node@v7
         with:

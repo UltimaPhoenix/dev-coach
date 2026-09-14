@@ -17,6 +17,11 @@ Restart your agent afterward. Prefer a global binary? `npm install -g devcoach`,
 (and drop the `npx -y` prefix everywhere). After upgrading devcoach, re-run `devcoach install` to refresh
 the skill — `devcoach stats` reminds you when it's out of date.
 
+**Canary builds:** every change merged into the `develop` branch is published to npm under the `next`
+tag — `npx -y devcoach@next` (or `npm install -g devcoach@next`) runs the unreleased version, documented at
+[ultimaphoenix.github.io/dev-coach/next](https://ultimaphoenix.github.io/dev-coach/next/). `latest` stays the
+last release.
+
 ## Manual MCP config (Claude Code)
 
 If `devcoach install` isn't available, register it yourself.

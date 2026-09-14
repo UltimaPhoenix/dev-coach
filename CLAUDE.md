@@ -239,6 +239,15 @@ hook (verified empirically) — hence priming-first design; blocks are the rare 
 
 ## Development conventions
 
+- **Branching model**: `develop` is the integration branch — every PR (features, Dependabot, the
+  screenshots workflow) targets it; `main` only ever receives release commits, fast-forwarded by the
+  `bump` job, so it is always the last release. `main` stays the **default branch** on purpose:
+  the self-marketplace (`/plugin marketplace add UltimaPhoenix/dev-coach`, `source: "./plugin"`) clones
+  the default branch and `claude plugin marketplace add` has no ref option, so whatever is on `main`
+  is what plugin users install. Feature branches from `develop`; hotfixes from `main` (release on
+  `main`, then merge `main` into `develop` — the next release preflight refuses to run until
+  `main` is an ancestor of `develop`). Release pushes carry `[skip ci]`, so `main` never gets a
+  CI run: SonarCloud's main branch and the README CI badge point at `develop`.
 - **Clean Code**; match surrounding style.
 - **Biome** must pass: `npm run lint` (and `npm run format` to fix). **Typecheck**: `npm run typecheck`.
 - **Coverage thresholds** (`vitest.config.ts`): 92% lines · 95% functions · 91% statements · 76%
@@ -283,8 +292,17 @@ HOME=$(mktemp -d) node dist/bin.js stats     # or DEVCOACH_DIR=$(mktemp -d) …
 
 ## Release
 
-Releases are cut from the `workflow_dispatch` run of `.github/workflows/ci.yml` (patch/minor/major
-or an exact version): `bump` commits + tags `v<version>`, then `publish` (`npm publish`, OIDC
+Releases are cut from the `workflow_dispatch` run of `.github/workflows/ci.yml` **on `develop`**
+(patch/minor/major or an exact version): `bump` commits `chore: release v<version> [skip ci]` on
+`develop`, tags it and pushes — atomically — the bump to `develop`, the fast-forward of `main` and
+the tag (a non-fast-forward `main` rejects all three); dispatched on `main` it is a hotfix release
+(bump on `main` only). Every green push to `develop` also publishes a **canary**: the `prerelease`
+job computes `<next minor>-next.<run>.g<sha>` in the runner (never committed, never a `v*` tag —
+the release preflight derives versions from `v*` tags only), publishes it to npm under the dist-tag
+`next` (`npx -y devcoach@next`), and recreates the rolling GitHub prerelease `next` with the
+`.mcpb` + plugin/Gemini zips. The docs site deploys both branches from one Pages artifact:
+`main` at `/dev-coach/`, `develop` at `/dev-coach/next/` (`DOCS_NEXT=1` build: noindex, no sitemap,
+banner). Then `publish` (`npm publish`, OIDC
 trusted publishing, tokenless), `release` (GitHub Release with the self-signed `.mcpb`, the Claude
 Code plugin zip, the Gemini extension zip, a CycloneDX SBOM and `SHASUMS256.txt`), `homebrew`
 (regenerates `Formula/devcoach.rb` in `UltimaPhoenix/homebrew-tap`), `marketplace` (pins the entry

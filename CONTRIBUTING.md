@@ -38,10 +38,13 @@ See [CLAUDE.md](CLAUDE.md) for the full project structure, stack, and convention
 
 ## Submitting a PR
 
-1. Fork the repo and create a branch from `main`
+1. Fork the repo and create a branch from `develop` — the integration branch. `main` only ever
+   receives releases (CI fast-forwards it when a release is cut), so it is always the last published
+   version; a hotfix for the released version branches from `main` and is merged back into `develop`
 2. Make your changes and confirm all checks pass
-3. Open a PR against `main` with a clear description of *what* and *why* — and **state any change you
-   made to existing behaviour**
+3. Open a PR against `develop` with a clear description of *what* and *why* — and **state any change
+   you made to existing behaviour**. Every merge into `develop` publishes a canary
+   (`npx -y devcoach@next`, docs at `/next/`); releases are cut from `develop` by the maintainer
 4. Sign the **[Contributor License Agreement](CLA.md)** — the CLA Assistant bot comments on your PR
    with a one-line phrase to post; signing is required before merge
 
