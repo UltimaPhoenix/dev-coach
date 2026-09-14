@@ -65,6 +65,14 @@ export const DEFAULT_PROFILE: Record<string, number> = {
   frontend: 5,
 };
 
+/** `share_name` is free text: at most this many characters, trimmed; empty means "not set". */
+export const SHARE_NAME_MAX = 80;
+
+/** The one normalisation every writer of `share_name` goes through (CLI, MCP, web, restore). */
+export function normalizeShareName(raw: string): string {
+  return raw.trim().slice(0, SHARE_NAME_MAX);
+}
+
 export const DEFAULT_SETTINGS: Record<string, string> = {
   max_per_day: "2",
   min_gap_minutes: "240",
@@ -803,7 +811,9 @@ function restoreSettingsSection(db: DatabaseSync, unzipped: Unzipped, result: Re
   if (s.nudge_scope === "session" || s.nudge_scope === "global") {
     setSetting(db, "nudge_scope", s.nudge_scope);
   }
-  if (typeof s.share_name === "string") setSetting(db, "share_name", s.share_name);
+  if (typeof s.share_name === "string") {
+    setSetting(db, "share_name", normalizeShareName(s.share_name));
+  }
   result.settings = 1;
 }
 

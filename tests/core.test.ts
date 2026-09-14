@@ -441,6 +441,17 @@ describe("lesson sharing — storage & pacing", () => {
     expect(db.getLessons(c, { imported: false }).map((l) => l.id)).toEqual(["same-slug"]);
   });
 
+  it("topic_tracked is an own-property check (a topic named like an Object.prototype key is not 'tracked')", () => {
+    c = freshDb();
+    const p = payloadFor("proto-topic");
+    p.lesson.topic_id = "toString";
+    expect(coach.importSharedLesson(c, p).topic_tracked).toBe(false);
+    db.upsertKnowledge(c, "toString", 5);
+    const q = payloadFor("proto-topic", "Bob");
+    q.lesson.topic_id = "toString";
+    expect(coach.importSharedLesson(c, q).topic_tracked).toBe(true);
+  });
+
   it("many senders sharing the same slug all import (suffixes are generated, not a fixed list)", () => {
     c = freshDb();
     const ids = ["Ann", "Bob", "Cid", "Dee", "Eve", "Fay"].map(

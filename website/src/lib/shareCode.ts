@@ -6,6 +6,9 @@
 export const SHARE_CODE_PREFIX = "devcoach:lesson:1:";
 const CODE_RE = /devcoach:lesson:(\d+):([A-Za-z0-9_-]+)/;
 const MAX_DECODED_BYTES = 256 * 1024;
+// A real code is ~1–3 K chars; this bounds the compressed input before anything is inflated.
+const MAX_CODE_CHARS = 64_000;
+const TOO_LARGE = "The code is too large to be a lesson.";
 
 export interface SharedLesson {
   format: "devcoach.lesson";
@@ -66,17 +69,39 @@ export async function decodeShareCode(code: string): Promise<SharedLesson> {
   if (Number(m[1]) > 1) {
     throw new ShareCodeError("This lesson was shared by a newer devcoach — update yours to read it.");
   }
+  if (m[2].length > MAX_CODE_CHARS) throw new ShareCodeError(TOO_LARGE);
   let text: string;
   try {
     const bytes = base64urlToBytes(m[2]);
-    const stream = new Blob([bytes as BlobPart])
+    const reader = new Blob([bytes as BlobPart])
       .stream()
-      .pipeThrough(new DecompressionStream("deflate-raw"));
-    text = await new Response(stream).text();
-  } catch {
+      .pipeThrough(new DecompressionStream("deflate-raw"))
+      .getReader();
+    // Inflate with a byte budget: stop as soon as the output passes the cap instead of
+    // materialising a "zip bomb" in the visitor's tab (same rule as the CLI's inflateBounded).
+    const chunks: Uint8Array[] = [];
+    let total = 0;
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > MAX_DECODED_BYTES) {
+        await reader.cancel().catch(() => undefined);
+        throw new ShareCodeError(TOO_LARGE);
+      }
+      chunks.push(value);
+    }
+    const joined = new Uint8Array(total);
+    let offset = 0;
+    for (const chunk of chunks) {
+      joined.set(chunk, offset);
+      offset += chunk.byteLength;
+    }
+    text = new TextDecoder().decode(joined);
+  } catch (err) {
+    if (err instanceof ShareCodeError) throw err;
     throw new ShareCodeError("The code is damaged or incomplete — ask for it again.");
   }
-  if (text.length > MAX_DECODED_BYTES) throw new ShareCodeError("The code is too large to be a lesson.");
   let payload: SharedLesson;
   try {
     payload = JSON.parse(text) as SharedLesson;

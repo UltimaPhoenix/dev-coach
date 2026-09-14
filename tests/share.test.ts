@@ -1,4 +1,6 @@
 import dns from "node:dns";
+import http from "node:http";
+import type { AddressInfo } from "node:net";
 import { deflateSync } from "fflate";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { type Lesson, parseLesson } from "../src/core/models";
@@ -22,7 +24,12 @@ import {
   sharedLessonIdCandidates,
   sharedLessonToLesson,
 } from "../src/core/share";
-import { fetchSharedInput, isHttpUrl, isPrivateAddress } from "../src/core/share-fetch";
+import {
+  fetchSharedInput,
+  isHttpUrl,
+  isPrivateAddress,
+  pinnedDispatcher,
+} from "../src/core/share-fetch";
 
 const lesson = (over: Partial<Lesson> = {}): Lesson =>
   parseLesson({
@@ -279,6 +286,24 @@ describe("import shaping", () => {
     ]);
   });
 
+  it("a card whose body quotes a devcoach:lesson: example still imports from its real (last) code", () => {
+    const p = buildSharePayload(
+      lesson({
+        body: "Share codes look like `devcoach:lesson:1:eJyrVkrOz1WyUkrLL8pVqgUA` — paste them.",
+      }),
+      { includeContext: false, sharedBy: "Ada", now },
+    );
+    const text = renderShareText(p);
+    expect(text.indexOf("devcoach:lesson:1:")).toBeLessThan(text.lastIndexOf("devcoach:lesson:1:"));
+    const parsed = parseSharedInput(text);
+    expect(parsed.kind).toBe("shared");
+    if (parsed.kind === "shared") expect(parsed.payload.lesson.title).toBe(p.lesson.title);
+    // and a wrapped real code after a bogus example is re-joined correctly
+    const code = encodeShareCode(p);
+    const wrapped = `devcoach:lesson:1:bogus\n\n${code.slice(0, 60)}\n${code.slice(60)}\n`;
+    expect(parseSharedInput(wrapped).kind).toBe("shared");
+  });
+
   it("a category containing a comma survives the .devcoach.md round trip", () => {
     const p = buildSharePayload(lesson({ categories: ["hello, world", "async", 'say "hi"'] }), {
       includeContext: false,
@@ -406,6 +431,31 @@ describe("fetchSharedInput", () => {
     await expect(
       fetchSharedInput("https://example.test/raw", { lookup: publicLookup, maxRedirects: 2 }),
     ).rejects.toThrow(/too many times/);
+  });
+
+  it("pins the socket to the address the guard resolved — DNS cannot rebind it", async () => {
+    // A server on 127.0.0.1 answers; the URL's hostname would never resolve there. Only the
+    // pinned dispatcher can reach it, and the Host header still names the URL's host.
+    const server = http.createServer((req, res) => res.end(`host=${req.headers.host}`));
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const port = (server.address() as AddressInfo).port;
+    const dispatcher = pinnedDispatcher("127.0.0.1");
+    try {
+      const res = await fetch(`http://rebind.example.test:${port}/x`, {
+        dispatcher,
+      } as RequestInit);
+      expect(await res.text()).toBe(`host=rebind.example.test:${port}`);
+    } finally {
+      await dispatcher.close();
+      server.close();
+    }
+    // fetchSharedInput always fetches through such a dispatcher (one per hop)
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response("devcoach:lesson:1:abc", { status: 200 }));
+    await fetchSharedInput("https://example.test/raw", { lookup: publicLookup });
+    const init = fetchSpy.mock.calls[0]?.[1] as { dispatcher?: unknown } | undefined;
+    expect(init?.dispatcher).toBeDefined();
   });
 
   it("caps the body while streaming, not after buffering it", async () => {

@@ -400,20 +400,39 @@ describe("web lesson sharing", () => {
     expect((await get("/lessons/nope/share")).status).toBe(404);
   });
 
-  it("POST share re-renders the fragment with the posted name/context and persists the name", async () => {
-    const r = await postForm("/lessons/sh1/share", { name: "  Ada ", include_context: "1" });
+  it("POST share re-renders the fragment; the name is persisted only on the change event (persist=1)", async () => {
+    // a debounced keystroke re-renders but does not touch the setting
+    const typing = await postForm("/lessons/sh1/share", { name: "Ad", include_context: "1" });
+    expect(typing.status).toBe(200);
+    expect(await typing.text()).toContain("Ad");
+    expect(db.withConnection((c) => db.getSettings(c).share_name)).toBeNull();
+    const r = await postForm("/lessons/sh1/share", {
+      name: "  Ada ",
+      include_context: "1",
+      persist: "1",
+    });
     expect(r.status).toBe(200);
     const html = await r.text();
     expect(html).toContain("Ada");
     expect(html).toContain("includes project, branch and commit");
     expect(db.withConnection((c) => db.getSettings(c).share_name)).toBe("Ada");
-    const anon = await (await postForm("/lessons/sh1/share", { name: "" })).text();
+    const anon = await (await postForm("/lessons/sh1/share", { name: "", persist: "1" })).text();
     expect(anon).toContain("Shared anonymously");
     expect(db.withConnection((c) => db.getSettings(c).share_name)).toBeNull();
+    // every writer clamps to SHARE_NAME_MAX
+    await postForm("/lessons/sh1/share", { name: "x".repeat(200), persist: "1" });
+    expect(db.withConnection((c) => db.getSettings(c).share_name)).toHaveLength(db.SHARE_NAME_MAX);
+    await post("/settings", {
+      max_per_day: "2",
+      min_gap_minutes: "240",
+      share_name: "y".repeat(200),
+    });
+    expect(db.withConnection((c) => db.getSettings(c).share_name)).toHaveLength(db.SHARE_NAME_MAX);
+    await post("/settings", { max_per_day: "2", min_gap_minutes: "240", share_name: "" });
   });
 
   it("share endpoint refuses cross-site requests, so another site cannot rename the sender", async () => {
-    await postForm("/lessons/sh1/share", { name: "Ada" });
+    await postForm("/lessons/sh1/share", { name: "Ada", persist: "1" });
     const cross = await app.fetch(
       new Request("http://localhost/lessons/sh1/share?name=Attacker&format=text", {
         headers: { "sec-fetch-site": "cross-site" },
@@ -422,7 +441,7 @@ describe("web lesson sharing", () => {
     expect(cross.status).toBe(403);
     const crossPost = await postForm(
       "/lessons/sh1/share",
-      { name: "Attacker" },
+      { name: "Attacker", persist: "1" },
       { "sec-fetch-site": "cross-site" },
     );
     expect(crossPost.status).toBe(403);

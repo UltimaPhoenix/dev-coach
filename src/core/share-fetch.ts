@@ -5,9 +5,12 @@
 // The URL is untrusted (it may come from a prompt injection via the import_lesson tool), so only
 // public hosts are fetched: loopback, private, link-local and unique-local addresses are refused
 // after DNS resolution, redirects are followed by hand with the same check on every hop, and the
-// body is read with a byte budget instead of trusting Content-Length.
+// body is read with a byte budget instead of trusting Content-Length. The socket is pinned to the
+// address the guard validated (a per-request dispatcher whose DNS lookup answers with it), so a
+// DNS-rebinding record cannot hand fetch() a different, private address a moment later.
 import dns from "node:dns";
-import { isIP } from "node:net";
+import { isIP, type LookupFunction } from "node:net";
+import { Agent, type Dispatcher } from "undici";
 import { ShareInputError } from "./share";
 
 export interface FetchSharedOptions {
@@ -62,12 +65,16 @@ async function defaultLookup(hostname: string): Promise<string[]> {
   return found.map((entry) => entry.address);
 }
 
-async function assertPublicHost(url: URL, lookup: (h: string) => Promise<string[]>): Promise<void> {
+/** The validated public address for the URL's host — the one the socket must connect to. */
+async function resolvePublicHost(
+  url: URL,
+  lookup: (h: string) => Promise<string[]>,
+): Promise<string> {
   const host = url.hostname.replace(/^\[|\]$/g, "").toLowerCase();
   if (host === "localhost" || host.endsWith(".localhost")) throw new ShareInputError(NOT_PUBLIC);
   if (isIP(host)) {
     if (isPrivateAddress(host)) throw new ShareInputError(NOT_PUBLIC);
-    return;
+    return host;
   }
   let addresses: string[];
   try {
@@ -75,9 +82,23 @@ async function assertPublicHost(url: URL, lookup: (h: string) => Promise<string[
   } catch {
     throw new ShareInputError("The URL could not be reached — copy the lesson text instead.");
   }
-  if (addresses.length === 0 || addresses.some((a) => isPrivateAddress(a))) {
-    throw new ShareInputError(NOT_PUBLIC);
-  }
+  const first = addresses[0];
+  if (!first || addresses.some((a) => isPrivateAddress(a))) throw new ShareInputError(NOT_PUBLIC);
+  return first;
+}
+
+/**
+ * A dispatcher whose sockets always connect to `address`, whatever DNS says at connect time:
+ * the guard's resolution and the connection cannot be split by a rebinding record. Host header
+ * and TLS server name still come from the URL, so the request looks normal to the server.
+ */
+export function pinnedDispatcher(address: string): Dispatcher {
+  const family = isIP(address) === 6 ? 6 : 4;
+  const lookup: LookupFunction = (_hostname, options, callback) => {
+    if (options.all) callback(null, [{ address, family }]);
+    else callback(null, address, family);
+  };
+  return new Agent({ connect: { lookup } });
 }
 
 async function readBounded(res: Response, maxBytes: number): Promise<string> {
@@ -118,23 +139,32 @@ export async function fetchSharedInput(
   try {
     let current = new URL(url.trim());
     for (let hop = 0; ; hop++) {
-      await assertPublicHost(current, lookup);
-      const res = await fetch(current, { signal: controller.signal, redirect: "manual" });
-      if (REDIRECT_STATUSES.has(res.status)) {
-        const location = res.headers.get("location");
-        if (!location || hop >= maxRedirects) {
-          throw new ShareInputError(
-            "The URL redirects too many times — copy the lesson text instead.",
-          );
+      const address = await resolvePublicHost(current, lookup);
+      const dispatcher = pinnedDispatcher(address);
+      try {
+        const res = await fetch(current, {
+          signal: controller.signal,
+          redirect: "manual",
+          dispatcher,
+        } as RequestInit);
+        if (REDIRECT_STATUSES.has(res.status)) {
+          const location = res.headers.get("location");
+          if (!location || hop >= maxRedirects) {
+            throw new ShareInputError(
+              "The URL redirects too many times — copy the lesson text instead.",
+            );
+          }
+          current = new URL(location, current);
+          if (!/^https?:$/.test(current.protocol)) throw new ShareInputError(NOT_PUBLIC);
+          continue;
         }
-        current = new URL(location, current);
-        if (!/^https?:$/.test(current.protocol)) throw new ShareInputError(NOT_PUBLIC);
-        continue;
+        if (!res.ok) {
+          throw new ShareInputError(`The URL answered ${res.status} — nothing to import there.`);
+        }
+        return await readBounded(res, maxBytes);
+      } finally {
+        await dispatcher.close().catch(() => undefined);
       }
-      if (!res.ok) {
-        throw new ShareInputError(`The URL answered ${res.status} — nothing to import there.`);
-      }
-      return await readBounded(res, maxBytes);
     }
   } catch (err) {
     if (err instanceof ShareInputError) throw err;

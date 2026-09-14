@@ -704,8 +704,6 @@ export interface ShareState {
   includeContext: boolean;
   text: string;
   link: string;
-  markdown: string;
-  filename: string;
 }
 
 /**
@@ -783,9 +781,10 @@ ${
       <div x-show="open" x-transition:enter="transition ease-out duration-100" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100" class="absolute right-0 top-full mt-1 z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg w-80 p-4 space-y-3" style="display:none">
         <p class="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">Share this lesson</p>
         <form method="post" action="/lessons/${encodeURIComponent(l.id)}/share" hx-post="/lessons/${encodeURIComponent(l.id)}/share" hx-target="#share-payloads" hx-swap="outerHTML" hx-trigger="input delay:300ms, change" onsubmit="return false" class="space-y-2.5">
+          <input type="hidden" name="persist" value="0" x-ref="persist" />
           <div>
             <label for="share-name" class="block text-xs text-gray-400 dark:text-gray-500 mb-1">Your name</label>
-            <input id="share-name" type="text" name="name" value="${sh.name}" maxlength="80" placeholder="anonymous" autocomplete="off" class="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            <input id="share-name" type="text" name="name" value="${sh.name}" maxlength="80" placeholder="anonymous" autocomplete="off" @input="$refs.persist.value = '0'" @change="$refs.persist.value = '1'" class="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500" />
           </div>
           <label class="flex items-start gap-2 text-xs text-gray-600 dark:text-gray-300 cursor-pointer"><input type="checkbox" name="include_context" value="1" ${sh.includeContext ? "checked" : ""} class="mt-0.5" /><span>Include where it happened <span class="text-gray-400 dark:text-gray-500">(project, branch, commit — never local paths)</span></span></label>
         </form>

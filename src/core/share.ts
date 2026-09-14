@@ -200,7 +200,7 @@ function parsePayloadJson(json: string): SharedLesson {
 // ── Renderers ────────────────────────────────────────────────────────────────
 
 /** The card as the user knows it, a one-line hint, and the code as the very last line. */
-export function renderShareText(payload: SharedLesson): string {
+export function renderShareText(payload: SharedLesson, code = encodeShareCode(payload)): string {
   const who = payload.shared_by
     ? `Shared by ${payload.shared_by} with devcoach`
     : "Shared with devcoach";
@@ -208,12 +208,12 @@ export function renderShareText(payload: SharedLesson): string {
     formatLessonForDisplay(payload.lesson),
     "",
     `${who} — paste it to your agent or run: devcoach import`,
-    encodeShareCode(payload),
+    code,
   ].join("\n");
 }
 
-export function renderShareLink(payload: SharedLesson): string {
-  return `${SHARE_PAGE_URL}#${encodeShareCode(payload)}`;
+export function renderShareLink(payload: SharedLesson, code = encodeShareCode(payload)): string {
+  return `${SHARE_PAGE_URL}#${code}`;
 }
 
 export function slugify(s: string): string {
@@ -379,20 +379,29 @@ export function parseSharedInput(text: string): SharedInput {
   } else if (t.startsWith("---")) {
     return { kind: "shared", source: "markdown", payload: parseShareMarkdownFile(t) };
   }
-  const m = CODE_RE.exec(t);
-  if (!m) {
+  const matches = [...t.matchAll(new RegExp(CODE_RE.source, "g"))];
+  if (matches.length === 0) {
     throw new ShareInputError(
       "Not a devcoach lesson: expected a devcoach:lesson code, a share link, a .devcoach.md file or a lessons JSON export.",
     );
   }
-  try {
-    return { kind: "shared", source: "code", payload: decodeShareCode(m[0]) };
-  } catch (err) {
-    // Email clients wrap long lines: re-join the base64 continuation lines that follow the code.
-    const rejoined = rejoinWrappedCode(t.slice(m.index));
-    if (rejoined === m[0]) throw err;
-    return { kind: "shared", source: "code", payload: decodeShareCode(rejoined) };
+  // The real code is the LAST line of a card, and a lesson body may quote a devcoach:lesson:…
+  // example of its own — so try every match, last first, each also re-joined with the base64
+  // continuation lines email clients wrap it into.
+  let lastError: unknown;
+  for (const m of matches.reverse()) {
+    const candidates = [m[0]];
+    const rejoined = rejoinWrappedCode(t.slice(m.index ?? 0));
+    if (rejoined !== m[0]) candidates.push(rejoined);
+    for (const candidate of candidates) {
+      try {
+        return { kind: "shared", source: "code", payload: decodeShareCode(candidate) };
+      } catch (err) {
+        lastError = err;
+      }
+    }
   }
+  throw lastError;
 }
 
 function rejoinWrappedCode(fromCode: string): string {

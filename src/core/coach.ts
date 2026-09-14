@@ -148,7 +148,7 @@ export interface SharedImportResult {
  * being overwritten; re-importing the same share is a duplicate. Never touches pacing.
  */
 export function importSharedLesson(db: DatabaseSync, payload: SharedLesson): SharedImportResult {
-  const tracked = payload.lesson.topic_id in getAllKnowledge(db);
+  const tracked = Object.hasOwn(getAllKnowledge(db), payload.lesson.topic_id);
   for (const id of sharedLessonIdCandidates(payload)) {
     const existing = getLessonById(db, id);
     if (existing) {

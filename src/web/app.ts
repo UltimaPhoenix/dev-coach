@@ -12,6 +12,7 @@ import type { KnowledgeEntry, Lesson } from "../core/models";
 import {
   buildSharePayload,
   decodeShareCode,
+  encodeShareCode,
   renderShareLink,
   renderShareMarkdownFile,
   renderShareText,
@@ -98,34 +99,35 @@ function gitUserName(): string | null {
   return gitUserNameCache;
 }
 
+/**
+ * The share popover's state for a lesson: the payload is built and encoded once; the text and
+ * link renderings (what the fragment needs) are derived from that single code, and the
+ * `.devcoach.md` file is rendered only by the download route.
+ */
 function shareState(
   lesson: Lesson,
+  settingName: string | null,
   o: { name?: string | null; includeContext?: boolean; open?: boolean },
-): ShareState {
-  const setting = db.withConnection((c) => db.getSettings(c).share_name);
+): { state: ShareState; payload: SharedLesson } {
   const sharedBy = resolveSharedBy({
     explicit: o.name ?? null,
-    setting,
+    setting: settingName,
     gitUserName: gitUserName(),
   });
   const includeContext = o.includeContext ?? false;
   const payload = buildSharePayload(lesson, { includeContext, sharedBy });
+  const code = encodeShareCode(payload);
   return {
-    id: lesson.id,
-    open: o.open ?? false,
-    name: sharedBy ?? "",
-    includeContext,
-    text: renderShareText(payload),
-    link: renderShareLink(payload),
-    filename: sharedLessonFilename(payload),
-    markdown: renderShareMarkdownFile(payload),
+    payload,
+    state: {
+      id: lesson.id,
+      open: o.open ?? false,
+      name: sharedBy ?? "",
+      includeContext,
+      text: renderShareText(payload, code),
+      link: renderShareLink(payload, code),
+    },
   };
-}
-
-function rememberShareName(name: string | undefined): void {
-  if (name === undefined) return;
-  const trimmed = name.trim().slice(0, 80);
-  db.withConnection((c) => db.setSetting(c, "share_name", trimmed));
 }
 
 function uiTheme(): string {
@@ -398,35 +400,45 @@ export function createApp(): Hono {
 
   // Share payloads: `?format=text|link` → text/plain, `md` → the .devcoach.md attachment,
   // no format → the #share-payloads fragment (HTMX re-render when name/context change).
-  // POST carries name + include_context from the popover form and remembers the name; the GET
-  // variants (fragment, formats, the download link) render with the name they carry but never
-  // persist it. Same-origin only: a page elsewhere must not read a share or rename the sender.
+  // POST carries name + include_context from the popover form; it remembers the name only when
+  // the form says so (`persist=1`, sent on the input's change event — not on every keystroke).
+  // The GET variants (fragment, formats, the download link) render with the name they carry but
+  // never persist it. Same-origin only: a page elsewhere must not read a share or rename the sender.
   app.on(["GET", "POST"], "/lessons/:lesson_id/share", async (c: Context) => {
     if (isCrossSite(c)) return c.text("Forbidden", 403);
-    const lesson = db.withConnection((conn) =>
-      db.getLessonById(conn, c.req.param("lesson_id") ?? ""),
-    );
-    if (!lesson) return c.text("Lesson not found", 404);
     let name: string | undefined;
     let includeContext: boolean;
+    let persist = false;
     if (c.req.method === "POST") {
       const body = await c.req.parseBody();
       name = textField(body, "name");
       includeContext = textField(body, "include_context") === "1";
-      rememberShareName(name);
+      persist = textField(body, "persist") === "1";
     } else {
       name = c.req.query("name");
       includeContext = c.req.query("include_context") === "1";
     }
-    const state = shareState(lesson, { name, includeContext });
+    const found = db.withConnection((conn) => {
+      const lesson = db.getLessonById(conn, c.req.param("lesson_id") ?? "");
+      if (!lesson) return null;
+      if (persist && name !== undefined) {
+        db.setSetting(conn, "share_name", db.normalizeShareName(name));
+      }
+      return { lesson, settingName: db.getSettings(conn).share_name };
+    });
+    if (!found) return c.text("Lesson not found", 404);
+    const { state, payload } = shareState(found.lesson, found.settingName, {
+      name,
+      includeContext,
+    });
     const format = c.req.query("format");
     if (format === "text") return c.text(state.text);
     if (format === "link") return c.text(state.link);
     if (format === "md") {
-      return new Response(state.markdown, {
+      return new Response(renderShareMarkdownFile(payload), {
         headers: {
           "content-type": "text/markdown; charset=utf-8",
-          "content-disposition": `attachment; filename="${state.filename}"`,
+          "content-disposition": `attachment; filename="${sharedLessonFilename(payload)}"`,
         },
       });
     }
@@ -434,15 +446,20 @@ export function createApp(): Hono {
   });
 
   app.get("/lessons/:lesson_id", (c) => {
-    const lesson = db.withConnection((conn) => db.getLessonById(conn, c.req.param("lesson_id")));
-    if (!lesson) return c.html("<h1>Lesson not found</h1>", 404);
+    const found = db.withConnection((conn) => {
+      const lesson = db.getLessonById(conn, c.req.param("lesson_id"));
+      if (!lesson) return null;
+      const settings = db.getSettings(conn);
+      return { lesson, settingName: settings.share_name, uiTheme: settings.ui_theme };
+    });
+    if (!found) return c.html("<h1>Lesson not found</h1>", 404);
     const q = c.req.query();
     const imported = q.imported === "1" ? "new" : q.imported === "dup" ? "dup" : null;
     return c.html(
       lessonDetailPage({
-        lesson,
-        uiTheme: uiTheme(),
-        share: shareState(lesson, { open: q.share === "1" }),
+        lesson: found.lesson,
+        uiTheme: found.uiTheme,
+        share: shareState(found.lesson, found.settingName, { open: q.share === "1" }).state,
         imported,
       }),
     );
@@ -507,7 +524,7 @@ export function createApp(): Hono {
       db.setSetting(conn, "ui_theme", theme);
       db.setSetting(conn, "nudge_every", String(nudgeEvery));
       db.setSetting(conn, "nudge_scope", nudgeScope);
-      db.setSetting(conn, "share_name", textField(body, "share_name").trim().slice(0, 80));
+      db.setSetting(conn, "share_name", db.normalizeShareName(textField(body, "share_name")));
     });
     return c.redirect("/settings", 303);
   });

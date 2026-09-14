@@ -20,8 +20,10 @@ local web dashboard. Everything is local — one SQLite file at `~/.devcoach/coa
 - **Node.js ≥ 24** (required for the embedded `node:sqlite`), ESM, TypeScript
 - **`@modelcontextprotocol/server`** — official MCP TypeScript SDK **v2** (`McpServer`, `ResourceTemplate`;
   `StdioServerTransport` from `@modelcontextprotocol/server/stdio`); `@modelcontextprotocol/client` is a
-  dev dependency for the in-memory tests only. Runtime dependency tree: 7 packages (the v1 monolith
-  dragged in ~90 — express, ajv, jose, …)
+  dev dependency for the in-memory tests only. Runtime dependency tree: 8 packages (the v1 monolith
+  dragged in ~90 — express, ajv, jose, …); `undici` is the eighth — only for the pinned-address
+  dispatcher of `share-fetch.ts` (the `.mcpb` bundle inlines it, hence the `createRequire` shim in
+  `tsup.mcpb.config.ts`'s banner)
 - **`node:sqlite`** (`DatabaseSync`) — zero-dependency embedded SQLite at `~/.devcoach/coaching.db`
 - **Zod** — schema validation + tool `inputSchema`/`outputSchema`
 - **Hono** + `@hono/node-server` — web dashboard (server-rendered `hono/html`, vendored Tailwind/Alpine/HTMX)
@@ -207,10 +209,18 @@ setting → git `user.name` → null. Storage: `coach.importSharedLesson` keeps 
 share as `duplicated` (`isSameSharedLesson`: imported + same title/topic/sender — no `LIKE`).
 Surfaces: CLI `share`/`import` (no arg = clipboard), MCP `share_lesson`/`import_lesson`
 (`reply_check`: code verbatim in a fenced block), dashboard (`/lessons/:id/share`,
-`POST /lessons/import` with a `Sec-Fetch-Site` guard, read-only `GET /lessons/import?code=`,
+`POST /lessons/import` with a `Sec-Fetch-Site` guard (the share route too; it persists `share_name`
+only when the popover posts `persist=1`, set by Alpine on the name input's `change`, not per keystroke),
+read-only `GET /lessons/import?code=`,
 `/ping` = the app's only CORS route, locked to the docs origin + `Access-Control-Allow-Private-Network`),
-and the docs page `website/src/pages/lesson.tsx`. Roadmap, not built: short links (secret Gist) and
-ephemeral one-use links.
+and the docs page `website/src/pages/lesson.tsx`. Hardening (from two ultrareview rounds, keep it):
+markdown from lessons is always `DOMPurify.sanitize`d before `innerHTML` (dashboard) / rendered
+through `marked` + DOMPurify (docs page); `decodeShareCode` caps the input at `MAX_CODE_CHARS` and
+inflates with a byte budget (`inflateBounded`; the docs decoder streams the same way); `fetchSharedInput`
+refuses non-public hosts after DNS resolution, pins the socket to the resolved address (`pinnedDispatcher`,
+undici — defeats DNS rebinding), follows ≤ 3 redirects by hand and reads the body with a byte cap;
+`share_name` is normalised by one helper (`normalizeShareName`, `SHARE_NAME_MAX`). Roadmap, not built:
+short links (secret Gist) and ephemeral one-use links.
 
 ## Cue engine (`core/coach.ts`)
 

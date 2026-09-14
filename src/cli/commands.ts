@@ -324,11 +324,11 @@ function cmdSet(key: string, value: string): void {
     process.exit(1);
   }
   if (key === "share_name") {
-    const name = value.trim();
-    if (name.length > 80) {
-      log(c.red("share_name must be at most 80 characters."));
+    if (value.trim().length > db.SHARE_NAME_MAX) {
+      log(c.red(`share_name must be at most ${db.SHARE_NAME_MAX} characters.`));
       process.exit(1);
     }
+    const name = db.normalizeShareName(value);
     db.withConnection((conn) => db.setSetting(conn, key, name));
     log(name ? c.green(`Set share_name = ${name}`) : c.green("Cleared share_name"));
     return;
@@ -475,7 +475,7 @@ function cmdShare(id: string | undefined, o: ShareOpts): void {
     });
     let remembered = false;
     if (o.by?.trim() && !settings.share_name) {
-      db.setSetting(conn, "share_name", o.by.trim());
+      db.setSetting(conn, "share_name", db.normalizeShareName(o.by));
       remembered = true;
     }
     const payload = buildSharePayload(lesson, { includeContext: Boolean(o.withContext), sharedBy });

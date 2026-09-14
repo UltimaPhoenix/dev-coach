@@ -725,9 +725,10 @@ export function createServer(): McpServer {
           }),
         );
       if (args.key === "share_name") {
-        const name = args.value.trim();
-        if (name.length > 80) return errResult("share_name must be at most 80 characters");
-        return save(name);
+        if (args.value.trim().length > db.SHARE_NAME_MAX) {
+          return errResult(`share_name must be at most ${db.SHARE_NAME_MAX} characters`);
+        }
+        return save(db.normalizeShareName(args.value));
       }
       if (args.key === "nudge_scope") {
         if (args.value !== "session" && args.value !== "global") {
