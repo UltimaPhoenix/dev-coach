@@ -4,7 +4,7 @@ Notable changes to devcoach. Versions follow [Semantic Versioning](https://semve
 
 ---
 
-## [Unreleased]
+## [2.2.0] — 2026-09-14
 
 ### Added
 - **`devcoach uninstall`** — the inverse of `install`: removes the MCP registration, devcoach's hook
