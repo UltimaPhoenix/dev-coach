@@ -173,11 +173,13 @@ jobs:
         run: |
           set -euo pipefail
           # Recreate rather than update: assets are version-named, so an update would accumulate them.
+          # --target lets GitHub create the rolling tag itself, pointing at this commit: a locally
+          # pushed tag raced the asynchronous --cleanup-tag deletion once ("tag next exists locally
+          # but has not been pushed") and the step failed after npm had already published.
           gh release delete next --yes --cleanup-tag 2>/dev/null || true
-          git tag -f next
-          git push --force origin refs/tags/next
+          git push --delete origin refs/tags/next 2>/dev/null || true
           NOTES="$(printf 'Canary build **%s** from `develop` @ %s — unreleased, may break.\n\nInstall: `npx -y devcoach@next` · docs: https://ultimaphoenix.github.io/dev-coach/next/' "$VERSION" "$GITHUB_SHA")"
-          gh release create next --prerelease --title "next (canary)" --notes "$NOTES" \
+          gh release create next --target "$GITHUB_SHA" --prerelease --title "next (canary)" --notes "$NOTES" \
             dist-mcpb/*.mcpb dist-plugin/*.zip dist-gemini/*.zip
 
   # ── Version bump → commit → tag (workflow_dispatch only) ───────────────────
