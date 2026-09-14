@@ -49,22 +49,25 @@ devcoach --version
 
 | Command | Description |
 |---|---|
-| `devcoach lessons [--period <p>] [--level <l>] [--category <c>] [--project/--repository/--branch/--commit <…>] [--starred] [--feedback <f>] [--date-from/--date-to <YYYY-MM-DD>] [--sort <col>] [--order <asc\|desc>]` | List lessons with filters |
+| `devcoach lessons [--period <p>] [--level <l>] [--category <c>] [--project/--repository/--branch/--commit <…>] [--starred] [--imported] [--feedback <f>] [--date-from/--date-to <YYYY-MM-DD>] [--sort <col>] [--order <asc\|desc>]` | List lessons with filters |
 | `devcoach lesson <id>` | Show a single lesson in full |
 | `devcoach star <id>` / `unstar <id>` | Star / unstar |
 | `devcoach delete <id>` | Permanently delete a lesson |
 | `devcoach feedback <id> <know\|dont_know\|clear>` | Record comprehension (adjusts confidence) |
+| `devcoach share [id] [--last] [--link] [--file [path]] [--with-context] [--by <name> \| --anonymous]` | Hand a lesson to a teammate — see [Sharing a lesson](#sharing-a-lesson) |
+| `devcoach import [source]` | Add a shared lesson — code, card text, link, URL, `.devcoach.md`, JSON export, `-` for stdin; no argument reads the **clipboard** |
 
 ## Stats & settings
 
 | Command | Description |
 |---|---|
 | `devcoach stats` | Lesson counts, rate-limit status, weakest/strongest topics |
-| `devcoach settings` | Show current settings — `max_per_day`, `min_gap_minutes`, `nudge_every`, `nudge_scope` |
+| `devcoach settings` | Show current settings — `max_per_day`, `min_gap_minutes`, `nudge_every`, `nudge_scope`, `share_name` |
 | `devcoach set max_per_day <n>` | Max lessons per 24h (1–20, default 2) |
 | `devcoach set min_gap_minutes <n>` | Minimum minutes between lessons (0–1440, default 240) |
 | `devcoach set nudge_every <n>` | Interactions between lesson cues (0–1000, default 10; 0 = every turn) |
 | `devcoach set nudge_scope <session\|global>` | Count interactions per chat session (default) or globally |
+| `devcoach set share_name <name>` | The sender name proposed by `share` (max 80 chars; empty clears → git `user.name`) |
 
 ## Backup, export & import
 
@@ -88,6 +91,34 @@ On restore, your profile and full lesson history are merged in; you can also poi
 [web dashboard's Settings page](./web-ui.md#settings-settings). For the zip's internal format, see
 [Configuration & data](../reference/configuration.md#backup-strategy).
 
+## Sharing a lesson
+
+One lesson, three transports — the receiver never has to tell them apart:
+
+```bash
+devcoach share --last                 # the card + one devcoach:lesson:1:… line → paste anywhere
+devcoach share <id> --link            # https://ultimaphoenix.github.io/dev-coach/lesson#devcoach:lesson:1:…
+devcoach share <id> --file            # writes <id>.devcoach.md (YAML front matter + markdown)
+devcoach share <id> --with-context    # also project/branch/commit/task — never a local folder path
+devcoach share <id> --by "Ada" | --anonymous   # sender name (default: share_name → git user.name)
+```
+
+Receiving is one command, whatever you were given:
+
+```bash
+devcoach import                       # no argument: reads the clipboard
+devcoach import lesson.devcoach.md    # a file
+devcoach import "devcoach:lesson:1:…" # the code, or the whole copied card in quotes
+devcoach import https://…             # a share link, or any URL whose body is a shared lesson
+pbpaste | devcoach import -           # stdin
+```
+
+The lesson joins your log like your own (`devcoach lessons --imported` lists the shared ones): its
+topic counts as taught and `feedback` works as usual, but it never counts against `max_per_day` or the
+minimum gap. Importing the same share twice reports *Already in your log*. Only the lesson travels by
+default — context is opt-in with `--with-context`, and a local path never leaves your machine.
+`--by` is remembered as `share_name` the first time (change it with `devcoach set share_name`).
+
 ## Environment variables
 
 | Variable | Effect |
@@ -104,4 +135,6 @@ devcoach lessons --category docker --sort timestamp --order asc
 devcoach feedback 9f3a know
 devcoach set min_gap_minutes 120
 devcoach backup ~/devcoach-$(date +%F).zip
+devcoach share --last --link
+devcoach import
 ```

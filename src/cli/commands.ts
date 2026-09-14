@@ -1,11 +1,24 @@
+import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { createInterface } from "node:readline/promises";
+import { text as readStream } from "node:stream/consumers";
 import { Command } from "commander";
 import { scanClaudeHistory } from "../core/claude-history";
 import * as coach from "../core/coach";
 import * as db from "../core/db";
 import { detectStack, mergeStacks } from "../core/detect";
-import { detectGitContext } from "../core/git";
+import { detectGitContext, detectGitUserName } from "../core/git";
+import {
+  buildSharePayload,
+  encodeShareCode,
+  renderShareLink,
+  renderShareMarkdownFile,
+  renderShareText,
+  resolveSharedBy,
+  ShareInputError,
+  sharedLessonFilename,
+} from "../core/share";
+import { fetchSharedInput, isHttpUrl } from "../core/share-fetch";
 import { VERSION } from "../version";
 import { cmdDoctor, cmdInstall, skillHint } from "./install";
 import {
@@ -80,6 +93,7 @@ interface LessonsOpts {
   branch: string | null;
   commit: string | null;
   starred: boolean;
+  imported: boolean;
   feedback: string | null;
   level: string | null;
   dateFrom: string | null;
@@ -99,6 +113,7 @@ function cmdLessons(o: LessonsOpts): void {
       branch: o.branch,
       commit: o.commit,
       starred: o.starred ? true : null,
+      imported: o.imported ? true : null,
       feedback: o.feedback,
       date_from: o.dateFrom,
       date_to: o.dateTo,
@@ -120,6 +135,8 @@ function cmdLessons(o: LessonsOpts): void {
     { header: "Categories" },
   ];
   if (hasMeta) columns.push({ header: "Project" }, { header: "Branch" }, { header: "Commit" });
+  const hasShared = lessons.some((l) => l.imported);
+  if (hasShared) columns.push({ header: "Shared by" });
   const rows = lessons.map((l) => {
     const row = [
       l.starred ? c.yellow("★") : c.dim("·"),
@@ -136,6 +153,7 @@ function cmdLessons(o: LessonsOpts): void {
         l.commit_hash ? c.cyan(l.commit_hash.slice(0, 7)) : "",
       );
     }
+    if (hasShared) row.push(l.imported ? (l.shared_by ?? c.dim("anonymous")) : "");
     return row;
   });
   log(renderTable("Lessons", columns, rows));
@@ -157,6 +175,7 @@ function cmdLesson(id: string): void {
   log(
     `${c.dim("Star:")}        ${starLabel}   ${c.dim("Feedback:")} ${feedbackLabel(lesson.feedback)}`,
   );
+  if (lesson.imported) log(`${c.dim("Shared by:")}   ${lesson.shared_by ?? c.dim("anonymous")}`);
   if (lesson.task_context) log(`${c.dim("Context:")}     ${lesson.task_context}`);
   if (lesson.project || lesson.repository || lesson.branch || lesson.commit_hash || lesson.folder) {
     const parts: string[] = [];
@@ -245,6 +264,7 @@ function cmdSettings(): void {
         ["min_gap_minutes", `${s.min_gap_minutes} (${gapLabel})`],
         ["nudge_every", s.nudge_every === 0 ? "0 (off)" : String(s.nudge_every)],
         ["nudge_scope", s.nudge_scope],
+        ["share_name", s.share_name ?? c.dim("(unset → git user.name)")],
       ],
     ),
   );
@@ -294,7 +314,7 @@ function cmdStats(): void {
 }
 
 function cmdSet(key: string, value: string): void {
-  const validKeys = ["max_per_day", "min_gap_minutes", "nudge_every", "nudge_scope"];
+  const validKeys = ["max_per_day", "min_gap_minutes", "nudge_every", "nudge_scope", "share_name"];
   if (!validKeys.includes(key)) {
     log(c.red(`Unknown key '${key}'. Valid keys: ${validKeys.join(", ")}`));
     process.exit(1);
@@ -302,6 +322,16 @@ function cmdSet(key: string, value: string): void {
   if (key === "nudge_scope" && value !== "session" && value !== "global") {
     log(c.red(`Invalid nudge_scope '${value}'. Use: session | global`));
     process.exit(1);
+  }
+  if (key === "share_name") {
+    if (value.trim().length > db.SHARE_NAME_MAX) {
+      log(c.red(`share_name must be at most ${db.SHARE_NAME_MAX} characters.`));
+      process.exit(1);
+    }
+    const name = db.normalizeShareName(value);
+    db.withConnection((conn) => db.setSetting(conn, key, name));
+    log(name ? c.green(`Set share_name = ${name}`) : c.green("Cleared share_name"));
+    return;
   }
   if (key === "nudge_every") {
     const n = Number.parseInt(value, 10);
@@ -404,6 +434,150 @@ function cmdRestore(input: string): void {
   if (result.invalid) parts.push(`${c.red(String(result.invalid))} rejected (invalid)`);
   log(`${c.green("✓")} Lessons: ${parts.join(", ")}`);
   if (result.learning_state) log(`${c.green("✓")} Notebook restored`);
+}
+
+// ── Lesson sharing ───────────────────────────────────────────────────────────
+
+const note = (s: string): void => {
+  // Hints go to stderr so `devcoach share --link | devcoach import -` pipes stay clean.
+  console.error(c.dim(s));
+};
+
+interface ShareOpts {
+  last?: boolean;
+  link?: boolean;
+  file?: string | boolean;
+  withContext?: boolean;
+  by?: string;
+  anonymous?: boolean;
+}
+
+function cmdShare(id: string | undefined, o: ShareOpts): void {
+  if (o.by !== undefined && o.anonymous) {
+    log(c.red("Use either --by <name> or --anonymous, not both."));
+    process.exit(1);
+  }
+  if (!id && !o.last) {
+    log(c.red("Give a lesson id, or --last for the most recent one."));
+    process.exit(2);
+  }
+  const found = db.withConnection((conn) => {
+    const lesson = o.last
+      ? (db.getLessons(conn, { imported: false, page: 1, per_page: 1 })[0] ?? null)
+      : db.getLessonById(conn, id as string);
+    if (!lesson) return null;
+    const settings = db.getSettings(conn);
+    const sharedBy = resolveSharedBy({
+      explicit: o.by ?? null,
+      anonymous: o.anonymous,
+      setting: settings.share_name,
+      gitUserName: detectGitUserName(),
+    });
+    let remembered = false;
+    if (o.by?.trim() && !settings.share_name) {
+      db.setSetting(conn, "share_name", db.normalizeShareName(o.by));
+      remembered = true;
+    }
+    const payload = buildSharePayload(lesson, { includeContext: Boolean(o.withContext), sharedBy });
+    return { payload, remembered };
+  });
+  if (!found) {
+    log(c.red(o.last ? "No lessons to share yet." : `Lesson '${id}' not found.`));
+    process.exit(1);
+  }
+  const { payload, remembered } = found;
+  if (o.file !== undefined && o.file !== false) {
+    const path = typeof o.file === "string" ? o.file : sharedLessonFilename(payload);
+    writeFileSync(path, renderShareMarkdownFile(payload));
+    log(`${c.green("Saved:")} ${path}`);
+  } else if (o.link) {
+    log(renderShareLink(payload));
+  } else {
+    log(renderShareText(payload));
+    if (encodeShareCode(payload).length > 16_000) {
+      note("Long lesson — prefer --file for a friendlier hand-off.");
+    }
+  }
+  if (remembered)
+    note("(remembered as share_name — change it with: devcoach set share_name <name>)");
+  if (payload.shared_by === null) {
+    note("Shared anonymously (set a name with: devcoach set share_name <name>)");
+  }
+}
+
+function readClipboard(): string {
+  const candidates: [string, string[]][] =
+    process.platform === "darwin"
+      ? [["pbpaste", []]]
+      : process.platform === "win32"
+        ? [["powershell", ["-NoProfile", "-Command", "Get-Clipboard"]]]
+        : [
+            ["wl-paste", ["--no-newline"]],
+            ["xclip", ["-selection", "clipboard", "-o"]],
+            ["xsel", ["--clipboard", "--output"]],
+          ];
+  for (const [cmd, args] of candidates) {
+    try {
+      const out = execFileSync(cmd, args, {
+        encoding: "utf8",
+        timeout: 3000,
+        stdio: ["ignore", "pipe", "ignore"],
+      });
+      if (out.trim()) return out;
+    } catch {
+      // tool missing or empty clipboard — try the next one
+    }
+  }
+  throw new ShareInputError(
+    "Clipboard is empty or unavailable — pass the code, a link or a file, or pipe it: devcoach import -",
+  );
+}
+
+/** Whatever the user gave us: nothing (clipboard), "-" (stdin), a file, a URL, or the text itself. */
+async function readImportSource(source: string | undefined): Promise<string> {
+  if (source === undefined) return readClipboard();
+  if (source === "-") return readStream(process.stdin);
+  if (existsSync(source)) return readFileSync(source, "utf8");
+  // A share link carries the lesson in its fragment — decoded locally, never fetched.
+  if (isHttpUrl(source) && !source.includes("#devcoach:lesson:")) return fetchSharedInput(source);
+  return source;
+}
+
+async function cmdImport(source: string | undefined): Promise<void> {
+  try {
+    const raw = await readImportSource(source);
+    const result = db.withConnection((conn) => coach.importSharedInput(conn, raw));
+    if (result.kind === "lessons") {
+      const parts = [`${c.cyan(String(result.inserted))} imported`];
+      if (result.duplicated)
+        parts.push(`${c.yellow(String(result.duplicated))} duplicates skipped`);
+      if (result.invalid) parts.push(`${c.red(String(result.invalid))} rejected (invalid)`);
+      log(`${c.green("✓")} Lessons: ${parts.join(", ")}`);
+      return;
+    }
+    const lesson = result.lesson;
+    if (!lesson) {
+      log(c.red("Could not store the lesson."));
+      process.exit(1);
+    }
+    const who = lesson.shared_by ? `shared by ${lesson.shared_by}` : "shared anonymously";
+    if (result.duplicated) {
+      log(`${c.yellow("Already in your log")} as ${c.cyan(lesson.id)} (${who})`);
+    } else {
+      log(
+        `${c.green("✓ Imported")} ${c.bold(`"${lesson.title}"`)} (${who}) as ${c.cyan(lesson.id)} — topic ${c.cyan(lesson.topic_id)}`,
+      );
+    }
+    if (result.topic_tracked === false) {
+      note(
+        `Topic '${lesson.topic_id}' is not in your knowledge map — track it with: devcoach knowledge-add ${lesson.topic_id}`,
+      );
+    }
+  } catch (err) {
+    if (!(err instanceof ShareInputError)) throw err;
+    log(c.red(err.message));
+    process.exit(1);
+  }
 }
 
 // ── Setup wizard (interactive) ───────────────────────────────────────────────
@@ -571,6 +745,7 @@ function printWelcome(): void {
     ["lessons / lesson", "List past lessons / show one in detail"],
     ["star / unstar / delete", "Manage a lesson"],
     ["feedback <id>", "Record know / dont_know feedback"],
+    ["share / import", "Hand a lesson to a teammate / add a shared lesson to your log"],
     ["knowledge-add / -remove", "Add / remove a topic"],
     ["group-add / -remove / -assign", "Manage knowledge groups"],
     ["backup / restore", "Export / import a full backup zip"],
@@ -599,6 +774,7 @@ interface LessonsCliOpts {
   branch?: string;
   commit?: string;
   starred?: boolean;
+  imported?: boolean;
   feedback?: string;
   level?: string;
   dateFrom?: string;
@@ -643,6 +819,7 @@ function buildProgram(): Command {
     .option("--branch <branch>", "Filter by branch (fuzzy)")
     .option("--commit <commit>", "Filter by commit hash prefix (fuzzy)")
     .option("--starred", "Show only starred lessons")
+    .option("--imported", "Show only lessons shared with you")
     .option("--feedback <feedback>", "know | dont_know | none")
     .option("--level <level>", "junior | mid | senior")
     .option("--date-from <date>", "Show lessons on or after this date (YYYY-MM-DD[THH:MM])")
@@ -658,6 +835,7 @@ function buildProgram(): Command {
         branch: str(opts.branch),
         commit: str(opts.commit),
         starred: Boolean(opts.starred),
+        imported: Boolean(opts.imported),
         feedback: str(opts.feedback),
         level: str(opts.level),
         dateFrom: str(opts.dateFrom),
@@ -698,6 +876,27 @@ function buildProgram(): Command {
     .argument("<value>", "know | dont_know | clear")
     .action((id: string, value: string) => cmdFeedback(id, value));
 
+  program
+    .command("share")
+    .description("Share a lesson: copyable text (default), --link, or a .devcoach.md file")
+    .argument("[id]", "Lesson ID (or use --last)")
+    .option("--last", "Share the most recent lesson")
+    .option("--link", "Print the share link only")
+    .option("--file [path]", "Write a .devcoach.md file (default: <lesson-id>.devcoach.md)")
+    .option("--with-context", "Include project/branch/commit/task context (off by default)")
+    .option("--by <name>", "Sender name (remembered as share_name when unset)")
+    .option("--anonymous", "Share without a sender name")
+    .action((id: string | undefined, opts: ShareOpts) => cmdShare(id, opts));
+
+  program
+    .command("import")
+    .description(
+      "Import a shared lesson: a devcoach:lesson code, a share link, a URL, a .devcoach.md or " +
+        "lessons .json file, - for stdin — or the clipboard when omitted",
+    )
+    .argument("[source]", "Code, link, URL, file path, or - (stdin); omit to read the clipboard")
+    .action((source: string | undefined) => cmdImport(source));
+
   program.command("settings").description("Show current settings").action(cmdSettings);
 
   program
@@ -707,7 +906,9 @@ function buildProgram(): Command {
 
   program
     .command("set")
-    .description("Update a setting (max_per_day | min_gap_minutes)")
+    .description(
+      "Update a setting (max_per_day | min_gap_minutes | nudge_every | nudge_scope | share_name)",
+    )
     .argument("<key>", "Setting key")
     .argument("<value>", "New value")
     .action((key: string, value: string) => cmdSet(key, value));

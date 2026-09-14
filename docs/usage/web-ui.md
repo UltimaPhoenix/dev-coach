@@ -88,15 +88,26 @@ current filters."
 
 **Sort:** click the Date, Topic, Title, Level or Feedback column header. Ascending or descending.
 
-**Table columns:** ★, Date, Topic, Title, Level, Categories, Feedback — the feedback cell shows
-`✓ Known` / `✗ Unknown` (or nothing yet).
+**Table columns:** ★, Date, Topic, Title, Level, Categories, Feedback, ↗ — the feedback cell shows
+`✓ Known` / `✗ Unknown` (or nothing yet); `↗` opens the lesson with its Share popover.
 
 **Pagination:** 25 per page.
 
 **Actions per row:**
 - `★` — toggle starred
+- `↗` — share this lesson (opens the detail page with the Share popover)
 - Click a level pill or category chip — filter the table by it
 - Click anywhere else on the row — open the detail page (feedback is recorded there)
+
+**＋ Import** (toolbar, right) — add a lesson someone shared with you: paste the code, the link, a
+URL, or the whole copied card into the box, pick a `.devcoach.md` file, or simply **drop the file
+anywhere on the page**. See [Sharing a lesson](#sharing-a-lesson).
+
+<ThemedShot
+  alt="Import a shared lesson"
+  light={require("../screenshots/lessons-import-light.png").default}
+  dark={require("../screenshots/lessons-import-dark.png").default}
+/>
 
 <ThemedShot
   alt="Lessons"
@@ -110,8 +121,9 @@ current filters."
 
 Full lesson content laid out in reading order:
 
-- **Title row** — `← Back to lessons`, star toggle, title, level pill (Junior / Mid / Senior)
-- **Metadata row** — relative date with tooltip, topic ID, category chips, feedback badge + Clear
+- **Title row** — `← Back to lessons`, star toggle, title, level pill (Junior / Mid / Senior), **↗ Share**
+- **Metadata row** — relative date with tooltip, topic ID, category chips, feedback badge + Clear;
+  a lesson someone shared with you also shows `🤝 shared by <name>`
 - **TL;DR callout** — one-sentence summary in a highlighted indigo box, always visible above the body
 - **Lesson body** — full markdown content with syntax-highlighted code blocks
 - **Task context** — a `Context:` line with the coding task that triggered the lesson (when available)
@@ -167,17 +179,64 @@ Full lesson content laid out in reading order:
 
 ---
 
+### Sharing a lesson
+
+A lesson that landed for you is worth handing to a teammate. **↗ Share** on a lesson (or `↗` in the
+table) opens a popover with your name (prefilled from `share_name`, then git), an *Include where it
+happened* checkbox (project, branch, commit and task context — **off by default**, and a local folder
+path is never exported), and three ways to hand it over — all carrying the same lesson:
+
+| Transport | What you get | Best for |
+|---|---|---|
+| **Copy text** | The lesson card as markdown, then one `devcoach:lesson:1:…` line | Chat, issues, email — the receiver pastes the whole thing anywhere devcoach accepts input |
+| **Copy link** | `https://ultimaphoenix.github.io/dev-coach/lesson#devcoach:lesson:1:…` | Messaging: the receiver sees the lesson in the browser and imports it with one click |
+| **Download .md** | `<lesson-id>.devcoach.md` — YAML front matter + the markdown body | Files, pull requests, wikis — renders on GitHub, opens in any editor |
+
+The link is **server-less**: the lesson travels in the URL fragment, which the browser never sends to
+the site. The page decodes it locally, renders it, checks whether your dashboard is running
+(`GET /ping` on `127.0.0.1`, best-effort) and offers **Import into my devcoach**.
+
+<ThemedShot
+  alt="Share popover"
+  light={require("../screenshots/lesson-share-light.png").default}
+  dark={require("../screenshots/lesson-share-dark.png").default}
+/>
+
+**Receiving** — every way in leads to the same place:
+
+- **＋ Import** on the Lessons page: paste the code, the link, a URL whose body is a shared lesson
+  (a raw gist, a file in a repo), the whole copied card, or a lessons JSON export; pick a
+  `.devcoach.md`; or **drop the file anywhere** on the page.
+- The share link's **Import** button opens `/lessons/import?code=…` on your dashboard — a preview
+  with a single **Add to my lessons** button. **Nothing is saved until you click.**
+- The [CLI](./cli.md#sharing-a-lesson) (`devcoach import`, no argument = clipboard) and your
+  [agent](./coaching.md#sharing-a-lesson-with-a-teammate) (`import_lesson`) do the same.
+
+<ThemedShot
+  alt="Shared lesson preview"
+  light={require("../screenshots/lesson-import-preview-light.png").default}
+  dark={require("../screenshots/lesson-import-preview-dark.png").default}
+/>
+
+An imported lesson joins your log like one of your own — its topic counts as taught, ✓/✗ feedback
+calibrates your profile as usual — but it **never counts against your daily limit** or the minimum gap,
+and it never resets the pacing. Importing the same share twice is reported as *already in your log*.
+
+---
+
 ### Settings (`/settings`)
 
 Three panels:
 
-**Coaching** — the five settings, applied with *Save settings*:
+**Coaching** — the six settings, applied with *Save settings*:
 - **Max lessons per day** — maximum lessons in a 24-hour window (1–20; `max_per_day`)
 - **Minimum gap between lessons** — a dropdown: No cooldown, 15 minutes, 30 minutes, 1 hour,
   1 hour 30 min, 2 hours, 3 hours, 4 hours, 6 hours, 8 hours, 12 hours, 24 hours (`min_gap_minutes`)
 - **Interactions between lessons** — how many interactions pass before a lesson is cued (0–1000;
   0 = every turn; `nudge_every`)
 - **Count interactions** — *Per chat session* or *Globally* (`nudge_scope`)
+- **Your name (for sharing)** — the sender name proposed when you share a lesson; empty means your
+  git `user.name` (`share_name`)
 - **UI theme** — 🌓 System / ☀️ Light / 🌙 Dark (`ui_theme`)
 
 **Backup & Restore**:
@@ -215,6 +274,8 @@ The dashboard is where you actively shape your coaching:
 4. **Star lessons to revisit** — use the `★` button to mark lessons worth reading again. You can filter by "starred only" on the Lessons page.
 
 5. **Jump to context** — click repository, commit, or folder links on lesson details to immediately review the code that triggered the lesson. This helps you understand *why* the lesson was taught and *where* to apply it.
+
+6. **Share what landed** — hand a lesson to a teammate with **↗ Share**, and import theirs with **＋ Import**. Shared lessons enrich your log without touching your pacing.
 
 The knowledge map, feedback history, and git context together create a feedback loop: your edits guide lesson selection, lesson feedback adjusts your confidence, and the ability to jump back to context lets you learn in the exact place it happened.
 

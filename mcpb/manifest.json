@@ -53,6 +53,14 @@
       "description": "Current knowledge map"
     },
     {
+      "name": "share_lesson",
+      "description": "Share a lesson as copyable text, a link or a .devcoach.md file"
+    },
+    {
+      "name": "import_lesson",
+      "description": "Import a lesson someone shared into the coaching log"
+    },
+    {
       "name": "update_knowledge",
       "description": "Adjust confidence for a topic"
     },

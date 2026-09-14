@@ -1,11 +1,18 @@
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { Readable } from "node:stream";
 import { describe, expect, it, vi } from "vitest";
 import { parseHookPayload, runCli } from "../src/cli/commands";
 import * as db from "../src/core/db";
 import { parseLesson } from "../src/core/models";
+import { fetchSharedInput } from "../src/core/share-fetch";
 import { VERSION } from "../src/version";
+
+vi.mock("../src/core/share-fetch", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../src/core/share-fetch")>();
+  return { ...actual, fetchSharedInput: vi.fn(actual.fetchSharedInput) };
+});
 
 // Drop a fake executable on a throwaway PATH dir so install can exercise the `claude` CLI branch.
 function fakeBin(name: string, script: string): string {
@@ -739,5 +746,154 @@ describe("cli rich rendering branches", () => {
     } finally {
       process.env.PATH = savedPath;
     }
+  });
+});
+
+describe("cli share / import", () => {
+  const seed = (id: string) =>
+    db.withConnection((c) =>
+      db.insertLesson(
+        c,
+        parseLesson({
+          id,
+          timestamp: "2026-09-01T10:00:00Z",
+          topic_id: "docker",
+          categories: ["docker"],
+          title: `Layer cache ${id}`,
+          level: "mid",
+          summary: "Order Dockerfile steps from stable to volatile.",
+          body: "Body text.",
+          folder: "/Users/someone/private",
+          repository_platform: "local",
+          repository: "/Users/someone/private",
+        }),
+      ),
+    );
+
+  it("share prints the card + code, --link the link, --file a .devcoach.md; errors are friendly", async () => {
+    seed("s1");
+    const text = await run(["share", "s1", "--anonymous"]);
+    expect(text.out).toContain("🎓 devcoach");
+    expect(text.out).toContain("Layer cache s1");
+    expect(text.out).toMatch(/devcoach:lesson:1:[A-Za-z0-9_-]+/);
+    expect(text.out).toContain("Shared anonymously");
+    expect(text.out).not.toContain("/Users/someone"); // local paths never leave
+    const link = await run(["share", "--last", "--anonymous", "--link"]);
+    expect(link.out.trim()).toMatch(
+      /^https:\/\/ultimaphoenix\.github\.io\/dev-coach\/lesson#devcoach:lesson:1:/,
+    );
+    const dir = mkdtempSync(join(tmpdir(), "dc-share-"));
+    const file = join(dir, "l.devcoach.md");
+    expect(
+      (await run(["share", "s1", "--file", file, "--with-context", "--by", "Ada"])).out,
+    ).toContain("Saved:");
+    expect(readFileSync(file, "utf8")).toContain('shared_by: "Ada"');
+    expect(readFileSync(file, "utf8")).not.toContain("/Users/someone");
+    expect((await run(["share", "nope"])).code).toBe(1);
+    expect((await run(["share"])).code).toBe(2);
+    expect((await run(["share", "s1", "--by", "X", "--anonymous"])).code).toBe(1);
+  });
+
+  it("--by is remembered as share_name once; settings/set expose it", async () => {
+    seed("s2");
+    expect(db.withConnection((c) => db.getSettings(c).share_name)).toBe("Ada"); // from the --file share above
+    expect((await run(["share", "s2", "--by", "Bob"])).out).toContain("Shared by Bob");
+    expect(db.withConnection((c) => db.getSettings(c).share_name)).toBe("Ada"); // not overwritten
+    expect((await run(["settings"])).out).toContain("Ada");
+    expect((await run(["set", "share_name", "Carol"])).out).toContain("Set share_name = Carol");
+    expect((await run(["set", "share_name", ""])).out).toContain("Cleared");
+    expect((await run(["set", "share_name", "x".repeat(81)])).code).toBe(1);
+    // no setting left → falls back to git user.name, or anonymous when git has none
+    expect((await run(["share", "s2"])).out).toMatch(
+      /Shared (by [^\n]+ with devcoach|anonymously)/,
+    );
+  });
+
+  it("import takes a code, a file, stdin, a URL — duplicates and junk are reported, not thrown", async () => {
+    seed("s3");
+    const code =
+      (await run(["share", "s3", "--anonymous"])).out.match(
+        /devcoach:lesson:1:[A-Za-z0-9_-]+/,
+      )?.[0] ?? "";
+    db.withConnection((c) => c.exec("DELETE FROM lessons WHERE id = 's3'"));
+    const first = await run(["import", code]);
+    expect(first.out).toContain('✓ Imported "Layer cache s3"');
+    expect(first.out).toContain("shared anonymously");
+    expect(first.out).toContain("not in your knowledge map");
+    expect((await run(["import", code])).out).toContain("Already in your log");
+    expect((await run(["lessons", "--imported"])).out).toContain("Layer cache s3");
+    expect((await run(["lesson", "s3"])).out).toContain("Shared by:");
+    // file
+    seed("s4");
+    const dir = mkdtempSync(join(tmpdir(), "dc-import-"));
+    const file = join(dir, "l.devcoach.md");
+    await run(["share", "s4", "--file", file, "--by", "Ada"]);
+    db.withConnection((c) => c.exec("DELETE FROM lessons WHERE id = 's4'"));
+    expect((await run(["import", file])).out).toContain("shared by Ada");
+    // stdin
+    seed("s5");
+    const stdinText = (await run(["share", "s5", "--anonymous"])).out;
+    db.withConnection((c) => c.exec("DELETE FROM lessons WHERE id = 's5'"));
+    const stdinSpy = vi
+      .spyOn(process, "stdin", "get")
+      .mockReturnValue(Readable.from([stdinText]) as never);
+    try {
+      expect((await run(["import", "-"])).out).toContain('✓ Imported "Layer cache s5"');
+    } finally {
+      stdinSpy.mockRestore();
+    }
+    // URL (fetched) and share link (decoded locally, never fetched)
+    seed("s6");
+    const link = (await run(["share", "s6", "--anonymous", "--link"])).out.trim();
+    db.withConnection((c) => c.exec("DELETE FROM lessons WHERE id = 's6'"));
+    const fetchSpy = vi.mocked(fetchSharedInput).mockImplementation(async () => {
+      throw new Error("must not fetch a share link");
+    });
+    try {
+      expect((await run(["import", link])).out).toContain('✓ Imported "Layer cache s6"');
+      expect(fetchSpy).not.toHaveBeenCalled();
+      fetchSpy.mockResolvedValueOnce(stdinText);
+      expect((await run(["import", "https://example.test/raw"])).out).toContain(
+        "Already in your log",
+      );
+    } finally {
+      fetchSpy.mockReset();
+    }
+    // legacy lessons array + junk
+    expect(
+      (
+        await run([
+          "import",
+          JSON.stringify([
+            {
+              id: "legacy-1",
+              timestamp: "2026-01-01T00:00:00Z",
+              topic_id: "go",
+              categories: [],
+              title: "t",
+              level: "mid",
+              summary: "s",
+            },
+          ]),
+        ])
+      ).out,
+    ).toContain("1 imported");
+    const junk = await run(["import", "/no/such/file"]);
+    expect(junk.code).toBe(1);
+    expect(junk.out).toContain("Not a devcoach lesson");
+    expect(junk.out).not.toContain("    at ");
+  });
+
+  it("import with no argument reads the clipboard, and says so when there is none", async () => {
+    const path = process.env.PATH;
+    process.env.PATH = ""; // no pbpaste/xclip reachable → friendly error, no spawn of anything real
+    try {
+      const r = await run(["import"]);
+      expect(r.code).toBe(1);
+      expect(r.out).toContain("Clipboard is empty or unavailable");
+    } finally {
+      process.env.PATH = path;
+    }
+    expect((await run([])).out).toContain("share / import");
   });
 });

@@ -50,10 +50,15 @@ function freshenFixture(zipPath, outDir) {
   return out;
 }
 
+// Lesson-sharing pages: the share popover open on a lesson, the import box open on the list, and
+// the read-only preview a share link lands on (its code is computed from the fixture at capture time).
+const SHARE_LESSON_ID = "lesson-docker-layer-cache-001";
 const PAGES = [
   ["knowledge-map", "/"],
   ["lessons", "/lessons"],
+  ["lessons-import", "/lessons?import=1"],
   ["settings", "/settings"],
+  ["lesson-share", `/lessons/${SHARE_LESSON_ID}?share=1`],
   ["lesson-docker-layer-cache", "/lessons/lesson-docker-layer-cache-001"],
   ["lesson-postgresql-explain-analyze", "/lessons/lesson-postgresql-explain-analyze-001"],
   ["lesson-git-interactive-rebase", "/lessons/lesson-git-interactive-rebase-001"],
@@ -81,19 +86,29 @@ async function main() {
 
   console.log(`Restoring demo data from ${fixture} (timestamps shifted to now)…`);
   execFileSync("node", [bin, "restore", freshenFixture(fixture, home)], { env, stdio: "inherit" });
+  // A stable sender name for the share screenshots (the fixture keeps the product default: empty).
+  execFileSync("node", [bin, "set", "share_name", "Alex"], { env, stdio: "ignore" });
 
   console.log(`Starting devcoach UI on ${BASE}…`);
   const server = spawn("node", [bin, "ui", "--port", String(PORT)], { env, stdio: "ignore" });
 
   try {
     await waitForServer(BASE);
+    const shareText = await (
+      await fetch(`${BASE}/lessons/${SHARE_LESSON_ID}/share?format=text`)
+    ).text();
+    const shareCode = shareText.trim().split("\n").at(-1);
+    const pages = [
+      ...PAGES,
+      ["lesson-import-preview", `/lessons/import?code=${encodeURIComponent(shareCode)}`],
+    ];
     const { chromium } = await import("playwright");
     mkdirSync(outDir, { recursive: true });
     const browser = await chromium.launch();
     for (const scheme of ["light", "dark"]) {
       const ctx = await browser.newContext({ viewport: VIEWPORT, colorScheme: scheme });
       const page = await ctx.newPage();
-      for (const [name, path] of PAGES) {
+      for (const [name, path] of pages) {
         await page.goto(`${BASE}${path}`, { waitUntil: "networkidle" });
         const out = join(outDir, `${name}-${scheme}.png`);
         await page.screenshot({ path: out, fullPage: true });

@@ -3,7 +3,14 @@ import { join } from "node:path";
 import { Client, InMemoryTransport } from "@modelcontextprotocol/client";
 import { describe, expect, it, vi } from "vitest";
 import * as db from "../src/core/db";
+import { ShareInputError } from "../src/core/share";
+import { fetchSharedInput } from "../src/core/share-fetch";
 import { createServer } from "../src/mcp/server";
+
+vi.mock("../src/core/share-fetch", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../src/core/share-fetch")>();
+  return { ...actual, fetchSharedInput: vi.fn(actual.fetchSharedInput) };
+});
 
 async function connect() {
   const [ct, st] = InMemoryTransport.createLinkedPair();
@@ -16,10 +23,10 @@ async function connect() {
 const text = (r: any): string => r.content[0].text;
 
 describe("mcp server", () => {
-  it("lists 18 tools, 10 resources + 1 template, 1 prompt", async () => {
+  it("lists 20 tools, 10 resources + 1 template, 1 prompt", async () => {
     const { client, server } = await connect();
     const tools = (await client.listTools()).tools;
-    expect(tools).toHaveLength(18);
+    expect(tools).toHaveLength(20);
     const names = tools.map((t: any) => t.name);
     expect(names).toContain("preview_deep_scan");
     // State reads are tools: tool names resolve in every client, resource reads need the
@@ -368,6 +375,8 @@ describe("mcp server error paths", () => {
     ["add_group", { name: "G" }],
     ["remove_group", { name: "G" }],
     ["update_settings", { key: "max_per_day", value: "5" }],
+    ["share_lesson", { lesson_id: "x" }],
+    ["import_lesson", { payload: "devcoach:lesson:1:eJw" }],
   ];
 
   it("DB-backed tools return isError when the DB throws", async () => {
@@ -438,6 +447,190 @@ describe("mcp server error paths", () => {
       expect(parsed === null || typeof parsed === "object", uri).toBe(true);
     }
     spy.mockRestore();
+    await client.close();
+    await server.close();
+  });
+});
+
+describe("mcp lesson sharing", () => {
+  async function seeded() {
+    const { client, server } = await connect();
+    const log: any = await client.callTool({
+      name: "log_lesson",
+      arguments: {
+        id: "share-me",
+        topic_id: "sqlite",
+        categories: ["sqlite", "node"],
+        title: "WAL mode explained",
+        level: "mid",
+        summary: "Readers never block writers.",
+        body: "Body text.\n\n💡 *Senior tip:* enable it.",
+        project: "proj",
+        folder: "/Users/me/secret/proj",
+        repository: "local",
+        repository_platform: "local",
+      },
+    });
+    expect(log.isError).toBeFalsy();
+    return { client, server };
+  }
+
+  it("share_lesson renders text / link / file, never exports the folder", async () => {
+    const { client, server } = await seeded();
+    const asText: any = await client.callTool({
+      name: "share_lesson",
+      arguments: { lesson_id: "share-me" },
+    });
+    expect(asText.isError).toBeFalsy();
+    const sc = asText.structuredContent;
+    expect(sc.transport).toBe("text");
+    expect(sc.code).toMatch(/^devcoach:lesson:1:[A-Za-z0-9_-]+$/);
+    expect(sc.text).toContain("WAL mode explained");
+    expect(sc.text.trim().endsWith(sc.code)).toBe(true);
+    expect(sc.link).toBeNull();
+    expect(sc.markdown).toBeNull();
+    expect(sc.include_context).toBe(false);
+    expect(sc.reply_check).toContain("fenced code block");
+
+    const link: any = await client.callTool({
+      name: "share_lesson",
+      arguments: { lesson_id: "share-me", transport: "link", shared_by: "Phoenix" },
+    });
+    expect(link.structuredContent.link).toBe(
+      `https://ultimaphoenix.github.io/dev-coach/lesson#${link.structuredContent.code}`,
+    );
+    expect(link.structuredContent.shared_by).toBe("Phoenix");
+    expect(link.structuredContent.text).toBeNull();
+
+    const file: any = await client.callTool({
+      name: "share_lesson",
+      arguments: { lesson_id: "share-me", transport: "file", include_context: true, shared_by: "" },
+    });
+    expect(file.structuredContent.filename).toBe("share-me.devcoach.md");
+    expect(file.structuredContent.markdown).toContain("format: devcoach.lesson");
+    expect(file.structuredContent.markdown).toContain("project:");
+    expect(file.structuredContent.markdown).not.toContain("secret");
+    expect(file.structuredContent.markdown).not.toContain("folder");
+    expect(file.structuredContent.shared_by).toBeNull();
+    expect(file.structuredContent.reply_check).toContain("filename");
+
+    const missing: any = await client.callTool({
+      name: "share_lesson",
+      arguments: { lesson_id: "nope" },
+    });
+    expect(missing.isError).toBe(true);
+    expect(text(missing)).toContain("not found");
+    await client.close();
+    await server.close();
+  });
+
+  it("import_lesson stores a shared lesson once, flags it imported, rejects junk", async () => {
+    const { client, server } = await seeded();
+    const shared: any = await client.callTool({
+      name: "share_lesson",
+      arguments: { lesson_id: "share-me", shared_by: "Teammate" },
+    });
+    await client.callTool({ name: "delete_lesson", arguments: { lesson_id: "share-me" } });
+
+    const imported: any = await client.callTool({
+      name: "import_lesson",
+      arguments: { payload: shared.structuredContent.text },
+    });
+    expect(imported.isError).toBeFalsy();
+    expect(imported.structuredContent.kind).toBe("shared");
+    expect(imported.structuredContent.inserted).toBe(1);
+    expect(imported.structuredContent.lesson.id).toBe("share-me");
+    expect(imported.structuredContent.lesson.imported).toBe(true);
+    expect(imported.structuredContent.lesson.shared_by).toBe("Teammate");
+    expect(imported.structuredContent.topic_tracked).toBe(false);
+    expect(imported.structuredContent.reply_check).toContain("daily limit");
+
+    const again: any = await client.callTool({
+      name: "import_lesson",
+      arguments: {
+        payload: `https://ultimaphoenix.github.io/dev-coach/lesson#${shared.structuredContent.code}`,
+      },
+    });
+    expect(again.isError).toBeFalsy();
+    expect(again.structuredContent.duplicated).toBe(1);
+    expect(again.structuredContent.inserted).toBe(0);
+
+    const own: any = await client.callTool({ name: "get_lessons", arguments: { imported: false } });
+    expect(JSON.parse(text(own)).map((l: any) => l.id)).not.toContain("share-me");
+    const theirs: any = await client.callTool({
+      name: "get_lessons",
+      arguments: { imported: true },
+    });
+    expect(JSON.parse(text(theirs)).map((l: any) => l.id)).toEqual(["share-me"]);
+
+    const junk: any = await client.callTool({
+      name: "import_lesson",
+      arguments: { payload: "hello" },
+    });
+    expect(junk.isError).toBe(true);
+    expect(text(junk)).toContain("Not a devcoach lesson");
+    await client.close();
+    await server.close();
+  });
+
+  it("import_lesson fetches a URL and surfaces fetch failures", async () => {
+    const { client, server } = await seeded();
+    const shared: any = await client.callTool({
+      name: "share_lesson",
+      arguments: { lesson_id: "share-me" },
+    });
+    await client.callTool({ name: "delete_lesson", arguments: { lesson_id: "share-me" } });
+    const fetchSpy = vi
+      .mocked(fetchSharedInput)
+      .mockResolvedValueOnce(shared.structuredContent.code)
+      .mockRejectedValueOnce(
+        new ShareInputError("The URL answered 404 — nothing to import there."),
+      );
+    try {
+      const ok: any = await client.callTool({
+        name: "import_lesson",
+        arguments: { payload: "https://gist.githubusercontent.com/x/raw/lesson.txt" },
+      });
+      expect(ok.isError).toBeFalsy();
+      expect(ok.structuredContent.inserted).toBe(1);
+      const gone: any = await client.callTool({
+        name: "import_lesson",
+        arguments: { payload: "https://example.com/missing" },
+      });
+      expect(gone.isError).toBe(true);
+      expect(text(gone)).toContain("404");
+      // a prompt-injected loopback / private URL is refused by the real guard before any request
+      const local: any = await client.callTool({
+        name: "import_lesson",
+        arguments: { payload: "http://127.0.0.1:7860/settings" },
+      });
+      expect(local.isError).toBe(true);
+      expect(text(local)).toContain("Only public");
+    } finally {
+      fetchSpy.mockReset();
+    }
+    await client.close();
+    await server.close();
+  });
+
+  it("update_settings accepts share_name (trimmed, ≤ 80, empty clears)", async () => {
+    const { client, server } = await connect();
+    const set: any = await client.callTool({
+      name: "update_settings",
+      arguments: { key: "share_name", value: "  Phoenix  " },
+    });
+    expect(set.isError).toBeFalsy();
+    expect(set.structuredContent.share_name).toBe("Phoenix");
+    const tooLong: any = await client.callTool({
+      name: "update_settings",
+      arguments: { key: "share_name", value: "x".repeat(81) },
+    });
+    expect(tooLong.isError).toBe(true);
+    const cleared: any = await client.callTool({
+      name: "update_settings",
+      arguments: { key: "share_name", value: "" },
+    });
+    expect(cleared.structuredContent.share_name).toBeNull();
     await client.close();
     await server.close();
   });

@@ -30,6 +30,22 @@ local-only constraint is the whole point. On claude.ai you can still use the
 Lessons can include snippets of your project context, so treat backups like any other sensitive working
 file and store them somewhere you trust. See [Backup, export & import](../usage/cli.md#backup-export--import).
 
+## Sharing is explicit
+
+[Sharing a lesson](../usage/web-ui.md#sharing-a-lesson) is the only way a lesson leaves your machine,
+and it only happens when you ask for it:
+
+- **Only the lesson travels by default** — title, summary, body, topic, categories and level. Project,
+  branch, commit and task context are included only with an explicit *Include where it happened* /
+  `--with-context` / `include_context`; a **local folder path is never exported**, and a repository
+  name only when it points at a remote host (GitHub, GitLab, Bitbucket).
+- **The share link is server-less** — the lesson is encoded in the URL fragment, which browsers never
+  send to the site; the docs page decodes it locally. devcoach still makes no network calls of its own:
+  the only outbound request is `devcoach import <url>` fetching a URL *you* pasted.
+- **Your name is opt-in** — proposed from `share_name` or git `user.name`, editable, and
+  "anonymous" is always available.
+- **Nothing is saved on the receiving side until you click** *Add to my lessons* (or run the import).
+
 ## What devcoach reads
 
 During automatic onboarding devcoach reads a small set of **metadata** sources, locally and read-only,

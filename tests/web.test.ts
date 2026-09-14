@@ -1,7 +1,13 @@
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import * as db from "../src/core/db";
 import { parseLesson } from "../src/core/models";
+import { fetchSharedInput } from "../src/core/share-fetch";
 import { createApp } from "../src/web/app";
+
+vi.mock("../src/core/share-fetch", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../src/core/share-fetch")>();
+  return { ...actual, fetchSharedInput: vi.fn(actual.fetchSharedInput) };
+});
 
 const app = createApp();
 const get = (path: string) => app.fetch(new Request(`http://localhost${path}`));
@@ -328,5 +334,306 @@ describe("web view branches — exhaustive", () => {
     const html = await (await get("/")).text();
     // rateLimit.allowed === false → yellow reason branch instead of "Available now"
     expect(html).not.toContain("Available now");
+  });
+});
+
+describe("web lesson sharing", () => {
+  const postForm = (
+    path: string,
+    fields: Record<string, string>,
+    headers: Record<string, string> = {},
+  ) =>
+    app.fetch(
+      new Request(`http://localhost${path}`, {
+        method: "POST",
+        body: new URLSearchParams(fields),
+        headers: { "content-type": "application/x-www-form-urlencoded", ...headers },
+      }),
+    );
+  const seed = (id: string, title: string) =>
+    db.withConnection((c) =>
+      db.insertLesson(
+        c,
+        parseLesson({
+          id,
+          timestamp: "2026-06-16T10:00:00Z",
+          topic_id: "sqlite",
+          categories: ["sqlite"],
+          title,
+          level: "mid",
+          summary: "Readers never block writers.",
+          body: "Body **bold**.",
+          project: "proj",
+          folder: "/Users/me/secret",
+          repository: "local",
+          repository_platform: "local",
+        }),
+      ),
+    );
+
+  it("share popover: fragment, text, link and .md download; folder never leaks", async () => {
+    seed("sh1", "WAL mode");
+    const page = await get("/lessons/sh1?share=1");
+    const html = await page.text();
+    expect(html).toContain('x-data="{ open: true }"');
+    expect(html).toContain('id="share-payloads"');
+    expect(html).toContain("devcoach:lesson:1:");
+    expect(html).toContain("share.js");
+
+    const frag = await get("/lessons/sh1/share");
+    expect(frag.status).toBe(200);
+    expect(await frag.text()).toContain("Copy text");
+
+    const text = await (await get("/lessons/sh1/share?format=text")).text();
+    expect(text).toContain("WAL mode");
+    expect(text.trim().split("\n").at(-1)).toMatch(/^devcoach:lesson:1:/);
+    const link = await (await get("/lessons/sh1/share?format=link")).text();
+    expect(link).toMatch(
+      /^https:\/\/ultimaphoenix\.github\.io\/dev-coach\/lesson#devcoach:lesson:1:/,
+    );
+
+    const md = await get("/lessons/sh1/share?format=md&name=Phoenix&include_context=1");
+    expect(md.headers.get("content-disposition")).toBe('attachment; filename="sh1.devcoach.md"');
+    const body = await md.text();
+    expect(body).toContain("format: devcoach.lesson");
+    expect(body).toContain('shared_by: "Phoenix"');
+    expect(body).toContain("project:");
+    expect(body).not.toContain("secret");
+    // a GET renders with the name it carries but never persists it (only the popover POST does)
+    expect(db.withConnection((c) => db.getSettings(c).share_name)).toBeNull();
+
+    expect((await get("/lessons/nope/share")).status).toBe(404);
+  });
+
+  it("POST share re-renders the fragment; the name is persisted only on the change event (persist=1)", async () => {
+    // a debounced keystroke re-renders but does not touch the setting
+    const typing = await postForm("/lessons/sh1/share", { name: "Ad", include_context: "1" });
+    expect(typing.status).toBe(200);
+    expect(await typing.text()).toContain("Ad");
+    expect(db.withConnection((c) => db.getSettings(c).share_name)).toBeNull();
+    const r = await postForm("/lessons/sh1/share", {
+      name: "  Ada ",
+      include_context: "1",
+      persist: "1",
+    });
+    expect(r.status).toBe(200);
+    const html = await r.text();
+    expect(html).toContain("Ada");
+    expect(html).toContain("includes project, branch and commit");
+    expect(db.withConnection((c) => db.getSettings(c).share_name)).toBe("Ada");
+    const anon = await (await postForm("/lessons/sh1/share", { name: "", persist: "1" })).text();
+    expect(anon).toContain("Shared anonymously");
+    expect(db.withConnection((c) => db.getSettings(c).share_name)).toBeNull();
+    // every writer clamps to SHARE_NAME_MAX
+    await postForm("/lessons/sh1/share", { name: "x".repeat(200), persist: "1" });
+    expect(db.withConnection((c) => db.getSettings(c).share_name)).toHaveLength(db.SHARE_NAME_MAX);
+    await post("/settings", {
+      max_per_day: "2",
+      min_gap_minutes: "240",
+      share_name: "y".repeat(200),
+    });
+    expect(db.withConnection((c) => db.getSettings(c).share_name)).toHaveLength(db.SHARE_NAME_MAX);
+    await post("/settings", { max_per_day: "2", min_gap_minutes: "240", share_name: "" });
+  });
+
+  it("share endpoint refuses cross-site requests, so another site cannot rename the sender", async () => {
+    await postForm("/lessons/sh1/share", { name: "Ada", persist: "1" });
+    const cross = await app.fetch(
+      new Request("http://localhost/lessons/sh1/share?name=Attacker&format=text", {
+        headers: { "sec-fetch-site": "cross-site" },
+      }),
+    );
+    expect(cross.status).toBe(403);
+    const crossPost = await postForm(
+      "/lessons/sh1/share",
+      { name: "Attacker", persist: "1" },
+      { "sec-fetch-site": "cross-site" },
+    );
+    expect(crossPost.status).toBe(403);
+    expect(db.withConnection((c) => db.getSettings(c).share_name)).toBe("Ada");
+  });
+
+  it("markdown from lessons is sanitized before it reaches innerHTML (detail, preview, settings)", async () => {
+    seed("xss", "Boom");
+    db.withConnection((c) => db.deleteLesson(c, "xss"));
+    const stored = parseLesson({
+      id: "xss",
+      timestamp: "2026-06-16T10:00:00Z",
+      topic_id: "sqlite",
+      categories: ["sqlite"],
+      title: "Boom",
+      level: "mid",
+      summary: "s",
+      body: '<img src=x onerror="alert(1)">',
+    });
+    db.withConnection((c) => db.insertLesson(c, stored));
+    const detail = await (await get("/lessons/xss")).text();
+    expect(detail).toContain("/static/vendor/purify.min.js");
+    expect(detail).toMatch(/innerHTML = DOMPurify\.sanitize\(marked\.parse\(/);
+    expect(detail).not.toMatch(/innerHTML = marked\.parse\(/);
+    const code = (await (await get("/lessons/xss/share?format=text")).text())
+      .trim()
+      .split("\n")
+      .at(-1);
+    const preview = await (
+      await get(`/lessons/import?code=${encodeURIComponent(code ?? "")}`)
+    ).text();
+    expect(preview).toContain("/static/vendor/purify.min.js");
+    expect(preview).toMatch(/innerHTML = DOMPurify\.sanitize\(marked\.parse\(/);
+    expect(preview).not.toMatch(/innerHTML = marked\.parse\(/);
+    const settings = await (await get("/settings")).text();
+    expect(settings).toContain("/static/vendor/purify.min.js");
+    expect(settings).not.toMatch(/innerHTML = marked\.parse\(/);
+    expect((await get("/static/vendor/purify.min.js")).status).toBe(200);
+  });
+
+  it("import from the paste box: new → detail banner, again → dup, junk → invalid", async () => {
+    const text = await (await get("/lessons/sh1/share?format=text&name=Ada")).text();
+    db.withConnection((c) => db.deleteLesson(c, "sh1"));
+
+    const r = await postForm("/lessons/import", { from: "lessons", text });
+    expect(r.status).toBe(303);
+    expect(r.headers.get("location")).toBe("/lessons/sh1?imported=1");
+    const detail = await (await get("/lessons/sh1?imported=1")).text();
+    expect(detail).toContain("✓ Imported “WAL mode”, shared by Ada");
+    expect(detail).toContain("🤝 shared by");
+    const stored = db.withConnection((c) => db.getLessonById(c, "sh1"));
+    expect(stored?.imported).toBe(true);
+    expect(stored?.folder).toBeNull();
+
+    const code = text.trim().split("\n").at(-1) ?? "";
+    const dup = await postForm("/lessons/import", {
+      from: "lessons",
+      text: `https://ultimaphoenix.github.io/dev-coach/lesson#${code}`,
+    });
+    expect(dup.headers.get("location")).toBe("/lessons/sh1?imported=dup");
+    expect(await (await get("/lessons/sh1?imported=dup")).text()).toContain(
+      "was already in your log",
+    );
+
+    const junk = await postForm("/lessons/import", { from: "lessons", text: "hello there" });
+    expect(junk.headers.get("location")).toBe("/lessons?import=1&error=invalid");
+    const lessons = await (await get("/lessons?import=1&error=invalid")).text();
+    expect(lessons).toContain('x-data="{ open: true }"');
+    expect(lessons).toContain("doesn't look like a devcoach lesson");
+  });
+
+  it("import: a dropped .devcoach.md file and a URL (fetched server-side)", async () => {
+    const md = await (await get("/lessons/sh1/share?format=md")).text();
+    db.withConnection((c) => db.deleteLesson(c, "sh1"));
+    const fd = new FormData();
+    fd.append("from", "lessons");
+    fd.append("file", new File([md], "sh1.devcoach.md", { type: "text/markdown" }));
+    const r = await app.fetch(
+      new Request("http://localhost/lessons/import", { method: "POST", body: fd }),
+    );
+    expect(r.headers.get("location")).toBe("/lessons/sh1?imported=1");
+
+    db.withConnection((c) => db.deleteLesson(c, "sh1"));
+    const fetchSpy = vi.mocked(fetchSharedInput).mockResolvedValueOnce(md);
+    try {
+      const viaUrl = await postForm("/lessons/import", {
+        from: "lessons",
+        text: "https://example.com/raw/sh1.devcoach.md",
+      });
+      expect(viaUrl.headers.get("location")).toBe("/lessons/sh1?imported=1");
+    } finally {
+      fetchSpy.mockReset();
+    }
+  });
+
+  it("import: a browser's untouched file input (zero-byte File) does not shadow the pasted text", async () => {
+    const text = await (await get("/lessons/sh1/share?format=text")).text();
+    db.withConnection((c) => db.deleteLesson(c, "sh1"));
+    const fd = new FormData();
+    fd.append("from", "lessons");
+    fd.append("text", text);
+    fd.append("file", new File([], "", { type: "application/octet-stream" }));
+    const r = await app.fetch(
+      new Request("http://localhost/lessons/import", { method: "POST", body: fd }),
+    );
+    expect(r.headers.get("location")).toBe("/lessons/sh1?imported=1");
+  });
+
+  it("import POST from another site is refused (Sec-Fetch-Site) and writes nothing", async () => {
+    const text = await (await get("/lessons/sh1/share?format=text")).text();
+    db.withConnection((c) => db.deleteLesson(c, "sh1"));
+    const r = await postForm(
+      "/lessons/import",
+      { from: "lessons", text },
+      { "sec-fetch-site": "cross-site" },
+    );
+    expect(r.headers.get("location")).toBe("/lessons?import=1&error=cross");
+    expect(db.withConnection((c) => db.getLessonById(c, "sh1"))).toBeNull();
+    expect(await (await get("/lessons?import=1&error=cross")).text()).toContain(
+      "only work from this dashboard",
+    );
+    // same-origin browsers and header-less clients pass
+    const ok = await postForm(
+      "/lessons/import",
+      { from: "lessons", text },
+      { "sec-fetch-site": "same-origin" },
+    );
+    expect(ok.headers.get("location")).toBe("/lessons/sh1?imported=1");
+  });
+
+  it("GET /lessons/import previews a code without writing; bad code → friendly error; no code → paste form", async () => {
+    seed("sh2", "Preview me");
+    const code =
+      (await (await get("/lessons/sh2/share?format=text&name=Bo")).text())
+        .trim()
+        .split("\n")
+        .at(-1) ?? "";
+    db.withConnection((c) => db.deleteLesson(c, "sh2"));
+    const r = await get(`/lessons/import?code=${encodeURIComponent(code)}`);
+    expect(r.status).toBe(200);
+    const html = await r.text();
+    expect(html).toContain("Someone shared a lesson with you");
+    expect(html).toContain("Preview me");
+    expect(html).toContain("shared by <span");
+    expect(html).toContain("Add to my lessons");
+    expect(html).toContain("Nothing is saved until you click");
+    expect(db.withConnection((c) => db.getLessonById(c, "sh2"))).toBeNull();
+
+    const bad = await (await get("/lessons/import?code=devcoach:lesson:1:zzzz")).text();
+    expect(bad).toContain("damaged or incomplete");
+    const empty = await (await get("/lessons/import")).text();
+    expect(empty).toContain("Import a shared lesson");
+    expect(empty).toContain('id="import-form"');
+  });
+
+  it("legacy lessons.json upload from the settings page keeps its flash", async () => {
+    const fd = new FormData();
+    fd.append("file", new File(["nope"], "x.json", { type: "application/json" }));
+    const r = await app.fetch(
+      new Request("http://localhost/lessons/import", { method: "POST", body: fd }),
+    );
+    expect(r.headers.get("location")).toBe("/settings?imported=0&skipped=0&invalid=1");
+  });
+
+  it("settings form saves share_name; lessons page shows the ↗ share link", async () => {
+    expect(
+      (await post("/settings", { max_per_day: "2", min_gap_minutes: "240", share_name: " Zed " }))
+        .status,
+    ).toBe(303);
+    expect(db.withConnection((c) => db.getSettings(c).share_name)).toBe("Zed");
+    expect(await (await get("/settings")).text()).toContain('value="Zed"');
+    seed("sh3", "Row share");
+    const html = await (await get("/lessons?search=Row+share")).text();
+    expect(html).toContain("/lessons/sh3?share=1");
+    expect(html).toContain("＋ Import");
+  });
+
+  it("GET /ping answers the docs site with CORS + private-network headers", async () => {
+    const r = await get("/ping");
+    expect(r.status).toBe(200);
+    expect(await r.json()).toMatchObject({ ok: true });
+    expect(r.headers.get("access-control-allow-origin")).toBe("https://ultimaphoenix.github.io");
+    expect(r.headers.get("access-control-allow-private-network")).toBe("true");
+    const pre = await app.fetch(new Request("http://localhost/ping", { method: "OPTIONS" }));
+    expect(pre.status).toBe(204);
+    expect(pre.headers.get("access-control-allow-methods")).toContain("GET");
+    // no other route is CORS-enabled
+    expect((await get("/lessons")).headers.get("access-control-allow-origin")).toBeNull();
   });
 });

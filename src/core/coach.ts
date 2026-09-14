@@ -9,8 +9,11 @@ import {
   getKnowledgeEntries,
   getKnowledgeGroupList,
   getLastLessonTimestamp,
+  getLessonById,
   getSettings,
   getTaughtTopicIds,
+  importLessons,
+  insertLessonIfAbsent,
   isOnboardingComplete,
   markCuePending,
   NUDGE_RETRY_AFTER,
@@ -18,7 +21,14 @@ import {
   setFeedback,
   upsertKnowledge,
 } from "./db";
-import type { Profile, RateLimitResult } from "./models";
+import type { Lesson, Profile, RateLimitResult } from "./models";
+import {
+  isSameSharedLesson,
+  parseSharedInput,
+  type SharedLesson,
+  sharedLessonIdCandidates,
+  sharedLessonToLesson,
+} from "./share";
 
 export function checkRateLimit(db: DatabaseSync): RateLimitResult {
   try {
@@ -110,12 +120,84 @@ export function getStats(db: DatabaseSync): Record<string, unknown> {
       total_lessons: total,
       lessons_today: lessonsToday,
       lessons_this_week: lessonsWeek,
+      imported_lessons: countFilteredLessons(db, { imported: true }),
       weakest_topics: weakest,
       strongest_topics: strongest,
     };
   } catch (err) {
     return { error: String(err) };
   }
+}
+
+// ── Lesson sharing (import side) ─────────────────────────────────────────────
+
+export interface SharedImportResult {
+  kind: "shared" | "lessons";
+  inserted: number;
+  duplicated: number;
+  invalid: number;
+  /** The stored (or already present) shared lesson; null for a legacy lessons-array import. */
+  lesson: Lesson | null;
+  /** Whether the lesson's topic is in the knowledge map; null for a lessons-array import. */
+  topic_tracked: boolean | null;
+}
+
+/**
+ * Store a shared lesson as one of our own (flagged `imported`, named after the sender). The
+ * sender's id is kept when free; an own lesson with the same slug gets a suffixed id instead of
+ * being overwritten; re-importing the same share is a duplicate. Never touches pacing.
+ */
+export function importSharedLesson(db: DatabaseSync, payload: SharedLesson): SharedImportResult {
+  const tracked = Object.hasOwn(getAllKnowledge(db), payload.lesson.topic_id);
+  for (const id of sharedLessonIdCandidates(payload)) {
+    const existing = getLessonById(db, id);
+    if (existing) {
+      if (isSameSharedLesson(existing, payload)) {
+        return {
+          kind: "shared",
+          inserted: 0,
+          duplicated: 1,
+          invalid: 0,
+          lesson: existing,
+          topic_tracked: tracked,
+        };
+      }
+      continue;
+    }
+    const lesson = sharedLessonToLesson(payload, id);
+    if (insertLessonIfAbsent(db, lesson)) {
+      return {
+        kind: "shared",
+        inserted: 1,
+        duplicated: 0,
+        invalid: 0,
+        lesson,
+        topic_tracked: tracked,
+      };
+    }
+  }
+  return {
+    kind: "shared",
+    inserted: 0,
+    duplicated: 0,
+    invalid: 1,
+    lesson: null,
+    topic_tracked: tracked,
+  };
+}
+
+/** Import whatever the user pasted: a shared lesson in any encoding, or a legacy lessons JSON array. */
+export function importSharedInput(db: DatabaseSync, text: string): SharedImportResult {
+  const input = parseSharedInput(text);
+  if (input.kind === "lessons") {
+    return {
+      kind: "lessons",
+      ...importLessons(db, input.records),
+      lesson: null,
+      topic_tracked: null,
+    };
+  }
+  return importSharedLesson(db, input.payload);
 }
 
 export function listTaughtTopics(db: DatabaseSync): string[] {

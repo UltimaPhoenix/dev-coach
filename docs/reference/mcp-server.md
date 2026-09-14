@@ -27,7 +27,7 @@ clients can look it up by that name and install it directly; the entry resolves 
 `npx -y devcoach mcp` command as the manual configuration above, so both paths run the identical
 local server.
 
-## Tools (18)
+## Tools (20)
 
 | Tool | Purpose | Annotation |
 |---|---|---|
@@ -38,7 +38,7 @@ local server.
 | `get_onboarding` | Onboarding status, the stack detected across the full Claude Code history with per-project provenance, default topics, `notebook_path` (same data as `devcoach://onboarding`) | read |
 | `get_profile` | The current knowledge map — topics, confidence, groups (same data as `devcoach://profile`) | read |
 | `update_knowledge` | Adjust a topic's confidence by a delta (clamped 0–10) | write |
-| `get_lessons` | Query lesson history (period, category, level, git, starred, feedback, search, date range); `limit` defaults to 10, `0` = all | read-only |
+| `get_lessons` | Query lesson history (period, category, level, git, starred, imported, feedback, search, date range); `limit` defaults to 10, `0` = all | read-only |
 | `star_lesson` | Star / unstar a lesson | write |
 | `delete_lesson` | Permanently delete a lesson | **destructive** |
 | `submit_feedback` | Record `know` / `dont_know` / `clear`; adjusts confidence ±1 (idempotent) | write |
@@ -46,7 +46,9 @@ local server.
 | `remove_topic` | Remove a topic from the knowledge map | **destructive** |
 | `add_group` | Create a knowledge group | write |
 | `remove_group` | Delete a group (topics move to Other) | **destructive** |
-| `update_settings` | Set one setting by key: `max_per_day` (1–20), `min_gap_minutes` (0–1440), `nudge_every` (0–1000) or `nudge_scope` (`session` \| `global`); `value` is always passed as a string | write |
+| `update_settings` | Set one setting by key: `max_per_day` (1–20), `min_gap_minutes` (0–1440), `nudge_every` (0–1000), `nudge_scope` (`session` \| `global`) or `share_name` (≤ 80 chars, empty clears); `value` is always passed as a string | write |
+| `share_lesson` | Hand a lesson to another person: `transport` `text` (default — the card plus one `devcoach:lesson:1:…` line), `link` (server-less URL on the docs site) or `file` (`.devcoach.md` contents + `filename`); `include_context` (default false) adds project/branch/commit/task — a local folder path never travels; `shared_by` overrides the `share_name` setting / git `user.name` (empty = anonymous). Returns a `reply_check` telling the model to print the code verbatim in a fenced block | read-only |
+| `import_lesson` | Store a lesson someone shared — `payload` is whatever the user handed over, verbatim: the code, the whole card, a share link, a URL (fetched, 5 s / 256 KB), `.devcoach.md` text or a lessons JSON export. Returns `{ kind, inserted, duplicated, invalid, lesson, topic_tracked }`; a duplicate is a normal outcome, not an error. Imported lessons never count against the daily limit | write |
 | `open_ui` | Launch the web dashboard in the background on `127.0.0.1` (`port` 1024–65535, default 7860) | open-world |
 | `complete_onboarding` | Save the initial profile (topics + groups) and mark onboarding done; guarantees a non-empty notebook placeholder (the model writes the real notebook directly, see [privacy.md](privacy.md)) | **destructive** |
 
@@ -101,3 +103,7 @@ See [configuration.md](configuration.md) for the SQLite schema. The `Lesson` sha
   "commit_hash": null, "folder": null, "repository_platform": null  // auto-detected from git when omitted
 }
 ```
+
+Lessons returned by `get_lessons` / `import_lesson` also carry `starred`, `feedback`, and the two
+sharing fields: `imported` (true when the lesson came from someone else — excluded from the rate
+limit) and `shared_by` (the sender's name, `null` when anonymous or not imported).

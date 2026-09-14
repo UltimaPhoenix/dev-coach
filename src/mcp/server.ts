@@ -1,5 +1,5 @@
 // MCP server on the official MCP TypeScript SDK v2 (@modelcontextprotocol/server).
-// 18 tools, 11 resources, and the devcoach_instructions prompt. Tools follow the build-mcp-server
+// 20 tools, 11 resources, and the devcoach_instructions prompt. Tools follow the build-mcp-server
 // review: title + hint annotations, tight Zod schemas with .describe(), outputSchema/structuredContent
 // for model returns, isError on failure. log_lesson is a pure save (never elicits);
 // feedback arrives next turn via submit_feedback.
@@ -13,7 +13,7 @@ import { scanClaudeHistory, scanRecentProjectWindow } from "../core/claude-histo
 import * as coach from "../core/coach";
 import * as db from "../core/db";
 import { detectStack, mergeStacks } from "../core/detect";
-import { detectGitContext } from "../core/git";
+import { detectGitContext, detectGitUserName } from "../core/git";
 import {
   confidenceInputSchema,
   FeedbackSchema,
@@ -24,6 +24,17 @@ import {
   RepositoryPlatformSchema,
   UiThemeSchema,
 } from "../core/models";
+import {
+  buildSharePayload,
+  encodeShareCode,
+  renderShareLink,
+  renderShareMarkdownFile,
+  renderShareText,
+  resolveSharedBy,
+  ShareInputError,
+  sharedLessonFilename,
+} from "../core/share";
+import { fetchSharedInput, isHttpUrl } from "../core/share-fetch";
 import { readSkill, readSkillReferences } from "../skill";
 import { VERSION } from "../version";
 
@@ -57,6 +68,8 @@ const lessonOutput = z.object({
   repository_platform: RepositoryPlatformSchema.nullable(),
   starred: z.boolean(),
   feedback: FeedbackSchema.nullable(),
+  imported: z.boolean(),
+  shared_by: z.string().nullable(),
 });
 
 // log_lesson's output adds a model-facing self-check. It must live in
@@ -86,7 +99,45 @@ const settingsOutput = z.object({
   ui_theme: UiThemeSchema,
   nudge_every: z.number().int(),
   nudge_scope: NudgeScopeSchema,
+  share_name: z.string().nullable(),
 });
+
+const shareOutput = z.object({
+  transport: z.enum(["text", "link", "file"]),
+  code: z.string(),
+  text: z.string().nullable(),
+  link: z.string().nullable(),
+  markdown: z.string().nullable(),
+  filename: z.string().nullable(),
+  shared_by: z.string().nullable(),
+  include_context: z.boolean(),
+  reply_check: z.string(),
+});
+
+const importOutput = z.object({
+  kind: z.enum(["shared", "lessons"]),
+  inserted: z.number().int(),
+  duplicated: z.number().int(),
+  invalid: z.number().int(),
+  lesson: lessonOutput.nullable(),
+  topic_tracked: z.boolean().nullable(),
+  reply_check: z.string(),
+});
+
+const SHARE_REPLY_CHECK: Record<"text" | "link" | "file", string> = {
+  text:
+    "Reply with `text` verbatim as the final message: the card as markdown, then the last line " +
+    "(devcoach:lesson:1:…) inside a fenced code block, character for character — never paraphrase, " +
+    "wrap, truncate or split it.",
+  link: "Reply with `link` on its own line, unchanged.",
+  file:
+    "Write `markdown` to `filename` (in the workspace unless the user named a path) with your " +
+    "file tool, then confirm the path in one line; do not print the markdown.",
+};
+const IMPORT_REPLY_CHECK =
+  "Confirm in one line: the title, who shared it, and that it joined the coaching log (feedback " +
+  "works as usual; it does not count against the daily limit). If topic_tracked is false, offer " +
+  "to track the topic with add_topic — only on confirmation.";
 
 const deepScanOutput = z.object({
   window_months: z.number().int(),
@@ -203,7 +254,9 @@ export function createServer(): McpServer {
         "Progressive technical coaching server. " +
         "Use the devcoach_instructions prompt for full coaching behaviour guidelines. " +
         "Read coaching state with the get_briefing / get_onboarding / get_profile tools; the " +
-        "devcoach:// resources expose the same data for clients that browse resources.",
+        "devcoach:// resources expose the same data for clients that browse resources. " +
+        "share_lesson hands a lesson to another person (text, link or file); import_lesson stores " +
+        "one they were given.",
     },
   );
 
@@ -352,6 +405,10 @@ export function createServer(): McpServer {
         branch: z.string().nullish().describe("Fuzzy match on git branch"),
         commit: z.string().nullish().describe("Fuzzy match on commit hash"),
         starred: z.boolean().nullish().describe("True to return only starred lessons"),
+        imported: z
+          .boolean()
+          .nullish()
+          .describe("True = only lessons shared with you, false = only your own"),
         feedback: z
           .enum(["know", "dont_know", "none"])
           .nullish()
@@ -387,6 +444,7 @@ export function createServer(): McpServer {
             branch: args.branch,
             commit: args.commit,
             starred: args.starred,
+            imported: args.imported,
             feedback: args.feedback,
             search: args.search,
             date_from: args.date_from,
@@ -638,14 +696,17 @@ export function createServer(): McpServer {
       description:
         "Update a coaching setting. max_per_day: integer 1-20. min_gap_minutes: integer 0-1440 " +
         "(0 = no cooldown). nudge_every: integer 0-1000 interactions between lesson cues " +
-        "(0 = cue every turn). nudge_scope: 'session' | 'global'. Returns the full updated Settings.",
+        "(0 = cue every turn). nudge_scope: 'session' | 'global'. share_name: the sender name " +
+        "proposed when sharing a lesson (max 80 chars, empty clears). Returns the full updated Settings.",
       inputSchema: z.object({
         key: z
-          .enum(["max_per_day", "min_gap_minutes", "nudge_every", "nudge_scope"])
+          .enum(["max_per_day", "min_gap_minutes", "nudge_every", "nudge_scope", "share_name"])
           .describe("Setting key"),
         value: z
           .string()
-          .describe("New value (integer string; or 'session'|'global' for nudge_scope)"),
+          .describe(
+            "New value (integer string; 'session'|'global' for nudge_scope; free text for share_name)",
+          ),
       }),
       outputSchema: settingsOutput,
       annotations: {
@@ -663,6 +724,12 @@ export function createServer(): McpServer {
             return db.getSettings(c);
           }),
         );
+      if (args.key === "share_name") {
+        if (args.value.trim().length > db.SHARE_NAME_MAX) {
+          return errResult(`share_name must be at most ${db.SHARE_NAME_MAX} characters`);
+        }
+        return save(db.normalizeShareName(args.value));
+      }
       if (args.key === "nudge_scope") {
         if (args.value !== "session" && args.value !== "global") {
           return errResult("nudge_scope must be 'session' or 'global'");
@@ -861,6 +928,113 @@ export function createServer(): McpServer {
       annotations: readOnly("Knowledge Profile"),
     },
     () => stateResult("get_profile", profilePayload()),
+  );
+
+  // ── Lesson sharing ───────────────────────────────────────────────────────
+
+  server.registerTool(
+    "share_lesson",
+    {
+      title: "Share Lesson",
+      description:
+        "Hand a lesson to another person. transport 'text' (default) returns the card plus a one-line " +
+        "code to paste anywhere; 'link' a server-less URL that previews the lesson and imports it " +
+        "into their dashboard; 'file' the contents of a .devcoach.md file. Only title, summary, " +
+        "body, topic, categories and level travel unless include_context is true; local paths " +
+        "never do. Pick the lesson with get_lessons first.",
+      inputSchema: z.object({
+        lesson_id: z.string().describe("Lesson id (from get_lessons)"),
+        transport: z
+          .enum(["text", "link", "file"])
+          .default("text")
+          .describe("text = card + code to paste; link = share URL; file = .devcoach.md contents"),
+        include_context: z
+          .boolean()
+          .default(false)
+          .describe(
+            "Include project/branch/commit/task context (off by default — privacy). Local paths are never included.",
+          ),
+        shared_by: z
+          .string()
+          .nullish()
+          .describe(
+            "Sender name. Omit → the share_name setting, then git user.name. Empty string → anonymous.",
+          ),
+      }),
+      outputSchema: shareOutput,
+      annotations: readOnly("Share Lesson"),
+    },
+    (args) => {
+      try {
+        const found = db.withConnection((c) => {
+          const lesson = db.getLessonById(c, args.lesson_id);
+          if (!lesson) return null;
+          const sharedBy = resolveSharedBy({
+            explicit: args.shared_by ?? null,
+            setting: db.getSettings(c).share_name,
+            gitUserName: detectGitUserName(),
+          });
+          return buildSharePayload(lesson, { includeContext: args.include_context, sharedBy });
+        });
+        if (!found) {
+          return errResult(
+            `share_lesson: lesson '${args.lesson_id}' not found — call get_lessons to pick one`,
+          );
+        }
+        return structured({
+          transport: args.transport,
+          code: encodeShareCode(found),
+          text: args.transport === "text" ? renderShareText(found) : null,
+          link: args.transport === "link" ? renderShareLink(found) : null,
+          markdown: args.transport === "file" ? renderShareMarkdownFile(found) : null,
+          filename: args.transport === "file" ? sharedLessonFilename(found) : null,
+          shared_by: found.shared_by,
+          include_context: args.include_context,
+          reply_check: SHARE_REPLY_CHECK[args.transport],
+        });
+      } catch (err) {
+        return errResult(`share_lesson failed: ${err}`);
+      }
+    },
+  );
+
+  server.registerTool(
+    "import_lesson",
+    {
+      title: "Import Lesson",
+      description:
+        "Store a lesson someone shared. Pass whatever the user handed you, verbatim: the " +
+        "devcoach:lesson:1:… code, the whole copied card, the share link, a URL to the lesson " +
+        "text, the contents of a .devcoach.md file, or a lessons JSON export. The lesson joins the " +
+        "coaching log as their own (feedback works as usual) but never counts against the daily " +
+        "limit; re-importing the same share is reported as a duplicate, not an error.",
+      inputSchema: z.object({
+        payload: z
+          .string()
+          .min(1)
+          .describe("The code, link, URL, card text, file text or JSON — verbatim"),
+      }),
+      outputSchema: importOutput,
+      annotations: {
+        title: "Import Lesson",
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
+    },
+    async (args) => {
+      try {
+        const raw =
+          isHttpUrl(args.payload) && !args.payload.includes("#devcoach:lesson:")
+            ? await fetchSharedInput(args.payload)
+            : args.payload;
+        const result = db.withConnection((c) => coach.importSharedInput(c, raw));
+        return structured({ ...result, reply_check: IMPORT_REPLY_CHECK });
+      } catch (err) {
+        if (err instanceof ShareInputError) return errResult(`import_lesson: ${err.message}`);
+        return errResult(`import_lesson failed: ${err}`);
+      }
+    },
   );
 
   // ── Resources ────────────────────────────────────────────────────────────
