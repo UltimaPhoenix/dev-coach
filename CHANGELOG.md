@@ -4,7 +4,7 @@ Notable changes to devcoach. Versions follow [Semantic Versioning](https://semve
 
 ---
 
-## [Unreleased]
+## [2.3.0] — 2026-09-15
 
 ### Added
 - **`devcoach ui`**: the dashboard URL is printed as a clickable terminal link (OSC 8, in terminals
@@ -12,6 +12,9 @@ Notable changes to devcoach. Versions follow [Semantic Versioning](https://semve
   gracefully** (in-flight requests finish; a second Ctrl+C exits at once). `devcoach ui --stop` and the
   new **`stop_ui`** MCP tool (20 → 21 tools; `/devcoach:ui stop` in the plugin) stop a dashboard that
   runs detached — the one your agent started with `open_ui` — through a same-origin `POST /shutdown`.
+
+### Changed
+- Dependencies: hono 4.13.7, zod 4.6.2; docs site marked 18, DOMPurify 3.4.15, React 19.3.
 
 ## [2.2.1] — 2026-09-15
 
