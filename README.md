@@ -108,17 +108,15 @@ The simplest way to add devcoach to **Claude Code** — one click, nothing to co
 /plugin install devcoach@ultimaphoenix
 ```
 
-The MCP server, hooks, and skill activate on install — no restart needed. Open the [web dashboard](#web-dashboard) right from Claude Code with `/devcoach:ui` (or just ask — the `open_ui` tool); `/devcoach:share` and `/devcoach:import` hand lessons around. The plugin **does not** add the `devcoach` CLI, so for terminal use run `npx -y devcoach ui` (or use Homebrew / `npm i -g devcoach` for a bare `devcoach`).
+The MCP server, hooks, and skill activate on install — no restart needed. Open the [web dashboard](#web-dashboard) right from Claude Code with `/devcoach:ui` (or just ask — the `open_ui` tool); `/devcoach:share` and `/devcoach:import` hand lessons around. Update later with `/plugin marketplace update ultimaphoenix`.
+
+The plugin **does not** add the `devcoach` CLI, but the CLI stays a handy companion when you want the dashboard or your data without going through Claude — `devcoach ui`, `stats`, `lessons`, `share` / `import`, `backup`: run them with `npx -y devcoach …`, or install Homebrew / `npm i -g devcoach` for a bare `devcoach`. Just never run `devcoach install` next to the plugin — it owns the hooks.
 
 <details>
-<summary><strong>Other ways to install the plugin</strong> (straight from the repo · offline zip)</summary>
+<summary><strong>Offline install</strong> (no marketplace access)</summary>
 
 ```bash
-# Straight from the devcoach repo (no separate marketplace)
-/plugin marketplace add UltimaPhoenix/dev-coach
-/plugin install devcoach@devcoach
-
-# Offline — download devcoach-plugin-<version>.zip from a GitHub Release, unzip, then:
+# Download devcoach-plugin-<version>.zip from a GitHub Release, unzip, then:
 /plugin marketplace add /path/to/unzipped-folder
 /plugin install devcoach@devcoach
 ```
