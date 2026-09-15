@@ -131,6 +131,15 @@
   margin: 0;
 }
 .status.up { color: #15803d; }
+.retry {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: var(--ifm-link-color);
+  text-decoration: underline;
+  cursor: pointer;
+}
 .portField {
   display: flex;
   align-items: center;

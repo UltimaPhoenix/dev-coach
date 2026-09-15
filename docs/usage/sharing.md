@@ -89,7 +89,9 @@ Every way in leads to the same place: the lesson joins your log, attributed to t
   popover or share anonymously. The receiver sees *shared by …* with that name and the date.
 - **The link is server-less**: the lesson sits in the URL fragment (after `#`), which browsers never
   send to the site. The page decodes it locally; the only request it makes is a best-effort
-  `GET /ping` to your own dashboard on `127.0.0.1` to say whether it is running.
+  `GET /ping` to your own dashboard on `127.0.0.1` to say whether it is running. That check needs a
+  one-time *Local network access* permission in Chrome 142+ and is not possible at all in Safari (see
+  Troubleshooting) — the **Import** button works regardless.
 
 See [Privacy & security](../reference/privacy.md#sharing-is-explicit) for the full statement.
 
@@ -142,5 +144,8 @@ Optional keys, present only when context was included: `task_context`, `project`
 | *too large to be a lesson* | The code is bigger than a real lesson (64 000 characters / 256 KB decoded) | Ask the sender for the `.devcoach.md` file instead |
 | *shared by a newer devcoach* | The sender runs a newer share format | Upgrade devcoach (`npm i -g devcoach@latest`, `brew upgrade devcoach`) |
 | *Only public http(s) URLs can be imported* | The URL points at localhost, a private network or a link-local address | Copy the lesson text instead of the URL |
-| The link page says no dashboard answered | The dashboard is not running, or runs on another port | Start it (`devcoach ui`, `/devcoach:ui`) or set the port in the panel; the Import button works either way |
+| The link page says no dashboard answered | The dashboard is not running, or runs on another port | Start it (`devcoach ui`, `/devcoach:ui`) or set the port in the panel, then *retry the check*; the Import button works either way |
+| Safari says it can't check my dashboard | Safari (WebKit) blocks any request from an https page to `http://127.0.0.1`, so the page cannot probe your dashboard — the check is skipped, nothing is wrong | If the dashboard is running, **Import** works as usual (it is a plain navigation); otherwise use **Copy code** or **Download .devcoach.md** |
+| Safari 18.2–18.5 refuses to open the Import link ("HTTPS-Only") | Those versions block links to `http://localhost` with no way to proceed | Paste `http://127.0.0.1:7860/lessons/import?code=…` in the address bar, or use **Copy code**; fixed in Safari 26 |
+| Chrome asked to allow local network access, or the page says the browser blocks it | Chrome 142+ asks once before a website may reach `127.0.0.1` | Allow it (icon left of the address bar → *Local network access*), then *retry*; **Import** works regardless of the answer |
 | The link page hides the Import button | The code is longer than a URL Node's dashboard accepts (~12 000 characters) | Use **Copy code** or **Download .devcoach.md** and import that |

@@ -19,6 +19,7 @@ import {
   type SharedLesson,
   sharedLessonFilename,
 } from "../lib/shareCode";
+import { type DashboardState, probeDashboard } from "../lib/dashboardProbe";
 import styles from "./lesson.module.css";
 
 const DEFAULT_PORT = 7860;
@@ -28,7 +29,6 @@ const MAX_LINK_CODE = 12_000;
 const PING_TIMEOUT_MS = 1500;
 
 type Status = "reading" | "empty" | "ready" | "error";
-type Dashboard = "unknown" | "up" | "down";
 
 function render(md: string): string {
   return DOMPurify.sanitize(marked.parse(md, { async: false, breaks: true, gfm: true }) as string);
@@ -49,7 +49,8 @@ export default function LessonPage(): ReactNode {
   const [lesson, setLesson] = useState<SharedLesson | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [port, setPort] = useState(DEFAULT_PORT);
-  const [dashboard, setDashboard] = useState<Dashboard>("unknown");
+  const [dashboard, setDashboard] = useState<DashboardState>("checking");
+  const [probeRun, setProbeRun] = useState(0);
   const [copied, setCopied] = useState(false);
   const [paste, setPaste] = useState("");
 
@@ -99,23 +100,25 @@ export default function LessonPage(): ReactNode {
 
   useEffect(() => setPort(readPort()), []);
 
-  // Best-effort "is a dashboard running?" — the button works regardless.
+  // Best-effort "is a dashboard running?" — the Import button works regardless. The probe knows
+  // about Safari (cannot probe at all) and Chrome's local-network permission; see lib/dashboardProbe.
   useEffect(() => {
     if (status !== "ready") return;
     let cancelled = false;
-    setDashboard("unknown");
-    fetch(`http://127.0.0.1:${port}/ping`, {
-      mode: "cors",
-      cache: "no-store",
-      signal: AbortSignal.timeout(PING_TIMEOUT_MS),
-    })
-      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
-      .then((j: { ok?: boolean }) => !cancelled && setDashboard(j?.ok ? "up" : "down"))
-      .catch(() => !cancelled && setDashboard("down"));
+    setDashboard("checking");
+    probeDashboard(port, AbortSignal.timeout(PING_TIMEOUT_MS), {
+      userAgent: navigator.userAgent,
+      permissions: navigator.permissions as unknown as
+        | { query(d: { name: string }): Promise<{ state: string }> }
+        | undefined,
+      fetch: (input, init) => fetch(input, init),
+      onPrompt: () => !cancelled && setDashboard("needs-permission"),
+    }).then((state) => !cancelled && setDashboard(state));
     return () => {
       cancelled = true;
     };
-  }, [status, port]);
+  }, [status, port, probeRun]);
+  const retryProbe = useCallback(() => setProbeRun((n) => n + 1), []);
 
   const changePort = useCallback((value: string) => {
     const v = Number(value);
@@ -225,14 +228,39 @@ export default function LessonPage(): ReactNode {
               <div className={styles.panel}>
                 <p className={styles.panelTitle}>Add it to your devcoach</p>
                 <p className={`${styles.status} ${dashboard === "up" ? styles.up : ""}`}>
-                  {dashboard === "up" && "✓ Your devcoach dashboard is running — one click adds this lesson to your log."}
+                  {dashboard === "checking" && "Looking for your dashboard…"}
+                  {dashboard === "up" &&
+                    "✓ Your devcoach dashboard is running — one click adds this lesson to your log."}
                   {dashboard === "down" && (
                     <>
                       No dashboard answered on 127.0.0.1:{port}. Start it with <code>devcoach ui</code> (or{" "}
-                      <code>/devcoach:ui</code> in Claude Code), then click Import.
+                      <code>/devcoach:ui</code> in Claude Code), check the port, then{" "}
+                      <button type="button" className={styles.retry} onClick={retryProbe}>
+                        retry the check
+                      </button>
+                      . Import works as soon as it is up.
                     </>
                   )}
-                  {dashboard === "unknown" && "Looking for your dashboard…"}
+                  {dashboard === "needs-permission" &&
+                    "Your browser is asking whether this page may reach your local network — allow it to enable the check. Import works either way."}
+                  {dashboard === "blocked-permission" && (
+                    <>
+                      Your browser blocks this page from reaching local services, so it cannot see your
+                      dashboard (Chrome: click the icon left of the address bar → <em>Local network access</em>{" "}
+                      → Allow, then{" "}
+                      <button type="button" className={styles.retry} onClick={retryProbe}>
+                        retry
+                      </button>
+                      ). Import still works if the dashboard is running.
+                    </>
+                  )}
+                  {dashboard === "unsupported" && (
+                    <>
+                      Safari doesn't let this page check whether your dashboard is running. If it is (
+                      <code>devcoach ui</code>, or <code>/devcoach:ui</code> in Claude Code), Import works as
+                      usual — otherwise use Copy code or Download .devcoach.md.
+                    </>
+                  )}
                 </p>
                 <div className={styles.buttons}>
                   {!tooLongForLink && (
