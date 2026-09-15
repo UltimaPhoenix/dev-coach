@@ -6,6 +6,13 @@ Notable changes to devcoach. Versions follow [Semantic Versioning](https://semve
 
 ## [Unreleased]
 
+### Fixed
+- **Share page — dashboard check tells the truth.** Safari (WebKit) blocks every request from an
+  https page to `http://127.0.0.1`, so the page used to report a running dashboard as "no dashboard
+  answered"; the check is now skipped there with an explanation. Chrome 142+'s *Local network
+  access* permission (asked, refused) is told apart from a dashboard that is really down, and a
+  *retry the check* link replaces reloading. The Import button was never affected.
+
 ### Changed
 - Docs: one install path for the Claude Code plugin — the UltimaPhoenix marketplace (pinned to each
   release by CI); the repo's own marketplace is a maintainer path now. The CLI is documented as a

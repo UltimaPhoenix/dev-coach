@@ -217,7 +217,11 @@ commands `/devcoach:share` + `/devcoach:import` (`plugin/commands/`), the user g
 only when the popover posts `persist=1`, set by Alpine on the name input's `change`, not per keystroke),
 read-only `GET /lessons/import?code=`,
 `/ping` = the app's only CORS route, locked to the docs origin + `Access-Control-Allow-Private-Network`),
-and the docs page `website/src/pages/lesson.tsx`. Hardening (from two ultrareview rounds, keep it):
+and the docs page `website/src/pages/lesson.tsx` — whose dashboard probe (`website/src/lib/dashboardProbe.ts`,
+`npm test --prefix website`) must stay browser-aware: WebKit blocks https→http://127.0.0.1 subresources as
+mixed content (bug 171934, open), so Safari/iOS get an "unsupported" state and NO fetch; Chrome 142+ gates
+loopback behind the `local-network-access` permission (queried before/after the fetch to tell a refusal
+from a dead dashboard; `targetAddressSpace: "loopback"` on the request). Hardening (from two ultrareview rounds, keep it):
 markdown from lessons is always `DOMPurify.sanitize`d before `innerHTML` (dashboard) / rendered
 through `marked` + DOMPurify (docs page); `decodeShareCode` caps the input at `MAX_CODE_CHARS` and
 inflates with a byte budget (`inflateBounded`; the docs decoder streams the same way); `fetchSharedInput`

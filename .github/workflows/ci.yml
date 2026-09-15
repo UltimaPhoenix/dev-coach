@@ -62,6 +62,9 @@ jobs:
       - run: npm run typecheck
       - run: npm run test:cov
       - run: npm run build
+      # The docs site's browser-side logic (share-link decoder, dashboard probe) has its own tiny
+      # node --test suite — no install needed, it only imports Node built-ins.
+      - run: npm test --prefix website
       # The Claude Desktop extension is a separate self-contained bundle (tsup.mcpb.config.ts); its
       # build script proves it resolves with no node_modules and answers an MCP initialize.
       - name: Build + smoke the Claude Desktop extension (.mcpb)
