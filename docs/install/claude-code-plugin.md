@@ -113,8 +113,10 @@ Three ways to reach it, from zero-install to a bare command:
 2. **From a terminal, without installing** — prefix any [CLI command](../usage/cli.md) with `npx -y`:
    `npx -y devcoach ui`, `npx -y devcoach stats`, …
 3. **A bare `devcoach` command** — install the npm package globally (`npm install -g devcoach`) or via
-   [Homebrew](./homebrew.md). Running it alongside the plugin is fine: both read the same
-   `~/.devcoach/coaching.db`.
+   [Homebrew](./homebrew.md). Running it alongside the plugin is fine — recommended, even: both read the
+   same `~/.devcoach/coaching.db`, the plugin keeps the hooks and the skill current with every release
+   (a Homebrew-only install needs a manual `devcoach install` after each `brew upgrade` for that), and
+   Homebrew gives you the CLI.
 
 One rule: with the plugin, **never run `devcoach install`** — the plugin already owns the coaching hooks
 and the skill, and a second registration would double-count interactions (`install` detects an enabled

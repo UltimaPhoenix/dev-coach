@@ -22,6 +22,9 @@ devcoach works the same whichever way you install it — pick by how you like to
   `brew install` sets up devcoach **and** the `devcoach` CLI, so you also get the
   [command line](../usage/cli.md) and can launch the [dashboard](../usage/web-ui.md) with a bare
   `devcoach ui`. *(On Windows, or if you prefer npm, [npx / npm](./npx.md) is the equivalent.)*
+  Mind one thing: `brew upgrade` updates only the binary — you re-run `devcoach install` to refresh the
+  hooks and the skill. In Claude Code the best of both is **plugin + Homebrew**: the plugin keeps the
+  coaching wiring current automatically, Homebrew adds the CLI.
 - **Prefer the simplest, no-terminal setup → the [Claude Code plugin](./claude-code-plugin.md)**
   (one-click from the marketplace) or, on Claude Desktop, the **[`.mcpb` extension](./claude-desktop.md)** *(Beta)*.
   Nothing to configure — install and go. *(These don't add the `devcoach` CLI — open the
