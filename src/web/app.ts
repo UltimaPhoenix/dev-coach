@@ -604,6 +604,75 @@ export interface StartUiOptions {
   onReady?: (url: string) => void;
   /** Install SIGINT/SIGTERM/SIGHUP handlers that shut down gracefully (default: true). */
   handleSignals?: boolean;
+  /** Called when the port cannot be bound (default: print the message and exit with `exitCode`). */
+  onListenError?: (failure: ListenFailure) => void;
+}
+
+/** Why `startUi` could not listen, already worded for the terminal. */
+export interface ListenFailure {
+  message: string;
+  exitCode: number;
+  /** Set when a devcoach dashboard already answers on that port. */
+  existingUrl?: string;
+}
+
+/** Is a devcoach dashboard answering on `port`? Its version when yes, null otherwise. */
+export async function pingUi(
+  port: number,
+  fetchImpl: typeof fetch = fetch,
+): Promise<{ version: string } | null> {
+  try {
+    const res = await fetchImpl(`http://127.0.0.1:${port}/ping`, {
+      signal: AbortSignal.timeout(1500),
+    });
+    if (!res.ok) return null;
+    const body = (await res.json()) as { ok?: unknown; version?: unknown };
+    return body.ok === true ? { version: String(body.version ?? "") } : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Turn a `listen` error into one clear line plus a hint: a dashboard already running on the port
+ * (exit 0 — the user can open it, or stop it), another process on the port, a privileged port, or
+ * anything else.
+ */
+export async function explainListenError(
+  port: number,
+  err: NodeJS.ErrnoException,
+  ping: typeof pingUi = pingUi,
+): Promise<ListenFailure> {
+  if (err.code === "EADDRINUSE") {
+    const running = await ping(port);
+    if (running) {
+      const url = `http://localhost:${port}`;
+      const version = running.version ? ` (v${running.version})` : "";
+      return {
+        existingUrl: url,
+        exitCode: 0,
+        message: `${c.yellow("devcoach UI is already running at")} ${c.cyan(link(url))}${version}\n${c.dim(
+          "Open it there, start another with --port <n>, or stop it with: devcoach ui --stop",
+        )}`,
+      };
+    }
+    return {
+      exitCode: 1,
+      message: `${c.red(`✗ Port ${port} is already in use by another process`)}\n${c.dim(
+        "Pick another port: devcoach ui --port <n>",
+      )}`,
+    };
+  }
+  if (err.code === "EACCES") {
+    return {
+      exitCode: 1,
+      message: c.red(`✗ Port ${port} is not allowed (permission denied) — use a port ≥ 1024`),
+    };
+  }
+  return {
+    exitCode: 1,
+    message: c.red(`✗ Could not start the devcoach UI on port ${port}: ${err.message}`),
+  };
 }
 
 export function startUi(port: number, opts: StartUiOptions = {}): ServerType {
@@ -629,11 +698,28 @@ export function startUi(port: number, opts: StartUiOptions = {}): ServerType {
     if (process.stdout.isTTY) console.log(c.dim("Press Ctrl+C to stop"));
     opts.onReady?.(url);
   });
+  const signals = ["SIGINT", "SIGTERM", "SIGHUP"] as const;
+  const onSignal: Record<(typeof signals)[number], () => void> = {
+    SIGINT: () => stop("SIGINT", true),
+    SIGTERM: () => stop("SIGTERM", true),
+    SIGHUP: () => stop("SIGHUP", true),
+  };
   if (opts.handleSignals !== false) {
-    for (const sig of ["SIGINT", "SIGTERM", "SIGHUP"] as const) {
-      process.on(sig, () => stop(sig, true));
-    }
+    for (const sig of signals) process.on(sig, onSignal[sig]);
   }
+  // serve() calls listen() at once and reports failures (EADDRINUSE, EACCES, …) as an 'error'
+  // event on the next tick; without a listener Node prints a stack trace and dies.
+  server.once("error", (err: NodeJS.ErrnoException) => {
+    for (const sig of signals) process.off(sig, onSignal[sig]);
+    void explainListenError(port, err).then((failure) => {
+      if (opts.onListenError) {
+        opts.onListenError(failure);
+        return;
+      }
+      console.error(failure.message);
+      process.exit(failure.exitCode);
+    });
+  });
   return server;
 }
 

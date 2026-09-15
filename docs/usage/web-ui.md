@@ -25,7 +25,9 @@ Installed devcoach globally or via Homebrew? Drop the `npx -y` and just run `dev
 printed as a clickable link (terminals that support OSC 8 hyperlinks — iTerm2, Ghostty, WezTerm, Kitty,
 VS Code, Windows Terminal, GNOME Terminal; elsewhere cmd/ctrl-click the plain URL), and `--open`
 launches your default browser as well. The dashboard binds to `127.0.0.1` only, so it is never
-reachable from other machines. Or let Claude open it for you via the MCP tool:
+reachable from other machines. If the port is taken, `devcoach ui` tells you whether a dashboard is
+already running there (open it, or `--stop` it) or another process holds the port (pick `--port`).
+Or let Claude open it for you via the MCP tool:
 
 ```
 open_ui({ port: 7860 })

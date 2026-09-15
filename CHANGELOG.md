@@ -4,6 +4,14 @@ Notable changes to devcoach. Versions follow [Semantic Versioning](https://semve
 
 ---
 
+## [2.3.1] — 2026-09-15
+
+### Fixed
+- **`devcoach ui` on a busy port** prints a one-line explanation instead of Node's `EADDRINUSE` stack
+  trace: a dashboard already running there (its link, `v<version>`, and the `--stop` hint; `--open`
+  opens that one) vs another process holding the port (suggests `--port`). The `open_ui` MCP tool
+  reports an already-running dashboard instead of spawning a child that died unseen.
+
 ## [2.3.0] — 2026-09-15
 
 ### Added

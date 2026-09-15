@@ -1063,6 +1063,12 @@ function buildProgram(): Command {
         onReady: (url) => {
           if (opts.open) openInBrowser(url);
         },
+        onListenError: (failure) => {
+          console.error(failure.message);
+          // The port belongs to a running dashboard: --open still means "show me the dashboard".
+          if (opts.open && failure.existingUrl) openInBrowser(failure.existingUrl);
+          process.exit(failure.exitCode);
+        },
       });
     });
 

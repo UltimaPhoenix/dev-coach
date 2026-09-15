@@ -1061,6 +1061,77 @@ describe("cli ui — link, --open, --stop, graceful shutdown", () => {
       "No devcoach UI is running",
     );
   });
+
+  it("startUi on a port held by a running dashboard explains it instead of crashing", async () => {
+    const { startUi } = await import("../src/web/app");
+    const first = startUi(0, { handleSignals: false });
+    const port = await new Promise<number>((resolve) =>
+      first.once("listening", () => resolve((first.address() as { port: number }).port)),
+    );
+    const onListenError = vi.fn();
+    const second = startUi(port, { handleSignals: false, onListenError });
+    try {
+      await vi.waitFor(() => expect(onListenError).toHaveBeenCalledTimes(1));
+      const failure = onListenError.mock.calls[0][0];
+      expect(failure.exitCode).toBe(0);
+      expect(failure.existingUrl).toBe(`http://localhost:${port}`);
+      expect(failure.message).toContain("already running at");
+      expect(failure.message).toContain(`(v${VERSION})`);
+      expect(failure.message).toContain("devcoach ui --stop");
+      expect(first.listening).toBe(true);
+    } finally {
+      if (second.listening) second.close();
+      first.close();
+    }
+  });
+
+  it("startUi on a port held by another process reports it as busy (exit 1)", async () => {
+    const { createServer } = await import("node:net");
+    const { startUi } = await import("../src/web/app");
+    const other = createServer();
+    const port = await new Promise<number>((resolve) =>
+      other.listen(0, "127.0.0.1", () => resolve((other.address() as { port: number }).port)),
+    );
+    const onListenError = vi.fn();
+    const ui = startUi(port, { handleSignals: false, onListenError });
+    try {
+      // The raw socket accepts and never answers, so the /ping probe runs into its 1.5 s timeout.
+      await vi.waitFor(() => expect(onListenError).toHaveBeenCalledTimes(1), { timeout: 4000 });
+      const failure = onListenError.mock.calls[0][0];
+      expect(failure.exitCode).toBe(1);
+      expect(failure.existingUrl).toBeUndefined();
+      expect(failure.message).toContain(`Port ${port} is already in use by another process`);
+      expect(failure.message).toContain("--port <n>");
+    } finally {
+      if (ui.listening) ui.close();
+      other.close();
+    }
+  });
+
+  it("explainListenError words EACCES and unknown errors; pingUi is null off a dashboard", async () => {
+    const { explainListenError, pingUi } = await import("../src/web/app");
+    const eacces = Object.assign(new Error("listen EACCES"), { code: "EACCES" });
+    expect((await explainListenError(80, eacces)).message).toContain("permission denied");
+    const odd = Object.assign(new Error("boom"), { code: "EWEIRD" });
+    const failure = await explainListenError(7860, odd);
+    expect(failure.exitCode).toBe(1);
+    expect(failure.message).toContain("Could not start the devcoach UI on port 7860: boom");
+    // A non-devcoach answer on the port (ping rejects the body) counts as "another process".
+    const busy = Object.assign(new Error("in use"), { code: "EADDRINUSE" });
+    const foreign = await explainListenError(7860, busy, async () => null);
+    expect(foreign.existingUrl).toBeUndefined();
+    const { createServer } = await import("node:net");
+    const other = createServer();
+    const port = await new Promise<number>((resolve) =>
+      other.listen(0, "127.0.0.1", () => resolve((other.address() as { port: number }).port)),
+    );
+    other.close();
+    expect(await pingUi(port)).toBeNull();
+    const notOk = async () => new Response(JSON.stringify({ ok: false }), { status: 200 });
+    expect(await pingUi(port, notOk as unknown as typeof fetch)).toBeNull();
+    const err500 = async () => new Response("nope", { status: 500 });
+    expect(await pingUi(port, err500 as unknown as typeof fetch)).toBeNull();
+  });
 });
 
 describe("gracefulShutdown", () => {
