@@ -636,6 +636,27 @@ describe("mcp lesson sharing", () => {
   });
 });
 
+describe("mcp open_ui", () => {
+  it("reports a dashboard that already answers on the port instead of spawning one", async () => {
+    const { startUi } = await import("../src/web/app");
+    const server = startUi(0, { handleSignals: false });
+    const port = await new Promise<number>((resolve) =>
+      server.once("listening", () => resolve((server.address() as { port: number }).port)),
+    );
+    const { client, server: mcp } = await connect();
+    try {
+      const r: any = await client.callTool({ name: "open_ui", arguments: { port } });
+      expect(r.isError).toBeFalsy();
+      expect(text(r)).toBe(`devcoach UI is already running at http://localhost:${port}`);
+      expect(server.listening).toBe(true);
+    } finally {
+      await client.close();
+      await mcp.close();
+      server.close();
+    }
+  });
+});
+
 describe("mcp stop_ui", () => {
   it("stops a running dashboard (graceful) and reports when nothing listens", async () => {
     const { startUi } = await import("../src/web/app");

@@ -766,10 +766,15 @@ export function createServer(): McpServer {
         openWorldHint: true,
       },
     },
-    (args) => {
+    async (args) => {
       const port = args.port;
       if (!(port >= 1024 && port <= 65535)) {
         return { content: [txt(`error: port ${port} is out of valid range (1024-65535)`)] };
+      }
+      // A detached child on a busy port would just die unseen (stdio is ignored) — say so instead.
+      const { pingUi } = await import("../web/app");
+      if (await pingUi(port)) {
+        return { content: [txt(`devcoach UI is already running at http://localhost:${port}`)] };
       }
       const child = spawn(process.execPath, [process.argv[1] ?? "", "ui", "--port", String(port)], {
         detached: true,
