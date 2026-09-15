@@ -21,6 +21,7 @@ import {
 import { fetchSharedInput, isHttpUrl } from "../core/share-fetch";
 import { VERSION } from "../version";
 import { cmdDoctor, cmdInstall, cmdUninstall, skillHint } from "./install";
+import { openInBrowser } from "./open";
 import {
   type Column,
   c,
@@ -733,7 +734,7 @@ export { cmdLessonReady, cmdOnboardHook, cmdPromptHook, cmdStopHook };
 function printWelcome(): void {
   const commands: [string, string][] = [
     ["mcp", "Start the MCP server (stdio) for Claude Code / Claude Desktop"],
-    ["ui [--port N]", "Launch the web dashboard  (default port: 7860)"],
+    ["ui [--port N] [--open|--stop]", "Launch the web dashboard  (default port: 7860)"],
     ["setup", "First-run wizard: import backup or build your knowledge profile"],
     ["install", "Register MCP server + hooks + skill (Claude default; --gemini/--codex beta)"],
     [
@@ -1041,11 +1042,28 @@ function buildProgram(): Command {
 
   program
     .command("ui")
-    .description("Launch the web dashboard")
+    .description(
+      "Launch the web dashboard (Ctrl+C stops it gracefully; --stop stops a running one)",
+    )
     .option("--port <port>", "Port", "7860")
-    .action(async (opts: { port?: string }) => {
-      const { startUi } = await import("../web/app");
-      startUi(Number.parseInt(opts.port ?? "7860", 10) || 7860);
+    .option("-o, --open", "Open the dashboard in your default browser")
+    .option("--stop", "Stop the dashboard running on --port (e.g. one started by your agent)")
+    .action(async (opts: { port?: string; open?: boolean; stop?: boolean }) => {
+      const port = Number.parseInt(opts.port ?? "7860", 10) || 7860;
+      const { startUi, stopUi } = await import("../web/app");
+      if (opts.stop) {
+        log(
+          (await stopUi(port))
+            ? c.green(`✓ devcoach UI on port ${port} stopped`)
+            : c.yellow(`No devcoach UI is running on port ${port}`),
+        );
+        return;
+      }
+      startUi(port, {
+        onReady: (url) => {
+          if (opts.open) openInBrowser(url);
+        },
+      });
     });
 
   program

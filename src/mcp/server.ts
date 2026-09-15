@@ -1,5 +1,5 @@
 // MCP server on the official MCP TypeScript SDK v2 (@modelcontextprotocol/server).
-// 20 tools, 11 resources, and the devcoach_instructions prompt. Tools follow the build-mcp-server
+// 21 tools, 11 resources, and the devcoach_instructions prompt. Tools follow the build-mcp-server
 // review: title + hint annotations, tight Zod schemas with .describe(), outputSchema/structuredContent
 // for model returns, isError on failure. log_lesson is a pure save (never elicits);
 // feedback arrives next turn via submit_feedback.
@@ -777,6 +777,44 @@ export function createServer(): McpServer {
       });
       child.unref();
       return { content: [txt(`devcoach UI starting at http://localhost:${port}`)] };
+    },
+  );
+
+  server.registerTool(
+    "stop_ui",
+    {
+      title: "Stop UI",
+      description:
+        "Stop the devcoach web dashboard listening on port (whoever started it — open_ui or a " +
+        "terminal). Graceful: in-flight requests finish first. Reports stopped=false when nothing " +
+        "is running there. port must be 1024-65535.",
+      inputSchema: z.object({
+        port: z.number().int().default(7860).describe("Port (default 7860)"),
+      }),
+      annotations: {
+        title: "Stop UI",
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
+    },
+    async (args) => {
+      const port = args.port;
+      if (!(port >= 1024 && port <= 65535)) {
+        return { content: [txt(`error: port ${port} is out of valid range (1024-65535)`)] };
+      }
+      const { stopUi } = await import("../web/app");
+      const stopped = await stopUi(port);
+      return {
+        content: [
+          txt(
+            stopped
+              ? `devcoach UI on port ${port} stopped`
+              : `No devcoach UI is running on port ${port}`,
+          ),
+        ],
+        structuredContent: { stopped, port },
+      };
     },
   );
 

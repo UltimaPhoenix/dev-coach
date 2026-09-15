@@ -21,9 +21,11 @@ npx -y devcoach ui              # http://localhost:7860
 npx -y devcoach ui --port 8080  # custom port
 ```
 
-Installed devcoach globally or via Homebrew? Drop the `npx -y` and just run `devcoach ui`. The dashboard
-binds to `127.0.0.1` only, so it is never reachable from other machines. Or let Claude open it for you
-via the MCP tool:
+Installed devcoach globally or via Homebrew? Drop the `npx -y` and just run `devcoach ui`. The URL is
+printed as a clickable link (terminals that support OSC 8 hyperlinks — iTerm2, Ghostty, WezTerm, Kitty,
+VS Code, Windows Terminal, GNOME Terminal; elsewhere cmd/ctrl-click the plain URL), and `--open`
+launches your default browser as well. The dashboard binds to `127.0.0.1` only, so it is never
+reachable from other machines. Or let Claude open it for you via the MCP tool:
 
 ```
 open_ui({ port: 7860 })
@@ -32,6 +34,15 @@ open_ui({ port: 7860 })
 Using the [Claude Code plugin](../install/claude-code-plugin.md)? It ships a shortcut for exactly that —
 type `/devcoach:ui` (optionally with a port, e.g. `/devcoach:ui 8080`) and Claude starts the dashboard
 and hands you the URL. No install, no PATH needed.
+
+## Stop
+
+- In the terminal that runs `devcoach ui`: **Ctrl+C**. The shutdown is graceful — the server stops
+  accepting, lets requests in flight finish (up to 2 s), then exits; a second Ctrl+C exits at once.
+- A dashboard started by your agent (`open_ui`, `/devcoach:ui`) runs detached, so Ctrl+C cannot reach
+  it: ask the agent to close it (`/devcoach:ui stop`, or *"stop the devcoach dashboard"* → the
+  `stop_ui` tool), or run `devcoach ui --stop` (add `--port` if you changed it). Both work on any
+  dashboard listening on that port.
 
 ---
 

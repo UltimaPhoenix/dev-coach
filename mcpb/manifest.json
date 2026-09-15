@@ -105,6 +105,10 @@
       "description": "Launch the web dashboard"
     },
     {
+      "name": "stop_ui",
+      "description": "Stop the web dashboard"
+    },
+    {
       "name": "complete_onboarding",
       "description": "Save the initial profile"
     }

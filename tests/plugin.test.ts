@@ -140,7 +140,7 @@ describe("claude code plugin packaging", () => {
   // mcp__devcoach__ name only exists when devcoach is wired as a plain MCP server — every
   // command allows both spellings of the tools it needs.
   it.each([
-    ["ui", ["open_ui"]],
+    ["ui", ["open_ui", "stop_ui"]],
     ["share", ["share_lesson", "get_lessons"]],
     ["import", ["import_lesson", "add_topic"]],
   ])("ships the /devcoach:%s command wired to its tools", (name, tools) => {

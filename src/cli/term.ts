@@ -19,8 +19,38 @@ export function colorize(name: "green" | "yellow" | "red", s: string): string {
   return name === "green" ? c.green(s) : name === "yellow" ? c.yellow(s) : c.red(s);
 }
 
-// biome-ignore lint/suspicious/noControlCharactersInRegex: matching ANSI escapes is intentional
-const ANSI_RE = /\[[0-9;]*m/g;
+/**
+ * OSC 8 terminal hyperlinks — the "clickable URL" escape (`ESC ] 8 ; ; url BEL text ESC ] 8 ; ; BEL`).
+ * Emitted only for terminals known to render it: unknown ones may print the raw bytes, and every
+ * terminal already makes a plain http:// URL cmd/ctrl-clickable on its own. Mirrors the checks of
+ * the `supports-hyperlinks` package without the dependency; Apple's Terminal.app is left out on
+ * purpose (it shows OSC 8 as text). FORCE_HYPERLINK=1 overrides, NO_COLOR / a pipe disable.
+ */
+export function supportsHyperlinks(
+  env: NodeJS.ProcessEnv = process.env,
+  isTTY: boolean = Boolean(process.stdout.isTTY),
+): boolean {
+  if (env.FORCE_HYPERLINK && env.FORCE_HYPERLINK !== "0") return true;
+  if (!isTTY || env.NO_COLOR || env.TERM === "dumb") return false;
+  const program = env.TERM_PROGRAM ?? "";
+  if (["iTerm.app", "WezTerm", "vscode", "Hyper", "ghostty", "Tabby", "rio"].includes(program)) {
+    return true;
+  }
+  if (["xterm-kitty", "alacritty", "xterm-ghostty", "wezterm"].includes(env.TERM ?? ""))
+    return true;
+  if (env.KITTY_WINDOW_ID || env.WT_SESSION) return true;
+  if (Number(env.VTE_VERSION ?? 0) >= 5000) return true;
+  if (Number(env.KONSOLE_VERSION ?? 0) >= 220000) return true;
+  return false;
+}
+
+/** `url` as a clickable terminal link (OSC 8) where supported, otherwise the plain text. */
+export function link(url: string, text = url): string {
+  return supportsHyperlinks() ? `\u001b]8;;${url}\u0007${text}\u001b]8;;\u0007` : text;
+}
+
+// biome-ignore lint/suspicious/noControlCharactersInRegex: matching ANSI/OSC escapes is intentional
+const ANSI_RE = /\u001b\[[0-9;]*m|\u001b\]8;;[^\u0007\u001b]*(?:\u0007|\u001b\\)/g;
 export const stripAnsi = (s: string): string => s.replace(ANSI_RE, "");
 const width = (s: string): number => [...stripAnsi(s)].length;
 

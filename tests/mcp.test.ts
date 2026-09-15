@@ -23,10 +23,10 @@ async function connect() {
 const text = (r: any): string => r.content[0].text;
 
 describe("mcp server", () => {
-  it("lists 20 tools, 10 resources + 1 template, 1 prompt", async () => {
+  it("lists 21 tools, 10 resources + 1 template, 1 prompt", async () => {
     const { client, server } = await connect();
     const tools = (await client.listTools()).tools;
-    expect(tools).toHaveLength(20);
+    expect(tools).toHaveLength(21);
     const names = tools.map((t: any) => t.name);
     expect(names).toContain("preview_deep_scan");
     // State reads are tools: tool names resolve in every client, resource reads need the
@@ -633,5 +633,30 @@ describe("mcp lesson sharing", () => {
     expect(cleared.structuredContent.share_name).toBeNull();
     await client.close();
     await server.close();
+  });
+});
+
+describe("mcp stop_ui", () => {
+  it("stops a running dashboard (graceful) and reports when nothing listens", async () => {
+    const { startUi } = await import("../src/web/app");
+    const server = startUi(0, { handleSignals: false });
+    const port = await new Promise<number>((resolve) =>
+      server.once("listening", () => resolve((server.address() as { port: number }).port)),
+    );
+    const closed = new Promise<void>((resolve) => server.once("close", () => resolve()));
+    const { client, server: mcp } = await connect();
+    try {
+      const r: any = await client.callTool({ name: "stop_ui", arguments: { port } });
+      expect(r.isError).toBeFalsy();
+      expect(r.structuredContent).toEqual({ stopped: true, port });
+      await closed; // the http server really closed
+      const again: any = await client.callTool({ name: "stop_ui", arguments: { port } });
+      expect(again.structuredContent).toEqual({ stopped: false, port });
+      const bad: any = await client.callTool({ name: "stop_ui", arguments: { port: 80 } });
+      expect(text(bad)).toContain("out of valid range");
+    } finally {
+      await client.close();
+      await mcp.close();
+    }
   });
 });

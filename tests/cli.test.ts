@@ -1008,3 +1008,97 @@ describe("cli uninstall", () => {
     }
   });
 });
+
+describe("cli ui — link, --open, --stop, graceful shutdown", () => {
+  it("browserCommand picks the platform opener", async () => {
+    const { browserCommand } = await import("../src/cli/open");
+    expect(browserCommand("darwin", "http://x")).toEqual(["open", ["http://x"]]);
+    expect(browserCommand("win32", "http://x")).toEqual(["cmd", ["/c", "start", "", "http://x"]]);
+    expect(browserCommand("linux", "http://x")).toEqual(["xdg-open", ["http://x"]]);
+  });
+
+  it("startUi prints the URL, hands it to onReady, and POST /shutdown closes it gracefully", async () => {
+    const { startUi } = await import("../src/web/app");
+    const lines: string[] = [];
+    const logSpy = vi.spyOn(console, "log").mockImplementation((...a) => lines.push(a.join(" ")));
+    let readyUrl = "";
+    const server = startUi(0, { handleSignals: false, onReady: (u) => (readyUrl = u) });
+    const port = await new Promise<number>((resolve) =>
+      server.once("listening", () => resolve((server.address() as { port: number }).port)),
+    );
+    const closed = new Promise<void>((resolve) => server.once("close", () => resolve()));
+    try {
+      await vi.waitFor(() => expect(readyUrl).toBe(`http://localhost:${port}`));
+      expect(lines.join("\n")).toContain(`running at http://localhost:${port}`);
+      // GET is not a stop; a cross-site POST is refused; a same-origin POST stops it
+      expect((await fetch(`http://127.0.0.1:${port}/shutdown`)).status).toBe(405);
+      const cross = await fetch(`http://127.0.0.1:${port}/shutdown`, {
+        method: "POST",
+        headers: { "sec-fetch-site": "cross-site" },
+      });
+      expect(cross.status).toBe(403);
+      expect(server.listening).toBe(true);
+      const ok = await fetch(`http://127.0.0.1:${port}/shutdown`, { method: "POST" });
+      expect(await ok.json()).toEqual({ ok: true });
+      await closed;
+      expect(server.listening).toBe(false);
+    } finally {
+      logSpy.mockRestore();
+      if (server.listening) server.close();
+    }
+  });
+
+  it("ui --stop reports stopped / not running", async () => {
+    const { startUi } = await import("../src/web/app");
+    const server = startUi(0, { handleSignals: false });
+    const port = await new Promise<number>((resolve) =>
+      server.once("listening", () => resolve((server.address() as { port: number }).port)),
+    );
+    const closed = new Promise<void>((resolve) => server.once("close", () => resolve()));
+    expect((await run(["ui", "--stop", "--port", String(port)])).out).toContain("stopped");
+    await closed;
+    expect((await run(["ui", "--stop", "--port", String(port)])).out).toContain(
+      "No devcoach UI is running",
+    );
+  });
+});
+
+describe("gracefulShutdown", () => {
+  it("lets an in-flight response finish, refuses new connections, then closes", async () => {
+    const { gracefulShutdown } = await import("../src/web/app");
+    const { createServer } = await import("node:http");
+    const server = createServer((_req, res) => {
+      setTimeout(() => res.end("done"), 400); // a slow handler, still running when we shut down
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const port = (server.address() as { port: number }).port;
+    const inflight = fetch(`http://127.0.0.1:${port}/slow`);
+    await new Promise((r) => setTimeout(r, 100)); // the request is accepted and being handled
+    const t0 = Date.now();
+    const done = gracefulShutdown(server, 2000);
+    const res = await inflight;
+    expect(res.status).toBe(200);
+    expect(await res.text()).toBe("done"); // finished, not cut
+    await done;
+    expect(Date.now() - t0).toBeLessThan(1500); // closed as soon as the drain completed, not at the deadline
+    expect(server.listening).toBe(false);
+    await expect(fetch(`http://127.0.0.1:${port}/slow`)).rejects.toThrow(); // nothing listens any more
+  });
+
+  it("cuts connections that outlive the grace period", async () => {
+    const { gracefulShutdown } = await import("../src/web/app");
+    const { createServer } = await import("node:http");
+    const server = createServer((_req, res) => {
+      res.write("partial"); // never ends — a hung response
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const port = (server.address() as { port: number }).port;
+    const hung = fetch(`http://127.0.0.1:${port}/hang`).then((r) => r.text());
+    await new Promise((r) => setTimeout(r, 100));
+    const t0 = Date.now();
+    await gracefulShutdown(server, 300);
+    expect(Date.now() - t0).toBeGreaterThanOrEqual(250);
+    expect(server.listening).toBe(false);
+    await expect(hung).rejects.toThrow(); // the hung response was terminated at the deadline
+  });
+});
