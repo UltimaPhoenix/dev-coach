@@ -4,7 +4,7 @@ Notable changes to devcoach. Versions follow [Semantic Versioning](https://semve
 
 ---
 
-## [Unreleased]
+## [2.2.1] — 2026-09-15
 
 ### Fixed
 - **Share page — dashboard check tells the truth.** Safari (WebKit) blocks every request from an
