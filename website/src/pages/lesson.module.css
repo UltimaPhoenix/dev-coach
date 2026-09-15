@@ -191,3 +191,13 @@
   font-size: 0.8rem;
   color: var(--ifm-color-emphasis-600);
 }
+/* The wordmark link follows the navbar treatment ("dev" in the theme foreground, "coach" in the
+   teal accent), not the link colour — and never an underline. */
+.footer a,
+.footer a:hover {
+  color: var(--ifm-font-color-base);
+  text-decoration: none;
+}
+.footer a:hover :global(.devcoach-wm) {
+  opacity: 0.8;
+}
