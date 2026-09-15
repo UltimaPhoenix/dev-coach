@@ -195,6 +195,10 @@ checkpoints, never touch the notebook.
   `share_lesson({lesson_id})` (see Sharing)
 - "Import this lesson" / a pasted `devcoach:lesson:` code, link or URL →
   `import_lesson({payload})` verbatim
+- "Open the dashboard" → `open_ui` (optional `port`); report the URL
+- "Close / stop the dashboard" → `stop_ui` (same `port`) — it stops whichever dashboard listens
+  there, one you opened or one started from a terminal; if the user runs `devcoach ui` in their own
+  terminal, Ctrl+C there stops it just as gracefully (in-flight requests finish)
 - "Lessons shared with me" → `get_lessons({imported: true})`
 - "Show me the lesson X shared" → `get_lessons({imported: true, search})` → the card,
   without `log_lesson` or the feedback line (see `references/sharing.md`)

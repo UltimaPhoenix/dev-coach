@@ -27,7 +27,7 @@ clients can look it up by that name and install it directly; the entry resolves 
 `npx -y devcoach mcp` command as the manual configuration above, so both paths run the identical
 local server.
 
-## Tools (20)
+## Tools (21)
 
 | Tool | Purpose | Annotation |
 |---|---|---|
@@ -50,6 +50,7 @@ local server.
 | `share_lesson` | Hand a lesson to another person: `transport` `text` (default — the card plus one `devcoach:lesson:1:…` line), `link` (server-less URL on the docs site) or `file` (`.devcoach.md` contents + `filename`); `include_context` (default false) adds project/branch/commit/task — a local folder path never travels; `shared_by` overrides the `share_name` setting / git `user.name` (empty = anonymous). Returns a `reply_check` telling the model to print the code verbatim in a fenced block | read-only |
 | `import_lesson` | Store a lesson someone shared — `payload` is whatever the user handed over, verbatim: the code, the whole card, a share link, a URL (fetched, 5 s / 256 KB), `.devcoach.md` text or a lessons JSON export. Returns `{ kind, inserted, duplicated, invalid, lesson, topic_tracked }`; a duplicate is a normal outcome, not an error. Imported lessons never count against the daily limit | write |
 | `open_ui` | Launch the web dashboard in the background on `127.0.0.1` (`port` 1024–65535, default 7860) | open-world |
+| `stop_ui` | Stop the dashboard listening on `port` (whoever started it) — graceful, in-flight requests finish; `stopped: false` when nothing runs there | open-world, idempotent |
 | `complete_onboarding` | Save the initial profile (topics + groups) and mark onboarding done; guarantees a non-empty notebook placeholder (the model writes the real notebook directly, see [privacy.md](privacy.md)) | **destructive** |
 
 Each tool declares a `title` and read-only/destructive hints, validates input with Zod, returns typed

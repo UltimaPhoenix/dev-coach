@@ -54,9 +54,11 @@ dev-coach/
 │   │   ├── git.ts  detect.ts  prompts.ts   # prompts.ts renders the lesson card (formatLessonForDisplay)
 │   │   ├── share.ts  share-fetch.ts   # lesson sharing: payload, code/link/.devcoach.md codecs, parseSharedInput; URL fetch
 │   │   ├── claude-history.ts   # cross-project stack scan of ~/.claude (projects map, manifests, activity, memories)
-│   ├── mcp/server.ts       # McpServer: 20 tools + 11 resources + devcoach_instructions prompt
-│   ├── cli/commands.ts     # Commander dispatcher (33 subcommands: 25 visible + 8 hidden hooks) + term.ts
-│   └── web/app.ts          # Hono app (24 routes) + views.ts (hono/html pages); assets/static/share.js
+│   ├── mcp/server.ts       # McpServer: 21 tools + 11 resources + devcoach_instructions prompt
+│   ├── cli/commands.ts     # Commander dispatcher (33 subcommands: 25 visible + 8 hidden hooks) + term.ts (colours, tables, OSC 8 link()) + open.ts (browser)
+│   └── web/app.ts          # Hono app (26 routes incl. POST /shutdown) + views.ts (hono/html pages); assets/static/share.js
+│                           #   startUi returns the server; SIGINT/SIGTERM/SIGHUP → gracefulShutdown (close, 2 s drain, exit);
+│                           #   the open_ui child is detached, so stop_ui / `ui --stop` POST /shutdown (same-origin guarded)
 ├── tests/                  # Vitest (16 files: core, db-extra, coach/git/claude-history, share, mcp, mcpb, web,
 │                           #   cli, setup-wizard, hooks, hooks-spawn, plugin, gemini-extension, mcp-registry, …)
 ├── website/src/pages/lesson.tsx  # the share link's landing page (+ src/lib/shareCode.ts: browser decoder)
@@ -75,12 +77,12 @@ dev-coach/
 
 ---
 
-## Exposed MCP tools (20)
+## Exposed MCP tools (21)
 
 `log_lesson`, `skip_lesson`, `update_knowledge`, `get_lessons`, `star_lesson`, `delete_lesson`,
 `submit_feedback`, `add_topic`, `remove_topic`, `add_group`, `remove_group`, `update_settings`,
 `open_ui`, `complete_onboarding`, `preview_deep_scan`, `get_briefing`, `get_onboarding`, `get_profile`,
-`share_lesson`, `import_lesson`.
+`share_lesson`, `import_lesson`, `stop_ui`.
 
 Every tool registers a `title` + read-only/destructive annotations, a tight Zod `inputSchema` with
 `.describe()` on each param, `outputSchema`/`structuredContent` for model-shaped returns

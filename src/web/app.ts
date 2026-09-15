@@ -3,8 +3,9 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, extname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { serve } from "@hono/node-server";
+import { type ServerType, serve } from "@hono/node-server";
 import { type Context, Hono } from "hono";
+import { c, link } from "../cli/term";
 import * as coach from "../core/coach";
 import * as db from "../core/db";
 import { detectGitUserName } from "../core/git";
@@ -140,7 +141,12 @@ function uiTheme(): string {
 
 // ── App ──────────────────────────────────────────────────────────────────────
 
-export function createApp(): Hono {
+export interface AppOptions {
+  /** Invoked by POST /shutdown after the response is sent (startUi wires the graceful stop). */
+  onShutdown?: () => void;
+}
+
+export function createApp(opts: AppOptions = {}): Hono {
   const app = new Hono();
 
   app.get("/static/*", (c) => {
@@ -160,6 +166,16 @@ export function createApp(): Hono {
   // ── Ping (the docs site's share page asks "is a dashboard running?") ─────
   app.get("/ping", (c) => c.json({ ok: true, version: VERSION }, 200, PING_HEADERS));
   app.options("/ping", (c) => c.body(null, 204, PING_HEADERS));
+
+  // ── Shutdown (`devcoach ui --stop`, the stop_ui tool) ─────────────────────
+  // The dashboard started by the MCP open_ui tool is detached from any terminal, so Ctrl-C cannot
+  // reach it; this is its off switch. Same-origin only: a web page elsewhere must not stop it.
+  app.post("/shutdown", (c) => {
+    if (isCrossSite(c)) return c.text("Forbidden", 403);
+    setTimeout(() => opts.onShutdown?.(), 50); // answer first, then close
+    return c.json({ ok: true });
+  });
+  app.get("/shutdown", (c) => c.text("Method Not Allowed", 405));
 
   // ── Profile ──────────────────────────────────────────────────────────────
   app.get("/", (c) => {
@@ -559,9 +575,77 @@ export function createApp(): Hono {
   return app;
 }
 
-export function startUi(port: number): void {
-  const app = createApp();
-  serve({ fetch: app.fetch, port, hostname: "127.0.0.1" }, (info) => {
-    console.log(`devcoach UI running at http://localhost:${info.port}`);
+/**
+ * Stop accepting, let in-flight responses finish for `graceMs`, then cut what is left.
+ * Resolves once the server is closed; never rejects.
+ */
+export function gracefulShutdown(server: ServerType, graceMs = 2000): Promise<void> {
+  // serve() returns an http.Server here; the union type also admits http2 servers, which lack
+  // the connection helpers — hence the optional calls.
+  const http = server as Partial<import("node:http").Server> & ServerType;
+  return new Promise((resolve) => {
+    const deadline = setTimeout(() => {
+      http.closeAllConnections?.();
+    }, graceMs);
+    // A keep-alive socket turns idle the moment its response ends; sweep those every 100 ms so
+    // close() completes as soon as the last in-flight response is out, not at the deadline.
+    const sweep = setInterval(() => http.closeIdleConnections?.(), 100);
+    server.close(() => {
+      clearTimeout(deadline);
+      clearInterval(sweep);
+      resolve();
+    });
+    http.closeIdleConnections?.();
   });
+}
+
+export interface StartUiOptions {
+  /** Called with the dashboard URL once it listens (used by `--open`). */
+  onReady?: (url: string) => void;
+  /** Install SIGINT/SIGTERM/SIGHUP handlers that shut down gracefully (default: true). */
+  handleSignals?: boolean;
+}
+
+export function startUi(port: number, opts: StartUiOptions = {}): ServerType {
+  let stopping = false;
+  // Stop accepting, drain, and let the process end on its own once the server is closed (nothing
+  // else keeps the event loop alive: DB connections are per request). Signals add a hard exit so
+  // a second Ctrl-C always wins.
+  const stop = (why: string, exitAfter: boolean): void => {
+    if (stopping) {
+      if (exitAfter) process.exit(130);
+      return;
+    }
+    stopping = true;
+    if (process.stdout.isTTY) console.log(c.dim(`devcoach UI stopping (${why})…`));
+    void gracefulShutdown(server).then(() => {
+      if (exitAfter) process.exit(0);
+    });
+  };
+  const app = createApp({ onShutdown: () => stop("stop requested", false) });
+  const server = serve({ fetch: app.fetch, port, hostname: "127.0.0.1" }, (info) => {
+    const url = `http://localhost:${info.port}`;
+    console.log(`devcoach UI running at ${c.cyan(link(url))}`);
+    if (process.stdout.isTTY) console.log(c.dim("Press Ctrl+C to stop"));
+    opts.onReady?.(url);
+  });
+  if (opts.handleSignals !== false) {
+    for (const sig of ["SIGINT", "SIGTERM", "SIGHUP"] as const) {
+      process.on(sig, () => stop(sig, true));
+    }
+  }
+  return server;
+}
+
+/** Ask the dashboard on `port` to shut down; false when nothing answers there. */
+export async function stopUi(port: number, fetchImpl: typeof fetch = fetch): Promise<boolean> {
+  try {
+    const res = await fetchImpl(`http://127.0.0.1:${port}/shutdown`, {
+      method: "POST",
+      signal: AbortSignal.timeout(3000),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
 }

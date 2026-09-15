@@ -4,6 +4,15 @@ Notable changes to devcoach. Versions follow [Semantic Versioning](https://semve
 
 ---
 
+## [Unreleased]
+
+### Added
+- **`devcoach ui`**: the dashboard URL is printed as a clickable terminal link (OSC 8, in terminals
+  that render it), `--open` launches your default browser, and **Ctrl+C now stops the server
+  gracefully** (in-flight requests finish; a second Ctrl+C exits at once). `devcoach ui --stop` and the
+  new **`stop_ui`** MCP tool (20 → 21 tools; `/devcoach:ui stop` in the plugin) stop a dashboard that
+  runs detached — the one your agent started with `open_ui` — through a same-origin `POST /shutdown`.
+
 ## [2.2.1] — 2026-09-15
 
 ### Fixed

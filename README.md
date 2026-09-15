@@ -386,10 +386,12 @@ Every lesson stores **where it happened** — your project folder, repository, b
 Open the dashboard at any time to review your progress, edit your profile, or manage settings:
 
 ```bash
-npx -y devcoach ui   # → http://localhost:7860
+npx -y devcoach ui          # → http://localhost:7860 (printed as a clickable link; Ctrl+C stops it)
+npx -y devcoach ui --open   # …and open it in your browser
+npx -y devcoach ui --stop   # stop a running dashboard, e.g. one your agent started
 ```
 
-Using the Claude Code plugin? Type `/devcoach:ui` in Claude Code instead — no install needed.
+Using the Claude Code plugin? Type `/devcoach:ui` in Claude Code instead — no install needed (`/devcoach:ui stop` closes it).
 
 | Page | What you can do |
 |------|-----------------|
