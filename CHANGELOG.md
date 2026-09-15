@@ -14,6 +14,9 @@ Notable changes to devcoach. Versions follow [Semantic Versioning](https://semve
   *retry the check* link replaces reloading. The Import button was never affected.
 
 ### Changed
+- Docs: Homebrew page explains that `brew upgrade` updates only the binary (re-run `devcoach install`
+  for hooks and skill) and recommends **plugin + Homebrew** for Claude Code users — the plugin keeps the
+  coaching wiring current automatically, Homebrew adds the CLI.
 - Docs: one install path for the Claude Code plugin — the UltimaPhoenix marketplace (pinned to each
   release by CI); the repo's own marketplace is a maintainer path now. The CLI is documented as a
   companion to the plugin (`devcoach ui`, `stats`, `share` / `import`, `backup` without going

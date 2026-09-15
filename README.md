@@ -96,7 +96,7 @@ brew install devcoach
 devcoach install
 ```
 
-`brew tap` registers the third-party repository; `brew trust --tap` marks it trusted so Homebrew will load its formulae when `HOMEBREW_REQUIRE_TAP_TRUST` is set. Both are one-time. To update later: `brew upgrade devcoach`. One-liner: `brew install UltimaPhoenix/tap/devcoach` (run `brew trust --tap UltimaPhoenix/tap` first if your Homebrew enforces tap trust). The formula declares `depends_on "node"`, so Homebrew pulls in a recent Node automatically.
+`brew tap` registers the third-party repository; `brew trust --tap` marks it trusted so Homebrew will load its formulae when `HOMEBREW_REQUIRE_TAP_TRUST` is set. Both are one-time. To update later: `brew upgrade devcoach`, then `devcoach install` again — Homebrew updates only the binary, the hooks and the skill it wired into your agents are refreshed by that second command (the [Claude Code plugin](#claude-code-plugin-recommended-for-claude-code) does this automatically, which is why **plugin + Homebrew** is the nicest combination for Claude Code users: the plugin owns the coaching wiring, Homebrew adds the CLI — and then you skip `devcoach install`). One-liner: `brew install UltimaPhoenix/tap/devcoach` (run `brew trust --tap UltimaPhoenix/tap` first if your Homebrew enforces tap trust). The formula declares `depends_on "node"`, so Homebrew pulls in a recent Node automatically.
 
 ### Claude Code plugin (recommended for Claude Code)
 
