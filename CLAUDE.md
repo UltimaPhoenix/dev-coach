@@ -248,9 +248,10 @@ hook (verified empirically) — hence priming-first design; blocks are the rare 
 - **Branching model**: `develop` is the integration branch — every PR (features, Dependabot, the
   screenshots workflow) targets it; `main` only ever receives release commits, fast-forwarded by the
   `bump` job, so it is always the last release. `main` stays the **default branch** on purpose:
-  the self-marketplace (`/plugin marketplace add UltimaPhoenix/dev-coach`, `source: "./plugin"`) clones
-  the default branch and `claude plugin marketplace add` has no ref option, so whatever is on `main`
-  is what plugin users install. Feature branches from `develop`; hotfixes from `main` (release on
+  the self-marketplace (`/plugin marketplace add UltimaPhoenix/dev-coach`, `source: "./plugin"` — the
+  maintainer / local-testing path; user docs point only at `UltimaPhoenix/claude-plugins-marketplace`,
+  which CI pins to each release tag) clones the default branch and `claude plugin marketplace add` has
+  no ref option, so whatever is on `main` is what that path installs. Feature branches from `develop`; hotfixes from `main` (release on
   `main`, then merge `main` into `develop` — the next release preflight refuses to run until
   `main` is an ancestor of `develop`). Release pushes carry `[skip ci]`, so `main` never gets a
   CI run: SonarCloud's main branch and the README CI badge point at `develop`.

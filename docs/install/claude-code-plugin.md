@@ -24,54 +24,46 @@ automatically, and `devcoach doctor` flags a double registration.
 
 ## Install
 
-### A — straight from this repo
-
-```bash
-/plugin marketplace add UltimaPhoenix/dev-coach
-/plugin install devcoach@devcoach
-```
-
-### B — from the marketplace (add once, install any plugin)
+Add the UltimaPhoenix marketplace once, then install devcoach from it:
 
 ```bash
 /plugin marketplace add UltimaPhoenix/claude-plugins-marketplace
 /plugin install devcoach@ultimaphoenix
 ```
 
-Adding the marketplace once gives you every UltimaPhoenix plugin; update later with
-`/plugin marketplace update`.
+The marketplace is pinned to each devcoach release by CI and carries every UltimaPhoenix plugin, so a
+new one is a single `/plugin install` away. The MCP server, hooks and skill activate on install — no
+restart needed.
 
-## About the personal marketplace
-
-The **UltimaPhoenix marketplace** (`UltimaPhoenix/claude-plugins-marketplace`) is a curated collection of plugins maintained by the devcoach author. It includes:
-
-- **devcoach** — the primary tool (what you're installing)
-- **Other plugins** — additional utilities and tools (available as they're added)
-
-**Why use it?** If you plan to use multiple plugins from this source, add the marketplace once and you can install any of them without needing to add each repo individually. When a new plugin is released, it's immediately available in your Claude Code plugin menu.
-
-**How to update:** If you've already added the marketplace, get the latest versions of all plugins:
+### Updating
 
 ```bash
-/plugin marketplace update
+/plugin marketplace update ultimaphoenix
 ```
 
-This updates your local plugin registry without reinstalling — only new versions are fetched if they've been updated since you last added the marketplace.
+This refreshes your local copy of the marketplace so it points at the latest releases; Claude Code then
+offers the update for the plugins you have installed. **Install fails with "invalid manifest …
+repository: expected string"?** Plugin releases up to 1.0.1 shipped a manifest that current Claude Code
+rejects — run the update above, then `/plugin install devcoach@ultimaphoenix` again.
 
-**Install fails with "invalid manifest … repository: expected string"?** Plugin releases up to 1.0.1 shipped a manifest that current Claude Code rejects. Run `/plugin marketplace update ultimaphoenix` so the marketplace points at the latest release, then `/plugin install devcoach@ultimaphoenix` again.
+### Installed it straight from the repo earlier?
 
-**Switching methods:** If you added devcoach straight from the repo (`UltimaPhoenix/dev-coach`) and later want to switch to the marketplace, remove the old one and add the marketplace:
+Older docs also showed `/plugin marketplace add UltimaPhoenix/dev-coach`. That path still works, but it
+tracks the repository's `main` branch rather than a pinned release and only ever contains devcoach.
+Move over once:
 
 ```bash
-/plugin marketplace remove UltimaPhoenix/dev-coach
+/plugin uninstall devcoach@devcoach
+/plugin marketplace remove devcoach
 /plugin marketplace add UltimaPhoenix/claude-plugins-marketplace
 /plugin install devcoach@ultimaphoenix
 ```
 
-### C — offline (download from a release)
+### Offline install
 
 Download `devcoach-plugin-<version>.zip` from the [GitHub Releases](https://github.com/UltimaPhoenix/dev-coach/releases),
-unzip it, then point Claude Code at the unzipped folder:
+unzip it, then point Claude Code at the unzipped folder (the zip carries its own marketplace, named
+`devcoach`):
 
 ```bash
 /plugin marketplace add /path/to/unzipped-folder
@@ -96,28 +88,38 @@ skip straight to `node` — and it only re-installs when a plugin update bumps t
 3. **`skills/devcoach/SKILL.md`** → the coaching playbook, auto-loaded so the agent knows *how* to
    teach when a hook fires.
 
-## Running the CLI & web dashboard
+## The CLI next to the plugin
 
-The plugin gives Claude Code everything it needs to coach you, but it keeps devcoach inside its own data
-dir — it does **not** put the `devcoach` **CLI** on your `PATH`. You still have three ways in, from
-zero-install to full CLI:
+The plugin does the coaching on its own and keeps devcoach inside its own data dir — it does **not**
+put the `devcoach` **CLI** on your `PATH`. The CLI stays a useful companion whenever you want the
+dashboard or your data *without going through Claude*:
+
+```bash
+devcoach ui                    # the web dashboard, from a terminal — no Claude session needed
+devcoach stats                 # counts, weakest and strongest topics
+devcoach lessons --period week # browse the log; devcoach lesson <id> shows one in full
+devcoach share --last          # hand a lesson to a teammate; devcoach import adds theirs
+devcoach backup ~/dc.zip       # profile + lessons + notebook in one file (devcoach restore to load it)
+devcoach doctor                # check the wiring and why the next stop would (not) cue a lesson
+```
+
+Three ways to reach it, from zero-install to a bare command:
 
 1. **From inside Claude Code — nothing to install.** Type `/devcoach:ui` (optionally with a port,
    e.g. `/devcoach:ui 8080`), or just ask — *"open the devcoach dashboard"*. The plugin also ships
    `/devcoach:share [last | <id> | about <topic>] [as link|file]` and `/devcoach:import <code or link>`
-   for [sharing lessons](../usage/sharing.md). Either way Claude calls
-   the `open_ui` tool, which starts the [web dashboard](../usage/web-ui.md) from the plugin's own
-   copy and gives you the URL (default http://localhost:7860).
+   for [sharing lessons](../usage/sharing.md). Either way Claude calls the `open_ui` / sharing tools
+   from the plugin's own copy and reports the URL (default http://localhost:7860).
 2. **From a terminal, without installing** — prefix any [CLI command](../usage/cli.md) with `npx -y`:
-
-   ```bash
-   npx -y devcoach ui        # open the web dashboard
-   npx -y devcoach stats     # any other command works the same way
-   ```
-
+   `npx -y devcoach ui`, `npx -y devcoach stats`, …
 3. **A bare `devcoach` command** — install the npm package globally (`npm install -g devcoach`) or via
-   [Homebrew](./homebrew.md) — running it alongside the plugin is fine. The plugin owns the coaching
-   hooks; the global binary just adds the CLI.
+   [Homebrew](./homebrew.md). Running it alongside the plugin is fine: both read the same
+   `~/.devcoach/coaching.db`.
+
+One rule: with the plugin, **never run `devcoach install`** — the plugin already owns the coaching hooks
+and the skill, and a second registration would double-count interactions (`install` detects an enabled
+plugin and skips the hooks; `devcoach doctor` flags a double registration). Likewise there is nothing
+for `devcoach uninstall` to undo: removing the plugin is `/plugin uninstall devcoach@ultimaphoenix`.
 
 ## Runs locally only
 

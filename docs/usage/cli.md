@@ -10,6 +10,15 @@ backups, and tuning settings without leaving the shell. It's a power-user compan
 [coaching in your agent](./coaching.md); everything here is also available in the
 [web dashboard](./web-ui.md).
 
+:::tip[Using the Claude Code plugin?]
+The plugin does the coaching by itself and does not put `devcoach` on your `PATH`, but the CLI is a
+useful companion whenever you want the dashboard or your data without going through Claude —
+`devcoach ui`, `stats`, `lessons`, `share` / `import`, `backup`. Run it with `npx -y devcoach …`, or
+install [Homebrew](../install/homebrew.md) / `npm i -g devcoach` for a bare command. Two commands are
+**not** for plugin users: `devcoach install` and `devcoach uninstall` — the plugin owns the hooks and
+the skill (`/plugin uninstall devcoach@ultimaphoenix` removes them).
+:::
+
 Built on [Commander](https://github.com/tj/commander.js), so every command supports `--help`.
 
 ```bash

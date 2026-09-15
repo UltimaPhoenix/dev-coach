@@ -4,6 +4,14 @@ Notable changes to devcoach. Versions follow [Semantic Versioning](https://semve
 
 ---
 
+## [Unreleased]
+
+### Changed
+- Docs: one install path for the Claude Code plugin — the UltimaPhoenix marketplace (pinned to each
+  release by CI); the repo's own marketplace is a maintainer path now. The CLI is documented as a
+  companion to the plugin (`devcoach ui`, `stats`, `share` / `import`, `backup` without going
+  through Claude — never `devcoach install` next to the plugin).
+
 ## [2.2.0] — 2026-09-14
 
 ### Added
