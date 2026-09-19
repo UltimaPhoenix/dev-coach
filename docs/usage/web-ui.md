@@ -128,11 +128,12 @@ under its topic.
   later.
 - **Reset column widths** — see below.
 
-**Resizable columns** — on desktop widths, drag the right edge of a column header to resize it. The
-title column has no handle of its own: it takes whatever the others leave, and every drag stops before
-it would squeeze the title below a readable width, so no column can ever be pushed out of view. Widths
-are remembered in this browser (and dropped if they no longer fit the window); double-click a handle to
-reset that column, or use **⋯ → Reset column widths**.
+**Resizable columns** — on desktop widths, drag the boundary between two column headers: the column
+on one side grows exactly as much as its neighbour shrinks, so the table never changes width and no
+column can be pushed out of view. The title column takes whatever its neighbours give or take and never
+drops below a readable width. Widths are remembered in this browser (and dropped if they no longer fit
+the window); double-click a boundary to reset the two columns beside it, or use **⋯ → Reset column
+widths**.
 
 **＋ Import** (toolbar, right) — add a lesson someone shared with you: paste the code, the link, a
 URL, or the whole copied card into the box, pick a `.devcoach.md` file, or simply **drop the file

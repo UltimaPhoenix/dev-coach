@@ -1,12 +1,12 @@
 // Drag-to-resize table columns (the lessons table). Widths live on the <col> elements and are
-// remembered per column in localStorage; double-click a handle to reset one column, or call
-// window.resetLessonColumns() (the ⋯ menu) to reset them all. Desktop widths only — on narrow
-// screens columns are already hidden and a drag would fight scrolling.
+// remembered per column in localStorage; double-click a handle to reset the two columns beside it,
+// or call window.resetLessonColumns() (the ⋯ menu) to reset them all. Desktop widths only — on
+// narrow screens columns are already hidden and a drag would fight scrolling.
 //
-// One column (`<col data-flex>`, the title) never gets an explicit width: it takes whatever the
-// others leave, so the table can never grow past its container and clip the right-hand columns.
-// Every drag is clamped so the flex column keeps at least MIN_FLEX px, which keeps every column
-// visible; stored widths that no longer fit (a narrower window) are dropped on load.
+// A drag moves the boundary between two neighbouring columns: one grows exactly as much as the
+// other shrinks, so the table never changes width. One column (`<col data-flex>`, the title) never
+// gets an explicit width: it absorbs whatever its neighbours give or take, clamped to MIN_FLEX so
+// it stays readable. Stored widths that no longer fit (a narrower window) are dropped on load.
 (function () {
   var MIN = 48;
   var MIN_FLEX = 220;
@@ -30,6 +30,16 @@
       /* storage unavailable: widths last for this page only */
     }
   }
+  function clamp(v, lo, hi) {
+    return Math.min(hi, Math.max(lo, v));
+  }
+  function setWidth(col, px) {
+    col.style.width = Math.round(px) + "px";
+  }
+  // The defaults are inline widths on the <col>s: remember them so resets restore, not wipe.
+  function restore(col) {
+    col.style.width = col.dataset.defaultWidth || "";
+  }
 
   var tables = document.querySelectorAll("table[data-resizable]");
   tables.forEach(function (table) {
@@ -37,13 +47,9 @@
     var ths = Array.prototype.slice.call(table.querySelectorAll("thead th"));
     if (cols.length !== ths.length) return;
     var widths = load();
-    // The defaults are inline widths on the <col>s: remember them so resets restore, not wipe.
     cols.forEach(function (col) {
       col.dataset.defaultWidth = col.style.width || "";
     });
-    function restore(col) {
-      col.style.width = col.dataset.defaultWidth || "";
-    }
     var flexIndex = cols.findIndex(function (col) {
       return col.hasAttribute("data-flex");
     });
@@ -70,10 +76,16 @@
       resizeTimer = setTimeout(apply, 150);
     });
 
+    function nextVisible(i) {
+      for (var j = i + 1; j < ths.length; j++) {
+        if (ths[j].getBoundingClientRect().width > 0) return j;
+      }
+      return -1;
+    }
+
     ths.forEach(function (th, i) {
-      // The star and share columns stay fixed; the flex column is whatever is left.
-      if (i === 0 || i === ths.length - 1 || i === flexIndex) return;
-      var col = cols[i];
+      // The star column stays fixed, and the share column (last) is never a drag partner.
+      if (i === 0 || i >= ths.length - 2) return;
       var handle = document.createElement("span");
       handle.className = "dc-resize-handle";
       handle.setAttribute("aria-hidden", "true");
@@ -84,29 +96,49 @@
       });
       handle.addEventListener("dblclick", function (e) {
         e.stopPropagation();
-        restore(col);
-        delete widths[col.dataset.col];
+        var j = nextVisible(i);
+        [cols[i], j >= 0 ? cols[j] : null].forEach(function (col) {
+          if (!col || col.hasAttribute("data-flex")) return;
+          restore(col);
+          delete widths[col.dataset.col];
+        });
         save(widths);
       });
       handle.addEventListener("pointerdown", function (e) {
         if (e.button !== 0) return;
+        var j = nextVisible(i);
+        if (j < 0) return;
         e.preventDefault();
         e.stopPropagation();
+        var left = cols[i];
+        var right = cols[j];
+        var leftFlex = left.hasAttribute("data-flex");
+        var rightFlex = right.hasAttribute("data-flex");
         var startX = e.clientX;
-        var startW = th.getBoundingClientRect().width;
-        var maxW = startW + Math.max(0, flexWidth() - MIN_FLEX);
+        var startL = th.getBoundingClientRect().width;
+        var startR = ths[j].getBoundingClientRect().width;
+        var total = startL + startR;
         handle.setPointerCapture(e.pointerId);
         table.classList.add("dc-resizing");
         function move(ev) {
-          var w = Math.min(maxW, Math.max(MIN, Math.round(startW + ev.clientX - startX)));
-          col.style.width = w + "px";
+          var dx = ev.clientX - startX;
+          if (leftFlex) {
+            setWidth(right, clamp(startR - dx, MIN, total - MIN_FLEX));
+          } else if (rightFlex) {
+            setWidth(left, clamp(startL + dx, MIN, total - MIN_FLEX));
+          } else {
+            var l = clamp(startL + dx, MIN, total - MIN);
+            setWidth(left, l);
+            setWidth(right, total - l);
+          }
         }
         function up() {
           handle.removeEventListener("pointermove", move);
           handle.removeEventListener("pointerup", up);
           handle.removeEventListener("pointercancel", up);
           table.classList.remove("dc-resizing");
-          widths[col.dataset.col] = Math.round(th.getBoundingClientRect().width);
+          if (!leftFlex) widths[left.dataset.col] = Math.round(th.getBoundingClientRect().width);
+          if (!rightFlex) widths[right.dataset.col] = Math.round(ths[j].getBoundingClientRect().width);
           save(widths);
         }
         handle.addEventListener("pointermove", move);
@@ -122,8 +154,6 @@
     } catch {
       /* ignore */
     }
-    document.querySelectorAll("table[data-resizable] colgroup > col").forEach(function (col) {
-      col.style.width = col.dataset.defaultWidth || "";
-    });
+    document.querySelectorAll("table[data-resizable] colgroup > col").forEach(restore);
   };
 })();
