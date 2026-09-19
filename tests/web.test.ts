@@ -111,7 +111,8 @@ describe("web app", () => {
     const settingsPage = await get("/settings");
     expect(settingsPage.status).toBe(200);
     const nav = await settingsPage.text();
-    expect(nav).toContain('href="/settings" aria-label="Settings"');
+    expect(nav).toContain('href="/settings" title="Settings"');
+    expect(nav).toContain("<span>Settings</span>");
     expect(nav).toContain('aria-current="page"');
     expect(nav).not.toContain(">Settings</a>");
     expect(await (await get("/lessons")).text()).not.toContain('aria-current="page"');
