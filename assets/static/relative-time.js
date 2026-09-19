@@ -50,14 +50,20 @@
     return date.getFullYear() + '-' + pad(date.getMonth() + 1) + '-' + pad(date.getDate());
   }
 
+  var weekdayShort = new Intl.DateTimeFormat('en', { weekday: 'short' });
+
+  function weekdayDay(date) {
+    return weekdayShort.format(date) + ' ' + date.getDate();
+  }
+
+  /* Compact: "17m" · "today" · "Mon 2" within the last week · "Sep 10" from a week on
+     (the full date for earlier years). */
   function compactTime(iso) {
     var p = parts(iso);
     if (p.diffMs < 0 || p.mins < 1) return 'now';
     if (p.mins < 60)    return p.mins + 'm';
     if (p.days === 0)   return 'today';
-    if (p.days < 7)     return p.days + 'd';
-    if (p.months < 1)   return Math.floor(p.days / 7) + 'w';
-    if (p.months < 2)   return p.months + 'mo';
+    if (p.days < 7)     return weekdayDay(new Date(iso));
     return absoluteDate(iso, 'short');
   }
 

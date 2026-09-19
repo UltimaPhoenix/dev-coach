@@ -133,7 +133,8 @@ on one side grows exactly as much as its neighbour shrinks, so the table never c
 column can be pushed out of view. The title column takes whatever its neighbours give or take and never
 drops below a readable width. Widths are remembered in this browser (and dropped if they no longer fit
 the window); double-click a boundary to reset the two columns beside it, or use **⋯ → Reset column
-widths**. When the Date column gets narrow, recent dates switch to a compact form (`17m`, `3d`, `2w`). Lessons
+widths**. When the Date column gets narrow, dates switch to a compact form: `17m`, `today`, `Mon 2` within the
+last week, then `Sep 10`. Lessons
 two months old or older show their date instead of a relative label: `July 3` within the current
 year, the full date (`2025-07-03`) for earlier years.
 
