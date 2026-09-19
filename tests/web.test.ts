@@ -680,9 +680,9 @@ describe("web lesson delete", () => {
     seedDel("del3", "Doomed too");
     const list = await (await get("/lessons?search=Doomed")).text();
     expect(list).toContain('aria-label="More actions"');
-    expect(list).toContain("🗑 Delete lessons…");
+    expect(list).toContain("Delete lessons…");
     expect(list).toContain("✕ Cancel");
-    expect(list).toContain("↔ Reset column widths");
+    expect(list).toContain("Reset column widths");
     expect(list).not.toContain("☑ Select</button>");
     expect(list).toContain('class="dc-check');
     expect(list).toContain('data-resizable="lessons"');
@@ -701,7 +701,7 @@ describe("web lesson delete", () => {
     const detail = await (await get("/lessons/del1")).text();
     expect(detail).toContain('aria-label="More actions"');
     expect(detail).not.toContain(">⋯</button>");
-    expect(detail).toContain("🗑 Delete lesson…");
+    expect(detail).toContain("Delete lesson…");
     expect(detail).toContain('name="id" value="del1"');
     expect(detail).toContain(
       'data-confirm="Delete “Doomed &lt;lesson&gt;”? This cannot be undone."',

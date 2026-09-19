@@ -571,8 +571,8 @@ export function lessonsPage(d: LessonsData): Html {
     ${anyFilter ? html`<a href="/lessons" class="ml-auto text-xs text-gray-400 hover:text-gray-700 dark:hover:text-white transition">Clear all</a>` : ""}
 
     ${moreMenu(
-      html`<button type="button" @click="selectMode = true; open = false" class="w-full text-left px-3 py-2 rounded-lg text-sm transition flex items-center gap-2 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800">🗑 Delete lessons…</button>
-        <button type="button" @click="window.resetLessonColumns && window.resetLessonColumns(); open = false" class="w-full text-left px-3 py-2 rounded-lg text-sm transition flex items-center gap-2 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800">↔ Reset column widths</button>`,
+      html`<button type="button" @click="selectMode = true; open = false" class="w-full text-left px-3 py-2 rounded-lg text-sm transition flex items-center gap-2 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"><span class="w-4 h-4 inline-flex items-center justify-center shrink-0 text-[13px] leading-none" aria-hidden="true">🗑</span>Delete lessons…</button>
+        <button type="button" @click="window.resetLessonColumns && window.resetLessonColumns(); open = false" class="w-full text-left px-3 py-2 rounded-lg text-sm transition flex items-center gap-2 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"><svg class="w-4 h-4 shrink-0 text-gray-400 dark:text-gray-500" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><rect x="2.5" y="4" width="15" height="12" rx="2"/><path d="M7.5 4v12M12.5 4v12"/></svg>Reset column widths</button>`,
       anyFilter ? "" : "ml-auto",
       'x-show="!selectMode"',
     )}
@@ -889,7 +889,7 @@ ${
       html`<form method="post" action="/lessons/delete" data-confirm="Delete “${l.title}”? This cannot be undone." onsubmit="return confirm(this.dataset.confirm)">
           <input type="hidden" name="id" value="${l.id}" />
           <input type="hidden" name="next" value="/lessons" />
-          <button type="submit" class="w-full text-left px-3 py-2 rounded-lg text-sm transition flex items-center gap-2 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 hover:!bg-rose-50 dark:hover:!bg-rose-900/30 hover:text-rose-700 dark:hover:text-rose-300">🗑 Delete lesson…</button>
+          <button type="submit" class="w-full text-left px-3 py-2 rounded-lg text-sm transition flex items-center gap-2 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 hover:!bg-rose-50 dark:hover:!bg-rose-900/30 hover:text-rose-700 dark:hover:text-rose-300"><span class="w-4 h-4 inline-flex items-center justify-center shrink-0 text-[13px] leading-none" aria-hidden="true">🗑</span>Delete lesson…</button>
         </form>`,
       "shrink-0",
     )}
