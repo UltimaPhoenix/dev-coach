@@ -108,7 +108,8 @@ Three ways to reach it, from zero-install to a bare command:
 1. **From inside Claude Code — nothing to install.** Type `/devcoach:ui` (optionally with a port,
    e.g. `/devcoach:ui 8080`), or just ask — *"open the devcoach dashboard"*. The plugin also ships
    `/devcoach:share [last | <id> | about <topic>] [as link|file]` and `/devcoach:import <code or link>`
-   for [sharing lessons](../usage/sharing.md). Either way Claude calls the `open_ui` / sharing tools
+   for [sharing lessons](../usage/sharing.md), and `/devcoach:course [last | <id> | about <topic> |
+   <a concept>] [continue]` for a [step-by-step course](../usage/courses.md). Either way Claude calls the `open_ui` / sharing tools
    from the plugin's own copy and reports the URL (default http://localhost:7860).
 2. **From a terminal, without installing** — prefix any [CLI command](../usage/cli.md) with `npx -y`:
    `npx -y devcoach ui`, `npx -y devcoach stats`, …

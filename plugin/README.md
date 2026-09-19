@@ -1,7 +1,7 @@
 # devcoach — Claude Code plugin
 
 Install: `/plugin marketplace add UltimaPhoenix/claude-plugins-marketplace`, then `/plugin install devcoach@ultimaphoenix`.
-Open the web dashboard any time with `/devcoach:ui`.
+Open the web dashboard any time with `/devcoach:ui`; `/devcoach:course` starts a step-by-step course.
 Docs: https://ultimaphoenix.github.io/dev-coach/install/claude-code-plugin
 
 **Maintainers:** the repo's own `.claude-plugin/marketplace.json` (`/plugin marketplace add

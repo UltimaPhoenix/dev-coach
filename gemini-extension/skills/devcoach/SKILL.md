@@ -13,7 +13,9 @@ description: >
   silently whether ONE lesson is due, even when coaching is never mentioned;
   (5) the user wants to share a lesson with someone, or hands you a lesson they
   were given — a `devcoach:lesson:` code, a share link, a URL, or a
-  `.devcoach.md` file — to import.
+  `.devcoach.md` file — to import; (6) the user wants to be taught something
+  properly — "explain this step by step", "start a course", "teach me X from the
+  basics", `/devcoach:course` — or asks about their courses.
   Do NOT use for ordinary development tasks on code, apps, or documents that
   merely contain words like profile, lessons, or notebook — only when the subject
   is the user's own coaching data.
@@ -55,6 +57,15 @@ profile/notebook", "rebuild/refresh my notebook", "refresh my profile from my
 projects", "any new tech I should track?" — read `references/review.md` in this
 skill's directory and follow it. Those flows are incremental and non-destructive;
 only an explicit "redo onboarding" goes through `references/onboarding.md`.
+
+## Courses
+
+When the user wants to be taught something properly — "explain this step by step", "start
+a course on X", "teach me from the basics", "continue the course", `/devcoach:course` — or
+says *yes* to the one offer you make after a ❌ *couldn't follow* — read
+`references/course.md` in this skill's directory and follow it. A course is user-initiated,
+never starts inside a cued turn, explores what the user already knows one question at a
+time, and lives in ONE HTML document you write yourself.
 
 ## Before delivering a lesson
 
@@ -168,6 +179,9 @@ confidence change; the lesson is kept as a seed for a step-by-step course. Call
 only when confidence is below the lesson's band (within/above band → already
 calibrated, skip the call). Never call `update_knowledge` on top of feedback.
 
+**After a ❌:** offer ONCE, in one line — *"Want a step-by-step course on this? 🎓"* — and
+on a *yes* start it on that message (`references/course.md`). No other follow-up.
+
 **Starring:** after feedback, if `get_lessons({search: topic_id})` shows 2+ lessons on
 the topic, offer *"Want to save this one? ⭐"* — `star_lesson` only if the user agrees,
 never silently. A star is also the one moment to offer sharing (see
@@ -195,6 +209,8 @@ checkpoints, never touch the notebook.
 - "How good am I at X?" / "Show my profile" → `get_profile`
 - "Coaching log" → `get_lessons({period: "all"})`
 - "Lessons to revisit" / "the ones I couldn't follow" → `get_lessons({feedback: "dont_know"})`
+- "My courses" → `get_courses` · "Continue the course" → `get_courses({status: "active"})`
+  then `references/course.md` §5 · "Start a course on X" → `references/course.md`
 - "Share this / the last lesson" / "share the lesson about X" → `get_lessons` then
   `share_lesson({lesson_id})` (see Sharing)
 - "Import this lesson" / a pasted `devcoach:lesson:` code, link or URL →

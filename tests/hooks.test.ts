@@ -91,6 +91,31 @@ describe("hooks in-process (runHook dispatcher + payload-injected entrypoints)",
     expect(JSON.parse(cue.out).systemMessage).toContain("checking whether a lesson is due");
   });
 
+  it("cues pause while a course is active and resume once it is over", () => {
+    seedProfile();
+    db.withConnection((c) =>
+      db.insertCourse(c, {
+        id: "paused",
+        lesson_id: null,
+        topic_id: "typescript",
+        title: "Paused",
+        goal: null,
+        prerequisites: [],
+        status: "active",
+        created_at: "2026-09-19T10:00:00Z",
+        updated_at: "2026-09-19T10:00:00Z",
+        completed_at: null,
+      }),
+    );
+    expect(capture(() => cmdStopHook(payload()))).toEqual({ out: "", code: 0 });
+    expect(capture(() => cmdPromptHook(payload()))).toEqual({ out: "", code: 0 });
+    db.withConnection((c) =>
+      db.updateCourseStatus(c, "paused", "abandoned", "2026-09-19T11:00:00Z"),
+    );
+    expect(JSON.parse(capture(() => cmdStopHook(payload())).out).decision).toBe("block");
+    db.withConnection((c) => db.deleteCourseRows(c, "paused"));
+  });
+
   it("the cue delegates to the skill instead of duplicating its rules", () => {
     // The cue once repeated the skill's rules and the copy drifted ("output NOTHING
     // else" with no recovery clause) — models obeyed the drifted copy and the card
