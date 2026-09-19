@@ -163,8 +163,12 @@ export function createApp(opts: AppOptions = {}): Hono {
     if (!filePath.startsWith(STATIC_DIR)) return c.notFound();
     try {
       const data = readFileSync(filePath);
+      // Local dashboard: always revalidate, so a rebuilt script or stylesheet shows up on reload.
       return new Response(new Uint8Array(data), {
-        headers: { "content-type": CONTENT_TYPES[extname(filePath)] ?? "application/octet-stream" },
+        headers: {
+          "content-type": CONTENT_TYPES[extname(filePath)] ?? "application/octet-stream",
+          "cache-control": "no-cache",
+        },
       });
     } catch {
       return c.notFound();

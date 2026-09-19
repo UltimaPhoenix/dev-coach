@@ -15,9 +15,9 @@
     var diffMs = now - date;
     var mins = Math.floor(diffMs / 60000);
     var days = Math.floor(diffMs / 86400000);
-    /* Whole calendar months elapsed (a lesson from the 3rd is "1 month ago" from the 3rd on). */
+    /* Calendar months between the two dates by label: a July lesson seen in September is two
+       months away, whatever the day of month — old enough to print the date. */
     var months = (now.getFullYear() - date.getFullYear()) * 12 + (now.getMonth() - date.getMonth());
-    if (now.getDate() < date.getDate()) months -= 1;
     return { diffMs: diffMs, mins: mins, days: days, months: Math.max(0, months) };
   }
 
