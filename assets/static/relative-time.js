@@ -5,7 +5,7 @@
   /* "yesterday" / "today" are only right at day granularity; for weeks the number is always
      spelled out — "last week" for something 13 days old is a lie — and from two months on the
      relative label stops being useful at all: the date is printed instead ("July 27" within the
-     current year, the full ISO date for earlier years). */
+     current year, "July 27, 2025" for earlier years). */
   var rtfAuto = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
   var rtfExact = new Intl.RelativeTimeFormat('en', { numeric: 'always' });
   var COMPACT_BELOW = 120; // cell width (px) under which the compact form is used
@@ -36,18 +36,16 @@
 
   var monthDayLong = new Intl.DateTimeFormat('en', { month: 'long', day: 'numeric' });
   var monthDayShort = new Intl.DateTimeFormat('en', { month: 'short', day: 'numeric' });
+  var monthDayYear = new Intl.DateTimeFormat('en', { month: 'long', day: 'numeric', year: 'numeric' });
+  var monthYear = new Intl.DateTimeFormat('en', { month: 'short', year: 'numeric' });
 
-  function pad(n) {
-    return (n < 10 ? '0' : '') + n;
-  }
-
-  /* Same year → "July 27" (compact: "Jul 27"); an earlier year → the full date, 2025-07-27. */
+  /* Same year → "July 27" (compact: "Jul 27"); an earlier year → "July 27, 2025" (compact:
+     "Jul 2025" — at that distance the year matters more than the day). */
   function absoluteDate(iso, style) {
     var date = new Date(iso);
-    if (date.getFullYear() === new Date().getFullYear()) {
-      return (style === 'long' ? monthDayLong : monthDayShort).format(date);
-    }
-    return date.getFullYear() + '-' + pad(date.getMonth() + 1) + '-' + pad(date.getDate());
+    var sameYear = date.getFullYear() === new Date().getFullYear();
+    if (style === 'long') return (sameYear ? monthDayLong : monthDayYear).format(date);
+    return (sameYear ? monthDayShort : monthYear).format(date);
   }
 
   var weekdayShort = new Intl.DateTimeFormat('en', { weekday: 'short' });

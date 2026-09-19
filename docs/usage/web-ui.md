@@ -136,7 +136,7 @@ the window); double-click a boundary to reset the two columns beside it, or use 
 widths**. When the Date column gets narrow, dates switch to a compact form: `17m`, `today`, `Mon 2` within the
 last week, then `Sep 10`. Lessons
 two months old or older show their date instead of a relative label: `July 3` within the current
-year, the full date (`2025-07-03`) for earlier years.
+year, `July 3, 2025` for earlier years (compact: `Jul 2025`).
 
 **＋ Import** (toolbar, right) — add a lesson someone shared with you: paste the code, the link, a
 URL, or the whole copied card into the box, pick a `.devcoach.md` file, or simply **drop the file
