@@ -101,7 +101,7 @@ current filters."
 
 **Sort:** click the Date, Topic, Title, Level or Feedback column header. Ascending or descending.
 
-**Table columns:** ★, Date, Topic, Title, Level, Categories, Feedback, ↗ — the feedback cell shows
+**Table columns:** ★, Date, Topic, Title, Level, Categories, Feedback, ↗, 🗑 — the feedback cell shows
 `✓ Known` / `✗ Unknown` (or nothing yet); `↗` opens the lesson with its Share popover.
 
 **Pagination:** 25 per page.
@@ -109,6 +109,8 @@ current filters."
 **Actions per row:**
 - `★` — toggle starred
 - `↗` — share this lesson (opens the detail page with the Share popover)
+- `🗑` — delete this lesson after a confirmation (permanent; a lesson someone shared with you can
+  be deleted too, and the same share is accepted again if you import it later)
 - Click a level pill or category chip — filter the table by it
 - Click anywhere else on the row — open the detail page (feedback is recorded there)
 
@@ -134,7 +136,8 @@ anywhere on the page**. See [Sharing a lesson](#sharing-a-lesson).
 
 Full lesson content laid out in reading order:
 
-- **Title row** — `← Back to lessons`, star toggle, title, level pill (Junior / Mid / Senior), **↗ Share**
+- **Title row** — `← Back to lessons`, star toggle, title, level pill (Junior / Mid / Senior), **↗ Share**,
+  **🗑 Delete** (asks for confirmation, then returns to the list)
 - **Metadata row** — relative date with tooltip, topic ID, category chips, feedback badge + Clear;
   a lesson someone shared with you also shows `🤝 shared by <name>`
 - **TL;DR callout** — one-sentence summary in a highlighted indigo box, always visible above the body

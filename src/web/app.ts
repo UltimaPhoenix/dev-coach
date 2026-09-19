@@ -414,6 +414,17 @@ export function createApp(opts: AppOptions = {}): Hono {
     return c.redirect(safeRedirect(textField(body, "next") || undefined), 303);
   });
 
+  // Same-origin only: a page elsewhere must never be able to delete a lesson. Imported lessons go
+  // the same way; the same share can be imported again afterwards (duplicate detection only looks
+  // at rows that still exist).
+  app.post("/lessons/:lesson_id/delete", async (c) => {
+    if (isCrossSite(c)) return c.text("Forbidden", 403);
+    const body = await c.req.parseBody();
+    const deleted = db.withConnection((conn) => db.deleteLesson(conn, c.req.param("lesson_id")));
+    if (!deleted) return c.text("Lesson not found", 404);
+    return c.redirect(safeRedirect(textField(body, "next") || undefined), 303);
+  });
+
   // Share payloads: `?format=text|link` → text/plain, `md` → the .devcoach.md attachment,
   // no format → the #share-payloads fragment (HTMX re-render when name/context change).
   // POST carries name + include_context from the popover form; it remembers the name only when

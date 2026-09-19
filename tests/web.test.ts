@@ -11,14 +11,19 @@ vi.mock("../src/core/share-fetch", async (importOriginal) => {
 
 const app = createApp();
 const get = (path: string) => app.fetch(new Request(`http://localhost${path}`));
-const post = (path: string, fields: Record<string, string>) =>
+const postForm = (
+  path: string,
+  fields: Record<string, string>,
+  headers: Record<string, string> = {},
+) =>
   app.fetch(
     new Request(`http://localhost${path}`, {
       method: "POST",
       body: new URLSearchParams(fields),
-      headers: { "content-type": "application/x-www-form-urlencoded" },
+      headers: { "content-type": "application/x-www-form-urlencoded", ...headers },
     }),
   );
+const post = (path: string, fields: Record<string, string>) => postForm(path, fields);
 
 beforeAll(() => {
   db.withConnection((c) => {
@@ -338,18 +343,6 @@ describe("web view branches — exhaustive", () => {
 });
 
 describe("web lesson sharing", () => {
-  const postForm = (
-    path: string,
-    fields: Record<string, string>,
-    headers: Record<string, string> = {},
-  ) =>
-    app.fetch(
-      new Request(`http://localhost${path}`, {
-        method: "POST",
-        body: new URLSearchParams(fields),
-        headers: { "content-type": "application/x-www-form-urlencoded", ...headers },
-      }),
-    );
   const seed = (id: string, title: string) =>
     db.withConnection((c) =>
       db.insertLesson(
@@ -635,5 +628,64 @@ describe("web lesson sharing", () => {
     expect(pre.headers.get("access-control-allow-methods")).toContain("GET");
     // no other route is CORS-enabled
     expect((await get("/lessons")).headers.get("access-control-allow-origin")).toBeNull();
+  });
+});
+
+describe("web lesson delete", () => {
+  const seedDel = (id: string, title: string) =>
+    db.withConnection((c) =>
+      db.insertLesson(
+        c,
+        parseLesson({
+          id,
+          timestamp: "2026-06-16T10:00:00Z",
+          topic_id: "python",
+          categories: ["python"],
+          title,
+          level: "mid",
+          summary: "s",
+        }),
+      ),
+    );
+
+  it("renders a confirmed delete control on the list row and the detail page", async () => {
+    seedDel("del1", "Doomed <lesson>");
+    const list = await (await get("/lessons?search=Doomed")).text();
+    expect(list).toContain('hx-post="/lessons/del1/delete"');
+    expect(list).toContain('hx-confirm="Delete “Doomed &lt;lesson&gt;”? This cannot be undone."');
+    expect(list).toContain('hx-select-oob="#lesson-count:outerHTML"');
+    expect(list).toContain(
+      'value="/lessons?period=all&amp;search=Doomed&amp;sort=timestamp&amp;order=desc&amp;page=1"',
+    );
+    const detail = await (await get("/lessons/del1")).text();
+    expect(detail).toContain('action="/lessons/del1/delete"');
+    expect(detail).toContain(
+      'data-confirm="Delete “Doomed &lt;lesson&gt;”? This cannot be undone."',
+    );
+    expect(detail).toContain('onsubmit="return confirm(this.dataset.confirm)"');
+  });
+
+  it("POST delete removes the lesson and redirects to next", async () => {
+    const r = await post("/lessons/del1/delete", { next: "/lessons?search=Doomed" });
+    expect(r.status).toBe(303);
+    expect(r.headers.get("location")).toBe("/lessons?search=Doomed");
+    expect((await get("/lessons/del1")).status).toBe(404);
+    expect(await (await get("/lessons?search=Doomed")).text()).not.toContain("/lessons/del1");
+    // unknown id → 404; open redirect → fallback
+    expect((await post("/lessons/del1/delete", {})).status).toBe(404);
+  });
+
+  it("delete from another site is refused and keeps the lesson", async () => {
+    seedDel("del2", "Survivor");
+    const r = await postForm("/lessons/del2/delete", {}, { "sec-fetch-site": "cross-site" });
+    expect(r.status).toBe(403);
+    expect(db.withConnection((c) => db.getLessonById(c, "del2"))?.title).toBe("Survivor");
+    const ok = await postForm(
+      "/lessons/del2/delete",
+      { next: "//evil" },
+      { "sec-fetch-site": "same-origin" },
+    );
+    expect(ok.status).toBe(303);
+    expect(ok.headers.get("location")).toBe("/lessons");
   });
 });

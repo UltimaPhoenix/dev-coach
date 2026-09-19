@@ -56,7 +56,7 @@ dev-coach/
 │   │   ├── claude-history.ts   # cross-project stack scan of ~/.claude (projects map, manifests, activity, memories)
 │   ├── mcp/server.ts       # McpServer: 21 tools + 11 resources + devcoach_instructions prompt
 │   ├── cli/commands.ts     # Commander dispatcher (33 subcommands: 25 visible + 8 hidden hooks) + term.ts (colours, tables, OSC 8 link()) + open.ts (browser)
-│   └── web/app.ts          # Hono app (26 routes incl. POST /shutdown) + views.ts (hono/html pages); assets/static/share.js
+│   └── web/app.ts          # Hono app (27 routes incl. POST /shutdown) + views.ts (hono/html pages); assets/static/share.js
 │                           #   startUi returns the server; SIGINT/SIGTERM/SIGHUP → gracefulShutdown (close, 2 s drain, exit);
 │                           #   the open_ui child is detached, so stop_ui / `ui --stop` POST /shutdown (same-origin guarded)
 ├── tests/                  # Vitest (16 files: core, db-extra, coach/git/claude-history, share, mcp, mcpb, web,
