@@ -106,14 +106,14 @@ current filters."
 
 **Table columns:** ★, Date, Topic, Title, Level, Categories, Feedback, ↗ — the title gets the width
 (categories wrap onto a second line when needed); the feedback cell shows `✓ Known` / `✗ Unknown`
-(or nothing yet); `↗` opens the lesson with its Share popover; a shared lesson shows `🤝 <sender>`
+(or nothing yet); `↗` opens the Share panel right there; a shared lesson shows `🤝 <sender>`
 under its topic.
 
 **Pagination:** 25 per page.
 
 **Actions per row:**
 - `★` — toggle starred
-- `↗` (appears when you hover the row) — share this lesson (opens the detail page with the Share popover)
+- `↗` (appears when you hover the row) — share this lesson in a small dialog, without leaving the list
 - Click a level pill or category chip — filter the table by it
 - Click anywhere else on the row — open the detail page (feedback is recorded there)
 
@@ -220,7 +220,7 @@ Full lesson content laid out in reading order:
 ### Sharing a lesson
 
 A lesson that landed for you is worth handing to a teammate. **↗ Share** on a lesson (or `↗` in the
-table) opens a popover with your name (prefilled from `share_name`, then git), an *Include where it
+table, which opens the same panel in a dialog without leaving the list) shows your name (prefilled from `share_name`, then git), an *Include where it
 happened* checkbox (project, branch, commit and task context — **off by default**, and a local folder
 path is never exported), and three ways to hand it over — all carrying the same lesson:
 

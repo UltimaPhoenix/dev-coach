@@ -632,7 +632,12 @@ describe("web lesson sharing", () => {
     expect(await (await get("/settings")).text()).toContain('value="Zed"');
     seed("sh3", "Row share");
     const html = await (await get("/lessons?search=Row+share")).text();
-    expect(html).toContain("/lessons/sh3?share=1");
+    expect(html).toContain('hx-get="/lessons/sh3/share?format=panel"');
+    expect(html).toContain('id="share-modal-body"');
+    const panel = await (await get("/lessons/sh3/share?format=panel")).text();
+    expect(panel).toContain("Row share");
+    expect(panel).toContain('name="include_context"');
+    expect(panel).toContain('id="share-payloads"');
     expect(html).toContain("＋ Import");
   });
 

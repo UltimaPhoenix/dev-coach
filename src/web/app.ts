@@ -33,6 +33,7 @@ import {
   type ShareState,
   settingsPage,
   shareFragment,
+  sharePanel,
 } from "./views";
 
 const PER_PAGE = 25;
@@ -497,6 +498,7 @@ export function createApp(opts: AppOptions = {}): Hono {
         },
       });
     }
+    if (format === "panel") return c.html(sharePanel(found.lesson.id, state, found.lesson.title));
     return c.html(shareFragment(state));
   });
 

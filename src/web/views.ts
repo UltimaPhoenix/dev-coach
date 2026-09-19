@@ -452,7 +452,7 @@ export function lessonsPage(d: LessonsData): Html {
 
   const pageIds = JSON.stringify(d.lessons.map((l) => l.id));
   const body = html`
-<div :class="selectMode && 'dc-selecting'" x-data="{ selectMode: false, selected: [], toggle(id) { const i = this.selected.indexOf(id); if (i < 0) this.selected.push(id); else this.selected.splice(i, 1) }, setAll(ids, on) { this.selected = on ? ids.slice() : [] }, leave() { this.selectMode = false; this.selected = [] } }" @keydown.escape.window="leave()">
+<div :class="selectMode && 'dc-selecting'" x-data="{ selectMode: false, selected: [], shareOpen: false, toggle(id) { const i = this.selected.indexOf(id); if (i < 0) this.selected.push(id); else this.selected.splice(i, 1) }, setAll(ids, on) { this.selected = on ? ids.slice() : [] }, leave() { this.selectMode = false; this.selected = []; this.shareOpen = false } }" @keydown.escape.window="leave()">
 <form id="filter-form" method="get" action="/lessons">
   <input type="hidden" name="period" id="h-period" value="${s.period}">
   <input type="hidden" name="date_from" id="h-date-from" value="${s.date_from}">
@@ -662,7 +662,7 @@ ${
         <td class="px-3 py-3" @click="selectMode || $event.stopPropagation()" @keydown="selectMode || $event.stopPropagation()"><a href="${lessonsQs(s, { level: lesson.level })}" class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${levelTextColor[lesson.level] ?? ""} hover:ring-2 hover:ring-current hover:ring-offset-1 transition-shadow">${lesson.level}</a></td>
         <td class="px-3 py-3 hidden lg:table-cell" @click="selectMode || $event.stopPropagation()" @keydown="selectMode || $event.stopPropagation()"><div class="flex flex-wrap gap-1">${lesson.categories.map((cat) => html`<a href="${lessonsQs(s, { category: cat })}" class="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors">${cat}</a>`)}</div></td>
         <td class="px-3 py-3 hidden xl:table-cell" @click="selectMode || $event.stopPropagation()" @keydown="selectMode || $event.stopPropagation()">${lesson.feedback === "know" ? html`<span class="text-xs text-teal-600 dark:text-teal-400 font-medium">✓ Known</span>` : lesson.feedback === "dont_know" ? html`<span class="text-xs text-rose-500 dark:text-rose-400 font-medium">✗ Unknown</span>` : ""}</td>
-        <td class="px-2 py-3 text-center" @click="selectMode || $event.stopPropagation()" @keydown="selectMode || $event.stopPropagation()"><a href="/lessons/${encodeURIComponent(lesson.id)}?share=1" title="Share this lesson" class="inline-flex text-gray-400 dark:text-gray-500 hover:text-indigo-500 dark:hover:text-indigo-400 transition opacity-0 group-hover:opacity-100 focus-visible:opacity-100"><svg class="w-4 h-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 14 14 6M8 6h6v6"/></svg></a></td>
+        <td class="px-2 py-3 text-center" @click="selectMode || $event.stopPropagation()" @keydown="selectMode || $event.stopPropagation()"><button type="button" hx-get="/lessons/${encodeURIComponent(lesson.id)}/share?format=panel" hx-target="#share-modal-body" hx-swap="innerHTML" @click="shareOpen = true" title="Share this lesson" aria-label="Share this lesson" class="inline-flex text-gray-400 dark:text-gray-500 hover:text-indigo-500 dark:hover:text-indigo-400 transition opacity-0 group-hover:opacity-100 focus-visible:opacity-100"><svg class="w-4 h-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 14 14 6M8 6h6v6"/></svg></button></td>
       </tr>`;
       })}
     </tbody>
@@ -712,6 +712,13 @@ ${
         <button type="submit" :disabled="!selected.length" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition bg-rose-600 text-white border-rose-600 hover:bg-rose-500 disabled:opacity-40 disabled:cursor-not-allowed">🗑 Delete selected</button>
       </form>
     </div>
+  </div>
+</div>
+<div x-show="shareOpen" style="display:none" x-transition:enter="transition ease-out duration-100" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" class="fixed inset-0 z-[70] flex items-start justify-center pt-20 px-4">
+  <div class="absolute inset-0 bg-gray-900/40 dark:bg-black/60" @click="shareOpen = false"></div>
+  <div role="dialog" aria-modal="true" aria-label="Share this lesson" class="relative w-full max-w-sm bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl p-4">
+    <button type="button" @click="shareOpen = false" aria-label="Close" class="absolute top-2 right-2 w-7 h-7 inline-flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition">✕</button>
+    <div id="share-modal-body" class="space-y-3"><p class="text-xs text-gray-400 dark:text-gray-500">Loading…</p></div>
   </div>
 </div>
 </div>`;
@@ -817,6 +824,27 @@ export function shareFragment(sh: ShareState): Html {
 </div>`;
 }
 
+/**
+ * The share panel (sender name, context toggle, the copy/download payloads). It lives inside the
+ * lesson page's popover and, with `heading`, inside the lessons list's modal — the same route
+ * (`?format=panel`) serves it there so the list never has to leave the page.
+ */
+export function sharePanel(lessonId: string, sh: ShareState, heading: string | null = null): Html {
+  return html`
+        <p class="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">Share this lesson</p>
+        ${heading ? html`<p class="text-sm font-semibold text-gray-800 dark:text-gray-100 leading-snug">${heading}</p>` : ""}
+        <form method="post" action="/lessons/${encodeURIComponent(lessonId)}/share" hx-post="/lessons/${encodeURIComponent(lessonId)}/share" hx-target="#share-payloads" hx-swap="outerHTML" hx-trigger="input delay:300ms, change" onsubmit="return false" class="space-y-2.5">
+          <input type="hidden" name="persist" value="0" x-ref="persist" />
+          <div>
+            <label for="share-name" class="block text-xs text-gray-400 dark:text-gray-500 mb-1">Your name</label>
+            <input id="share-name" type="text" name="name" value="${sh.name}" maxlength="80" placeholder="anonymous" autocomplete="off" @input="$refs.persist.value = '0'" @change="$refs.persist.value = '1'" class="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
+          <label class="flex items-start gap-2 text-xs text-gray-600 dark:text-gray-300 cursor-pointer"><input type="checkbox" name="include_context" value="1" ${sh.includeContext ? "checked" : ""} class="mt-0.5" /><span>Include where it happened <span class="text-gray-400 dark:text-gray-500">(project, branch, commit — never local paths)</span></span></label>
+        </form>
+        ${shareFragment(sh)}
+`;
+}
+
 export function lessonDetailPage(d: {
   lesson: Lesson;
   uiTheme: string;
@@ -873,16 +901,7 @@ ${
     <div class="relative shrink-0" x-data="{ open: ${String(sh.open)} }" @click.outside="open = false" @keydown.escape="open = false">
       <button type="button" @click="open = !open" title="Share this lesson" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-indigo-400 !text-xs !px-2.5 !py-1">↗ Share</button>
       <div x-show="open" x-transition:enter="transition ease-out duration-100" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100" class="absolute right-0 top-full mt-1 z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg w-80 p-4 space-y-3" style="display:none">
-        <p class="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">Share this lesson</p>
-        <form method="post" action="/lessons/${encodeURIComponent(l.id)}/share" hx-post="/lessons/${encodeURIComponent(l.id)}/share" hx-target="#share-payloads" hx-swap="outerHTML" hx-trigger="input delay:300ms, change" onsubmit="return false" class="space-y-2.5">
-          <input type="hidden" name="persist" value="0" x-ref="persist" />
-          <div>
-            <label for="share-name" class="block text-xs text-gray-400 dark:text-gray-500 mb-1">Your name</label>
-            <input id="share-name" type="text" name="name" value="${sh.name}" maxlength="80" placeholder="anonymous" autocomplete="off" @input="$refs.persist.value = '0'" @change="$refs.persist.value = '1'" class="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-          </div>
-          <label class="flex items-start gap-2 text-xs text-gray-600 dark:text-gray-300 cursor-pointer"><input type="checkbox" name="include_context" value="1" ${sh.includeContext ? "checked" : ""} class="mt-0.5" /><span>Include where it happened <span class="text-gray-400 dark:text-gray-500">(project, branch, commit — never local paths)</span></span></label>
-        </form>
-        ${shareFragment(sh)}
+        ${sharePanel(l.id, sh)}
       </div>
     </div>
     ${moreMenu(

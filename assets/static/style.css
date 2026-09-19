@@ -228,6 +228,7 @@
 }
 /* In Select mode every click on a row means "toggle it": links and forms inside stop reacting. */
 .dc-selecting tbody a,
-.dc-selecting tbody form {
+.dc-selecting tbody form,
+.dc-selecting tbody button {
   pointer-events: none;
 }
