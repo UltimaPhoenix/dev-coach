@@ -273,6 +273,10 @@ export interface LessonsSelected {
   branch: string;
   commit: string;
   starred: boolean;
+  /** "" = all, "1" = shared with me, "0" = my own. */
+  imported: string;
+  /** Exact sender name; implies imported = "1". */
+  shared_by: string;
   search: string;
   feedback: string;
   date_from: string;
@@ -291,6 +295,8 @@ export interface LessonsData {
   allRepositories: string[];
   allBranches: string[];
   allCommits: string[];
+  /** Every sender of a shared lesson, one dropdown entry each. */
+  allSharedBy: string[];
   s: LessonsSelected;
   page: number;
   perPage: number;
@@ -323,6 +329,8 @@ function lessonsQs(s: LessonsSelected, overrides: Record<string, string> = {}): 
     branch: s.branch,
     commit: s.commit,
     feedback: s.feedback,
+    imported: s.imported,
+    shared_by: s.shared_by,
     search: s.search,
     date_from: s.date_from,
     date_to: s.date_to,
@@ -350,6 +358,8 @@ export function lessonsPage(d: LessonsData): Html {
         s.branch ||
         s.commit ||
         s.starred ||
+        s.imported ||
+        s.shared_by ||
         s.search ||
         s.feedback,
     );
@@ -361,6 +371,20 @@ export function lessonsPage(d: LessonsData): Html {
         : `Until ${s.date_to}`
     : (PERIOD_LABELS[s.period] ?? "All time");
   const feedbackLabel = s.feedback ? (FEEDBACK_LABELS[s.feedback] ?? "Feedback") : "Feedback";
+  const sharedLabel = s.shared_by
+    ? `🤝 from ${s.shared_by}`
+    : s.imported === "1"
+      ? "🤝 Shared with me"
+      : s.imported === "0"
+        ? "👤 My own"
+        : "🤝 Shared";
+  // [imported value, sender, label] — the sender travels in data attributes, never in a JS literal.
+  const sharedOptions: [string, string, string][] = [
+    ["", "", "All lessons"],
+    ["0", "", "👤 My own"],
+    ["1", "", "🤝 Shared with me"],
+    ...d.allSharedBy.map((name): [string, string, string] => ["1", name, `🤝 from ${name}`]),
+  ];
   const levelTextColor: Record<string, string> = {
     junior: "text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-900/20",
     mid: "text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20",
@@ -412,6 +436,8 @@ export function lessonsPage(d: LessonsData): Html {
   <input type="hidden" name="date_to" id="h-date-to" value="${s.date_to}">
   <input type="hidden" name="feedback" id="h-feedback" value="${s.feedback}">
   <input type="hidden" name="starred" id="h-starred" value="${s.starred ? "1" : ""}">
+  <input type="hidden" name="imported" id="h-imported" value="${s.imported}">
+  <input type="hidden" name="shared_by" id="h-shared-by" value="${s.shared_by}">
   <input type="hidden" name="category" value="${s.category}">
   <input type="hidden" name="level" id="h-level" value="${s.level}">
   <input type="hidden" name="project" value="${s.project}">
@@ -431,6 +457,16 @@ export function lessonsPage(d: LessonsData): Html {
   <div class="flex flex-wrap items-center gap-2 mb-3">
     <button type="button" onclick="var h=document.getElementById('h-starred'); h.value=h.value?'':'1'; document.getElementById('filter-form').submit()"
             class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition ${s.starred ? "bg-yellow-400 text-yellow-900 border-yellow-400" : "bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-yellow-400 hover:text-yellow-500"}">★ Starred</button>
+
+    <div class="relative" x-data="{ open: false }" @click.outside="open = false" @keydown.escape="open = false">
+      <button type="button" @click="open = !open" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition ${s.imported || s.shared_by ? "bg-indigo-600 text-white border-indigo-600" : "bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-indigo-400"}">${sharedLabel}${caret}</button>
+      <div x-show="open" x-transition:enter="transition ease-out duration-100" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100" class="absolute left-0 top-full mt-1 z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg w-52 p-1 overflow-hidden" style="display:none">
+        ${sharedOptions.map(([val, name, lbl]) => {
+          const active = s.imported === val && s.shared_by === name;
+          return html`<button type="button" data-imported="${val}" data-shared-by="${name}" onclick="var d=this.dataset; document.getElementById('h-imported').value=d.imported; document.getElementById('h-shared-by').value=d.sharedBy; document.getElementById('filter-form').submit()" class="w-full text-left px-3 py-2 rounded-lg text-sm transition flex items-center justify-between ${active ? "bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 font-medium" : "text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"}"><span class="truncate">${lbl}</span>${active ? html`<span class="text-indigo-500 ml-auto">✓</span>` : ""}</button>`;
+        })}
+      </div>
+    </div>
 
     <div class="relative" x-data="periodPicker()" @keydown.escape="close()">
       <button type="button" @click="toggle()" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition ${customDate || s.period !== "all" ? "bg-indigo-600 text-white border-indigo-600" : "bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-indigo-400"}">
@@ -532,6 +568,7 @@ export function lessonsPage(d: LessonsData): Html {
     ${s.period !== "all" && !customDate ? chip(`🕐 ${periodLabel}`, lessonsQs(s, { period: "all" })) : ""}
     ${s.feedback ? chip(FEEDBACK_LABELS[s.feedback] ?? s.feedback, lessonsQs(s, { feedback: "" })) : ""}
     ${s.starred ? html`<span class="inline-flex items-center gap-1 pl-2.5 pr-1 py-0.5 rounded-full text-xs bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300 border border-yellow-200 dark:border-yellow-800">★ Starred<a href="${lessonsQs({ ...s, starred: false })}" class="ml-0.5 w-4 h-4 flex items-center justify-center rounded-full hover:bg-yellow-200 dark:hover:bg-yellow-700 transition">×</a></span>` : ""}
+    ${s.imported || s.shared_by ? chip(sharedLabel, lessonsQs(s, { imported: "", shared_by: "" })) : ""}
     ${s.search ? chip(`🔍 "${s.search}"`, lessonsQs(s, { search: "" })) : ""}
     ${s.category ? chip(s.category, lessonsQs(s, { category: "" })) : ""}
     ${s.level ? chip(`${LEVEL_EMOJI[s.level] ?? ""} ${s.level}`, lessonsQs(s, { level: "" })) : ""}
@@ -580,7 +617,7 @@ export function lessonsPage(d: LessonsData): Html {
           <span class="text-gray-400 dark:text-gray-500 cursor-default" data-ts="${lesson.timestamp}">${date}</span>
           <div class="absolute z-10 bottom-full left-0 mb-1 px-2 py-1 rounded bg-gray-800 dark:bg-gray-700 text-white text-xs whitespace-nowrap pointer-events-none opacity-0 group-hover/date:opacity-100 transition-opacity duration-150">${tip}</div>
         </td>
-        <td class="px-3 py-3 hidden sm:table-cell"><span class="text-xs font-mono text-cyan-600 dark:text-cyan-400">${lesson.topic_id}</span></td>
+        <td class="px-3 py-3 hidden sm:table-cell"><span class="text-xs font-mono text-cyan-600 dark:text-cyan-400">${lesson.topic_id}</span>${lesson.imported ? html`<span class="block text-[11px] text-gray-400 dark:text-gray-500 truncate max-w-[10rem]" title="This lesson was shared with you">🤝 ${lesson.shared_by ?? "anonymous"}</span>` : ""}</td>
         <td class="px-3 py-3 max-w-xs"><a href="/lessons/${encodeURIComponent(lesson.id)}" class="font-medium text-gray-800 dark:text-gray-100 hover:text-indigo-600 dark:hover:text-indigo-400 transition line-clamp-2">${lesson.title}</a></td>
         <td class="px-3 py-3" onclick="event.stopPropagation()" onkeydown="event.stopPropagation()"><a href="${lessonsQs(s, { level: lesson.level })}" class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${levelTextColor[lesson.level] ?? ""} hover:ring-2 hover:ring-current hover:ring-offset-1 transition-shadow">${lesson.level}</a></td>
         <td class="px-3 py-3 hidden lg:table-cell" onclick="event.stopPropagation()" onkeydown="event.stopPropagation()"><div class="flex flex-wrap gap-1">${lesson.categories.map((cat) => html`<a href="${lessonsQs(s, { category: cat })}" class="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors">${cat}</a>`)}</div></td>

@@ -325,6 +325,8 @@ export function createApp(opts: AppOptions = {}): Hono {
     const dateFrom = q.date_from || "";
     const dateTo = q.date_to || "";
     const starred = q.starred === "1";
+    const importedQ = q.imported === "1" ? "1" : q.imported === "0" ? "0" : "";
+    const sharedBy = q.shared_by || null;
     const sort = q.sort || "timestamp";
     const order = q.order === "asc" ? "asc" : "desc";
     let page = Math.max(1, Number.parseInt(q.page ?? "1", 10) || 1);
@@ -339,6 +341,8 @@ export function createApp(opts: AppOptions = {}): Hono {
       branch: q.branch || null,
       commit: q.commit || null,
       starred: starred ? true : null,
+      imported: sharedBy || importedQ === "1" ? true : importedQ === "0" ? false : null,
+      shared_by: sharedBy,
       search: q.search || null,
       feedback: q.feedback || null,
       date_from: dateFrom || null,
@@ -358,6 +362,7 @@ export function createApp(opts: AppOptions = {}): Hono {
         allRepositories: db.getDistinctColumn(conn, "repository"),
         allBranches: db.getDistinctColumn(conn, "branch"),
         allCommits: db.getDistinctColumn(conn, "commit_hash"),
+        allSharedBy: db.listSharedBy(conn),
         theme: db.getSettings(conn).ui_theme,
       };
     });
@@ -371,6 +376,8 @@ export function createApp(opts: AppOptions = {}): Hono {
       branch: q.branch || "",
       commit: q.commit || "",
       starred,
+      imported: sharedBy ? "1" : importedQ,
+      shared_by: sharedBy ?? "",
       search: q.search || "",
       feedback: q.feedback || "",
       date_from: dateFrom,
@@ -390,6 +397,7 @@ export function createApp(opts: AppOptions = {}): Hono {
         allRepositories: data.allRepositories,
         allBranches: data.allBranches,
         allCommits: data.allCommits,
+        allSharedBy: data.allSharedBy,
         s,
         page,
         perPage: PER_PAGE,

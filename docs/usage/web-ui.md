@@ -94,7 +94,8 @@ Filterable, sortable table of all delivered lessons.
 - Level — All levels / 🟢 Junior / 🟡 Mid / 🔴 Senior
 - Filters popover — Category / Project / Repository / Branch / Commit
 - Starred only
-- Free-text search
+- Shared — All lessons / 👤 My own / 🤝 Shared with me / 🤝 from `<name>` (one entry per sender)
+- Free-text search (also matches the sender of a shared lesson)
 
 Active filters show as chips above the table; when nothing matches you get "No lessons match the
 current filters."
@@ -102,7 +103,8 @@ current filters."
 **Sort:** click the Date, Topic, Title, Level or Feedback column header. Ascending or descending.
 
 **Table columns:** ★, Date, Topic, Title, Level, Categories, Feedback, ↗, 🗑 — the feedback cell shows
-`✓ Known` / `✗ Unknown` (or nothing yet); `↗` opens the lesson with its Share popover.
+`✓ Known` / `✗ Unknown` (or nothing yet); `↗` opens the lesson with its Share popover; a shared
+lesson shows `🤝 <sender>` under its topic.
 
 **Pagination:** 25 per page.
 

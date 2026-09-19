@@ -439,6 +439,11 @@ describe("lesson sharing — storage & pacing", () => {
         .sort(),
     ).toEqual(["same-slug-shared", "same-slug-shared-2"]);
     expect(db.getLessons(c, { imported: false }).map((l) => l.id)).toEqual(["same-slug"]);
+    // by sender: exact match on the filter, substring (case-insensitive) through search
+    expect(db.getLessons(c, { shared_by: "Bob" }).map((l) => l.id)).toEqual(["same-slug-shared-2"]);
+    expect(db.getLessons(c, { shared_by: "bob" })).toEqual([]);
+    expect(db.getLessons(c, { search: "bob" }).map((l) => l.id)).toEqual(["same-slug-shared-2"]);
+    expect(db.listSharedBy(c)).toEqual(["Ada", "Bob"]);
   });
 
   it("topic_tracked is an own-property check (a topic named like an Object.prototype key is not 'tracked')", () => {

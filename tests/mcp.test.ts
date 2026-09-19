@@ -562,6 +562,16 @@ describe("mcp lesson sharing", () => {
       arguments: { imported: true },
     });
     expect(JSON.parse(text(theirs)).map((l: any) => l.id)).toEqual(["share-me"]);
+    const bySender: any = await client.callTool({
+      name: "get_lessons",
+      arguments: { shared_by: "Teammate" },
+    });
+    expect(JSON.parse(text(bySender)).map((l: any) => l.id)).toEqual(["share-me"]);
+    const nobody: any = await client.callTool({
+      name: "get_lessons",
+      arguments: { shared_by: "Nobody" },
+    });
+    expect(JSON.parse(text(nobody))).toEqual([]);
 
     const junk: any = await client.callTool({
       name: "import_lesson",

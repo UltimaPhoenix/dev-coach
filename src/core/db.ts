@@ -314,6 +314,8 @@ export interface LessonFilters {
   date_to?: string | null;
   /** true = only lessons shared to you, false = only your own. */
   imported?: boolean | null;
+  /** Exact sender name of a shared lesson (implies imported). */
+  shared_by?: string | null;
 }
 
 type AddClause = (clause: string, ...vals: SqlParam[]) => void;
@@ -357,10 +359,12 @@ function lessonWhere(f: LessonFilters): { where: string; params: SqlParam[] } {
   }
   if (f.starred != null) add("starred = ?", f.starred ? 1 : 0);
   if (f.imported != null) add("imported = ?", f.imported ? 1 : 0);
+  if (f.shared_by != null) add("imported = 1 AND shared_by = ?", f.shared_by);
   if (f.search != null) {
     const like = `%${f.search}%`;
     add(
-      "(title LIKE ? OR topic_id LIKE ? OR summary LIKE ? OR body LIKE ?)",
+      "(title LIKE ? OR topic_id LIKE ? OR summary LIKE ? OR body LIKE ? OR shared_by LIKE ?)",
+      like,
       like,
       like,
       like,
@@ -461,6 +465,14 @@ export function getDistinctColumn(db: DatabaseSync, column: string): string[] {
     `SELECT DISTINCT ${column} FROM lessons WHERE ${column} IS NOT NULL ORDER BY ${column}`,
   );
   return rows.map((r) => r[column] as string);
+}
+
+/** Every sender who shared a lesson with you, for the dashboard's "from <name>" filter. */
+export function listSharedBy(db: DatabaseSync): string[] {
+  return allRows(
+    db,
+    "SELECT DISTINCT shared_by FROM lessons WHERE imported = 1 AND shared_by IS NOT NULL ORDER BY shared_by",
+  ).map((r) => r.shared_by as string);
 }
 
 export function getLessonById(db: DatabaseSync, lessonId: string): Lesson | null {

@@ -689,3 +689,54 @@ describe("web lesson delete", () => {
     expect(ok.headers.get("location")).toBe("/lessons");
   });
 });
+
+describe("web shared-with-me filters", () => {
+  it("filters by imported / sender, renders the dropdown, chip and row badge", async () => {
+    db.withConnection((c) => {
+      db.insertLesson(
+        c,
+        parseLesson({
+          id: "from-ada",
+          timestamp: "2026-06-16T10:00:00Z",
+          topic_id: "sql",
+          categories: ["sql"],
+          title: "Ada's <index> tip",
+          level: "mid",
+          summary: "s",
+          imported: true,
+          shared_by: "Ada <Lovelace>",
+        }),
+      );
+    });
+    const all = await (await get("/lessons")).text();
+    expect(all).toContain('data-shared-by="Ada &lt;Lovelace&gt;"');
+    expect(all).toContain("🤝 Ada &lt;Lovelace&gt;"); // row badge under the topic
+    expect(all).toContain("🤝 Shared"); // neutral button label
+
+    const theirs = await (await get("/lessons?imported=1")).text();
+    expect(theirs).toContain("/lessons/from-ada");
+    expect(theirs).not.toContain("/lessons/w1");
+    expect(theirs).toContain("🤝 Shared with me");
+
+    const mine = await (await get("/lessons?imported=0&search=Webify")).text();
+    expect(mine).toContain("/lessons/w1");
+    expect(mine).toContain("👤 My own");
+    expect(await (await get("/lessons?imported=0&search=index")).text()).not.toContain(
+      "/lessons/from-ada",
+    );
+
+    const byAda = await (await get("/lessons?shared_by=Ada+%3CLovelace%3E")).text();
+    expect(byAda).toContain("/lessons/from-ada");
+    expect(byAda).not.toContain("/lessons/w1");
+    expect(byAda).toContain("🤝 from Ada &lt;Lovelace&gt;"); // label + chip
+    expect(byAda).toContain("Clear all");
+    // the chip's clear link drops both fields; other filters survive
+    expect(byAda).toMatch(/href="\?period=all(&amp;[^"]*)?&amp;sort=timestamp&amp;order=desc"/);
+
+    const bySearch = await (await get("/lessons?search=lovelace")).text();
+    expect(bySearch).toContain("/lessons/from-ada");
+    expect((await get("/lessons?shared_by=Nobody")).status).toBe(200);
+    expect(await (await get("/lessons?shared_by=Nobody")).text()).toContain("No lessons match");
+    db.withConnection((c) => db.deleteLesson(c, "from-ada"));
+  });
+});

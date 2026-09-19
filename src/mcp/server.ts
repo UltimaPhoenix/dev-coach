@@ -409,6 +409,10 @@ export function createServer(): McpServer {
           .boolean()
           .nullish()
           .describe("True = only lessons shared with you, false = only your own"),
+        shared_by: z
+          .string()
+          .nullish()
+          .describe("Only lessons shared by this person (exact sender name; implies imported)"),
         feedback: z
           .enum(["know", "dont_know", "none"])
           .nullish()
@@ -416,7 +420,7 @@ export function createServer(): McpServer {
         search: z
           .string()
           .nullish()
-          .describe("Full-text search over title, topic_id, summary, body"),
+          .describe("Full-text search over title, topic_id, summary, body and the sender's name"),
         date_from: z.string().nullish().describe("ISO date/datetime lower bound"),
         date_to: z
           .string()
@@ -445,6 +449,7 @@ export function createServer(): McpServer {
             commit: args.commit,
             starred: args.starred,
             imported: args.imported,
+            shared_by: args.shared_by,
             feedback: args.feedback,
             search: args.search,
             date_from: args.date_from,
