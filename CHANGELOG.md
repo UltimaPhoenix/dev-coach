@@ -4,6 +4,15 @@ Notable changes to devcoach. Versions follow [Semantic Versioning](https://semve
 
 ---
 
+## [Unreleased]
+
+### Changed
+- **Three answers under a lesson card**: `✅ knew it (y)` · `💡 understood (u)` · `❌ couldn't follow
+  (n)`. Only *knew it* moves confidence (+1, undone if you change your answer); *understood* means the
+  level was right; *couldn't follow* keeps the lesson as a seed for a step-by-step course. **Schema v4**
+  (automatic, one-shot): existing `dont_know` answers — recorded when "no" mostly meant "new to me" —
+  become `understood`; the couldn't-follow list starts empty.
+
 ## [2.4.0] — 2026-09-19
 
 ### Added

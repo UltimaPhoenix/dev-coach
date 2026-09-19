@@ -301,7 +301,25 @@ describe("coach", () => {
     expect(coach.applyKnowledgeDelta(c, "python", 2)).toBe(6);
     expect(coach.applyKnowledgeDelta(c, "newtopic", 1)).toBe(6); // base 5 + 1
     db.insertLesson(c, lesson());
-    expect(coach.recordFeedback(c, "l1", "know")).toBe("python");
+    expect(coach.recordFeedback(c, "l1", "know")).toMatchObject({
+      topic_id: "python",
+      previous: null,
+      delta: 1,
+    });
+    expect(db.getAllKnowledge(c).python).toBe(7); // 6 after the +2 delta above, +1 for know
+    // understood / dont_know never move confidence; leaving `know` undoes its +1; idempotent
+    expect(coach.recordFeedback(c, "l1", "understood")).toMatchObject({
+      previous: "know",
+      delta: -1,
+    });
+    expect(db.getAllKnowledge(c).python).toBe(6);
+    expect(coach.recordFeedback(c, "l1", "dont_know")).toMatchObject({
+      previous: "understood",
+      delta: 0,
+    });
+    expect(coach.recordFeedback(c, "l1", "dont_know")).toMatchObject({ delta: 0 });
+    expect(db.getAllKnowledge(c).python).toBe(6);
+    expect(coach.recordFeedback(c, "missing", "know")).toBeNull();
     const stats = coach.getStats(c);
     expect(stats.total_lessons).toBe(1);
     expect((stats.weakest_topics as unknown[]).length).toBeGreaterThan(0);
@@ -385,9 +403,24 @@ describe("lesson sharing — storage & pacing", () => {
     expect(cols).toContain("imported");
     expect(cols).toContain("shared_by");
     expect((c.prepare("PRAGMA user_version").get() as { user_version: number }).user_version).toBe(
-      3,
+      db.SCHEMA_VERSION,
     );
     expect(coach.importSharedLesson(c, payloadFor("m1")).inserted).toBe(1);
+  });
+
+  it("v4 rewrites pre-existing dont_know answers to understood — once", () => {
+    const path = join(mkdtempSync(join(tmpdir(), "dc-db-")), "v3.db");
+    const old = db.getInitializedConnection(path);
+    db.insertLesson(old, lesson({ id: "old", feedback: "dont_know" }));
+    old.exec("PRAGMA user_version = 3");
+    old.close();
+    c = db.getInitializedConnection(path);
+    expect(db.getLessonById(c, "old")?.feedback).toBe("understood");
+    // a fresh answer on a v4 database is what the user meant: couldn't follow
+    db.insertLesson(c, lesson({ id: "fresh", feedback: "dont_know" }));
+    c.close();
+    c = db.getInitializedConnection(path);
+    expect(db.getLessonById(c, "fresh")?.feedback).toBe("dont_know");
   });
 
   it("an imported lesson is ours (taught topic, feedback works) but never touches pacing", () => {
@@ -412,7 +445,7 @@ describe("lesson sharing — storage & pacing", () => {
     });
     // …but taught, and feedback calibrates the profile as for any lesson.
     expect(db.getTaughtTopicIds(c)).toEqual(["docker"]);
-    expect(coach.recordFeedback(c, "p1", "know")).toBe("docker");
+    expect(coach.recordFeedback(c, "p1", "know")?.topic_id).toBe("docker");
     expect(db.getAllKnowledge(c).docker).toBe(6);
     // an own lesson right after still counts as usual
     db.insertLesson(c, lesson({ id: "own", timestamp: new Date() }));

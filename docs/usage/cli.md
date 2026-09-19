@@ -64,7 +64,7 @@ devcoach --version
 | `devcoach lesson <id>` | Show a single lesson in full |
 | `devcoach star <id>` / `unstar <id>` | Star / unstar |
 | `devcoach delete <id>` | Permanently delete a lesson |
-| `devcoach feedback <id> <know\|dont_know\|clear>` | Record comprehension (adjusts confidence) |
+| `devcoach feedback <id> <know\|understood\|dont_know\|clear>` | Record your answer under a lesson (`know` adjusts confidence) |
 | `devcoach share [id] [--last] [--link] [--file [path]] [--with-context] [--by <name> \| --anonymous]` | Hand a lesson to a teammate — see [Sharing a lesson](#sharing-a-lesson) |
 | `devcoach import [source]` | Add a shared lesson — code, card text, link, URL, `.devcoach.md`, JSON export, `-` for stdin; no argument reads the **clipboard** |
 

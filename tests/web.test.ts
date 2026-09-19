@@ -93,6 +93,11 @@ describe("web app", () => {
   it("star + feedback redirect 303", async () => {
     expect((await post("/lessons/w1/star", { starred: "1", next: "/lessons" })).status).toBe(303);
     expect(
+      (await post("/lessons/w1/feedback", { feedback: "bogus", next: "/lessons" })).status,
+    ).toBe(400);
+    expect((await post("/lessons/w1/feedback", { feedback: "understood" })).status).toBe(303);
+    expect(await (await get("/lessons/w1")).text()).toContain("💡 Understood");
+    expect(
       (await post("/lessons/w1/feedback", { feedback: "know", next: "//evil.com" })).status,
     ).toBe(303);
   });
@@ -204,7 +209,7 @@ describe("web view branches (rich rendering)", () => {
       ),
     );
     const html = await (await get("/lessons/g1")).text();
-    expect(html).toContain("I know this");
+    expect(html).toContain("I knew this");
     expect(html).toContain("github.com/UltimaPhoenix/dev-coach");
     expect(html).toContain("/commit/abcdef1234567");
     expect(html).toContain("vscode://file//home/x");
@@ -216,7 +221,7 @@ describe("web view branches (rich rendering)", () => {
     ).text();
     expect(html).toContain("Clear all");
     expect(html).toContain("Starred");
-    expect(html).toContain("Known");
+    expect(html).toContain("Knew it");
   });
 
   it("lessons page: custom date range label", async () => {
@@ -290,7 +295,7 @@ describe("web view branches — exhaustive", () => {
     });
     const gl = await (await get("/lessons/gl")).text();
     expect(gl).toContain("/-/commit/deadbeef1234"); // gitlab commit URL form
-    expect(gl).toContain("I don't know this"); // dont_know branch
+    expect(gl).toContain("Couldn't follow"); // dont_know branch
     expect(gl).toContain("Context:"); // task_context branch
     const bb = await (await get("/lessons/bb")).text();
     expect(bb).toContain("/commits/cafe123"); // bitbucket commit URL form

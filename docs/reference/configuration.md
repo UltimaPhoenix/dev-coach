@@ -132,7 +132,7 @@ lessons (
   branch              TEXT,
   commit_hash         TEXT,
   folder              TEXT,
-  feedback            TEXT,            -- know | dont_know | NULL
+  feedback            TEXT,            -- know | understood | dont_know | NULL
   repository_platform TEXT,            -- github | gitlab | bitbucket | local
   starred             INTEGER NOT NULL DEFAULT 0,
   imported            INTEGER NOT NULL DEFAULT 0,  -- 1 = shared by someone else (ignored by the rate limit)

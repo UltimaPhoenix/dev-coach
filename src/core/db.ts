@@ -119,13 +119,14 @@ export function getConnection(dbPath: string = DB_PATH): DatabaseSync {
  * idempotent statements). Bump it whenever initSchema/migrate changes. The legacy Python
  * runtime ignores user_version, so stamping is safe on the shared DB.
  */
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 
 export function getInitializedConnection(dbPath: string = DB_PATH): DatabaseSync {
   const db = getConnection(dbPath);
   const row = db.prepare("PRAGMA user_version").get() as { user_version?: number } | undefined;
-  if (Number(row?.user_version ?? 0) !== SCHEMA_VERSION) {
-    initSchema(db);
+  const fromVersion = Number(row?.user_version ?? 0);
+  if (fromVersion !== SCHEMA_VERSION) {
+    initSchema(db, fromVersion);
     db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
   }
   return db;
@@ -160,7 +161,8 @@ export function withConnection<T>(fn: (db: DatabaseSync) => T, dbPath: string = 
 
 // ── Schema init ──────────────────────────────────────────────────────────────
 
-export function initSchema(db: DatabaseSync): void {
+/** `fromVersion` is the stored `user_version` before this run (0 for a brand-new file). */
+export function initSchema(db: DatabaseSync, fromVersion = 0): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS lessons (
         id                  TEXT PRIMARY KEY,
@@ -227,11 +229,11 @@ export function initSchema(db: DatabaseSync): void {
     CREATE INDEX IF NOT EXISTS idx_lessons_feedback ON lessons (feedback);
     CREATE INDEX IF NOT EXISTS idx_lessons_topic_id ON lessons (topic_id);
   `);
-  migrate(db);
+  migrate(db, fromVersion);
   seedDefaults(db);
 }
 
-function migrate(db: DatabaseSync): void {
+function migrate(db: DatabaseSync, fromVersion: number): void {
   for (const ddl of [
     "ALTER TABLE lessons ADD COLUMN body TEXT",
     "ALTER TABLE lessons ADD COLUMN imported INTEGER NOT NULL DEFAULT 0",
@@ -242,6 +244,12 @@ function migrate(db: DatabaseSync): void {
     } catch {
       // column already exists
     }
+  }
+  // v4 — feedback grew a third answer. Under the old two-answer model "don't know" mostly meant
+  // "new to me", which is now `understood`; `dont_know` is reserved for "couldn't follow" and
+  // seeds courses. One-shot: only a database coming from before v4 is rewritten.
+  if (fromVersion < 4) {
+    db.exec("UPDATE lessons SET feedback = 'understood' WHERE feedback = 'dont_know'");
   }
 }
 

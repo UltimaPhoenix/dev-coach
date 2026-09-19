@@ -92,7 +92,7 @@ Filterable, sortable table of all delivered lessons.
 **Filters:**
 - Period — All time / Today / Last 7 days / Last 30 days / Last year / Custom range (the date range
   accepts an optional time: `2026-04-25T14:30`)
-- Feedback — All feedback / ✓ Known / ✗ Don't know / — No response
+- Feedback — All feedback / ✓ Knew it / 💡 Understood / ✗ Couldn't follow / — No response
 - Level — All levels / 🟢 Junior / 🟡 Mid / 🔴 Senior
 - Filters popover — Category / Project / Repository / Branch / Commit
 - Starred only
@@ -105,7 +105,7 @@ current filters."
 **Sort:** click the Date, Topic, Title, Level or Feedback column header. Ascending or descending.
 
 **Table columns:** ★, Date, Topic, Title, Level, Categories, Feedback, ↗ — the title gets the width
-(categories wrap onto a second line when needed); the feedback cell shows `✓ Known` / `✗ Unknown`
+(categories wrap onto a second line when needed); the feedback cell shows `✓ Knew it` / `💡 Understood` / `✗ Couldn't follow`
 (or nothing yet); `↗` opens the Share panel right there; a shared lesson shows `🤝 <sender>`
 under its topic.
 
@@ -177,7 +177,7 @@ Full lesson content laid out in reading order:
   - **commit** — the exact commit (clickable to view on GitHub/GitLab/Bitbucket or as a local hash)
   - **folder** — a VS Code icon link that opens the project folder in VS Code, so you can immediately
     review the code that triggered the lesson
-- **Feedback buttons** — `✓ I know this` / `✗ I don't know this` (hidden once feedback is recorded)
+- **Feedback buttons** — `✓ I knew this` / `💡 Understood` / `✗ Couldn't follow` (hidden once feedback is recorded)
 - **ID line** — the full lesson ID, for `devcoach lesson <id>` and friends
 
 <Tabs>

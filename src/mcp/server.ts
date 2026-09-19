@@ -416,9 +416,12 @@ export function createServer(): McpServer {
           .nullish()
           .describe("Only lessons shared by this person (exact sender name; implies imported)"),
         feedback: z
-          .enum(["know", "dont_know", "none"])
+          .enum(["know", "understood", "dont_know", "none"])
           .nullish()
-          .describe("Filter by feedback ('none' = no response)"),
+          .describe(
+            "Filter by feedback: know (already knew), understood (new, now clear), " +
+              "dont_know (couldn't follow — a course seed), none (no response)",
+          ),
         search: z
           .string()
           .nullish()
@@ -522,12 +525,15 @@ export function createServer(): McpServer {
     {
       title: "Submit Feedback",
       description:
-        "Record comprehension feedback for a lesson and adjust knowledge confidence. " +
-        "know = +1, dont_know = -1, clear = remove feedback (no confidence change). " +
-        "Idempotent — the same feedback twice adjusts confidence only once.",
+        "Record the user's answer under a lesson card. know = already knew it (confidence +1); " +
+        "understood = new and now clear (no confidence change); dont_know = couldn't follow this " +
+        "session (no confidence change; the lesson becomes a course seed); clear = remove the " +
+        "answer. Idempotent — repeating the stored answer changes nothing.",
       inputSchema: z.object({
         lesson_id: z.string().describe("Lesson id"),
-        feedback: z.enum(["know", "dont_know", "clear"]).describe("know | dont_know | clear"),
+        feedback: z
+          .enum(["know", "understood", "dont_know", "clear"])
+          .describe("know | understood | dont_know | clear"),
       }),
       annotations: {
         title: "Submit Feedback",
@@ -539,19 +545,10 @@ export function createServer(): McpServer {
     async (args) => {
       try {
         const feedbackValue = args.feedback === "clear" ? null : args.feedback;
-        const ok = db.withConnection((c) => {
-          const row = c
-            .prepare("SELECT feedback, topic_id FROM lessons WHERE id = ?")
-            .get(args.lesson_id) as { feedback: string | null; topic_id: string } | undefined;
-          if (!row) return false;
-          if (row.feedback === feedbackValue) return true;
-          db.setFeedback(c, args.lesson_id, feedbackValue);
-          if ((feedbackValue === "know" || feedbackValue === "dont_know") && row.topic_id) {
-            coach.applyKnowledgeDelta(c, row.topic_id, feedbackValue === "know" ? 1 : -1);
-          }
-          return true;
-        });
-        return { content: [txt(String(ok))] };
+        const result = db.withConnection((c) =>
+          coach.recordFeedback(c, args.lesson_id, feedbackValue),
+        );
+        return { content: [txt(String(result !== null))] };
       } catch (err) {
         return errResult(`submit_feedback failed for '${args.lesson_id}': ${err}`);
       }

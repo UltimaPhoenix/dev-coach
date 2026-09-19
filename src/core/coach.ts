@@ -13,6 +13,7 @@ import {
   getSettings,
   getTaughtTopicIds,
   importLessons,
+  withTransaction,
   insertLessonIfAbsent,
   isOnboardingComplete,
   markCuePending,
@@ -89,16 +90,48 @@ export function applyKnowledgeDelta(db: DatabaseSync, topic: string, delta: numb
   return newConfidence;
 }
 
+export interface FeedbackResult {
+  topic_id: string;
+  /** The value stored before this call (null = no feedback yet). */
+  previous: string | null;
+  /** Confidence change applied to the topic: +1 entering `know`, -1 leaving it, else 0. */
+  delta: number;
+  /** The topic's confidence after the call (null when the topic is not tracked). */
+  confidence: number | null;
+}
+
+/**
+ * The one writer for lesson feedback. `know` means "already knew it" and is the only answer
+ * that moves the knowledge map (+1 on entering, -1 on leaving); `understood` and `dont_know`
+ * record the answer without touching confidence. Idempotent: repeating the stored value is a
+ * no-op, and read + write happen in one transaction so a double click cannot count twice.
+ */
 export function recordFeedback(
   db: DatabaseSync,
   lessonId: string,
-  feedbackValue: string | null,
-): string | null {
-  const topicId = setFeedback(db, lessonId, feedbackValue);
-  if (topicId && (feedbackValue === "know" || feedbackValue === "dont_know")) {
-    applyKnowledgeDelta(db, topicId, feedbackValue === "know" ? 1 : -1);
-  }
-  return topicId;
+  next: string | null,
+): FeedbackResult | null {
+  return withTransaction(db, () => {
+    const row = db.prepare("SELECT feedback, topic_id FROM lessons WHERE id = ?").get(lessonId) as
+      | { feedback: string | null; topic_id: string }
+      | undefined;
+    if (!row) return null;
+    const previous = row.feedback ?? null;
+    const known = getAllKnowledge(db);
+    if (previous === next) {
+      return {
+        topic_id: row.topic_id,
+        previous,
+        delta: 0,
+        confidence: known[row.topic_id] ?? null,
+      };
+    }
+    setFeedback(db, lessonId, next);
+    const delta = (next === "know" ? 1 : 0) - (previous === "know" ? 1 : 0);
+    const confidence =
+      delta !== 0 ? applyKnowledgeDelta(db, row.topic_id, delta) : (known[row.topic_id] ?? null);
+    return { topic_id: row.topic_id, previous, delta, confidence };
+  });
 }
 
 export function getStats(db: DatabaseSync): Record<string, unknown> {

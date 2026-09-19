@@ -44,13 +44,22 @@ const levelColor = (lvl: string): string =>
         ? c.red(lvl)
         : lvl;
 const feedbackIcon = (fb: string | null): string =>
-  fb === "know" ? ` ${c.green("✓")}` : fb === "dont_know" ? ` ${c.red("✗")}` : "";
+  fb === "know"
+    ? ` ${c.green("✓")}`
+    : fb === "understood"
+      ? ` ${c.cyan("💡")}`
+      : fb === "dont_know"
+        ? ` ${c.red("✗")}`
+        : "";
 const feedbackLabel = (fb: string | null): string =>
   fb === "know"
-    ? c.green("✓ I know this")
-    : fb === "dont_know"
-      ? c.red("✗ I don't know this")
-      : c.dim("no feedback");
+    ? c.green("✓ I knew this")
+    : fb === "understood"
+      ? c.cyan("💡 Understood")
+      : fb === "dont_know"
+        ? c.red("✗ Couldn't follow")
+        : c.dim("no feedback");
+const FEEDBACK_VALUES = ["know", "understood", "dont_know", "clear"];
 
 // ── Display commands ─────────────────────────────────────────────────────────
 
@@ -220,37 +229,26 @@ function cmdDelete(id: string): void {
 }
 
 function cmdFeedback(id: string, feedback: string): void {
-  if (!["know", "dont_know", "clear"].includes(feedback)) {
-    log(c.red(`Invalid feedback '${feedback}'. Use: know | dont_know | clear`));
+  if (!FEEDBACK_VALUES.includes(feedback)) {
+    log(c.red(`Invalid feedback '${feedback}'. Use: ${FEEDBACK_VALUES.join(" | ")}`));
     process.exit(1);
   }
   const feedbackValue = feedback === "clear" ? null : feedback;
-  const result = db.withConnection((conn) => {
-    const topicId = coach.recordFeedback(conn, id, feedbackValue);
-    if (topicId === null) return null;
-    const row = conn.prepare("SELECT confidence FROM knowledge WHERE topic = ?").get(topicId) as
-      | { confidence: number }
-      | undefined;
-    return { topicId, newConf: row ? row.confidence : 5 };
-  });
+  const result = db.withConnection((conn) => coach.recordFeedback(conn, id, feedbackValue));
   if (result === null) {
     log(c.red(`Lesson '${id}' not found.`));
     process.exit(1);
   }
   let confLabel: string;
-  if (feedbackValue === "know" || feedbackValue === "dont_know") {
-    const oldConf = result.newConf + (feedbackValue === "know" ? -1 : 1);
-    confLabel = `${c.cyan(result.topicId)} confidence: ${oldConf} → ${c.bold(String(result.newConf))}`;
-  } else {
+  if (feedbackValue === null) {
     confLabel = "feedback cleared";
+  } else if (result.delta !== 0 && result.confidence !== null) {
+    const oldConf = result.confidence - result.delta;
+    confLabel = `${c.cyan(result.topic_id)} confidence: ${oldConf} → ${c.bold(String(result.confidence))}`;
+  } else {
+    confLabel = `${c.cyan(result.topic_id)} confidence unchanged`;
   }
-  const icon =
-    feedbackValue === "know"
-      ? c.green("✓ I know this")
-      : feedbackValue === "dont_know"
-        ? c.red("✗ I don't know this")
-        : c.dim("cleared");
-  log(`Lesson ${c.cyan(id)} → ${icon}  (${confLabel})`);
+  log(`Lesson ${c.cyan(id)} → ${feedbackLabel(feedbackValue)}  (${confLabel})`);
 }
 
 function cmdSettings(): void {
@@ -751,7 +749,7 @@ function printWelcome(): void {
     ["settings / set", "Show / update settings (max_per_day | min_gap_minutes)"],
     ["lessons / lesson", "List past lessons / show one in detail"],
     ["star / unstar / delete", "Manage a lesson"],
-    ["feedback <id>", "Record know / dont_know feedback"],
+    ["feedback <id>", "Record know / understood / dont_know feedback"],
     ["share / import", "Hand a lesson to a teammate / add a shared lesson to your log"],
     ["knowledge-add / -remove", "Add / remove a topic"],
     ["group-add / -remove / -assign", "Manage knowledge groups"],
@@ -829,7 +827,7 @@ function buildProgram(): Command {
     .option("--starred", "Show only starred lessons")
     .option("--imported", "Show only lessons shared with you")
     .option("--from <name>", "Show only lessons shared by this person")
-    .option("--feedback <feedback>", "know | dont_know | none")
+    .option("--feedback <feedback>", "know | understood | dont_know | none")
     .option("--level <level>", "junior | mid | senior")
     .option("--date-from <date>", "Show lessons on or after this date (YYYY-MM-DD[THH:MM])")
     .option("--date-to <date>", "Show lessons on or before this date (YYYY-MM-DD[THH:MM])")
@@ -881,9 +879,9 @@ function buildProgram(): Command {
 
   program
     .command("feedback")
-    .description("Record know/dont_know feedback for a lesson")
+    .description("Record your answer under a lesson: know / understood / dont_know")
     .argument("<id>", "Lesson ID")
-    .argument("<value>", "know | dont_know | clear")
+    .argument("<value>", "know | understood | dont_know | clear")
     .action((id: string, value: string) => cmdFeedback(id, value));
 
   program

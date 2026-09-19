@@ -230,6 +230,19 @@ describe("mcp server", () => {
         }),
       ),
     ).toBe("true");
+    expect(
+      text(
+        await client.callTool({
+          name: "submit_feedback",
+          arguments: { lesson_id: "t1", feedback: "understood" },
+        }),
+      ),
+    ).toBe("true");
+    const understood: any = await client.callTool({
+      name: "get_lessons",
+      arguments: { feedback: "understood" },
+    });
+    expect(JSON.parse(text(understood)).map((l: any) => l.id)).toContain("t1");
 
     const ok: any = await client.callTool({
       name: "update_settings",

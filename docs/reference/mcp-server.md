@@ -41,7 +41,7 @@ local server.
 | `get_lessons` | Query lesson history (period, category, level, git, starred, imported, `shared_by`, feedback, search, date range); `limit` defaults to 10, `0` = all | read-only |
 | `star_lesson` | Star / unstar a lesson | write |
 | `delete_lesson` | Permanently delete a lesson | **destructive** |
-| `submit_feedback` | Record `know` / `dont_know` / `clear`; adjusts confidence ±1 (idempotent) | write |
+| `submit_feedback` | Record `know` / `understood` / `dont_know` / `clear`; only `know` moves confidence (+1, undone on change; idempotent) | write |
 | `add_topic` | Add/update a topic (confidence 0–10, default 5), optionally in a group | write |
 | `remove_topic` | Remove a topic from the knowledge map | **destructive** |
 | `add_group` | Create a knowledge group | write |

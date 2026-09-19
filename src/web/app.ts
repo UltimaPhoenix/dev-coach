@@ -438,6 +438,9 @@ export function createApp(opts: AppOptions = {}): Hono {
   app.post("/lessons/:lesson_id/feedback", async (c) => {
     const body = await c.req.parseBody();
     const fb = textField(body, "feedback");
+    if (!["", "clear", "know", "understood", "dont_know"].includes(fb)) {
+      return c.text("Unknown feedback value", 400);
+    }
     const value = fb === "" || fb === "clear" ? null : fb;
     db.withConnection((conn) => coach.recordFeedback(conn, c.req.param("lesson_id"), value));
     return c.redirect(safeRedirect(textField(body, "next") || undefined), 303);

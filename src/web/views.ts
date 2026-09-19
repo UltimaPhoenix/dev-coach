@@ -354,8 +354,9 @@ const PERIOD_LABELS: Record<string, string> = {
   year: "Last year",
 };
 const FEEDBACK_LABELS: Record<string, string> = {
-  know: "✓ Known",
-  dont_know: "✗ Don't know",
+  know: "✓ Knew it",
+  understood: "💡 Understood",
+  dont_know: "✗ Couldn't follow",
   none: "— No response",
 };
 const LEVEL_EMOJI: Record<string, string> = { junior: "🟢", mid: "🟡", senior: "🔴" };
@@ -540,8 +541,9 @@ export function lessonsPage(d: LessonsData): Html {
         ${(
           [
             ["", "All feedback"],
-            ["know", "✓ Known"],
-            ["dont_know", "✗ Don't know"],
+            ["know", "✓ Knew it"],
+            ["understood", "💡 Understood"],
+            ["dont_know", "✗ Couldn't follow"],
             ["none", "— No response"],
           ] as [string, string][]
         ).map(
@@ -681,7 +683,7 @@ ${
         <td class="px-3 py-3"><a href="/lessons/${encodeURIComponent(lesson.id)}" class="font-semibold text-[15px] leading-snug text-gray-800 dark:text-gray-100 hover:text-indigo-600 dark:hover:text-indigo-400 transition line-clamp-2">${lesson.title}</a></td>
         <td class="px-3 py-3"><a href="${lessonsQs(s, { level: lesson.level })}" class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${levelTextColor[lesson.level] ?? ""} hover:ring-2 hover:ring-current hover:ring-offset-1 transition-shadow">${lesson.level}</a></td>
         <td class="px-3 py-3 hidden lg:table-cell"><div class="flex flex-wrap gap-1">${lesson.categories.map((cat) => html`<a href="${lessonsQs(s, { category: cat })}" class="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors">${cat}</a>`)}</div></td>
-        <td class="px-3 py-3 hidden xl:table-cell">${lesson.feedback === "know" ? html`<span class="text-xs text-teal-600 dark:text-teal-400 font-medium">✓ Known</span>` : lesson.feedback === "dont_know" ? html`<span class="text-xs text-rose-500 dark:text-rose-400 font-medium">✗ Unknown</span>` : ""}</td>
+        <td class="px-3 py-3 hidden xl:table-cell">${lesson.feedback === "know" ? html`<span class="text-xs text-teal-600 dark:text-teal-400 font-medium">✓ Knew it</span>` : lesson.feedback === "understood" ? html`<span class="text-xs text-indigo-500 dark:text-indigo-400 font-medium">💡 Understood</span>` : lesson.feedback === "dont_know" ? html`<span class="text-xs text-rose-500 dark:text-rose-400 font-medium">✗ Couldn't follow</span>` : ""}</td>
         <td class="px-2 py-3 text-center"><button type="button" hx-get="/lessons/${encodeURIComponent(lesson.id)}/share?format=panel" hx-target="#share-modal-body" hx-swap="innerHTML" @click="openShare($el)" title="Share this lesson" aria-label="Share this lesson" class="inline-flex text-gray-400 dark:text-gray-500 hover:text-indigo-500 dark:hover:text-indigo-400 transition opacity-0 group-hover:opacity-100 focus-visible:opacity-100"><svg class="w-4 h-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 14 14 6M8 6h6v6"/></svg></button></td>
       </tr>`;
       })}
@@ -952,8 +954,10 @@ ${
       l.feedback
         ? html`${
             l.feedback === "know"
-              ? html`<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-700">✓ I know this</span>`
-              : html`<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-700">✗ I don't know this</span>`
+              ? html`<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-700">✓ I knew this</span>`
+              : l.feedback === "understood"
+                ? html`<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-700">💡 Understood</span>`
+                : html`<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-700">✗ Couldn't follow</span>`
           }
         <form method="post" action="/lessons/${encodeURIComponent(l.id)}/feedback" ${raw(feedbackHx)}><input type="hidden" name="feedback" value="clear" /><input type="hidden" name="next" value="/lessons/${encodeURIComponent(l.id)}" /><button type="submit" class="text-xs text-gray-400 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-400 transition">Clear</button></form>`
         : ""
@@ -979,8 +983,9 @@ ${
   <div id="lesson-feedback">${
     !l.feedback
       ? html`<div class="mt-6 pt-4 border-t border-gray-100 dark:border-gray-800 flex flex-wrap gap-2">
-    <form method="post" action="/lessons/${encodeURIComponent(l.id)}/feedback" ${raw(feedbackHx)}><input type="hidden" name="feedback" value="know" /><input type="hidden" name="next" value="/lessons/${encodeURIComponent(l.id)}" /><button type="submit" class="px-3 py-1 rounded text-sm font-medium transition bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-green-100 dark:hover:bg-green-800 hover:text-green-700 dark:hover:text-white">✓ I know this</button></form>
-    <form method="post" action="/lessons/${encodeURIComponent(l.id)}/feedback" ${raw(feedbackHx)}><input type="hidden" name="feedback" value="dont_know" /><input type="hidden" name="next" value="/lessons/${encodeURIComponent(l.id)}" /><button type="submit" class="px-3 py-1 rounded text-sm font-medium transition bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-red-100 dark:hover:bg-red-900 hover:text-red-700 dark:hover:text-white">✗ I don't know this</button></form>
+    <form method="post" action="/lessons/${encodeURIComponent(l.id)}/feedback" ${raw(feedbackHx)}><input type="hidden" name="feedback" value="know" /><input type="hidden" name="next" value="/lessons/${encodeURIComponent(l.id)}" /><button type="submit" class="px-3 py-1 rounded text-sm font-medium transition bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-green-100 dark:hover:bg-green-800 hover:text-green-700 dark:hover:text-white">✓ I knew this</button></form>
+    <form method="post" action="/lessons/${encodeURIComponent(l.id)}/feedback" ${raw(feedbackHx)}><input type="hidden" name="feedback" value="understood" /><input type="hidden" name="next" value="/lessons/${encodeURIComponent(l.id)}" /><button type="submit" class="px-3 py-1 rounded text-sm font-medium transition bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-indigo-100 dark:hover:bg-indigo-900 hover:text-indigo-700 dark:hover:text-white">💡 Understood</button></form>
+    <form method="post" action="/lessons/${encodeURIComponent(l.id)}/feedback" ${raw(feedbackHx)}><input type="hidden" name="feedback" value="dont_know" /><input type="hidden" name="next" value="/lessons/${encodeURIComponent(l.id)}" /><button type="submit" class="px-3 py-1 rounded text-sm font-medium transition bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-red-100 dark:hover:bg-red-900 hover:text-red-700 dark:hover:text-white">✗ Couldn't follow</button></form>
   </div>`
       : ""
   }</div>

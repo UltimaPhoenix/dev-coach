@@ -10,7 +10,9 @@ export type Level = z.infer<typeof LevelSchema>;
 export const RepositoryPlatformSchema = z.enum(["github", "gitlab", "bitbucket", "local"]);
 export type RepositoryPlatform = z.infer<typeof RepositoryPlatformSchema>;
 
-export const FeedbackSchema = z.enum(["know", "dont_know"]);
+// know = already knew it (confidence +1) · understood = new and now clear (no change) ·
+// dont_know = couldn't follow this session (no change; the lesson becomes a course seed).
+export const FeedbackSchema = z.enum(["know", "understood", "dont_know"]);
 export type Feedback = z.infer<typeof FeedbackSchema>;
 
 /** Confidence accepted from tool inputs: clamped range 0-10. */

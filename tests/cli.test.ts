@@ -697,13 +697,18 @@ describe("cli rich rendering branches", () => {
     expect(sr).toContain("folder=/f");
     expect(sr).toContain("Context:");
     expect(sr).toContain("★ starred");
-    expect(sr).toContain("I know this");
+    expect(sr).toContain("I knew this");
     const jr = (await run(["lesson", "jr"])).out;
-    expect(jr).toContain("I don't know this");
+    expect(jr).toContain("Couldn't follow");
   });
 
-  it("feedback dont_know lowers confidence", async () => {
-    expect((await run(["feedback", "sr", "dont_know"])).out).toContain("confidence");
+  it("leaving know undoes its +1; understood and dont_know leave confidence alone", async () => {
+    const left = (await run(["feedback", "sr", "dont_know"])).out;
+    const m = left.match(/confidence: (\d+) → (\d+)/);
+    expect(m).not.toBeNull();
+    expect(Number(m?.[2])).toBe(Number(m?.[1]) - 1); // leaving `know` undoes its +1
+    expect((await run(["feedback", "sr", "understood"])).out).toContain("confidence unchanged");
+    expect((await run(["feedback", "sr", "understood"])).out).toContain("💡 Understood");
   });
 
   it("stats shows weakest and strongest topics", async () => {
