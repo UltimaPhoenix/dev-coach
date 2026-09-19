@@ -220,6 +220,18 @@ Full lesson content laid out in reading order:
 
 ---
 
+### Courses (`/courses`)
+
+Every step-by-step [course](./courses.md) with its progress, its status and the lesson it grew
+from. A course page shows the prerequisite chain as ✓/✗ chips, the step list with **Mark done** /
+**Skip** / **Reopen**, and the course document in a sandboxed frame (`sandbox="allow-scripts
+allow-forms"` plus a `Content-Security-Policy` that also sandboxes the document when opened on its
+own: no network, no form posts, no navigation out). The **⋯** menu holds **Delete course…** — rows
+and folder go, the seed lesson stays. A lesson that seeded a course shows a `🎓 Course · N/M` link
+in its metadata row.
+
+---
+
 ### Sharing a lesson
 
 A lesson that landed for you is worth handing to a teammate. **↗ Share** on a lesson (or `↗` in the

@@ -5,6 +5,7 @@ import { text as readStream } from "node:stream/consumers";
 import { Command } from "commander";
 import { scanClaudeHistory } from "../core/claude-history";
 import * as coach from "../core/coach";
+import * as courses from "../core/courses";
 import * as db from "../core/db";
 import { detectStack, mergeStacks } from "../core/detect";
 import { detectGitContext, detectGitUserName } from "../core/git";
@@ -226,6 +227,78 @@ function cmdDelete(id: string): void {
     process.exit(1);
   }
   log(`Lesson ${c.cyan(id)} deleted.`);
+}
+
+const courseStatusLabel = (status: string): string =>
+  status === "completed"
+    ? c.green(status)
+    : status === "abandoned"
+      ? c.dim(status)
+      : c.cyan(status);
+
+function cmdCourses(): void {
+  const list = db.withConnection((conn) => courses.listCourses(conn));
+  if (list.length === 0) {
+    log(c.dim("No courses yet. Start one in your agent: /devcoach:course, or say yes after a ❌."));
+    return;
+  }
+  const columns: Column[] = [
+    { header: "ID" },
+    { header: "Title" },
+    { header: "Progress", justify: "center" },
+    { header: "Status" },
+    { header: "Updated" },
+  ];
+  const rows = list.map((course) => {
+    const p = courses.progress(course);
+    return [
+      c.cyan(course.id),
+      course.title,
+      `${p.done}/${p.total}`,
+      courseStatusLabel(course.status),
+      course.updated_at.slice(0, 10),
+    ];
+  });
+  log(renderTable("Courses", columns, rows));
+}
+
+function cmdCourse(id: string): void {
+  const course = db.withConnection((conn) => courses.getCourse(conn, id));
+  if (course === null) {
+    log(c.red(`Course '${id}' not found.`));
+    process.exit(1);
+  }
+  const p = courses.progress(course);
+  log(rule(c.bold(course.title)));
+  log(`${c.dim("ID:")}        ${course.id}`);
+  log(
+    `${c.dim("Topic:")}     ${c.cyan(course.topic_id)}   ${c.dim("Status:")} ${courseStatusLabel(course.status)}   ${c.dim("Progress:")} ${p.done}/${p.total}`,
+  );
+  if (course.goal) log(`${c.dim("Goal:")}      ${course.goal}`);
+  if (course.lesson_id) log(`${c.dim("From:")}      lesson ${c.cyan(course.lesson_id)}`);
+  const doc = courses.courseDocument(course.id);
+  log(
+    `${c.dim("Document:")}  ${doc ?? c.dim(`not written yet → ${courses.documentPath(course.id)}`)}`,
+  );
+  if (course.prerequisites.length) {
+    log(
+      `${c.dim("Chain:")}     ${course.prerequisites
+        .map((q) => (q.known ? c.green(`✓ ${q.concept}`) : c.red(`✗ ${q.concept}`)))
+        .join(c.dim(" → "))}`,
+    );
+  }
+  log("");
+  if (course.steps.length === 0) {
+    log(c.dim("No steps registered yet."));
+    return;
+  }
+  for (const step of course.steps) {
+    const icon =
+      step.status === "done" ? c.green("●") : step.status === "skipped" ? c.dim("◌") : c.cyan("○");
+    log(
+      `  ${icon} ${step.position}. ${step.title}  ${c.dim(`${step.kind} · #${step.anchor}${step.status !== "todo" ? ` · ${step.status}` : ""}`)}`,
+    );
+  }
 }
 
 function cmdFeedback(id: string, feedback: string): void {
@@ -748,6 +821,7 @@ function printWelcome(): void {
     ["stats", "Coaching statistics and rate-limit status"],
     ["settings / set", "Show / update settings (max_per_day | min_gap_minutes)"],
     ["lessons / lesson", "List past lessons / show one in detail"],
+    ["courses / course", "List your courses / show one with its steps"],
     ["star / unstar / delete", "Manage a lesson"],
     ["feedback <id>", "Record know / understood / dont_know feedback"],
     ["share / import", "Hand a lesson to a teammate / add a shared lesson to your log"],
@@ -858,6 +932,17 @@ function buildProgram(): Command {
     .description("Show a single lesson in detail")
     .argument("<id>", "Lesson ID")
     .action((id: string) => cmdLesson(id));
+
+  program
+    .command("courses")
+    .description("List your step-by-step courses")
+    .action(() => cmdCourses());
+
+  program
+    .command("course")
+    .description("Show a course: steps, progress, document path")
+    .argument("<id>", "Course ID")
+    .action((id: string) => cmdCourse(id));
 
   program
     .command("star")

@@ -10,7 +10,7 @@ const sidebars: SidebarsConfig = {
       type: "category",
       label: "Using devcoach",
       collapsed: false,
-      items: ["usage/coaching", "usage/sharing", "usage/web-ui", "usage/cli"],
+      items: ["usage/coaching", "usage/courses", "usage/sharing", "usage/web-ui", "usage/cli"],
     },
     {
       type: "category",

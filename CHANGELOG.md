@@ -6,6 +6,16 @@ Notable changes to devcoach. Versions follow [Semantic Versioning](https://semve
 
 ## [Unreleased]
 
+### Added
+- **Courses** — a step-by-step path out of a lesson you couldn't follow (or into any concept). The
+  coach first asks what you already know, one question at a time, down the prerequisite chain; then
+  it writes ONE rich, self-contained HTML document (live examples, check questions) at
+  `~/.devcoach/courses/<id>/index.html` and teaches it one step per message. Start it with `n` under a
+  card + yes, `/devcoach:course`, or "teach me X from the basics". Four MCP tools (`create_course`,
+  `add_course_step`, `update_course_progress`, `get_courses`; 21 → 25), a **Courses** page in the
+  dashboard with the document in a sandboxed frame, `devcoach courses` / `course <id>`, backups carry
+  courses, and lesson cues pause while a course is active. **Schema v5** (additive, automatic).
+
 ### Changed
 - **Three answers under a lesson card**: `✅ knew it (y)` · `💡 understood (u)` · `❌ couldn't follow
   (n)`. Only *knew it* moves confidence (+1, undone if you change your answer); *understood* means the

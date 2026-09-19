@@ -4,6 +4,7 @@ import { dirname, join } from "node:path";
 import { Readable } from "node:stream";
 import { describe, expect, it, vi } from "vitest";
 import { parseHookPayload, runCli } from "../src/cli/commands";
+import * as courses from "../src/core/courses";
 import * as db from "../src/core/db";
 import { parseLesson } from "../src/core/models";
 import { fetchSharedInput } from "../src/core/share-fetch";
@@ -262,6 +263,35 @@ describe("cli", () => {
     expect((await run(["set", "bad", "5"])).code).toBe(1);
     expect((await run(["settings"])).out).toContain("max_per_day");
     expect((await run(["stats"])).out).toContain("Coaching Stats");
+  });
+
+  it("courses / course list and show a course", async () => {
+    expect((await run(["courses"])).out).toContain("No courses yet");
+    const course = db.withConnection((c) =>
+      courses.createCourse(c, {
+        title: "CLI course",
+        topic_id: "python",
+        goal: "See it in the terminal",
+        prerequisites: [{ concept: "loops", known: true }],
+      }),
+    );
+    const before = (await run(["course", course.id])).out;
+    expect(before).toContain("not written yet");
+    expect(before).toContain("No steps registered yet");
+    writeFileSync(courses.documentPath(course.id), '<section id="step-1">x</section>');
+    db.withConnection((c) => {
+      courses.addStep(c, course.id, { title: "Loops", kind: "concept", anchor: "step-1" });
+      courses.setStepStatus(c, course.id, 1, "done");
+    });
+    const list = (await run(["courses"])).out;
+    expect(list).toContain("CLI course");
+    expect(list).toContain("1/1");
+    expect(list).toContain("completed");
+    const show = (await run(["course", course.id])).out;
+    expect(show).toContain("✓ loops");
+    expect(show).toContain("1. Loops");
+    expect(show).toContain("index.html");
+    expect((await run(["course", "missing"])).code).toBe(1);
   });
 
   it("lesson commands (lesson/star/feedback/delete)", async () => {

@@ -42,7 +42,7 @@ dev-coach/
 ├── tsconfig.json  biome.json  vitest.config.ts  tsup.config.ts  tsup.mcpb.config.ts  .node-version (26)
 ├── assets/                 # tracked single source of truth
 │   ├── SKILL.md            # coaching instructions (slim body; served as the MCP prompt)
-│   ├── references/         # skill progressive disclosure: onboarding.md, calibration.md, review.md, sharing.md
+│   ├── references/         # skill progressive disclosure: onboarding.md, calibration.md, review.md, sharing.md, course.md
 │   └── static/             # vendored web bundle (tailwind.js, alpinejs, htmx, flatpickr, …)
 ├── src/
 │   ├── bin.ts              # #!/usr/bin/env node → runCli()
@@ -54,9 +54,10 @@ dev-coach/
 │   │   ├── git.ts  detect.ts  prompts.ts   # prompts.ts renders the lesson card (formatLessonForDisplay)
 │   │   ├── share.ts  share-fetch.ts   # lesson sharing: payload, code/link/.devcoach.md codecs, parseSharedInput; URL fetch
 │   │   ├── claude-history.ts   # cross-project stack scan of ~/.claude (projects map, manifests, activity, memories)
-│   ├── mcp/server.ts       # McpServer: 21 tools + 11 resources + devcoach_instructions prompt
-│   ├── cli/commands.ts     # Commander dispatcher (33 subcommands: 25 visible + 8 hidden hooks) + term.ts (colours, tables, OSC 8 link()) + open.ts (browser)
-│   └── web/app.ts          # Hono app (28 routes incl. POST /shutdown) + views.ts (hono/html pages); assets/static/share.js
+│   │   ├── courses.ts      # courses: directory + document validation over the db.ts rows (see Courses below)
+│   ├── mcp/server.ts       # McpServer: 25 tools + 11 resources + devcoach_instructions prompt
+│   ├── cli/commands.ts     # Commander dispatcher (35 subcommands: 27 visible + 8 hidden hooks) + term.ts (colours, tables, OSC 8 link()) + open.ts (browser)
+│   └── web/app.ts          # Hono app (33 routes incl. POST /shutdown) + views.ts (hono/html pages); assets/static/share.js
 │                           #   startUi returns the server; SIGINT/SIGTERM/SIGHUP → gracefulShutdown (close, 2 s drain, exit);
 │                           #   the open_ui child is detached, so stop_ui / `ui --stop` POST /shutdown (same-origin guarded)
 ├── tests/                  # Vitest (16 files: core, db-extra, coach/git/claude-history, share, mcp, mcpb, web,
@@ -77,12 +78,19 @@ dev-coach/
 
 ---
 
-## Exposed MCP tools (21)
+## Exposed MCP tools (25)
 
 `log_lesson`, `skip_lesson`, `update_knowledge`, `get_lessons`, `star_lesson`, `delete_lesson`,
 `submit_feedback`, `add_topic`, `remove_topic`, `add_group`, `remove_group`, `update_settings`,
 `open_ui`, `complete_onboarding`, `preview_deep_scan`, `get_briefing`, `get_onboarding`, `get_profile`,
-`share_lesson`, `import_lesson`, `stop_ui`.
+`share_lesson`, `import_lesson`, `stop_ui`, `create_course`, `add_course_step`,
+`update_course_progress`, `get_courses`.
+
+**Feedback** (`submit_feedback`) has three answers: `know` = already knew it (the only one that moves
+confidence: +1 entering, −1 leaving), `understood` = new and clear (no change), `dont_know` = couldn't
+follow this session (no change; the lesson is a course seed). `coach.recordFeedback` is the single
+writer (one transaction, idempotent) for MCP, CLI and the dashboard. Schema v4 rewrote pre-existing
+`dont_know` rows to `understood` once (gated on the stored `user_version`).
 
 Every tool registers a `title` + read-only/destructive annotations, a tight Zod `inputSchema` with
 `.describe()` on each param, `outputSchema`/`structuredContent` for model-shaped returns
@@ -172,7 +180,7 @@ because Homebrew formulae have no uninstall hook, so the formula's `caveats` tel
 ## DB schema (shared `~/.devcoach/coaching.db`)
 
 `lessons` (19 cols incl. `categories` JSON, `feedback`, `starred`, git metadata, `body`,
-`imported` + `shared_by` — schema v3, see Lesson sharing below),
+`imported` + `shared_by`), `courses` + `course_steps` (schema v5, see Courses below),
 `knowledge` (topic, confidence 0–10, updated_at), `settings`, `knowledge_group_names`,
 `knowledge_groups` (composite PK), `nudge_state` (per-session lesson-cue counter) and `cue_state`
 (single row: `pending`, `last_cue_at`, `last_skip_reason` — cue lifecycle; both runtime only,
@@ -184,6 +192,26 @@ per chat session, or `global`) — the quiet session-scoped pacing is an explici
 never raise cue frequency by default.
 `DEFAULT_PROFILE` (`core/db.ts`) seeds 24 topics only via `complete_onboarding` (an empty knowledge
 table reliably means onboarding hasn't run).
+
+## Courses (`core/courses.ts`, `references/course.md`)
+
+A course is ONE rich, self-contained HTML document the model writes itself at
+`~/.devcoach/courses/<id>/index.html` (`COURSES_DIR`; the notebook precedent — no tool carries
+HTML), indexed by `courses` (id = `slugify(title, "course")`, `lesson_id` seed, `prerequisites` JSON
+from the Q&A, status active|completed|abandoned) and `course_steps` (one row per `<section id=anchor>`,
+status todo|done|skipped). `core/courses.ts` owns every path check: ids match `^[a-z0-9-]+$` before any
+filesystem access, `courseDocument(id)` re-validates on every read (under the course dir, regular
+file, no symlink, ≤ 2 MB), `addStep` refuses an anchor the document does not contain. Backups carry
+`courses.json` + `courses/<id>/index.html`; restore whitelists entry names and never overwrites.
+Tools: `create_course` (returns `course_dir`, `document_path`, `seed_context`, a `reply_check` that
+has the model write the file), `add_course_step`, `update_course_progress`, `get_courses`.
+Dashboard: `/courses`, `/courses/:id` (steps + `<iframe sandbox="allow-scripts allow-forms">`),
+`/courses/:id/index.html` served under `Content-Security-Policy: sandbox …; default-src 'none';
+form-action 'none'; base-uri 'none'; frame-ancestors 'self'` so a top-level open is as confined as
+the frame — course HTML is never inlined or DOMPurify'd. The skill flow (`references/course.md`) is
+user-initiated, never starts inside a cued turn, explores prerequisites one yes/no question per
+message, and **both hooks pause lesson cues while a course is active** (`db.hasActiveCourse`, no
+counter bump). `/devcoach:course` is the plugin command.
 
 ## Rate-limit logic (`core/coach.ts`)
 
