@@ -696,6 +696,9 @@ describe("web lesson delete", () => {
     expect(list).toContain("table-resize.js");
     expect(list).not.toContain(">↗</a>");
     expect(list).toContain('data-id="del1"');
+    expect(list).toContain('data-title="Doomed &lt;lesson&gt;"');
+    expect(list).toContain('role="alertdialog"');
+    expect(list).not.toContain("confirm(");
     expect(list).toContain('action="/lessons/delete"');
     expect(list).toContain("Delete selected");
     expect(list).not.toContain('hx-post="/lessons/del1/delete"');
@@ -708,10 +711,10 @@ describe("web lesson delete", () => {
     expect(detail).not.toContain(">⋯</button>");
     expect(detail).toContain("Delete lesson…");
     expect(detail).toContain('name="id" value="del1"');
-    expect(detail).toContain(
-      'data-confirm="Delete “Doomed &lt;lesson&gt;”? This cannot be undone."',
-    );
-    expect(detail).toContain('onsubmit="return confirm(this.dataset.confirm)"');
+    expect(detail).toContain("Delete this lesson?");
+    expect(detail).toContain("“Doomed &lt;lesson&gt;”");
+    expect(detail).toContain('role="alertdialog"');
+    expect(detail).not.toContain("confirm(");
   });
 
   it("POST /lessons/delete removes one or many ids and redirects to next", async () => {

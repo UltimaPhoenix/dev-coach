@@ -39,6 +39,27 @@ function moreMenu(items: Html, className = "", attrs = ""): Html {
     </div>`;
 }
 
+/**
+ * The delete confirmation, in the app's own style instead of the browser's confirm(): what is
+ * about to go, that it cannot be undone, and a red button that says so. `show` / `close` are
+ * static Alpine expressions.
+ */
+function dangerDialog(show: string, close: string, heading: Html, body: Html, footer: Html): Html {
+  return html`<div x-show="${show}" style="display:none" x-transition:enter="transition ease-out duration-100" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" class="fixed inset-0 z-[80] flex items-center justify-center px-4">
+    <div class="absolute inset-0 bg-gray-900/50 dark:bg-black/60" @click="${close}"></div>
+    <div role="alertdialog" aria-modal="true" class="relative w-full max-w-md bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl p-5">
+      <div class="flex items-start gap-3">
+        <span class="w-9 h-9 rounded-full bg-rose-100 dark:bg-rose-900/40 text-rose-600 dark:text-rose-300 inline-flex items-center justify-center shrink-0" aria-hidden="true">🗑</span>
+        <div class="min-w-0 flex-1">
+          <h2 class="text-base font-semibold text-gray-900 dark:text-white">${heading}</h2>
+          <div class="mt-1 text-sm text-gray-500 dark:text-gray-400 space-y-2">${body}</div>
+        </div>
+      </div>
+      <div class="mt-5 flex justify-end gap-2">${footer}</div>
+    </div>
+  </div>`;
+}
+
 // ── Layout (base.html) ───────────────────────────────────────────────────────
 
 export function layout(o: {
@@ -452,7 +473,7 @@ export function lessonsPage(d: LessonsData): Html {
 
   const pageIds = JSON.stringify(d.lessons.map((l) => l.id));
   const body = html`
-<div :class="selectMode && 'dc-selecting'" x-data="{ selectMode: false, selected: [], shareOpen: false, sharePos: { left: 0, top: null, bottom: null }, openShare(btn) { const r = btn.getBoundingClientRect(); const w = 320; const left = Math.max(8, Math.min(r.right - w, innerWidth - w - 8)); const below = innerHeight - r.bottom > 380; this.sharePos = { left, top: below ? r.bottom + 6 : null, bottom: below ? null : innerHeight - r.top + 6 }; this.shareOpen = true }, toggle(id) { const i = this.selected.indexOf(id); if (i < 0) this.selected.push(id); else this.selected.splice(i, 1) }, setAll(ids, on) { this.selected = on ? ids.slice() : [] }, leave() { this.selectMode = false; this.selected = []; this.shareOpen = false } }" @keydown.escape.window="leave()">
+<div :class="selectMode && 'dc-selecting'" x-data="{ selectMode: false, selected: [], confirmOpen: false, shareOpen: false, sharePos: { left: 0, top: null, bottom: null }, openShare(btn) { const r = btn.getBoundingClientRect(); const w = 320; const left = Math.max(8, Math.min(r.right - w, innerWidth - w - 8)); const below = innerHeight - r.bottom > 380; this.sharePos = { left, top: below ? r.bottom + 6 : null, bottom: below ? null : innerHeight - r.top + 6 }; this.shareOpen = true }, toggle(id) { const i = this.selected.indexOf(id); if (i < 0) this.selected.push(id); else this.selected.splice(i, 1) }, setAll(ids, on) { this.selected = on ? ids.slice() : [] }, selectedTitles() { const rows = Array.from(document.querySelectorAll('tr[data-id]')); return this.selected.map((id) => { const r = rows.find((x) => x.dataset.id === id); return r ? r.dataset.title : id }) }, leave() { this.selectMode = false; this.selected = []; this.shareOpen = false; this.confirmOpen = false } }" @keydown.escape.window="leave()">
 <form id="filter-form" method="get" action="/lessons">
   <input type="hidden" name="period" id="h-period" value="${s.period}">
   <input type="hidden" name="date_from" id="h-date-from" value="${s.date_from}">
@@ -644,7 +665,7 @@ ${
         const rowId = domId("lesson-row-", lesson.id);
         const date = lesson.timestamp.slice(0, 10);
         const tip = lesson.timestamp.slice(0, 16).replace("T", " ");
-        return html`<tr id="${rowId}" data-id="${lesson.id}" data-href="/lessons/${encodeURIComponent(lesson.id)}" class="hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors group cursor-pointer" tabindex="0" role="link" @click="if (selectMode) toggle($el.dataset.id); else if (!$event.target.closest('a, button, input, label')) window.location = $el.dataset.href" @keydown.enter="if (selectMode) toggle($el.dataset.id); else if ($event.target === $el) window.location = $el.dataset.href" @keydown.space.prevent="selectMode && toggle($el.dataset.id)" :class="selected.includes($el.dataset.id) && 'bg-indigo-50 dark:bg-indigo-900/20'">
+        return html`<tr id="${rowId}" data-id="${lesson.id}" data-title="${lesson.title}" data-href="/lessons/${encodeURIComponent(lesson.id)}" class="hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors group cursor-pointer" tabindex="0" role="link" @click="if (selectMode) toggle($el.dataset.id); else if (!$event.target.closest('a, button, input, label')) window.location = $el.dataset.href" @keydown.enter="if (selectMode) toggle($el.dataset.id); else if ($event.target === $el) window.location = $el.dataset.href" @keydown.space.prevent="selectMode && toggle($el.dataset.id)" :class="selected.includes($el.dataset.id) && 'bg-indigo-50 dark:bg-indigo-900/20'">
         <td class="px-3 py-3">
           <form x-show="!selectMode" method="post" action="/lessons/${encodeURIComponent(lesson.id)}/star" hx-post="/lessons/${encodeURIComponent(lesson.id)}/star" hx-target="#${rowId}" hx-select="#${rowId}" hx-swap="outerHTML">
             <input type="hidden" name="starred" value="${lesson.starred ? "0" : "1"}" />
@@ -706,14 +727,26 @@ ${
     <div class="ml-auto flex items-center gap-3">
       <p class="text-sm text-gray-700 dark:text-gray-200 tabular-nums"><span x-text="selected.length"></span> selected</p>
       <button type="button" x-show="selected.length" style="display:none" @click="selected = []" class="text-xs text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-200 transition">Clear</button>
-      <form method="post" action="/lessons/delete" class="flex items-center gap-2" @submit="if (!confirm('Delete ' + selected.length + (selected.length === 1 ? ' lesson' : ' lessons') + '? This cannot be undone.')) $event.preventDefault()">
-        <template x-for="id in selected" :key="id"><input type="hidden" name="id" :value="id" /></template>
-        <input type="hidden" name="next" value="/lessons${lessonsQs(s, { page: String(d.page) })}" />
-        <button type="submit" :disabled="!selected.length" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition bg-rose-600 text-white border-rose-600 hover:bg-rose-500 disabled:opacity-40 disabled:cursor-not-allowed">🗑 Delete selected</button>
-      </form>
+      <button type="button" :disabled="!selected.length" @click="confirmOpen = true" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition bg-rose-600 text-white border-rose-600 hover:bg-rose-500 disabled:opacity-40 disabled:cursor-not-allowed">🗑 Delete selected</button>
     </div>
   </div>
 </div>
+${dangerDialog(
+  "confirmOpen",
+  "confirmOpen = false",
+  html`<span x-text="selected.length === 1 ? 'Delete this lesson?' : 'Delete ' + selected.length + ' lessons?'"></span>`,
+  html`<ul class="max-h-40 overflow-y-auto space-y-1 text-gray-700 dark:text-gray-200">
+      <template x-for="t in selectedTitles().slice(0, 6)" :key="t"><li class="truncate">· <span x-text="t"></span></li></template>
+    </ul>
+    <p x-show="selected.length > 6" style="display:none" x-text="'…and ' + (selected.length - 6) + ' more'"></p>
+    <p>They will be removed from your log. This cannot be undone.</p>`,
+  html`<button type="button" @click="confirmOpen = false" class="inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium border transition bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-indigo-400">Cancel</button>
+    <form method="post" action="/lessons/delete" class="contents">
+      <template x-for="id in selected" :key="id"><input type="hidden" name="id" :value="id" /></template>
+      <input type="hidden" name="next" value="/lessons${lessonsQs(s, { page: String(d.page) })}" />
+      <button type="submit" :disabled="!selected.length" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition bg-rose-600 text-white border-rose-600 hover:bg-rose-500" x-text="selected.length === 1 ? '🗑 Delete lesson' : '🗑 Delete ' + selected.length + ' lessons'">🗑 Delete</button>
+    </form>`,
+)}
 <div x-show="shareOpen" style="display:none" x-transition:enter="transition ease-out duration-100" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" class="fixed inset-0 z-[70] pointer-events-none">
   <div @click.outside="shareOpen = false" :style="{ left: sharePos.left + 'px', top: sharePos.top != null ? sharePos.top + 'px' : 'auto', bottom: sharePos.bottom != null ? sharePos.bottom + 'px' : 'auto' }" role="dialog" aria-label="Share this lesson" class="absolute w-80 pointer-events-auto bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg p-4">
     <button type="button" @click="shareOpen = false" aria-label="Close" class="absolute top-2 right-2 w-7 h-7 inline-flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition">✕</button>
@@ -882,6 +915,7 @@ export function lessonDetailPage(d: {
   const feedbackHx = `hx-post="/lessons/${encodeURIComponent(l.id)}/feedback" hx-target="#lesson-meta" hx-select="#lesson-meta" hx-swap="outerHTML" hx-select-oob="#lesson-feedback:outerHTML"`;
 
   const body = html`
+<div x-data="{ confirmOpen: false }" @keydown.escape.window="confirmOpen = false">
 <div class="mb-4"><a href="/lessons" class="text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-white text-sm transition">← Back to lessons</a></div>
 ${
   d.imported
@@ -898,11 +932,7 @@ ${
     <h1 class="text-xl font-bold text-gray-900 dark:text-white flex-1 min-w-0">${l.title}</h1>
     <a href="/lessons?level=${l.level}" class="text-xs font-semibold px-2 py-0.5 rounded-full border ${levelClass} shrink-0 hover:ring-2 hover:ring-current hover:ring-offset-1 transition-shadow">${l.level}</a>
     ${moreMenu(
-      html`<form method="post" action="/lessons/delete" data-confirm="Delete “${l.title}”? This cannot be undone." onsubmit="return confirm(this.dataset.confirm)">
-          <input type="hidden" name="id" value="${l.id}" />
-          <input type="hidden" name="next" value="/lessons" />
-          <button type="submit" class="w-full text-left px-3 py-2 rounded-lg text-sm transition flex items-center gap-2 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 hover:!bg-rose-50 dark:hover:!bg-rose-900/30 hover:text-rose-700 dark:hover:text-rose-300"><span class="w-4 h-4 inline-flex items-center justify-center shrink-0 text-[13px] leading-none" aria-hidden="true">🗑</span>Delete lesson…</button>
-        </form>`,
+      html`<button type="button" @click="confirmOpen = true; open = false" class="w-full text-left px-3 py-2 rounded-lg text-sm transition flex items-center gap-2 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 hover:!bg-rose-50 dark:hover:!bg-rose-900/30 hover:text-rose-700 dark:hover:text-rose-300"><span class="w-4 h-4 inline-flex items-center justify-center shrink-0 text-[13px] leading-none" aria-hidden="true">🗑</span>Delete lesson…</button>`,
       "shrink-0",
     )}
     <div class="relative shrink-0" x-data="{ open: ${String(sh.open)} }" @click.outside="open = false" @keydown.escape="open = false">
@@ -956,6 +986,20 @@ ${
       : ""
   }</div>
   <div class="mt-4 pt-4 border-t border-gray-100 dark:border-gray-800 text-xs text-gray-300 dark:text-gray-600">ID: ${l.id}</div>
+</div>
+${dangerDialog(
+  "confirmOpen",
+  "confirmOpen = false",
+  html`Delete this lesson?`,
+  html`<p class="text-gray-700 dark:text-gray-200 font-medium">“${l.title}”</p>
+    <p>${l.imported ? html`It was shared with you${l.shared_by ? html` by ${l.shared_by}` : ""}; you can import it again later. ` : ""}It will be removed from your log. This cannot be undone.</p>`,
+  html`<button type="button" @click="confirmOpen = false" class="inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium border transition bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-indigo-400">Cancel</button>
+    <form method="post" action="/lessons/delete" class="contents">
+      <input type="hidden" name="id" value="${l.id}" />
+      <input type="hidden" name="next" value="/lessons" />
+      <button type="submit" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition bg-rose-600 text-white border-rose-600 hover:bg-rose-500">🗑 Delete lesson</button>
+    </form>`,
+)}
 </div>`;
 
   const head = html`<link id="hljs-theme" rel="stylesheet" href="/static/vendor/hljs-dark.min.css" />`;
