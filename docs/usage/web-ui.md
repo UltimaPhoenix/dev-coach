@@ -113,7 +113,7 @@ under its topic.
 
 **Actions per row:**
 - `★` — toggle starred
-- `↗` (appears when you hover the row) — share this lesson in a small dialog, without leaving the list
+- `↗` (appears when you hover the row) — share this lesson from a popover right next to the icon, without leaving the list
 - Click a level pill or category chip — filter the table by it
 - Click anywhere else on the row — open the detail page (feedback is recorded there)
 
@@ -220,7 +220,7 @@ Full lesson content laid out in reading order:
 ### Sharing a lesson
 
 A lesson that landed for you is worth handing to a teammate. **↗ Share** on a lesson (or `↗` in the
-table, which opens the same panel in a dialog without leaving the list) shows your name (prefilled from `share_name`, then git), an *Include where it
+table, which opens the same panel in a popover next to the row) shows your name (prefilled from `share_name`, then git), an *Include where it
 happened* checkbox (project, branch, commit and task context — **off by default**, and a local folder
 path is never exported), and three ways to hand it over — all carrying the same lesson:
 

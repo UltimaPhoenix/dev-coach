@@ -29,7 +29,7 @@ for a typical lesson, one line, safe in URLs. A share is a plain string — noth
 ## From the dashboard
 
 Open a lesson and click **↗ Share** (or `↗` at the end of its row on the Lessons page — that one
-opens the same panel in a small dialog, so you never leave the list). The popover
+opens the same panel in a popover next to the row, so you never leave the list). The popover
 shows your name, an *Include where it happened* checkbox (off by default) and three actions: **Copy
 text**, **Copy link**, **Download .md**.
 
