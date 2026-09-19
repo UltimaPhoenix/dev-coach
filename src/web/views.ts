@@ -639,7 +639,7 @@ ${
   <table class="w-full text-sm table-fixed" data-resizable="lessons">
     <colgroup>
       <col data-col="star" style="width:2.75rem" />
-      <col data-col="date" data-min="128" style="width:8rem" />
+      <col data-col="date" data-min="72" style="width:8rem" />
       <col data-col="topic" data-min="88" class="hidden sm:table-column" style="width:11rem" />
       <col data-col="title" data-flex data-min="220" />
       <col data-col="level" data-min="88" style="width:5.5rem" />

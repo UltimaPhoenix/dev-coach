@@ -47,6 +47,10 @@
   function restore(col) {
     col.style.width = col.dataset.defaultWidth || "";
   }
+  // Let listeners (relative-time.js) react to the new widths.
+  function announce() {
+    document.dispatchEvent(new CustomEvent("dc:columns-resized"));
+  }
 
   var tables = document.querySelectorAll("table[data-resizable]");
   tables.forEach(function (table) {
@@ -75,6 +79,7 @@
         widths = {};
         cols.forEach(restore);
       }
+      announce();
     }
     apply();
     var resizeTimer;
@@ -110,6 +115,7 @@
           delete widths[col.dataset.col];
         });
         save(widths);
+        announce();
       });
       handle.addEventListener("pointerdown", function (e) {
         if (e.button !== 0) return;
@@ -141,6 +147,7 @@
             setWidth(left, l);
             setWidth(right, total - l);
           }
+          announce();
         }
         function up() {
           handle.removeEventListener("pointermove", move);
@@ -150,6 +157,7 @@
           if (!leftFlex) widths[left.dataset.col] = Math.round(th.getBoundingClientRect().width);
           if (!rightFlex) widths[right.dataset.col] = Math.round(ths[j].getBoundingClientRect().width);
           save(widths);
+          announce();
         }
         handle.addEventListener("pointermove", move);
         handle.addEventListener("pointerup", up);
@@ -165,5 +173,6 @@
       /* ignore */
     }
     document.querySelectorAll("table[data-resizable] colgroup > col").forEach(restore);
+    announce();
   };
 })();

@@ -133,7 +133,7 @@ on one side grows exactly as much as its neighbour shrinks, so the table never c
 column can be pushed out of view. The title column takes whatever its neighbours give or take and never
 drops below a readable width. Widths are remembered in this browser (and dropped if they no longer fit
 the window); double-click a boundary to reset the two columns beside it, or use **⋯ → Reset column
-widths**.
+widths**. When the Date column gets narrow, dates switch to a compact form (`17m`, `3d`, `2w`).
 
 **＋ Import** (toolbar, right) — add a lesson someone shared with you: paste the code, the link, a
 URL, or the whole copied card into the box, pick a `.devcoach.md` file, or simply **drop the file
