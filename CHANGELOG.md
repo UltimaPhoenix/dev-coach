@@ -4,7 +4,7 @@ Notable changes to devcoach. Versions follow [Semantic Versioning](https://semve
 
 ---
 
-## [Unreleased]
+## [2.4.0] — 2026-09-19
 
 ### Added
 - **Delete lessons from the dashboard**, kept out of the way until you ask: the **⋯ More** button
