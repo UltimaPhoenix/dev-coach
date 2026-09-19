@@ -686,6 +686,7 @@ describe("web lesson delete", () => {
     expect(list).toContain('class="dc-check');
     expect(list).toContain('data-resizable="lessons"');
     expect(list).toContain("<colgroup>");
+    expect(list).toContain('<col data-col="title" data-flex />');
     expect(list).toContain("table-resize.js");
     expect(list).not.toContain(">↗</a>");
     expect(list).toContain('data-id="del1"');

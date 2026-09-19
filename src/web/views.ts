@@ -621,7 +621,7 @@ ${
       <col data-col="star" style="width:2.75rem" />
       <col data-col="date" style="width:8rem" />
       <col data-col="topic" class="hidden sm:table-column" style="width:11rem" />
-      <col data-col="title" />
+      <col data-col="title" data-flex />
       <col data-col="level" style="width:5.5rem" />
       <col data-col="categories" class="hidden lg:table-column" style="width:24%" />
       <col data-col="feedback" class="hidden xl:table-column" style="width:7rem" />

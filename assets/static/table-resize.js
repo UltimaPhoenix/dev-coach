@@ -2,8 +2,14 @@
 // remembered per column in localStorage; double-click a handle to reset one column, or call
 // window.resetLessonColumns() (the ⋯ menu) to reset them all. Desktop widths only — on narrow
 // screens columns are already hidden and a drag would fight scrolling.
+//
+// One column (`<col data-flex>`, the title) never gets an explicit width: it takes whatever the
+// others leave, so the table can never grow past its container and clip the right-hand columns.
+// Every drag is clamped so the flex column keeps at least MIN_FLEX px, which keeps every column
+// visible; stored widths that no longer fit (a narrower window) are dropped on load.
 (function () {
   var MIN = 48;
+  var MIN_FLEX = 220;
   var STORAGE = "lessons-col-widths";
   if (!globalThis.matchMedia || !globalThis.matchMedia("(min-width: 1024px)").matches) {
     globalThis.resetLessonColumns = function () {};
@@ -31,14 +37,36 @@
     var ths = Array.prototype.slice.call(table.querySelectorAll("thead th"));
     if (cols.length !== ths.length) return;
     var widths = load();
-
-    cols.forEach(function (col) {
-      var px = widths[col.dataset.col];
-      if (typeof px === "number" && px >= MIN) col.style.width = px + "px";
+    var flexIndex = cols.findIndex(function (col) {
+      return col.hasAttribute("data-flex");
+    });
+    var flexTh = flexIndex >= 0 ? ths[flexIndex] : null;
+    function flexWidth() {
+      return flexTh ? flexTh.getBoundingClientRect().width : Infinity;
+    }
+    function apply() {
+      cols.forEach(function (col) {
+        var px = widths[col.dataset.col];
+        col.style.width = typeof px === "number" && px >= MIN ? px + "px" : "";
+      });
+      if (flexWidth() < MIN_FLEX) {
+        // The remembered layout does not fit this window: fall back to the defaults.
+        widths = {};
+        cols.forEach(function (col) {
+          col.style.width = "";
+        });
+      }
+    }
+    apply();
+    var resizeTimer;
+    globalThis.addEventListener("resize", function () {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(apply, 150);
     });
 
     ths.forEach(function (th, i) {
-      if (i === 0 || i === ths.length - 1) return; // the star and share columns stay fixed
+      // The star and share columns stay fixed; the flex column is whatever is left.
+      if (i === 0 || i === ths.length - 1 || i === flexIndex) return;
       var col = cols[i];
       var handle = document.createElement("span");
       handle.className = "dc-resize-handle";
@@ -60,10 +88,11 @@
         e.stopPropagation();
         var startX = e.clientX;
         var startW = th.getBoundingClientRect().width;
+        var maxW = startW + Math.max(0, flexWidth() - MIN_FLEX);
         handle.setPointerCapture(e.pointerId);
         table.classList.add("dc-resizing");
         function move(ev) {
-          var w = Math.max(MIN, Math.round(startW + ev.clientX - startX));
+          var w = Math.min(maxW, Math.max(MIN, Math.round(startW + ev.clientX - startX)));
           col.style.width = w + "px";
         }
         function up() {
