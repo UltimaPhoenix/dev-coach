@@ -418,8 +418,8 @@ export function lessonsPage(d: LessonsData): Html {
   const sortTh = (label: string, col: string, extra = "") => {
     const active = s.sort === col;
     const next = active && s.order === "desc" ? "asc" : "desc";
-    return html`<th class="px-3 py-3 whitespace-nowrap relative ${extra}">
-      <a href="${lessonsQs(s, { sort: col, order: next })}" class="inline-flex items-center gap-1 hover:text-gray-700 dark:hover:text-gray-200 transition group/sort">${label}
+    return html`<th class="px-3 py-3 whitespace-nowrap relative overflow-hidden text-ellipsis ${extra}">
+      <a href="${lessonsQs(s, { sort: col, order: next })}" class="hover:text-gray-700 dark:hover:text-gray-200 transition group/sort">${label}
         ${
           active
             ? html`<span class="text-indigo-400">${s.order === "asc" ? "↑" : "↓"}</span>`
@@ -634,7 +634,7 @@ ${
         ${sortTh("Topic", "topic_id", "hidden sm:table-cell")}
         ${sortTh("Title", "title")}
         ${sortTh("Level", "level")}
-        <th class="px-3 py-3 hidden lg:table-cell relative">Categories</th>
+        <th class="px-3 py-3 hidden lg:table-cell relative overflow-hidden text-ellipsis">Categories</th>
         ${sortTh("Feedback", "feedback", "hidden xl:table-cell")}
         <th class="px-2 py-3 w-8"><span class="sr-only">Share</span></th>
       </tr>

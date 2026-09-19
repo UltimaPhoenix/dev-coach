@@ -196,20 +196,31 @@
   outline-offset: 2px;
 }
 
+/* The hit area is the last 10px of the header (inside its padding, so it never covers the label);
+   what you see is a 2px line drawn exactly on the column boundary. */
 .dc-resize-handle {
   position: absolute;
   top: 0;
-  right: -4px;
-  width: 8px;
+  right: 0;
+  width: 10px;
   height: 100%;
   cursor: col-resize;
   z-index: 1;
-  border-radius: 2px;
+}
+.dc-resize-handle::after {
+  content: "";
+  position: absolute;
+  top: 18%;
+  bottom: 18%;
+  right: 0;
+  width: 2px;
+  border-radius: 1px;
+  background-color: transparent;
   transition: background-color 0.12s;
 }
-.dc-resize-handle:hover,
-.dc-resizing .dc-resize-handle:active {
-  background-color: rgba(99, 102, 241, 0.45);
+.dc-resize-handle:hover::after,
+.dc-resizing .dc-resize-handle:active::after {
+  background-color: rgba(99, 102, 241, 0.85);
 }
 .dc-resizing {
   user-select: none;
