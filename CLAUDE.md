@@ -56,7 +56,7 @@ dev-coach/
 │   │   ├── claude-history.ts   # cross-project stack scan of ~/.claude (projects map, manifests, activity, memories)
 │   ├── mcp/server.ts       # McpServer: 21 tools + 11 resources + devcoach_instructions prompt
 │   ├── cli/commands.ts     # Commander dispatcher (33 subcommands: 25 visible + 8 hidden hooks) + term.ts (colours, tables, OSC 8 link()) + open.ts (browser)
-│   └── web/app.ts          # Hono app (26 routes incl. POST /shutdown) + views.ts (hono/html pages); assets/static/share.js
+│   └── web/app.ts          # Hono app (28 routes incl. POST /shutdown) + views.ts (hono/html pages); assets/static/share.js
 │                           #   startUi returns the server; SIGINT/SIGTERM/SIGHUP → gracefulShutdown (close, 2 s drain, exit);
 │                           #   the open_ui child is detached, so stop_ui / `ui --stop` POST /shutdown (same-origin guarded)
 ├── tests/                  # Vitest (16 files: core, db-extra, coach/git/claude-history, share, mcp, mcpb, web,
@@ -178,7 +178,7 @@ because Homebrew formulae have no uninstall hook, so the formula's `caveats` tel
 (single row: `pending`, `last_cue_at`, `last_skip_reason` — cue lifecycle; both runtime only,
 never backed up), plus 4 indexes. All DDL is `CREATE … IF NOT EXISTS` + `INSERT OR IGNORE`
 (idempotent). Connections set `PRAGMA busy_timeout = 3000` (concurrent hook + MCP writers).
-`DEFAULT_SETTINGS`: `max_per_day=2`, `min_gap_minutes=240`, `ui_theme=system`, `share_name=""`,
+`DEFAULT_SETTINGS`: `max_per_day=2`, `min_gap_minutes=240`, `ui_theme=system`, `ui_home=auto` (`/` → `/lessons` once a lesson exists, else `/knowledge`), `share_name=""`,
 `nudge_every=10` (interactions between lesson cues; 0 = every turn), `nudge_scope=session` (count
 per chat session, or `global`) — the quiet session-scoped pacing is an explicit product decision;
 never raise cue frequency by default.

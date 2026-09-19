@@ -22,6 +22,7 @@ import {
   type NudgeScope,
   parseLesson,
   type Settings,
+  type UiHome,
   type UiTheme,
 } from "./models";
 
@@ -77,6 +78,7 @@ export const DEFAULT_SETTINGS: Record<string, string> = {
   max_per_day: "2",
   min_gap_minutes: "240",
   ui_theme: "system",
+  ui_home: "auto",
   nudge_every: "10",
   nudge_scope: "session",
   share_name: "",
@@ -314,6 +316,8 @@ export interface LessonFilters {
   date_to?: string | null;
   /** true = only lessons shared to you, false = only your own. */
   imported?: boolean | null;
+  /** Exact sender name of a shared lesson (implies imported). */
+  shared_by?: string | null;
 }
 
 type AddClause = (clause: string, ...vals: SqlParam[]) => void;
@@ -357,10 +361,12 @@ function lessonWhere(f: LessonFilters): { where: string; params: SqlParam[] } {
   }
   if (f.starred != null) add("starred = ?", f.starred ? 1 : 0);
   if (f.imported != null) add("imported = ?", f.imported ? 1 : 0);
+  if (f.shared_by != null) add("imported = 1 AND shared_by = ?", f.shared_by);
   if (f.search != null) {
     const like = `%${f.search}%`;
     add(
-      "(title LIKE ? OR topic_id LIKE ? OR summary LIKE ? OR body LIKE ?)",
+      "(title LIKE ? OR topic_id LIKE ? OR summary LIKE ? OR body LIKE ? OR shared_by LIKE ?)",
+      like,
       like,
       like,
       like,
@@ -414,6 +420,13 @@ export function deleteLesson(db: DatabaseSync, lessonId: string): boolean {
   return runSql(db, "DELETE FROM lessons WHERE id = ?", lessonId) > 0;
 }
 
+/** Batch delete (the dashboard's Select mode). Unknown ids are ignored; returns the count removed. */
+export function deleteLessons(db: DatabaseSync, ids: string[]): number {
+  if (ids.length === 0) return 0;
+  const marks = ids.map(() => "?").join(", ");
+  return runSql(db, `DELETE FROM lessons WHERE id IN (${marks})`, ...ids);
+}
+
 export function setStar(db: DatabaseSync, lessonId: string, starred: boolean): boolean {
   return runSql(db, "UPDATE lessons SET starred = ? WHERE id = ?", starred ? 1 : 0, lessonId) > 0;
 }
@@ -461,6 +474,14 @@ export function getDistinctColumn(db: DatabaseSync, column: string): string[] {
     `SELECT DISTINCT ${column} FROM lessons WHERE ${column} IS NOT NULL ORDER BY ${column}`,
   );
   return rows.map((r) => r[column] as string);
+}
+
+/** Every sender who shared a lesson with you, for the dashboard's "from <name>" filter. */
+export function listSharedBy(db: DatabaseSync): string[] {
+  return allRows(
+    db,
+    "SELECT DISTINCT shared_by FROM lessons WHERE imported = 1 AND shared_by IS NOT NULL ORDER BY shared_by",
+  ).map((r) => r.shared_by as string);
 }
 
 export function getLessonById(db: DatabaseSync, lessonId: string): Lesson | null {
@@ -606,6 +627,9 @@ export function getSettings(db: DatabaseSync): Settings {
   const rawTheme = data.ui_theme ?? "system";
   const theme: UiTheme =
     rawTheme === "dark" || rawTheme === "light" || rawTheme === "system" ? rawTheme : "system";
+  const rawHome = data.ui_home ?? "auto";
+  const home: UiHome =
+    rawHome === "lessons" || rawHome === "knowledge" || rawHome === "auto" ? rawHome : "auto";
   const nudgeEveryRaw = data.nudge_every;
   const nudgeEvery = nudgeEveryRaw !== undefined ? Number.parseInt(nudgeEveryRaw, 10) : 10;
   const nudgeScope: NudgeScope = data.nudge_scope === "global" ? "global" : "session";
@@ -613,6 +637,7 @@ export function getSettings(db: DatabaseSync): Settings {
     max_per_day: maxRaw !== undefined ? Number.parseInt(maxRaw, 10) : 2,
     min_gap_minutes: gap,
     ui_theme: theme,
+    ui_home: home,
     nudge_every: Number.isFinite(nudgeEvery) && nudgeEvery >= 0 ? nudgeEvery : 10,
     nudge_scope: nudgeScope,
     share_name: data.share_name?.trim() || null,
@@ -806,6 +831,9 @@ function restoreSettingsSection(db: DatabaseSync, unzipped: Unzipped, result: Re
   if ("min_gap_minutes" in s) setSetting(db, "min_gap_minutes", String(s.min_gap_minutes));
   if (s.ui_theme === "system" || s.ui_theme === "dark" || s.ui_theme === "light") {
     setSetting(db, "ui_theme", s.ui_theme);
+  }
+  if (s.ui_home === "auto" || s.ui_home === "lessons" || s.ui_home === "knowledge") {
+    setSetting(db, "ui_home", s.ui_home);
   }
   if ("nudge_every" in s) setSetting(db, "nudge_every", String(s.nudge_every));
   if (s.nudge_scope === "session" || s.nudge_scope === "global") {

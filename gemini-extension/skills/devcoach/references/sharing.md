@@ -54,7 +54,8 @@ just starred a lesson                            →  The one offer (below)
 ## Show a shared lesson
 
 "Show me what Ada shared", "read me the lesson I imported", "the lesson about X someone sent":
-`get_lessons({imported: true, search: …})` (ask if 2+ match), then render it as a normal card —
+`get_lessons({shared_by: "Ada"})` when a sender is named (exact name; `search` also matches the
+sender), else `get_lessons({imported: true, search: …})` — ask if 2+ match — then render it as a normal card —
 both bands, the title line with `Category · Level`, the body, the 💡 tip — **without**
 `log_lesson` and **without** the "Did that land?" line. It is already in their log, taught by
 someone else; it costs nothing on the rate limit. Record feedback only if they volunteer it

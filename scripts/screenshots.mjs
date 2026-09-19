@@ -54,7 +54,7 @@ function freshenFixture(zipPath, outDir) {
 // the read-only preview a share link lands on (its code is computed from the fixture at capture time).
 const SHARE_LESSON_ID = "lesson-docker-layer-cache-001";
 const PAGES = [
-  ["knowledge-map", "/"],
+  ["knowledge-map", "/knowledge"],
   ["lessons", "/lessons"],
   ["lessons-import", "/lessons?import=1"],
   ["settings", "/settings"],

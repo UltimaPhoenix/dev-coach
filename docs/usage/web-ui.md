@@ -50,9 +50,11 @@ and hands you the URL. No install, no PATH needed.
 
 ## Pages
 
-The top nav has **Profile** (`/`), **Lessons**, and **Settings**, plus a light/dark theme toggle.
+The top nav has **Profile** (`/knowledge`) and **Lessons**; top-right, the ⚙️ **Settings** button
+and the sun/moon toggles the light/dark theme. The root URL (`/`, what `devcoach ui` prints) opens **Lessons** once you have at least one
+lesson and the **knowledge map** before that; pick one explicitly under Settings → Home page.
 
-### Knowledge map (`/`)
+### Knowledge map (`/knowledge`)
 
 Displays your full knowledge map with colour-coded confidence bars:
 
@@ -94,23 +96,47 @@ Filterable, sortable table of all delivered lessons.
 - Level — All levels / 🟢 Junior / 🟡 Mid / 🔴 Senior
 - Filters popover — Category / Project / Repository / Branch / Commit
 - Starred only
-- Free-text search
+- Shared — All lessons / 👤 My own / 🤝 Shared with me / 🤝 from `<name>` (one entry per sender)
+- Free-text search (also matches the sender of a shared lesson)
 
 Active filters show as chips above the table; when nothing matches you get "No lessons match the
 current filters."
 
 **Sort:** click the Date, Topic, Title, Level or Feedback column header. Ascending or descending.
 
-**Table columns:** ★, Date, Topic, Title, Level, Categories, Feedback, ↗ — the feedback cell shows
-`✓ Known` / `✗ Unknown` (or nothing yet); `↗` opens the lesson with its Share popover.
+**Table columns:** ★, Date, Topic, Title, Level, Categories, Feedback, ↗ — the title gets the width
+(categories wrap onto a second line when needed); the feedback cell shows `✓ Known` / `✗ Unknown`
+(or nothing yet); `↗` opens the Share panel right there; a shared lesson shows `🤝 <sender>`
+under its topic.
 
 **Pagination:** 25 per page.
 
 **Actions per row:**
 - `★` — toggle starred
-- `↗` — share this lesson (opens the detail page with the Share popover)
+- `↗` (appears when you hover the row) — share this lesson from a popover right next to the icon, without leaving the list
 - Click a level pill or category chip — filter the table by it
 - Click anywhere else on the row — open the detail page (feedback is recorded there)
+
+**⋯ More** (toolbar, right) — the rare actions live behind this button so the toolbar stays calm:
+
+- **Delete lessons…** — deleting is deliberately hidden until you ask for it. The star column turns
+  into checkboxes, clicking a row now ticks it instead of opening it (the header checkbox ticks the
+  whole page), and a bar at the bottom shows *N selected* with **Delete selected**. One
+  confirmation, then the list reloads with the same filters and page. Esc or **✕ Cancel** (toolbar
+  or bar) leaves the mode without deleting anything; it is never remembered across reloads. Deleting is permanent; a lesson
+  someone shared with you can be deleted too, and the same share is accepted again if you import it
+  later.
+- **Reset column widths** — see below.
+
+**Resizable columns** — on desktop widths, drag the boundary between two column headers: the column
+on one side grows exactly as much as its neighbour shrinks, so the table never changes width and no
+column can be pushed out of view. The title column takes whatever its neighbours give or take and never
+drops below a readable width. Widths are remembered in this browser (and dropped if they no longer fit
+the window); double-click a boundary to reset the two columns beside it, or use **⋯ → Reset column
+widths**. When the Date column gets narrow, dates switch to a compact form: `17m`, `today`, `Mon 2` within the
+last week, then `Sep 10`. Lessons
+two months old or older show their date instead of a relative label: `July 3` within the current
+year, `July 3, 2025` for earlier years (compact: `Jul 2025`).
 
 **＋ Import** (toolbar, right) — add a lesson someone shared with you: paste the code, the link, a
 URL, or the whole copied card into the box, pick a `.devcoach.md` file, or simply **drop the file
@@ -134,7 +160,9 @@ anywhere on the page**. See [Sharing a lesson](#sharing-a-lesson).
 
 Full lesson content laid out in reading order:
 
-- **Title row** — `← Back to lessons`, star toggle, title, level pill (Junior / Mid / Senior), **↗ Share**
+- **Title row** — `← Back to lessons`, star toggle, title, level pill (Junior / Mid / Senior), **↗ Share**,
+  and the same **⋯ More** button as the Lessons toolbar, holding the rare actions — today
+  **🗑 Delete lesson…** (asks for confirmation, then returns to the list)
 - **Metadata row** — relative date with tooltip, topic ID, category chips, feedback badge + Clear;
   a lesson someone shared with you also shows `🤝 shared by <name>`
 - **TL;DR callout** — one-sentence summary in a highlighted indigo box, always visible above the body
@@ -195,7 +223,7 @@ Full lesson content laid out in reading order:
 ### Sharing a lesson
 
 A lesson that landed for you is worth handing to a teammate. **↗ Share** on a lesson (or `↗` in the
-table) opens a popover with your name (prefilled from `share_name`, then git), an *Include where it
+table, which opens the same panel in a popover next to the row) shows your name (prefilled from `share_name`, then git), an *Include where it
 happened* checkbox (project, branch, commit and task context — **off by default**, and a local folder
 path is never exported), and three ways to hand it over — all carrying the same lesson:
 
@@ -249,6 +277,8 @@ Three panels:
 - **Your name (for sharing)** — the sender name proposed when you share a lesson; empty means your
   git `user.name` (`share_name`)
 - **UI theme** — 🌓 System / ☀️ Light / 🌙 Dark (`ui_theme`)
+- **Home page** — 🏠 Auto / 📚 Lessons / 🧭 Knowledge map (`ui_home`): where `/` lands. Auto opens
+  Lessons once you have one, the knowledge map before
 
 **Backup & Restore**:
 - **Download backup** — a full zip (settings + knowledge map + lessons + notebook)

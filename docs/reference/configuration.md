@@ -2,7 +2,7 @@
 
 ## Settings
 
-devcoach has six settings, all stored in the `settings` table of the database:
+devcoach has seven settings, all stored in the `settings` table of the database:
 
 | Setting | Default | Range / values | Set via |
 |---------|---------|----------------|---------|
@@ -12,9 +12,11 @@ devcoach has six settings, all stored in the `settings` table of the database:
 | `nudge_scope` | `session` | `session` \| `global` | CLI · MCP tool · web UI |
 | `share_name` | *(empty)* | ≤ 80 chars; empty → git `user.name` | CLI · MCP tool · web UI |
 | `ui_theme` | `system` | `system` \| `light` \| `dark` | web UI only |
+| `ui_home` | `auto` | `auto` \| `lessons` \| `knowledge` | web UI only |
 
-`devcoach set <key> <value>` and the `update_settings` MCP tool accept the first five. `ui_theme` is
-the dashboard's colour scheme and is changed from the web UI's Settings page.
+`devcoach set <key> <value>` and the `update_settings` MCP tool accept the first five. The two `ui_*`
+settings belong to the dashboard and are changed from its Settings page: `ui_theme` is the colour
+scheme, `ui_home` is where `/` lands (`auto` = Lessons once a lesson exists, the knowledge map before).
 
 ---
 

@@ -124,6 +124,7 @@ describe("db knowledge + groups + settings", () => {
       max_per_day: 2,
       min_gap_minutes: 240,
       ui_theme: "system",
+      ui_home: "auto",
       nudge_every: 10,
       nudge_scope: "session",
       share_name: null,
@@ -439,6 +440,21 @@ describe("lesson sharing — storage & pacing", () => {
         .sort(),
     ).toEqual(["same-slug-shared", "same-slug-shared-2"]);
     expect(db.getLessons(c, { imported: false }).map((l) => l.id)).toEqual(["same-slug"]);
+    // by sender: exact match on the filter, substring (case-insensitive) through search
+    expect(db.getLessons(c, { shared_by: "Bob" }).map((l) => l.id)).toEqual(["same-slug-shared-2"]);
+    expect(db.getLessons(c, { shared_by: "bob" })).toEqual([]);
+    expect(db.getLessons(c, { search: "bob" }).map((l) => l.id)).toEqual(["same-slug-shared-2"]);
+    expect(db.listSharedBy(c)).toEqual(["Ada", "Bob"]);
+    // batch delete: unknown ids are ignored, the count is what actually went
+    expect(db.deleteLessons(c, [])).toBe(0);
+    expect(db.deleteLessons(c, ["same-slug-shared", "ghost"])).toBe(1);
+    expect(db.deleteLessons(c, ["same-slug-shared"])).toBe(0);
+    expect(
+      db
+        .getLessons(c)
+        .map((l) => l.id)
+        .sort(),
+    ).toEqual(["same-slug", "same-slug-shared-2"]);
   });
 
   it("topic_tracked is an own-property check (a topic named like an Object.prototype key is not 'tracked')", () => {

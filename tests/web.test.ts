@@ -2,7 +2,7 @@ import { beforeAll, describe, expect, it, vi } from "vitest";
 import * as db from "../src/core/db";
 import { parseLesson } from "../src/core/models";
 import { fetchSharedInput } from "../src/core/share-fetch";
-import { createApp } from "../src/web/app";
+import { createApp, resolveHomePath } from "../src/web/app";
 
 vi.mock("../src/core/share-fetch", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../src/core/share-fetch")>();
@@ -11,14 +11,19 @@ vi.mock("../src/core/share-fetch", async (importOriginal) => {
 
 const app = createApp();
 const get = (path: string) => app.fetch(new Request(`http://localhost${path}`));
-const post = (path: string, fields: Record<string, string>) =>
+const postForm = (
+  path: string,
+  fields: Record<string, string>,
+  headers: Record<string, string> = {},
+) =>
   app.fetch(
     new Request(`http://localhost${path}`, {
       method: "POST",
       body: new URLSearchParams(fields),
-      headers: { "content-type": "application/x-www-form-urlencoded" },
+      headers: { "content-type": "application/x-www-form-urlencoded", ...headers },
     }),
   );
+const post = (path: string, fields: Record<string, string>) => postForm(path, fields);
 
 beforeAll(() => {
   db.withConnection((c) => {
@@ -41,11 +46,26 @@ beforeAll(() => {
 });
 
 describe("web app", () => {
-  it("GET / renders profile and reflects added topic", async () => {
-    expect(
-      (await post("/knowledge", { topic: "rust", confidence: "7", group: "Languages" })).status,
-    ).toBe(303);
-    const r = await get("/");
+  it("GET / lands on lessons once there is one; the setting overrides", async () => {
+    const home = await get("/");
+    expect(home.status).toBe(302);
+    expect(home.headers.get("location")).toBe("/lessons"); // the fixture seeded w1
+    await post("/settings", { max_per_day: "2", min_gap_minutes: "240", ui_home: "knowledge" });
+    expect((await get("/")).headers.get("location")).toBe("/knowledge");
+    await post("/settings", { max_per_day: "2", min_gap_minutes: "240", ui_home: "bogus" });
+    expect((await get("/")).headers.get("location")).toBe("/lessons"); // bogus → auto
+    expect(resolveHomePath("auto", false)).toBe("/knowledge");
+    expect(resolveHomePath("lessons", false)).toBe("/lessons");
+    expect(resolveHomePath("knowledge", true)).toBe("/knowledge");
+    const settings = await (await get("/settings")).text();
+    expect(settings).toContain('name="ui_home" value="auto" checked');
+  });
+
+  it("GET /knowledge renders profile and reflects added topic", async () => {
+    const added = await post("/knowledge", { topic: "rust", confidence: "7", group: "Languages" });
+    expect(added.status).toBe(303);
+    expect(added.headers.get("location")).toBe("/knowledge");
+    const r = await get("/knowledge");
     expect(r.status).toBe(200);
     const html = await r.text();
     expect(html).toContain("Knowledge Map");
@@ -88,7 +108,14 @@ describe("web app", () => {
   });
 
   it("settings page, update, notebook save", async () => {
-    expect((await get("/settings")).status).toBe(200);
+    const settingsPage = await get("/settings");
+    expect(settingsPage.status).toBe(200);
+    const nav = await settingsPage.text();
+    expect(nav).toContain('href="/settings" title="Settings"');
+    expect(nav).toContain("<span>Settings</span>");
+    expect(nav).toContain('aria-current="page"');
+    expect(nav).not.toContain(">Settings</a>");
+    expect(await (await get("/lessons")).text()).not.toContain('aria-current="page"');
     expect(
       (await post("/settings", { max_per_day: "5", min_gap_minutes: "120", ui_theme: "dark" }))
         .status,
@@ -145,6 +172,10 @@ describe("web app", () => {
 
   it("static handler 404s missing files", async () => {
     expect((await get("/static/does-not-exist.css")).status).toBe(404);
+    const js = await get("/static/table-resize.js");
+    expect(js.status).toBe(200);
+    expect(js.headers.get("content-type")).toContain("text/javascript");
+    expect(await js.text()).toContain("resetLessonColumns");
   });
 });
 
@@ -290,7 +321,7 @@ describe("web view branches — exhaustive", () => {
   it("profile: low/mid/high confidence tiers + ungrouped Other section", async () => {
     await post("/knowledge", { topic: "lowconf", confidence: "2" }); // red tier, Other group
     await post("/knowledge", { topic: "midconf", confidence: "5" }); // yellow tier
-    const html = await (await get("/")).text();
+    const html = await (await get("/knowledge")).text();
     expect(html).toContain("lowconf");
     expect(html).toContain("midconf");
     expect(html).toContain("Other"); // ungrouped section header
@@ -331,25 +362,13 @@ describe("web view branches — exhaustive", () => {
         );
       }
     });
-    const html = await (await get("/")).text();
+    const html = await (await get("/knowledge")).text();
     // rateLimit.allowed === false → yellow reason branch instead of "Available now"
     expect(html).not.toContain("Available now");
   });
 });
 
 describe("web lesson sharing", () => {
-  const postForm = (
-    path: string,
-    fields: Record<string, string>,
-    headers: Record<string, string> = {},
-  ) =>
-    app.fetch(
-      new Request(`http://localhost${path}`, {
-        method: "POST",
-        body: new URLSearchParams(fields),
-        headers: { "content-type": "application/x-www-form-urlencoded", ...headers },
-      }),
-    );
   const seed = (id: string, title: string) =>
     db.withConnection((c) =>
       db.insertLesson(
@@ -620,7 +639,12 @@ describe("web lesson sharing", () => {
     expect(await (await get("/settings")).text()).toContain('value="Zed"');
     seed("sh3", "Row share");
     const html = await (await get("/lessons?search=Row+share")).text();
-    expect(html).toContain("/lessons/sh3?share=1");
+    expect(html).toContain('hx-get="/lessons/sh3/share?format=panel"');
+    expect(html).toContain('id="share-modal-body"');
+    const panel = await (await get("/lessons/sh3/share?format=panel")).text();
+    expect(panel).toContain("Row share");
+    expect(panel).toContain('name="include_context"');
+    expect(panel).toContain('id="share-payloads"');
     expect(html).toContain("＋ Import");
   });
 
@@ -635,5 +659,147 @@ describe("web lesson sharing", () => {
     expect(pre.headers.get("access-control-allow-methods")).toContain("GET");
     // no other route is CORS-enabled
     expect((await get("/lessons")).headers.get("access-control-allow-origin")).toBeNull();
+  });
+});
+
+describe("web lesson delete", () => {
+  const seedDel = (id: string, title: string) =>
+    db.withConnection((c) =>
+      db.insertLesson(
+        c,
+        parseLesson({
+          id,
+          timestamp: "2026-06-16T10:00:00Z",
+          topic_id: "python",
+          categories: ["python"],
+          title,
+          level: "mid",
+          summary: "s",
+        }),
+      ),
+    );
+  const postIds = (ids: string[], next: string, headers: Record<string, string> = {}) =>
+    app.fetch(
+      new Request("http://localhost/lessons/delete", {
+        method: "POST",
+        body: new URLSearchParams([...ids.map((id) => ["id", id]), ["next", next]]),
+        headers: { "content-type": "application/x-www-form-urlencoded", ...headers },
+      }),
+    );
+
+  it("list: Select mode instead of a per-row control; detail: the ⋯ menu", async () => {
+    seedDel("del1", "Doomed <lesson>");
+    seedDel("del3", "Doomed too");
+    const list = await (await get("/lessons?search=Doomed")).text();
+    expect(list).toContain('aria-label="More actions"');
+    expect(list).toContain("Delete lessons…");
+    expect(list).toContain("✕ Cancel");
+    expect(list).toContain("Reset column widths");
+    expect(list).not.toContain("☑ Select</button>");
+    expect(list).toContain('class="dc-check');
+    expect(list).toContain('data-resizable="lessons"');
+    expect(list).toContain("<colgroup>");
+    expect(list).toContain('<col data-col="title" data-flex data-min="220" />');
+    expect(list).toContain('<col data-col="date" data-min="96"');
+    expect(list).toContain("table-resize.js");
+    expect(list).not.toContain(">↗</a>");
+    expect(list).toContain('data-id="del1"');
+    expect(list).toContain('data-title="Doomed &lt;lesson&gt;"');
+    expect(list).toContain('role="alertdialog"');
+    expect(list).not.toContain("confirm(");
+    expect(list).toContain('action="/lessons/delete"');
+    expect(list).toContain("Delete selected");
+    expect(list).not.toContain('hx-post="/lessons/del1/delete"');
+    expect(list).not.toContain("🗑</button>");
+    expect(list).toContain(
+      'value="/lessons?period=all&amp;search=Doomed&amp;sort=timestamp&amp;order=desc&amp;page=1"',
+    );
+    const detail = await (await get("/lessons/del1")).text();
+    expect(detail).toContain('aria-label="More actions"');
+    expect(detail).not.toContain(">⋯</button>");
+    expect(detail).toContain("Delete lesson…");
+    expect(detail).toContain('name="id" value="del1"');
+    expect(detail).toContain("Delete this lesson?");
+    expect(detail).toContain("“Doomed &lt;lesson&gt;”");
+    expect(detail).toContain('role="alertdialog"');
+    expect(detail).not.toContain("confirm(");
+  });
+
+  it("POST /lessons/delete removes one or many ids and redirects to next", async () => {
+    const r = await postIds(["del1", "del3", "nope"], "/lessons?search=Doomed");
+    expect(r.status).toBe(303);
+    expect(r.headers.get("location")).toBe("/lessons?search=Doomed");
+    expect((await get("/lessons/del1")).status).toBe(404);
+    expect((await get("/lessons/del3")).status).toBe(404);
+    expect(await (await get("/lessons?search=Doomed")).text()).not.toContain("/lessons/del1");
+    seedDel("del4", "Single");
+    expect(
+      (await post("/lessons/delete", { id: "del4", next: "//evil" })).headers.get("location"),
+    ).toBe("/lessons");
+    expect((await get("/lessons/del4")).status).toBe(404);
+    // nothing to delete is not an error
+    expect((await post("/lessons/delete", { next: "/lessons" })).status).toBe(303);
+  });
+
+  it("delete from another site is refused and keeps the lesson", async () => {
+    seedDel("del2", "Survivor");
+    const r = await postIds(["del2"], "/lessons", { "sec-fetch-site": "cross-site" });
+    expect(r.status).toBe(403);
+    expect(db.withConnection((c) => db.getLessonById(c, "del2"))?.title).toBe("Survivor");
+    expect((await postIds(["del2"], "/lessons", { "sec-fetch-site": "same-origin" })).status).toBe(
+      303,
+    );
+    expect(db.withConnection((c) => db.getLessonById(c, "del2"))).toBeNull();
+  });
+});
+
+describe("web shared-with-me filters", () => {
+  it("filters by imported / sender, renders the dropdown, chip and row badge", async () => {
+    db.withConnection((c) => {
+      db.insertLesson(
+        c,
+        parseLesson({
+          id: "from-ada",
+          timestamp: "2026-06-16T10:00:00Z",
+          topic_id: "sql",
+          categories: ["sql"],
+          title: "Ada's <index> tip",
+          level: "mid",
+          summary: "s",
+          imported: true,
+          shared_by: "Ada <Lovelace>",
+        }),
+      );
+    });
+    const all = await (await get("/lessons")).text();
+    expect(all).toContain('data-shared-by="Ada &lt;Lovelace&gt;"');
+    expect(all).toContain("🤝 Ada &lt;Lovelace&gt;"); // row badge under the topic
+    expect(all).toContain("🤝 Shared"); // neutral button label
+
+    const theirs = await (await get("/lessons?imported=1")).text();
+    expect(theirs).toContain("/lessons/from-ada");
+    expect(theirs).not.toContain("/lessons/w1");
+    expect(theirs).toContain("🤝 Shared with me");
+
+    const mine = await (await get("/lessons?imported=0&search=Webify")).text();
+    expect(mine).toContain("/lessons/w1");
+    expect(mine).toContain("👤 My own");
+    expect(await (await get("/lessons?imported=0&search=index")).text()).not.toContain(
+      "/lessons/from-ada",
+    );
+
+    const byAda = await (await get("/lessons?shared_by=Ada+%3CLovelace%3E")).text();
+    expect(byAda).toContain("/lessons/from-ada");
+    expect(byAda).not.toContain("/lessons/w1");
+    expect(byAda).toContain("🤝 from Ada &lt;Lovelace&gt;"); // label + chip
+    expect(byAda).toContain("Clear all");
+    // the chip's clear link drops both fields; other filters survive
+    expect(byAda).toMatch(/href="\?period=all(&amp;[^"]*)?&amp;sort=timestamp&amp;order=desc"/);
+
+    const bySearch = await (await get("/lessons?search=lovelace")).text();
+    expect(bySearch).toContain("/lessons/from-ada");
+    expect((await get("/lessons?shared_by=Nobody")).status).toBe(200);
+    expect(await (await get("/lessons?shared_by=Nobody")).text()).toContain("No lessons match");
+    db.withConnection((c) => db.deleteLesson(c, "from-ada"));
   });
 });

@@ -9,7 +9,7 @@ import { c, link } from "../cli/term";
 import * as coach from "../core/coach";
 import * as db from "../core/db";
 import { detectGitUserName } from "../core/git";
-import type { KnowledgeEntry, Lesson } from "../core/models";
+import type { KnowledgeEntry, Lesson, UiHome } from "../core/models";
 import {
   buildSharePayload,
   decodeShareCode,
@@ -33,6 +33,7 @@ import {
   type ShareState,
   settingsPage,
   shareFragment,
+  sharePanel,
 } from "./views";
 
 const PER_PAGE = 25;
@@ -131,6 +132,13 @@ function shareState(
   };
 }
 
+/** Where `/` lands: the lessons list is the daily activity, but only once there is one to show. */
+export function resolveHomePath(home: UiHome, hasLessons: boolean): "/lessons" | "/knowledge" {
+  if (home === "lessons") return "/lessons";
+  if (home === "knowledge") return "/knowledge";
+  return hasLessons ? "/lessons" : "/knowledge";
+}
+
 function uiTheme(): string {
   try {
     return db.withConnection((c) => db.getSettings(c).ui_theme);
@@ -155,8 +163,12 @@ export function createApp(opts: AppOptions = {}): Hono {
     if (!filePath.startsWith(STATIC_DIR)) return c.notFound();
     try {
       const data = readFileSync(filePath);
+      // Local dashboard: always revalidate, so a rebuilt script or stylesheet shows up on reload.
       return new Response(new Uint8Array(data), {
-        headers: { "content-type": CONTENT_TYPES[extname(filePath)] ?? "application/octet-stream" },
+        headers: {
+          "content-type": CONTENT_TYPES[extname(filePath)] ?? "application/octet-stream",
+          "cache-control": "no-cache",
+        },
       });
     } catch {
       return c.notFound();
@@ -177,8 +189,17 @@ export function createApp(opts: AppOptions = {}): Hono {
   });
   app.get("/shutdown", (c) => c.text("Method Not Allowed", 405));
 
-  // ── Profile ──────────────────────────────────────────────────────────────
+  // ── Home: a router, not a page (302 — the answer depends on state) ──────────
   app.get("/", (c) => {
+    const { home, hasLessons } = db.withConnection((conn) => ({
+      home: db.getSettings(conn).ui_home,
+      hasLessons: db.countFilteredLessons(conn) > 0,
+    }));
+    return c.redirect(resolveHomePath(home, hasLessons), 302);
+  });
+
+  // ── Profile (the knowledge map) ─────────────────────────────────────────────
+  app.get("/knowledge", (c) => {
     const { profile, stats, rateLimit, settings } = db.withConnection((conn) => ({
       profile: coach.getProfile(conn),
       stats: coach.getStats(conn),
@@ -218,12 +239,12 @@ export function createApp(opts: AppOptions = {}): Hono {
         if (group && group !== "Other") db.assignTopicToGroup(conn, topic, group);
       });
     }
-    return c.redirect("/", 303);
+    return c.redirect("/knowledge", 303);
   });
 
   app.post("/knowledge/:topic/delete", (c) => {
     db.withConnection((conn) => db.deleteKnowledge(conn, c.req.param("topic")));
-    return c.redirect("/", 303);
+    return c.redirect("/knowledge", 303);
   });
 
   app.post("/knowledge/:topic/group", async (c) => {
@@ -233,24 +254,24 @@ export function createApp(opts: AppOptions = {}): Hono {
       if (group && group !== "Other") db.assignTopicToGroup(conn, topic, group);
       else db.unassignTopicFromGroup(conn, topic);
     });
-    return c.redirect("/", 303);
+    return c.redirect("/knowledge", 303);
   });
 
   app.post("/knowledge/:topic", async (c) => {
     const delta = Number.parseInt(textField(await c.req.parseBody(), "delta", "0"), 10) || 0;
     db.withConnection((conn) => coach.applyKnowledgeDelta(conn, c.req.param("topic"), delta));
-    return c.redirect("/", 303);
+    return c.redirect("/knowledge", 303);
   });
 
   app.post("/groups", async (c) => {
     const name = textField(await c.req.parseBody(), "group_name").trim();
     if (name && name !== "Other") db.withConnection((conn) => db.addGroup(conn, name));
-    return c.redirect("/", 303);
+    return c.redirect("/knowledge", 303);
   });
 
   app.post("/groups/:group_name/delete", (c) => {
     db.withConnection((conn) => db.deleteGroup(conn, c.req.param("group_name")));
-    return c.redirect("/", 303);
+    return c.redirect("/knowledge", 303);
   });
 
   // ── Lessons (static sub-paths before :lesson_id) ───────────────────────────
@@ -325,6 +346,8 @@ export function createApp(opts: AppOptions = {}): Hono {
     const dateFrom = q.date_from || "";
     const dateTo = q.date_to || "";
     const starred = q.starred === "1";
+    const importedQ = q.imported === "1" ? "1" : q.imported === "0" ? "0" : "";
+    const sharedBy = q.shared_by || null;
     const sort = q.sort || "timestamp";
     const order = q.order === "asc" ? "asc" : "desc";
     let page = Math.max(1, Number.parseInt(q.page ?? "1", 10) || 1);
@@ -339,6 +362,8 @@ export function createApp(opts: AppOptions = {}): Hono {
       branch: q.branch || null,
       commit: q.commit || null,
       starred: starred ? true : null,
+      imported: sharedBy || importedQ === "1" ? true : importedQ === "0" ? false : null,
+      shared_by: sharedBy,
       search: q.search || null,
       feedback: q.feedback || null,
       date_from: dateFrom || null,
@@ -358,6 +383,7 @@ export function createApp(opts: AppOptions = {}): Hono {
         allRepositories: db.getDistinctColumn(conn, "repository"),
         allBranches: db.getDistinctColumn(conn, "branch"),
         allCommits: db.getDistinctColumn(conn, "commit_hash"),
+        allSharedBy: db.listSharedBy(conn),
         theme: db.getSettings(conn).ui_theme,
       };
     });
@@ -371,6 +397,8 @@ export function createApp(opts: AppOptions = {}): Hono {
       branch: q.branch || "",
       commit: q.commit || "",
       starred,
+      imported: sharedBy ? "1" : importedQ,
+      shared_by: sharedBy ?? "",
       search: q.search || "",
       feedback: q.feedback || "",
       date_from: dateFrom,
@@ -390,6 +418,7 @@ export function createApp(opts: AppOptions = {}): Hono {
         allRepositories: data.allRepositories,
         allBranches: data.allBranches,
         allCommits: data.allCommits,
+        allSharedBy: data.allSharedBy,
         s,
         page,
         perPage: PER_PAGE,
@@ -411,6 +440,21 @@ export function createApp(opts: AppOptions = {}): Hono {
     const fb = textField(body, "feedback");
     const value = fb === "" || fb === "clear" ? null : fb;
     db.withConnection((conn) => coach.recordFeedback(conn, c.req.param("lesson_id"), value));
+    return c.redirect(safeRedirect(textField(body, "next") || undefined), 303);
+  });
+
+  // One route for both surfaces: the list's Select mode posts many `id` fields, the lesson page's
+  // ⋯ menu posts one. Same-origin only: a page elsewhere must never be able to delete a lesson.
+  // Unknown ids are ignored. Imported lessons go the same way; the same share can be imported
+  // again afterwards (duplicate detection only looks at rows that still exist).
+  app.post("/lessons/delete", async (c) => {
+    if (isCrossSite(c)) return c.text("Forbidden", 403);
+    const body = await c.req.parseBody({ all: true });
+    const raw = body.id;
+    const ids = (Array.isArray(raw) ? raw : [raw]).filter(
+      (v): v is string => typeof v === "string" && v !== "",
+    );
+    db.withConnection((conn) => db.deleteLessons(conn, ids));
     return c.redirect(safeRedirect(textField(body, "next") || undefined), 303);
   });
 
@@ -458,6 +502,7 @@ export function createApp(opts: AppOptions = {}): Hono {
         },
       });
     }
+    if (format === "panel") return c.html(sharePanel(found.lesson.id, state, found.lesson.title));
     return c.html(shareFragment(state));
   });
 
@@ -531,6 +576,8 @@ export function createApp(opts: AppOptions = {}): Hono {
     const minGap = Number.parseInt(textField(body, "min_gap_minutes", "240"), 10);
     let theme = textField(body, "ui_theme", "system");
     if (!["system", "dark", "light"].includes(theme)) theme = "system";
+    let home = textField(body, "ui_home", "auto");
+    if (!["auto", "lessons", "knowledge"].includes(home)) home = "auto";
     const nudgeEvery = Math.max(0, Number.parseInt(textField(body, "nudge_every", "10"), 10) || 0);
     let nudgeScope = textField(body, "nudge_scope", "session");
     if (nudgeScope !== "session" && nudgeScope !== "global") nudgeScope = "session";
@@ -538,6 +585,7 @@ export function createApp(opts: AppOptions = {}): Hono {
       db.setSetting(conn, "max_per_day", String(maxPerDay));
       db.setSetting(conn, "min_gap_minutes", String(Number.isNaN(minGap) ? 240 : minGap));
       db.setSetting(conn, "ui_theme", theme);
+      db.setSetting(conn, "ui_home", home);
       db.setSetting(conn, "nudge_every", String(nudgeEvery));
       db.setSetting(conn, "nudge_scope", nudgeScope);
       db.setSetting(conn, "share_name", db.normalizeShareName(textField(body, "share_name")));

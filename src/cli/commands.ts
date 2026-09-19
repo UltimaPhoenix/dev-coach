@@ -95,6 +95,7 @@ interface LessonsOpts {
   commit: string | null;
   starred: boolean;
   imported: boolean;
+  sharedBy: string | null;
   feedback: string | null;
   level: string | null;
   dateFrom: string | null;
@@ -114,7 +115,8 @@ function cmdLessons(o: LessonsOpts): void {
       branch: o.branch,
       commit: o.commit,
       starred: o.starred ? true : null,
-      imported: o.imported ? true : null,
+      imported: o.imported || o.sharedBy ? true : null,
+      shared_by: o.sharedBy,
       feedback: o.feedback,
       date_from: o.dateFrom,
       date_to: o.dateTo,
@@ -780,6 +782,7 @@ interface LessonsCliOpts {
   commit?: string;
   starred?: boolean;
   imported?: boolean;
+  from?: string;
   feedback?: string;
   level?: string;
   dateFrom?: string;
@@ -825,6 +828,7 @@ function buildProgram(): Command {
     .option("--commit <commit>", "Filter by commit hash prefix (fuzzy)")
     .option("--starred", "Show only starred lessons")
     .option("--imported", "Show only lessons shared with you")
+    .option("--from <name>", "Show only lessons shared by this person")
     .option("--feedback <feedback>", "know | dont_know | none")
     .option("--level <level>", "junior | mid | senior")
     .option("--date-from <date>", "Show lessons on or after this date (YYYY-MM-DD[THH:MM])")
@@ -841,6 +845,7 @@ function buildProgram(): Command {
         commit: str(opts.commit),
         starred: Boolean(opts.starred),
         imported: Boolean(opts.imported),
+        sharedBy: str(opts.from),
         feedback: str(opts.feedback),
         level: str(opts.level),
         dateFrom: str(opts.dateFrom),

@@ -38,7 +38,7 @@ local server.
 | `get_onboarding` | Onboarding status, the stack detected across the full Claude Code history with per-project provenance, default topics, `notebook_path` (same data as `devcoach://onboarding`) | read |
 | `get_profile` | The current knowledge map — topics, confidence, groups (same data as `devcoach://profile`) | read |
 | `update_knowledge` | Adjust a topic's confidence by a delta (clamped 0–10) | write |
-| `get_lessons` | Query lesson history (period, category, level, git, starred, imported, feedback, search, date range); `limit` defaults to 10, `0` = all | read-only |
+| `get_lessons` | Query lesson history (period, category, level, git, starred, imported, `shared_by`, feedback, search, date range); `limit` defaults to 10, `0` = all | read-only |
 | `star_lesson` | Star / unstar a lesson | write |
 | `delete_lesson` | Permanently delete a lesson | **destructive** |
 | `submit_feedback` | Record `know` / `dont_know` / `clear`; adjusts confidence ±1 (idempotent) | write |

@@ -199,8 +199,9 @@ checkpoints, never touch the notebook.
 - "Close / stop the dashboard" → `stop_ui` (same `port`) — it stops whichever dashboard listens
   there, one you opened or one started from a terminal; if the user runs `devcoach ui` in their own
   terminal, Ctrl+C there stops it just as gracefully (in-flight requests finish)
-- "Lessons shared with me" → `get_lessons({imported: true})`
-- "Show me the lesson X shared" → `get_lessons({imported: true, search})` → the card,
+- "Lessons shared with me" → `get_lessons({imported: true})`; "what did Ada send me" →
+  `get_lessons({shared_by: "Ada"})` (exact sender name)
+- "Show me the lesson X shared" → `get_lessons({shared_by: X, search})` → the card,
   without `log_lesson` or the feedback line (see `references/sharing.md`)
 
 ## Operating notes

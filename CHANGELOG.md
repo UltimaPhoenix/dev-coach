@@ -4,6 +4,30 @@ Notable changes to devcoach. Versions follow [Semantic Versioning](https://semve
 
 ---
 
+## [2.4.0] — 2026-09-19
+
+### Added
+- **Delete lessons from the dashboard**, kept out of the way until you ask: the **⋯ More** button
+  (the same on the Lessons toolbar and on a lesson page) holds the rare actions — *Delete lessons…*
+  turns the star column into checkboxes with a *Delete selected* bar (one confirmation, one request
+  for all of them); on a lesson page it holds *Delete lesson…*. Same-origin only, like share/import.
+  A lesson someone shared with you deletes the same way, and the same share is accepted again
+  afterwards.
+- **Lessons table**: the title gets the width and categories wrap instead of squeezing it; columns are
+  **resizable** by dragging a header edge (remembered in the browser, double-click or *⋯ → Reset
+  column widths* to reset); the share arrow appears on hover and opens the Share panel in a popover
+  next to the row, right there in the list.
+- **Filter lessons by sender**: the dashboard's new **🤝 Shared** dropdown (All / My own / Shared with
+  me / from `<name>`), a `🤝 <sender>` badge under the topic, `devcoach lessons --from <name>`,
+  `get_lessons({shared_by})`, and the skill answers "what did Ada send me". The free-text search now
+  matches the sender too.
+- **Settings moved top-right** as a ⚙️ Settings button next to the theme toggle; the nav keeps Profile and
+  Lessons.
+- **Home page setting** (`ui_home`, Settings → Home page): where the dashboard's `/` lands. **Auto**
+  (default) opens Lessons once you have at least one lesson and the knowledge map before that;
+  **Lessons** / **Knowledge map** pin one. The knowledge map now lives at `/knowledge`; launch URLs are
+  unchanged.
+
 ## [2.3.1] — 2026-09-15
 
 ### Fixed

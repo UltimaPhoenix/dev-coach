@@ -28,7 +28,8 @@ for a typical lesson, one line, safe in URLs. A share is a plain string — noth
 
 ## From the dashboard
 
-Open a lesson and click **↗ Share** (or `↗` at the end of its row on the Lessons page). The popover
+Open a lesson and click **↗ Share** (or `↗` at the end of its row on the Lessons page — that one
+opens the same panel in a popover next to the row, so you never leave the list). The popover
 shows your name, an *Include where it happened* checkbox (off by default) and three actions: **Copy
 text**, **Copy link**, **Download .md**.
 
@@ -98,7 +99,8 @@ See [Privacy & security](../reference/privacy.md#sharing-is-explicit) for the fu
 ## How an imported lesson behaves
 
 - It appears in your log with a **🤝 shared by** line and can be filtered with
-  `devcoach lessons --imported` or `get_lessons({imported: true})`.
+  `devcoach lessons --imported` / `--from <name>`, `get_lessons({imported: true})` /
+  `({shared_by: "<name>"})`, or the dashboard's **🤝 Shared** filter.
 - Its **topic counts as taught**, so the coach will not teach it again, and **✓/✗ feedback works**
   as for your own lessons. If the topic is not in your knowledge map yet, you are offered to track it.
 - It **never counts against your daily limit** or the minimum gap, and never resets the pacing — a

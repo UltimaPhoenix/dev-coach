@@ -830,6 +830,8 @@ describe("cli share / import", () => {
     await run(["share", "s4", "--file", file, "--by", "Ada"]);
     db.withConnection((c) => c.exec("DELETE FROM lessons WHERE id = 's4'"));
     expect((await run(["import", file])).out).toContain("shared by Ada");
+    expect((await run(["lessons", "--from", "Ada"])).out).toContain("Layer cache s4");
+    expect((await run(["lessons", "--from", "Nobody"])).out).toContain("No lessons found");
     // stdin
     seed("s5");
     const stdinText = (await run(["share", "s5", "--anonymous"])).out;

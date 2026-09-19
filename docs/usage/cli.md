@@ -60,7 +60,7 @@ devcoach --version
 
 | Command | Description |
 |---|---|
-| `devcoach lessons [--period <p>] [--level <l>] [--category <c>] [--project/--repository/--branch/--commit <…>] [--starred] [--imported] [--feedback <f>] [--date-from/--date-to <YYYY-MM-DD>] [--sort <col>] [--order <asc\|desc>]` | List lessons with filters |
+| `devcoach lessons [--period <p>] [--level <l>] [--category <c>] [--project/--repository/--branch/--commit <…>] [--starred] [--imported] [--from <name>] [--feedback <f>] [--date-from/--date-to <YYYY-MM-DD>] [--sort <col>] [--order <asc\|desc>]` | List lessons with filters |
 | `devcoach lesson <id>` | Show a single lesson in full |
 | `devcoach star <id>` / `unstar <id>` | Star / unstar |
 | `devcoach delete <id>` | Permanently delete a lesson |
@@ -124,7 +124,8 @@ devcoach import https://…             # a share link, or any URL whose body is
 pbpaste | devcoach import -           # stdin
 ```
 
-`devcoach lessons --imported` lists the lessons shared with you. What travels, the `.devcoach.md`
+`devcoach lessons --imported` lists the lessons shared with you, `--from <name>` only those from one
+sender (the free-text search matches sender names too). What travels, the `.devcoach.md`
 format and how an imported lesson behaves (it never counts against `max_per_day`) are in the
 [Sharing lessons](./sharing.md) guide. `--by` is remembered as `share_name` the first time (change it
 with `devcoach set share_name`).
