@@ -37,6 +37,13 @@
     var ths = Array.prototype.slice.call(table.querySelectorAll("thead th"));
     if (cols.length !== ths.length) return;
     var widths = load();
+    // The defaults are inline widths on the <col>s: remember them so resets restore, not wipe.
+    cols.forEach(function (col) {
+      col.dataset.defaultWidth = col.style.width || "";
+    });
+    function restore(col) {
+      col.style.width = col.dataset.defaultWidth || "";
+    }
     var flexIndex = cols.findIndex(function (col) {
       return col.hasAttribute("data-flex");
     });
@@ -47,14 +54,13 @@
     function apply() {
       cols.forEach(function (col) {
         var px = widths[col.dataset.col];
-        col.style.width = typeof px === "number" && px >= MIN ? px + "px" : "";
+        if (typeof px === "number" && px >= MIN) col.style.width = px + "px";
+        else restore(col);
       });
       if (flexWidth() < MIN_FLEX) {
         // The remembered layout does not fit this window: fall back to the defaults.
         widths = {};
-        cols.forEach(function (col) {
-          col.style.width = "";
-        });
+        cols.forEach(restore);
       }
     }
     apply();
@@ -78,7 +84,7 @@
       });
       handle.addEventListener("dblclick", function (e) {
         e.stopPropagation();
-        col.style.width = "";
+        restore(col);
         delete widths[col.dataset.col];
         save(widths);
       });
@@ -117,7 +123,7 @@
       /* ignore */
     }
     document.querySelectorAll("table[data-resizable] colgroup > col").forEach(function (col) {
-      col.style.width = "";
+      col.style.width = col.dataset.defaultWidth || "";
     });
   };
 })();
