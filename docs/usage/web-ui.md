@@ -119,11 +119,11 @@ under its topic.
 
 **⋯ More** (toolbar, right) — the rare actions live behind this button so the toolbar stays calm:
 
-- **Select lessons…** — deleting is deliberately hidden until you ask for it. The star column turns
+- **Delete lessons…** — deleting is deliberately hidden until you ask for it. The star column turns
   into checkboxes, clicking a row now ticks it instead of opening it (the header checkbox ticks the
-  whole page), and a bar at the bottom shows *N selected* with **Delete selected** and Cancel. One
-  confirmation, then the list reloads with the same filters and page. Esc or **✓ Done** leaves the
-  mode with nothing selected; it is never remembered across reloads. Deleting is permanent; a lesson
+  whole page), and a bar at the bottom shows *N selected* with **Delete selected**. One
+  confirmation, then the list reloads with the same filters and page. Esc or **✕ Cancel** (toolbar
+  or bar) leaves the mode without deleting anything; it is never remembered across reloads. Deleting is permanent; a lesson
   someone shared with you can be deleted too, and the same share is accepted again if you import it
   later.
 - **Reset column widths** — see below.

@@ -680,7 +680,8 @@ describe("web lesson delete", () => {
     seedDel("del3", "Doomed too");
     const list = await (await get("/lessons?search=Doomed")).text();
     expect(list).toContain('aria-label="More actions"');
-    expect(list).toContain("☑ Select lessons…");
+    expect(list).toContain("🗑 Delete lessons…");
+    expect(list).toContain("✕ Cancel");
     expect(list).toContain("↔ Reset column widths");
     expect(list).not.toContain("☑ Select</button>");
     expect(list).toContain('class="dc-check');

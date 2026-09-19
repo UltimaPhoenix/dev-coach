@@ -571,12 +571,12 @@ export function lessonsPage(d: LessonsData): Html {
     ${anyFilter ? html`<a href="/lessons" class="ml-auto text-xs text-gray-400 hover:text-gray-700 dark:hover:text-white transition">Clear all</a>` : ""}
 
     ${moreMenu(
-      html`<button type="button" @click="selectMode = true; open = false" class="w-full text-left px-3 py-2 rounded-lg text-sm transition flex items-center gap-2 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800">☑ Select lessons…</button>
+      html`<button type="button" @click="selectMode = true; open = false" class="w-full text-left px-3 py-2 rounded-lg text-sm transition flex items-center gap-2 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800">🗑 Delete lessons…</button>
         <button type="button" @click="window.resetLessonColumns && window.resetLessonColumns(); open = false" class="w-full text-left px-3 py-2 rounded-lg text-sm transition flex items-center gap-2 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800">↔ Reset column widths</button>`,
       anyFilter ? "" : "ml-auto",
       'x-show="!selectMode"',
     )}
-    <button type="button" x-show="selectMode" style="display:none" @click="leave()" class="${anyFilter ? "" : "ml-auto"} inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition bg-indigo-600 text-white border-indigo-600 hover:bg-indigo-500">✓ Done</button>
+    <button type="button" x-show="selectMode" style="display:none" @click="leave()" class="${anyFilter ? "" : "ml-auto"} inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-rose-400 hover:text-rose-600 dark:hover:text-rose-400">✕ Cancel</button>
     <div class="relative" x-data="{ open: ${String(d.importOpen)} }" @click.outside="open = false" @keydown.escape="open = false">
       <button type="button" @click="open = !open" title="Import a lesson someone shared" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-indigo-400">＋ Import</button>
       <div x-show="open" x-transition:enter="transition ease-out duration-100" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100" class="absolute right-0 top-full mt-1 z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg w-80 p-3 space-y-2.5" style="display:none">
