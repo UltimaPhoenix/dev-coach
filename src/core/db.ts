@@ -420,6 +420,13 @@ export function deleteLesson(db: DatabaseSync, lessonId: string): boolean {
   return runSql(db, "DELETE FROM lessons WHERE id = ?", lessonId) > 0;
 }
 
+/** Batch delete (the dashboard's Select mode). Unknown ids are ignored; returns the count removed. */
+export function deleteLessons(db: DatabaseSync, ids: string[]): number {
+  if (ids.length === 0) return 0;
+  const marks = ids.map(() => "?").join(", ");
+  return runSql(db, `DELETE FROM lessons WHERE id IN (${marks})`, ...ids);
+}
+
 export function setStar(db: DatabaseSync, lessonId: string, starred: boolean): boolean {
   return runSql(db, "UPDATE lessons SET starred = ? WHERE id = ?", starred ? 1 : 0, lessonId) > 0;
 }

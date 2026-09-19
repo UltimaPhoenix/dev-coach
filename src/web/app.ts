@@ -438,14 +438,18 @@ export function createApp(opts: AppOptions = {}): Hono {
     return c.redirect(safeRedirect(textField(body, "next") || undefined), 303);
   });
 
-  // Same-origin only: a page elsewhere must never be able to delete a lesson. Imported lessons go
-  // the same way; the same share can be imported again afterwards (duplicate detection only looks
-  // at rows that still exist).
-  app.post("/lessons/:lesson_id/delete", async (c) => {
+  // One route for both surfaces: the list's Select mode posts many `id` fields, the lesson page's
+  // ⋯ menu posts one. Same-origin only: a page elsewhere must never be able to delete a lesson.
+  // Unknown ids are ignored. Imported lessons go the same way; the same share can be imported
+  // again afterwards (duplicate detection only looks at rows that still exist).
+  app.post("/lessons/delete", async (c) => {
     if (isCrossSite(c)) return c.text("Forbidden", 403);
-    const body = await c.req.parseBody();
-    const deleted = db.withConnection((conn) => db.deleteLesson(conn, c.req.param("lesson_id")));
-    if (!deleted) return c.text("Lesson not found", 404);
+    const body = await c.req.parseBody({ all: true });
+    const raw = body.id;
+    const ids = (Array.isArray(raw) ? raw : [raw]).filter(
+      (v): v is string => typeof v === "string" && v !== "",
+    );
+    db.withConnection((conn) => db.deleteLessons(conn, ids));
     return c.redirect(safeRedirect(textField(body, "next") || undefined), 303);
   });
 

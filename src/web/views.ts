@@ -434,7 +434,9 @@ export function lessonsPage(d: LessonsData): Html {
         ? `${d.total} lesson${d.total !== 1 ? "s" : ""}`
         : `${(d.page - 1) * d.perPage + 1}–${Math.min(d.page * d.perPage, d.total)} of ${d.total}`;
 
+  const pageIds = JSON.stringify(d.lessons.map((l) => l.id));
   const body = html`
+<div x-data="{ selectMode: false, selected: [], toggle(id) { const i = this.selected.indexOf(id); if (i < 0) this.selected.push(id); else this.selected.splice(i, 1) }, setAll(ids, on) { this.selected = on ? ids.slice() : [] }, leave() { this.selectMode = false; this.selected = [] } }" @keydown.escape.window="leave()">
 <form id="filter-form" method="get" action="/lessons">
   <input type="hidden" name="period" id="h-period" value="${s.period}">
   <input type="hidden" name="date_from" id="h-date-from" value="${s.date_from}">
@@ -456,7 +458,7 @@ export function lessonsPage(d: LessonsData): Html {
       <input type="text" name="search" value="${s.search}" placeholder="Search lessons…" autocomplete="off" class="w-full pl-9 pr-10 py-3 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-100 placeholder-gray-400 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
       ${s.search ? html`<button type="submit" name="search" value="" class="absolute inset-y-0 right-3 flex items-center text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 text-xl leading-none">×</button>` : ""}
     </div>
-    <p id="lesson-count" class="text-sm text-gray-400 dark:text-gray-500 whitespace-nowrap shrink-0">${countLabel}</p>
+    <p class="text-sm text-gray-400 dark:text-gray-500 whitespace-nowrap shrink-0">${countLabel}</p>
   </div>
 
   <div class="flex flex-wrap items-center gap-2 mb-3">
@@ -552,7 +554,9 @@ export function lessonsPage(d: LessonsData): Html {
 
     ${anyFilter ? html`<a href="/lessons" class="ml-auto text-xs text-gray-400 hover:text-gray-700 dark:hover:text-white transition">Clear all</a>` : ""}
 
-    <div class="relative ${anyFilter ? "" : "ml-auto"}" x-data="{ open: ${String(d.importOpen)} }" @click.outside="open = false" @keydown.escape="open = false">
+    <button type="button" x-show="!selectMode" @click="selectMode = true" title="Select lessons to delete" class="${anyFilter ? "" : "ml-auto"} inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-indigo-400 hover:text-gray-700 dark:hover:text-gray-200">☑ Select</button>
+    <button type="button" x-show="selectMode" style="display:none" @click="leave()" class="${anyFilter ? "" : "ml-auto"} inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition bg-indigo-600 text-white border-indigo-600 hover:bg-indigo-500">✓ Done</button>
+    <div class="relative" x-data="{ open: ${String(d.importOpen)} }" @click.outside="open = false" @keydown.escape="open = false">
       <button type="button" @click="open = !open" title="Import a lesson someone shared" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-indigo-400">＋ Import</button>
       <div x-show="open" x-transition:enter="transition ease-out duration-100" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100" class="absolute right-0 top-full mt-1 z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg w-80 p-3 space-y-2.5" style="display:none">
         <p class="text-xs text-gray-500 dark:text-gray-400">Paste the lesson code, the link, a URL or the whole text — or drop a <code>.devcoach.md</code> anywhere on this page.</p>
@@ -588,12 +592,13 @@ export function lessonsPage(d: LessonsData): Html {
 <form id="import-form" method="post" action="/lessons/import" enctype="multipart/form-data" class="hidden"><input type="hidden" name="from" value="lessons" /></form>
 <div id="drop-hint" class="hidden fixed inset-0 z-[60] bg-indigo-500/10 border-4 border-dashed border-indigo-400 pointer-events-none items-center justify-center"><p class="bg-white dark:bg-gray-900 text-indigo-700 dark:text-indigo-300 font-semibold rounded-xl px-6 py-3 shadow-lg">Drop to import the lesson</p></div>
 
-<div id="lessons-table">${
-    d.lessons.length
-      ? html`<div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm overflow-hidden">
+${
+  d.lessons.length
+    ? html`<div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm overflow-hidden">
   <table class="w-full text-sm">
     <thead>
       <tr class="bg-gray-50 dark:bg-gray-800/60 border-b border-gray-200 dark:border-gray-800 text-left text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">
+        <th class="w-8 px-3 py-3" x-show="selectMode" style="display:none"><input type="checkbox" tabindex="-1" aria-label="Select all on this page" class="accent-indigo-600" :checked="selected.length > 0 && ${pageIds}.every((id) => selected.includes(id))" @change="setAll(${pageIds}, $event.target.checked)" /></th>
         <th class="w-8 px-3 py-3"></th>
         ${sortTh("Date", "timestamp")}
         ${sortTh("Topic", "topic_id", "hidden sm:table-cell")}
@@ -602,7 +607,6 @@ export function lessonsPage(d: LessonsData): Html {
         <th class="px-3 py-3 hidden lg:table-cell">Categories</th>
         ${sortTh("Feedback", "feedback", "hidden xl:table-cell")}
         <th class="px-2 py-3 w-8"><span class="sr-only">Share</span></th>
-        <th class="px-2 py-3 w-8"><span class="sr-only">Delete</span></th>
       </tr>
     </thead>
     <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
@@ -610,7 +614,8 @@ export function lessonsPage(d: LessonsData): Html {
         const rowId = domId("lesson-row-", lesson.id);
         const date = lesson.timestamp.slice(0, 10);
         const tip = lesson.timestamp.slice(0, 16).replace("T", " ");
-        return html`<tr id="${rowId}" class="hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors group cursor-pointer" tabindex="0" onclick="window.location='/lessons/${encodeURIComponent(lesson.id)}'" onkeydown="if(event.key==='Enter')window.location='/lessons/${encodeURIComponent(lesson.id)}'" role="link">
+        return html`<tr id="${rowId}" data-id="${lesson.id}" data-href="/lessons/${encodeURIComponent(lesson.id)}" class="hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors group cursor-pointer" tabindex="0" role="link" @click="selectMode ? toggle($el.dataset.id) : (window.location = $el.dataset.href)" @keydown.enter="selectMode ? toggle($el.dataset.id) : (window.location = $el.dataset.href)" @keydown.space.prevent="selectMode && toggle($el.dataset.id)" :class="selected.includes($el.dataset.id) && 'bg-indigo-50 dark:bg-indigo-900/20'">
+        <td class="px-3 py-3" x-show="selectMode" style="display:none"><input type="checkbox" tabindex="-1" class="accent-indigo-600 pointer-events-none" :checked="selected.includes($el.closest('tr').dataset.id)" /></td>
         <td class="px-3 py-3" onclick="event.stopPropagation()" onkeydown="event.stopPropagation()">
           <form method="post" action="/lessons/${encodeURIComponent(lesson.id)}/star" hx-post="/lessons/${encodeURIComponent(lesson.id)}/star" hx-target="#${rowId}" hx-select="#${rowId}" hx-swap="outerHTML">
             <input type="hidden" name="starred" value="${lesson.starred ? "0" : "1"}" />
@@ -628,12 +633,6 @@ export function lessonsPage(d: LessonsData): Html {
         <td class="px-3 py-3 hidden lg:table-cell" onclick="event.stopPropagation()" onkeydown="event.stopPropagation()"><div class="flex flex-wrap gap-1">${lesson.categories.map((cat) => html`<a href="${lessonsQs(s, { category: cat })}" class="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors">${cat}</a>`)}</div></td>
         <td class="px-3 py-3 hidden xl:table-cell" onclick="event.stopPropagation()" onkeydown="event.stopPropagation()">${lesson.feedback === "know" ? html`<span class="text-xs text-teal-600 dark:text-teal-400 font-medium">✓ Known</span>` : lesson.feedback === "dont_know" ? html`<span class="text-xs text-rose-500 dark:text-rose-400 font-medium">✗ Unknown</span>` : ""}</td>
         <td class="px-2 py-3 text-center" onclick="event.stopPropagation()" onkeydown="event.stopPropagation()"><a href="/lessons/${encodeURIComponent(lesson.id)}?share=1" title="Share this lesson" class="text-gray-300 dark:text-gray-600 hover:text-indigo-500 dark:hover:text-indigo-400 transition text-base leading-none">↗</a></td>
-        <td class="px-2 py-3 text-center" onclick="event.stopPropagation()" onkeydown="event.stopPropagation()">
-          <form method="post" action="/lessons/${encodeURIComponent(lesson.id)}/delete" hx-post="/lessons/${encodeURIComponent(lesson.id)}/delete" hx-target="#lessons-table" hx-select="#lessons-table" hx-select-oob="#lesson-count:outerHTML" hx-swap="outerHTML" hx-confirm="Delete “${lesson.title}”? This cannot be undone.">
-            <input type="hidden" name="next" value="/lessons${lessonsQs(s, { page: String(d.page) })}" />
-            <button type="submit" title="Delete this lesson" class="text-gray-300 dark:text-gray-600 hover:text-rose-500 dark:hover:text-rose-400 transition text-base leading-none">🗑</button>
-          </form>
-        </td>
       </tr>`;
       })}
     </tbody>
@@ -665,12 +664,25 @@ ${
 </div>`
     : ""
 }`
-      : html`<div class="flex flex-col items-center justify-center py-16 text-center">
+    : html`<div class="flex flex-col items-center justify-center py-16 text-center">
   <p class="text-3xl mb-3">📭</p>
   <p class="text-gray-500 dark:text-gray-400 text-sm">No lessons match the current filters.</p>
   ${anyFilter ? html`<a href="/lessons" class="mt-2 text-indigo-500 hover:text-indigo-400 text-sm transition">Clear all filters</a>` : ""}
 </div>`
-  }</div>`;
+}
+<div x-show="selectMode" style="display:none" x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0 translate-y-2" x-transition:enter-end="opacity-100 translate-y-0" class="fixed inset-x-0 bottom-0 z-50 border-t border-gray-200 dark:border-gray-800 bg-white/95 dark:bg-gray-900/95 backdrop-blur px-4 sm:px-6 py-3">
+  <div class="max-w-7xl mx-auto flex items-center gap-3">
+    <p class="text-sm text-gray-700 dark:text-gray-200"><span x-text="selected.length"></span> selected</p>
+    <button type="button" x-show="selected.length" style="display:none" @click="selected = []" class="text-xs text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-200 transition">Clear</button>
+    <form method="post" action="/lessons/delete" class="ml-auto flex items-center gap-2" @submit="if (!confirm('Delete ' + selected.length + (selected.length === 1 ? ' lesson' : ' lessons') + '? This cannot be undone.')) $event.preventDefault()">
+      <template x-for="id in selected" :key="id"><input type="hidden" name="id" :value="id" /></template>
+      <input type="hidden" name="next" value="/lessons${lessonsQs(s, { page: String(d.page) })}" />
+      <button type="button" @click="leave()" class="inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium border transition bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-indigo-400">Cancel</button>
+      <button type="submit" :disabled="!selected.length" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition bg-rose-600 text-white border-rose-600 hover:bg-rose-500 disabled:opacity-40 disabled:cursor-not-allowed">🗑 Delete selected</button>
+    </form>
+  </div>
+</div>
+</div>`;
 
   const scripts = html`<script src="/static/vendor/flatpickr.min.js"></script>
 <script src="/static/relative-time.js"></script>
@@ -840,10 +852,16 @@ ${
         ${shareFragment(sh)}
       </div>
     </div>
-    <form method="post" action="/lessons/${encodeURIComponent(l.id)}/delete" class="shrink-0" data-confirm="Delete “${l.title}”? This cannot be undone." onsubmit="return confirm(this.dataset.confirm)">
-      <input type="hidden" name="next" value="/lessons" />
-      <button type="submit" title="Delete this lesson" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-rose-400 hover:text-rose-600 dark:hover:text-rose-400 !text-xs !px-2.5 !py-1">🗑 Delete</button>
-    </form>
+    <div class="relative shrink-0" x-data="{ open: false }" @click.outside="open = false" @keydown.escape="open = false">
+      <button type="button" @click="open = !open" title="More actions" aria-label="More actions" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-indigo-400 !text-xs !px-2.5 !py-1">⋯</button>
+      <div x-show="open" x-transition:enter="transition ease-out duration-100" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100" class="absolute right-0 top-full mt-1 z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg w-48 p-1" style="display:none">
+        <form method="post" action="/lessons/delete" data-confirm="Delete “${l.title}”? This cannot be undone." onsubmit="return confirm(this.dataset.confirm)">
+          <input type="hidden" name="id" value="${l.id}" />
+          <input type="hidden" name="next" value="/lessons" />
+          <button type="submit" class="w-full text-left px-3 py-2 rounded-lg text-sm transition text-gray-700 dark:text-gray-200 hover:bg-rose-50 dark:hover:bg-rose-900/30 hover:text-rose-700 dark:hover:text-rose-300">🗑 Delete lesson…</button>
+        </form>
+      </div>
+    </div>
   </div>
   <div id="lesson-meta" class="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-500 dark:text-gray-400 mb-5">
     <span class="relative group/date cursor-default">🗓 <span data-ts="${l.timestamp}">${date}</span>

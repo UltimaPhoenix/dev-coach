@@ -104,7 +104,7 @@ current filters."
 
 **Sort:** click the Date, Topic, Title, Level or Feedback column header. Ascending or descending.
 
-**Table columns:** ★, Date, Topic, Title, Level, Categories, Feedback, ↗, 🗑 — the feedback cell shows
+**Table columns:** ★, Date, Topic, Title, Level, Categories, Feedback, ↗ — the feedback cell shows
 `✓ Known` / `✗ Unknown` (or nothing yet); `↗` opens the lesson with its Share popover; a shared
 lesson shows `🤝 <sender>` under its topic.
 
@@ -113,10 +113,16 @@ lesson shows `🤝 <sender>` under its topic.
 **Actions per row:**
 - `★` — toggle starred
 - `↗` — share this lesson (opens the detail page with the Share popover)
-- `🗑` — delete this lesson after a confirmation (permanent; a lesson someone shared with you can
-  be deleted too, and the same share is accepted again if you import it later)
 - Click a level pill or category chip — filter the table by it
 - Click anywhere else on the row — open the detail page (feedback is recorded there)
+
+**☑ Select** (toolbar, right) — deleting is deliberately hidden until you ask for it: Select turns
+on a checkbox column, clicking a row now ticks it instead of opening it (the header checkbox ticks
+the whole page), and a bar at the bottom shows *N selected* with **Delete selected** and Cancel.
+One confirmation, then the list reloads with the same filters and page. Esc or **✓ Done** leaves
+the mode with nothing selected; it is never remembered across reloads. Deleting is permanent; a
+lesson someone shared with you can be deleted too, and the same share is accepted again if you
+import it later.
 
 **＋ Import** (toolbar, right) — add a lesson someone shared with you: paste the code, the link, a
 URL, or the whole copied card into the box, pick a `.devcoach.md` file, or simply **drop the file
@@ -141,7 +147,8 @@ anywhere on the page**. See [Sharing a lesson](#sharing-a-lesson).
 Full lesson content laid out in reading order:
 
 - **Title row** — `← Back to lessons`, star toggle, title, level pill (Junior / Mid / Senior), **↗ Share**,
-  **🗑 Delete** (asks for confirmation, then returns to the list)
+  and a **⋯** menu holding the rare actions — today **🗑 Delete lesson…** (asks for confirmation,
+  then returns to the list)
 - **Metadata row** — relative date with tooltip, topic ID, category chips, feedback badge + Clear;
   a lesson someone shared with you also shows `🤝 shared by <name>`
 - **TL;DR callout** — one-sentence summary in a highlighted indigo box, always visible above the body

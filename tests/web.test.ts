@@ -662,46 +662,63 @@ describe("web lesson delete", () => {
         }),
       ),
     );
+  const postIds = (ids: string[], next: string, headers: Record<string, string> = {}) =>
+    app.fetch(
+      new Request("http://localhost/lessons/delete", {
+        method: "POST",
+        body: new URLSearchParams([...ids.map((id) => ["id", id]), ["next", next]]),
+        headers: { "content-type": "application/x-www-form-urlencoded", ...headers },
+      }),
+    );
 
-  it("renders a confirmed delete control on the list row and the detail page", async () => {
+  it("list: Select mode instead of a per-row control; detail: the ⋯ menu", async () => {
     seedDel("del1", "Doomed <lesson>");
+    seedDel("del3", "Doomed too");
     const list = await (await get("/lessons?search=Doomed")).text();
-    expect(list).toContain('hx-post="/lessons/del1/delete"');
-    expect(list).toContain('hx-confirm="Delete “Doomed &lt;lesson&gt;”? This cannot be undone."');
-    expect(list).toContain('hx-select-oob="#lesson-count:outerHTML"');
+    expect(list).toContain("☑ Select");
+    expect(list).toContain('data-id="del1"');
+    expect(list).toContain('action="/lessons/delete"');
+    expect(list).toContain("Delete selected");
+    expect(list).not.toContain('hx-post="/lessons/del1/delete"');
+    expect(list).not.toContain("🗑</button>");
     expect(list).toContain(
       'value="/lessons?period=all&amp;search=Doomed&amp;sort=timestamp&amp;order=desc&amp;page=1"',
     );
     const detail = await (await get("/lessons/del1")).text();
-    expect(detail).toContain('action="/lessons/del1/delete"');
+    expect(detail).toContain("⋯");
+    expect(detail).toContain("🗑 Delete lesson…");
+    expect(detail).toContain('name="id" value="del1"');
     expect(detail).toContain(
       'data-confirm="Delete “Doomed &lt;lesson&gt;”? This cannot be undone."',
     );
     expect(detail).toContain('onsubmit="return confirm(this.dataset.confirm)"');
   });
 
-  it("POST delete removes the lesson and redirects to next", async () => {
-    const r = await post("/lessons/del1/delete", { next: "/lessons?search=Doomed" });
+  it("POST /lessons/delete removes one or many ids and redirects to next", async () => {
+    const r = await postIds(["del1", "del3", "nope"], "/lessons?search=Doomed");
     expect(r.status).toBe(303);
     expect(r.headers.get("location")).toBe("/lessons?search=Doomed");
     expect((await get("/lessons/del1")).status).toBe(404);
+    expect((await get("/lessons/del3")).status).toBe(404);
     expect(await (await get("/lessons?search=Doomed")).text()).not.toContain("/lessons/del1");
-    // unknown id → 404; open redirect → fallback
-    expect((await post("/lessons/del1/delete", {})).status).toBe(404);
+    seedDel("del4", "Single");
+    expect(
+      (await post("/lessons/delete", { id: "del4", next: "//evil" })).headers.get("location"),
+    ).toBe("/lessons");
+    expect((await get("/lessons/del4")).status).toBe(404);
+    // nothing to delete is not an error
+    expect((await post("/lessons/delete", { next: "/lessons" })).status).toBe(303);
   });
 
   it("delete from another site is refused and keeps the lesson", async () => {
     seedDel("del2", "Survivor");
-    const r = await postForm("/lessons/del2/delete", {}, { "sec-fetch-site": "cross-site" });
+    const r = await postIds(["del2"], "/lessons", { "sec-fetch-site": "cross-site" });
     expect(r.status).toBe(403);
     expect(db.withConnection((c) => db.getLessonById(c, "del2"))?.title).toBe("Survivor");
-    const ok = await postForm(
-      "/lessons/del2/delete",
-      { next: "//evil" },
-      { "sec-fetch-site": "same-origin" },
+    expect((await postIds(["del2"], "/lessons", { "sec-fetch-site": "same-origin" })).status).toBe(
+      303,
     );
-    expect(ok.status).toBe(303);
-    expect(ok.headers.get("location")).toBe("/lessons");
+    expect(db.withConnection((c) => db.getLessonById(c, "del2"))).toBeNull();
   });
 });
 
