@@ -3,7 +3,7 @@
 // Tailwind (static/vendor/tailwind.js) and vendored Alpine/HTMX/Flatpickr/marked render them identically.
 import { html, raw } from "hono/html";
 import type { HtmlEscapedString } from "hono/utils/html";
-import type { KnowledgeEntry, Lesson, Settings } from "../core/models";
+import type { CourseWithSteps, KnowledgeEntry, Lesson, Settings } from "../core/models";
 import type { SharedLesson } from "../core/share";
 
 type Html = HtmlEscapedString | Promise<HtmlEscapedString>;
@@ -105,6 +105,7 @@ export function layout(o: {
     >
     ${link("/knowledge", "Profile", o.currentPath === "/knowledge")}
     ${link("/lessons", "Lessons", o.currentPath.includes("/lessons"))}
+    ${link("/courses", "Courses", o.currentPath.includes("/courses"))}
     <div class="ml-auto flex items-center gap-1.5">
       <a href="/settings" title="Settings" ${o.currentPath === "/settings" ? raw('aria-current="page"') : ""} class="h-8 px-2.5 inline-flex items-center gap-1.5 rounded-lg border text-sm font-medium transition ${o.currentPath === "/settings" ? "bg-white dark:bg-gray-900 border-indigo-400 text-gray-900 dark:text-white" : "bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-indigo-400 hover:text-gray-800 dark:hover:text-gray-100"}"><svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1.11-1.56 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.56-1.03H3a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.65 8.9a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.6h.09A1.7 1.7 0 0 0 10.1 3.1V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1.03 1.56 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.4 9v.09a1.7 1.7 0 0 0 1.56 1.03H21a2 2 0 1 1 0 4h-.09A1.7 1.7 0 0 0 19.4 15Z"/></svg><span>Settings</span></a>
       <button id="theme-toggle" onclick="toggleTheme()" title="Toggle theme" aria-label="Toggle theme"
@@ -884,6 +885,8 @@ export function lessonDetailPage(d: {
   share: ShareState;
   /** Flash after POST /lessons/import: freshly stored, or already in the log. */
   imported: "new" | "dup" | null;
+  /** The course this lesson seeded, if any (newest). */
+  course: { id: string; title: string; done: number; total: number; status: string } | null;
 }): Html {
   const l = d.lesson;
   const sh = d.share;
@@ -949,6 +952,7 @@ ${
     </span>
     <span>🏷 <span class="text-cyan-600 dark:text-cyan-400">${l.topic_id}</span></span>
     ${l.imported ? html`<span title="This lesson was shared with you">🤝 shared by <span class="text-gray-700 dark:text-gray-200">${l.shared_by ?? "anonymous"}</span></span>` : ""}
+    ${d.course ? html`<a href="/courses/${encodeURIComponent(d.course.id)}" title="${d.course.title}" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-700 hover:border-indigo-400 transition">🎓 Course · ${d.course.done}/${d.course.total}${d.course.status === "completed" ? " ✓" : ""}</a>` : ""}
     ${l.categories.map((cat) => html`<a href="/lessons?category=${encodeURIComponent(cat)}" class="inline-block bg-gray-100 dark:bg-gray-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/50 text-gray-600 dark:text-gray-300 text-xs rounded px-2 py-0.5 transition border border-gray-200 dark:border-gray-700 hover:border-indigo-400 dark:hover:border-indigo-600">${cat}</a>`)}
     ${
       l.feedback
@@ -1150,6 +1154,177 @@ const GAP_OPTIONS: [number, string][] = [
   [720, "12 hours"],
   [1440, "24 hours"],
 ];
+
+// ── Courses (GET /courses, GET /courses/:id) ────────────────────────────────
+
+const COURSE_STATUS_BADGE: Record<string, string> = {
+  active:
+    "bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-700",
+  completed:
+    "bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 border-green-200 dark:border-green-700",
+  abandoned:
+    "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 border-gray-200 dark:border-gray-700",
+};
+const STEP_ICON: Record<string, string> = { todo: "○", done: "●", skipped: "◌" };
+
+function statusBadge(status: string): Html {
+  return html`<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${COURSE_STATUS_BADGE[status] ?? COURSE_STATUS_BADGE.abandoned}">${status}</span>`;
+}
+
+export interface CoursesData {
+  courses: (CourseWithSteps & { lesson_title: string | null })[];
+  uiTheme: string;
+}
+
+export function coursesPage(d: CoursesData): Html {
+  const body = html`
+<div class="flex items-center justify-between mb-6">
+  <h1 class="text-2xl font-bold text-indigo-600 dark:text-indigo-400">Courses</h1>
+  <p class="text-sm text-gray-400 dark:text-gray-500">${d.courses.length} course${d.courses.length !== 1 ? "s" : ""}</p>
+</div>
+${
+  d.courses.length
+    ? html`<div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm overflow-hidden">
+  <table class="w-full text-sm table-fixed">
+    <colgroup><col style="width:46%" /><col style="width:22%" /><col style="width:14%" /><col style="width:8rem" /></colgroup>
+    <thead>
+      <tr class="bg-gray-50 dark:bg-gray-800/60 border-b border-gray-200 dark:border-gray-800 text-left text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">
+        <th class="px-4 py-3">Course</th><th class="px-3 py-3">Progress</th><th class="px-3 py-3">Status</th><th class="px-3 py-3">Updated</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+      ${d.courses.map((c) => {
+        const done = c.steps.filter((s) => s.status !== "todo").length;
+        const pct = c.steps.length ? Math.round((done / c.steps.length) * 100) : 0;
+        return html`<tr class="hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors cursor-pointer" tabindex="0" role="link" data-href="/courses/${encodeURIComponent(c.id)}" @click="if (!$event.target.closest('a, button')) window.location = $el.dataset.href" @keydown.enter="window.location = $el.dataset.href">
+        <td class="px-4 py-3">
+          <a href="/courses/${encodeURIComponent(c.id)}" class="font-semibold text-gray-800 dark:text-gray-100 hover:text-indigo-600 dark:hover:text-indigo-400 transition line-clamp-2">${c.title}</a>
+          ${c.lesson_id ? html`<span class="block text-[11px] text-gray-400 dark:text-gray-500 truncate">from <a href="/lessons/${encodeURIComponent(c.lesson_id)}" class="hover:text-indigo-500 hover:underline">${c.lesson_title ?? c.lesson_id}</a></span>` : ""}
+        </td>
+        <td class="px-3 py-3">
+          <div class="flex items-center gap-2"><div class="flex-1 h-1.5 rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden"><div class="h-full bg-indigo-500" style="width:${pct}%"></div></div><span class="text-xs tabular-nums text-gray-500 dark:text-gray-400 shrink-0">${done}/${c.steps.length}</span></div>
+        </td>
+        <td class="px-3 py-3">${statusBadge(c.status)}</td>
+        <td class="px-3 py-3 whitespace-nowrap text-gray-400 dark:text-gray-500 tabular-nums"><span data-ts="${c.updated_at}">${c.updated_at.slice(0, 10)}</span></td>
+      </tr>`;
+      })}
+    </tbody>
+  </table>
+</div>`
+    : html`<div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-8 text-center">
+  <p class="text-3xl mb-3">🎓</p>
+  <p class="text-gray-700 dark:text-gray-200 font-medium">No courses yet.</p>
+  <p class="text-sm text-gray-500 dark:text-gray-400 mt-2 max-w-md mx-auto">A course starts in your agent: answer <span class="font-mono">n</span> (couldn't follow) under a lesson card and say yes to the offer, or run <span class="font-mono">/devcoach:course</span> on any lesson or concept. The AI first asks what you already know, then writes the course here.</p>
+</div>`
+}`;
+  const scripts = html`<script src="/static/relative-time.js"></script>`;
+  return layout({
+    title: "Courses — devcoach",
+    currentPath: "/courses",
+    uiTheme: d.uiTheme,
+    body,
+    scripts,
+  });
+}
+
+export interface CourseDetailData {
+  course: CourseWithSteps;
+  lessonTitle: string | null;
+  /** 1-based position of the step shown in the frame. */
+  selected: number;
+  hasDocument: boolean;
+  uiTheme: string;
+}
+
+export function courseDetailPage(d: CourseDetailData): Html {
+  const c = d.course;
+  const done = c.steps.filter((s) => s.status !== "todo").length;
+  const current = c.steps.find((s) => s.position === d.selected) ?? c.steps[0];
+  const frameSrc = `/courses/${encodeURIComponent(c.id)}/index.html${current ? `#${current.anchor}` : ""}`;
+  const stepAction = (position: number, status: string, label: string, cls: string) =>
+    html`<form method="post" action="/courses/${encodeURIComponent(c.id)}/steps/${position}" class="inline"><input type="hidden" name="status" value="${status}" /><input type="hidden" name="next" value="/courses/${encodeURIComponent(c.id)}?step=${position}" /><button type="submit" class="${cls}">${label}</button></form>`;
+  const btn =
+    "inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium border transition bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-indigo-400";
+  const body = html`
+<div x-data="{ confirmOpen: false }" @keydown.escape.window="confirmOpen = false">
+<div class="mb-4"><a href="/courses" class="text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-white text-sm transition">← Back to courses</a></div>
+<div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-6 mb-4">
+  <div class="flex flex-wrap items-center gap-3 mb-2">
+    <h1 class="text-xl font-bold text-gray-900 dark:text-white flex-1 min-w-0">${c.title}</h1>
+    ${statusBadge(c.status)}
+    ${moreMenu(
+      html`<button type="button" @click="confirmOpen = true; open = false" class="w-full text-left px-3 py-2 rounded-lg text-sm transition flex items-center gap-2 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 hover:!bg-rose-50 dark:hover:!bg-rose-900/30 hover:text-rose-700 dark:hover:text-rose-300"><span class="w-4 h-4 inline-flex items-center justify-center shrink-0 text-[13px] leading-none" aria-hidden="true">🗑</span>Delete course…</button>`,
+      "shrink-0",
+    )}
+  </div>
+  <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-500 dark:text-gray-400">
+    <span>🏷 <span class="text-cyan-600 dark:text-cyan-400">${c.topic_id}</span></span>
+    <span>${done}/${c.steps.length} steps</span>
+    ${c.lesson_id ? html`<span>from <a href="/lessons/${encodeURIComponent(c.lesson_id)}" class="text-gray-700 dark:text-gray-200 hover:text-indigo-500 hover:underline">${d.lessonTitle ?? c.lesson_id}</a></span>` : ""}
+  </div>
+  ${c.goal ? html`<p class="mt-3 text-sm text-gray-700 dark:text-gray-200">${c.goal}</p>` : ""}
+  ${
+    c.prerequisites.length
+      ? html`<div class="mt-3 flex flex-wrap items-center gap-1.5 text-xs" title="The prerequisite chain explored before writing the course">
+    ${c.prerequisites.map((p) => html`<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border ${p.known ? "bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800" : "bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800"}">${p.known ? "✓" : "✗"} ${p.concept}</span>`)}
+  </div>`
+      : ""
+  }
+</div>
+<div class="grid grid-cols-1 lg:grid-cols-[18rem_1fr] gap-4">
+  <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-3">
+    <p class="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500 px-2 mb-2">Steps</p>
+    ${
+      c.steps.length
+        ? html`<ol class="space-y-1">${c.steps.map(
+            (
+              s,
+            ) => html`<li class="rounded-lg px-2 py-2 ${current && s.position === current.position ? "bg-indigo-50 dark:bg-indigo-900/30" : ""}">
+        <a href="/courses/${encodeURIComponent(c.id)}?step=${s.position}" class="flex items-start gap-2 text-sm">
+          <span class="${s.status === "done" ? "text-green-500" : s.status === "skipped" ? "text-gray-400" : "text-indigo-400"}">${STEP_ICON[s.status] ?? "○"}</span>
+          <span class="min-w-0 flex-1"><span class="block text-gray-800 dark:text-gray-100">${s.position}. ${s.title}</span><span class="block text-[11px] text-gray-400 dark:text-gray-500">${s.kind}${s.status !== "todo" ? ` · ${s.status}` : ""}</span></span>
+        </a>
+        ${
+          current && s.position === current.position
+            ? html`<div class="flex flex-wrap gap-1.5 mt-2 pl-6">
+          ${s.status !== "done" ? stepAction(s.position, "done", "✓ Mark done", `${btn} hover:border-green-400 hover:text-green-700 dark:hover:text-green-300`) : stepAction(s.position, "todo", "↺ Reopen", btn)}
+          ${s.status === "todo" ? stepAction(s.position, "skipped", "Skip", btn) : ""}
+        </div>`
+            : ""
+        }
+      </li>`,
+          )}</ol>`
+        : html`<p class="text-sm text-gray-500 dark:text-gray-400 px-2">No steps registered yet.</p>`
+    }
+  </div>
+  <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl overflow-hidden min-h-[60vh]">
+    ${
+      d.hasDocument
+        ? html`<iframe src="${frameSrc}" title="${c.title}" sandbox="allow-scripts allow-forms" referrerpolicy="no-referrer" class="w-full h-[75vh] bg-white"></iframe>`
+        : html`<div class="p-8 text-center text-sm text-gray-500 dark:text-gray-400"><p class="text-3xl mb-3">✍️</p>The course document hasn't been written yet. Ask your agent to continue the course — it writes <span class="font-mono">index.html</span> in the course folder, and it appears here.</div>`
+    }
+  </div>
+</div>
+${dangerDialog(
+  "confirmOpen",
+  "confirmOpen = false",
+  html`Delete this course?`,
+  html`<p class="text-gray-700 dark:text-gray-200 font-medium">“${c.title}”</p>
+    <p>The course, its steps and its document folder will be removed. This cannot be undone.${c.lesson_id ? " The lesson it grew from stays." : ""}</p>`,
+  html`<button type="button" @click="confirmOpen = false" class="inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium border transition bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-indigo-400">Cancel</button>
+    <form method="post" action="/courses/delete" class="contents">
+      <input type="hidden" name="id" value="${c.id}" />
+      <button type="submit" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition bg-rose-600 text-white border-rose-600 hover:bg-rose-500">🗑 Delete course</button>
+    </form>`,
+)}
+</div>`;
+  return layout({
+    title: `${c.title} — devcoach`,
+    currentPath: "/courses",
+    uiTheme: d.uiTheme,
+    body,
+  });
+}
 
 export interface SettingsData {
   settings: Settings;

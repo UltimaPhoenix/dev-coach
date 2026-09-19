@@ -1,4 +1,6 @@
+import { existsSync, writeFileSync } from "node:fs";
 import { beforeAll, describe, expect, it, vi } from "vitest";
+import * as courses from "../src/core/courses";
 import * as db from "../src/core/db";
 import { parseLesson } from "../src/core/models";
 import { fetchSharedInput } from "../src/core/share-fetch";
@@ -806,5 +808,82 @@ describe("web shared-with-me filters", () => {
     expect((await get("/lessons?shared_by=Nobody")).status).toBe(200);
     expect(await (await get("/lessons?shared_by=Nobody")).text()).toContain("No lessons match");
     db.withConnection((c) => db.deleteLesson(c, "from-ada"));
+  });
+});
+
+describe("web courses", () => {
+  it("lists, shows the sandboxed document, tracks progress, deletes", async () => {
+    const empty = await (await get("/courses")).text();
+    expect(empty).toContain("No courses yet");
+    expect(empty).toContain('href="/courses"'); // nav entry
+    const course = db.withConnection((c) =>
+      courses.createCourse(c, {
+        title: "From sums to powers",
+        topic_id: "python",
+        goal: "Read 2³",
+        lesson_id: "w1",
+        prerequisites: [
+          { concept: "powers", known: false },
+          { concept: "sums", known: true },
+        ],
+      }),
+    );
+    // no document yet → 404 on the frame route, placeholder on the page
+    expect((await get(`/courses/${course.id}/index.html`)).status).toBe(404);
+    expect(await (await get(`/courses/${course.id}`)).text()).toContain("hasn't been written yet");
+    writeFileSync(
+      courses.documentPath(course.id),
+      '<!doctype html><section id="step-1">one</section><section id="step-2">two</section>',
+    );
+    db.withConnection((c) => {
+      courses.addStep(c, course.id, { title: "Sums", kind: "concept", anchor: "step-1" });
+      courses.addStep(c, course.id, { title: "Powers", kind: "check", anchor: "step-2" });
+    });
+
+    const list = await (await get("/courses")).text();
+    expect(list).toContain("From sums to powers");
+    expect(list).toContain("0/2");
+    expect(list).toContain("Webify"); // seeded-from lesson title
+
+    const detail = await (await get(`/courses/${course.id}`)).text();
+    expect(detail).toContain(`src="/courses/${course.id}/index.html#step-1"`);
+    expect(detail).toContain('sandbox="allow-scripts allow-forms"');
+    expect(detail).toContain("✗ powers");
+    expect(detail).toContain("✓ sums");
+    expect(detail).toContain("Delete course…");
+
+    const doc = await get(`/courses/${course.id}/index.html`);
+    expect(doc.status).toBe(200);
+    expect(doc.headers.get("content-security-policy")).toContain("sandbox allow-scripts");
+    expect(doc.headers.get("content-security-policy")).toContain("form-action 'none'");
+    expect(doc.headers.get("x-content-type-options")).toBe("nosniff");
+    expect(doc.headers.get("referrer-policy")).toBe("no-referrer");
+    expect(await doc.text()).toContain("<section");
+    expect((await get("/courses/../etc/index.html")).status).toBe(404);
+
+    // the seed lesson links to its course
+    expect(await (await get("/lessons/w1")).text()).toContain("🎓 Course · 0/2");
+
+    const bad = await post(`/courses/${course.id}/steps/1`, { status: "bogus" });
+    expect(bad.status).toBe(400);
+    const done = await post(`/courses/${course.id}/steps/1`, { status: "done" });
+    expect(done.status).toBe(303);
+    expect(done.headers.get("location")).toBe(`/courses/${course.id}`);
+    expect((await post(`/courses/${course.id}/steps/9`, { status: "done" })).status).toBe(404);
+    const after = await (await get(`/courses/${course.id}?step=2`)).text();
+    expect(after).toContain("1/2 steps");
+    expect(after).toContain(`#step-2"`);
+
+    const cross = await postForm(
+      "/courses/delete",
+      { id: course.id },
+      { "sec-fetch-site": "cross-site" },
+    );
+    expect(cross.status).toBe(403);
+    expect(existsSync(courses.courseDir(course.id))).toBe(true);
+    const del = await post("/courses/delete", { id: course.id });
+    expect(del.headers.get("location")).toBe("/courses");
+    expect(existsSync(courses.courseDir(course.id))).toBe(false);
+    expect((await get(`/courses/${course.id}`)).status).toBe(404);
   });
 });
