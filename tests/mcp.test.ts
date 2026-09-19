@@ -23,10 +23,10 @@ async function connect() {
 const text = (r: any): string => r.content[0].text;
 
 describe("mcp server", () => {
-  it("lists 21 tools, 10 resources + 1 template, 1 prompt", async () => {
+  it("lists 25 tools, 10 resources + 1 template, 1 prompt", async () => {
     const { client, server } = await connect();
     const tools = (await client.listTools()).tools;
-    expect(tools).toHaveLength(21);
+    expect(tools).toHaveLength(25);
     const names = tools.map((t: any) => t.name);
     expect(names).toContain("preview_deep_scan");
     // State reads are tools: tool names resolve in every client, resource reads need the
@@ -390,6 +390,9 @@ describe("mcp server error paths", () => {
     ["update_settings", { key: "max_per_day", value: "5" }],
     ["share_lesson", { lesson_id: "x" }],
     ["import_lesson", { payload: "devcoach:lesson:1:eJw" }],
+    ["create_course", { title: "T", topic_id: "python" }],
+    ["add_course_step", { course_id: "x", title: "s", kind: "concept", anchor: "step-1" }],
+    ["update_course_progress", { course_id: "x", position: 1, status: "done" }],
   ];
 
   it("DB-backed tools return isError when the DB throws", async () => {
@@ -702,5 +705,112 @@ describe("mcp stop_ui", () => {
       await client.close();
       await mcp.close();
     }
+  });
+});
+
+describe("mcp courses", () => {
+  it("create → write the document → register steps → progress → read back", async () => {
+    const { client, server } = await connect();
+    await client.callTool({
+      name: "log_lesson",
+      arguments: {
+        id: "logs-lesson",
+        topic_id: "math",
+        categories: ["math"],
+        title: "Logarithms",
+        level: "mid",
+        summary: "s",
+        body: "A log asks: which power?",
+        task_context: "computing dB",
+      },
+    });
+    await client.callTool({
+      name: "submit_feedback",
+      arguments: { lesson_id: "logs-lesson", feedback: "dont_know" },
+    });
+    const missing: any = await client.callTool({
+      name: "create_course",
+      arguments: { title: "x", topic_id: "math", lesson_id: "nope" },
+    });
+    expect(missing.isError).toBe(true);
+    expect(text(missing)).toContain("get_lessons");
+
+    const created: any = await client.callTool({
+      name: "create_course",
+      arguments: {
+        title: "From powers to logarithms",
+        topic_id: "math",
+        goal: "Read a log as 'which power'",
+        lesson_id: "logs-lesson",
+        prerequisites: [
+          { concept: "logarithms", known: false },
+          { concept: "powers", known: true },
+        ],
+      },
+    });
+    expect(created.isError).toBeFalsy();
+    const sc = created.structuredContent;
+    expect(sc.id).toBe("from-powers-to-logarithms");
+    expect(sc.document_path.endsWith("/courses/from-powers-to-logarithms/index.html")).toBe(true);
+    expect(sc.seed_context.task_context).toBe("computing dB");
+    expect(sc.reply_check).toContain("add_course_step");
+    expect(existsSync(sc.course_dir)).toBe(true);
+
+    // a step needs the document, and the anchor inside it
+    const early: any = await client.callTool({
+      name: "add_course_step",
+      arguments: { course_id: sc.id, title: "Powers", kind: "concept", anchor: "step-1" },
+    });
+    expect(early.isError).toBe(true);
+    expect(text(early)).toContain("no document yet");
+    writeFileSync(
+      sc.document_path,
+      '<!doctype html><section id="step-1">p</section><section id="step-2">l</section>',
+    );
+    const s1: any = await client.callTool({
+      name: "add_course_step",
+      arguments: { course_id: sc.id, title: "Powers", kind: "concept", anchor: "step-1" },
+    });
+    expect(s1.isError).toBeFalsy();
+    expect(s1.structuredContent.step.position).toBe(1);
+    const bad: any = await client.callTool({
+      name: "add_course_step",
+      arguments: { course_id: sc.id, title: "Ghost", kind: "check", anchor: "step-9" },
+    });
+    expect(bad.isError).toBe(true);
+    await client.callTool({
+      name: "add_course_step",
+      arguments: { course_id: sc.id, title: "Logs", kind: "check", anchor: "step-2" },
+    });
+
+    const p1: any = await client.callTool({
+      name: "update_course_progress",
+      arguments: { course_id: sc.id, position: 1, status: "done" },
+    });
+    expect(p1.structuredContent.status).toBe("active");
+    const p2: any = await client.callTool({
+      name: "update_course_progress",
+      arguments: { course_id: sc.id, position: 2, status: "skipped" },
+    });
+    expect(p2.structuredContent.status).toBe("completed");
+    const gone: any = await client.callTool({
+      name: "update_course_progress",
+      arguments: { course_id: "nope", status: "abandoned" },
+    });
+    expect(gone.isError).toBe(true);
+
+    const byLesson: any = await client.callTool({
+      name: "get_courses",
+      arguments: { lesson_id: "logs-lesson" },
+    });
+    expect(byLesson.structuredContent.courses).toHaveLength(1);
+    expect(byLesson.structuredContent.courses[0].steps).toHaveLength(2);
+    const active: any = await client.callTool({
+      name: "get_courses",
+      arguments: { status: "active" },
+    });
+    expect(active.structuredContent.courses).toHaveLength(0);
+    await client.close();
+    await server.close();
   });
 });

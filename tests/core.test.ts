@@ -1,9 +1,19 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
+import { strToU8, unzipSync, zipSync } from "fflate";
 import { afterEach, describe, expect, it } from "vitest";
 import * as coach from "../src/core/coach";
+import * as courses from "../src/core/courses";
 import * as db from "../src/core/db";
 import { detectStack, mergeStacks } from "../src/core/detect";
 import { detectGitContext } from "../src/core/git";
@@ -550,6 +560,84 @@ describe("lesson sharing — storage & pacing", () => {
     const restored = db.getLessonById(c2, "ctx");
     expect(restored).toMatchObject({ imported: true, shared_by: "Bob", project: "their-project" });
     expect(db.getSettings(c2).share_name).toBe("Ada");
+    c2.close();
+  });
+});
+
+describe("courses — storage, validation, backup", () => {
+  let c: DatabaseSync;
+  afterEach(() => c?.close());
+
+  it("creates a slugged directory, indexes real sections only, tracks progress", () => {
+    c = freshDb();
+    const a = courses.createCourse(c, { title: "Sums & Powers!", topic_id: "math" });
+    expect(a.id).toBe("sums-powers");
+    expect(existsSync(courses.courseDir(a.id))).toBe(true);
+    const b = courses.createCourse(c, { title: "Sums & Powers!", topic_id: "math" });
+    expect(b.id).toBe("sums-powers-2");
+    expect(() => courses.courseDir("../etc")).toThrow(/Invalid course id/);
+    expect(courses.courseDocument(a.id)).toBeNull(); // nothing written yet
+    expect(() =>
+      courses.addStep(c, a.id, { title: "x", kind: "concept", anchor: "step-1" }),
+    ).toThrow(/no document yet/);
+    writeFileSync(courses.documentPath(a.id), '<section id="step-1"></section><div id="step-2">');
+    expect(courses.courseDocument(a.id)).toBe(courses.documentPath(a.id));
+    const s1 = courses.addStep(c, a.id, { title: "Sums", kind: "concept", anchor: "step-1" });
+    expect(s1.position).toBe(1);
+    expect(() =>
+      courses.addStep(c, a.id, { title: "dup", kind: "concept", anchor: "step-1" }),
+    ).toThrow(/already registered/);
+    expect(() => courses.addStep(c, a.id, { title: "x", kind: "check", anchor: "step-3" })).toThrow(
+      /No element/,
+    );
+    courses.addStep(c, a.id, { title: "Powers", kind: "example", anchor: "step-2" });
+    expect(courses.hasActiveCourse(c)).toBe(true);
+    expect(courses.setStepStatus(c, a.id, 1, "done")?.status).toBe("active");
+    expect(courses.setStepStatus(c, a.id, 2, "done")?.status).toBe("completed");
+    expect(courses.setStepStatus(c, a.id, 2, "todo")?.status).toBe("active"); // reopened
+    expect(courses.setStepStatus(c, a.id, 9, "done")).toBeNull();
+    expect(courses.progress(courses.getCourse(c, a.id)!)).toEqual({ done: 1, total: 2 });
+    expect(courses.setCourseStatus(c, b.id, "abandoned")?.status).toBe("abandoned");
+    expect(courses.listCourses(c, { status: "active" }).map((x) => x.id)).toEqual([a.id]);
+    // a symlinked document is refused at read time
+    rmSync(courses.documentPath(b.id), { force: true });
+    symlinkSync(courses.documentPath(a.id), courses.documentPath(b.id));
+    expect(courses.courseDocument(b.id)).toBeNull();
+    expect(courses.deleteCourse(c, a.id)).toBe(true);
+    expect(existsSync(courses.courseDir(a.id))).toBe(false);
+    expect(courses.getCourse(c, a.id)).toBeNull();
+    expect(courses.deleteCourse(c, "../x")).toBe(false);
+  });
+
+  it("backup carries courses + documents; restore refuses stray paths and never overwrites", () => {
+    c = freshDb();
+    const a = courses.createCourse(c, { title: "Backed up", topic_id: "math" });
+    writeFileSync(courses.documentPath(a.id), '<section id="step-1">hi</section>');
+    courses.addStep(c, a.id, { title: "One", kind: "concept", anchor: "step-1" });
+    const zip = db.createBackupZip(c);
+    const names = Object.keys(unzipSync(zip));
+    expect(names).toContain("courses.json");
+    expect(names).toContain(`courses/${a.id}/index.html`);
+    // wipe, then restore into a fresh DB + a fresh disk
+    courses.deleteCourse(c, a.id);
+    const c2 = freshDb();
+    const r = db.restoreBackupZip(c2, zip);
+    expect(r.courses).toBe(1);
+    expect(courses.getCourse(c2, a.id)?.steps).toHaveLength(1);
+    expect(readFileSync(courses.documentPath(a.id), "utf8")).toContain("hi");
+    // a second restore is a no-op (rows ignored, file kept as is)
+    writeFileSync(courses.documentPath(a.id), "edited");
+    expect(db.restoreBackupZip(c2, zip).courses).toBe(0);
+    expect(readFileSync(courses.documentPath(a.id), "utf8")).toBe("edited");
+    // a crafted archive: unknown course id, traversal, oversized — nothing reaches the disk
+    const evil = zipSync({
+      "courses.json": strToU8(JSON.stringify({ courses: [], steps: [] })),
+      "courses/../escape.html": strToU8("x"),
+      "courses/not-a-course/index.html": strToU8("x"),
+    });
+    db.restoreBackupZip(c2, evil);
+    expect(existsSync(join(db.COURSES_DIR, "..", "escape.html"))).toBe(false);
+    expect(existsSync(join(db.COURSES_DIR, "not-a-course"))).toBe(false);
     c2.close();
   });
 });

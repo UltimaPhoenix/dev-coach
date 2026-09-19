@@ -13,7 +13,6 @@ import {
   getSettings,
   getTaughtTopicIds,
   importLessons,
-  withTransaction,
   insertLessonIfAbsent,
   isOnboardingComplete,
   markCuePending,
@@ -21,6 +20,7 @@ import {
   peekNudge,
   setFeedback,
   upsertKnowledge,
+  withTransaction,
 } from "./db";
 import type { Lesson, Profile, RateLimitResult } from "./models";
 import {

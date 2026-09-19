@@ -216,13 +216,13 @@ export function renderShareLink(payload: SharedLesson, code = encodeShareCode(pa
   return `${SHARE_PAGE_URL}#${code}`;
 }
 
-export function slugify(s: string): string {
+export function slugify(s: string, fallback = "lesson"): string {
   return (
     s
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-+|-+$/g, "")
-      .slice(0, 60) || "lesson"
+      .slice(0, 60) || fallback
   );
 }
 

@@ -143,6 +143,47 @@ export interface RateLimitResult {
 }
 
 /** Validate/normalize a raw object into a Lesson (applies timestamp normalization + null coercion). */
+// ── Courses ──────────────────────────────────────────────────────────────────
+// A course grows from a lesson (usually one the user couldn't follow) or a free concept: the AI
+// walks the prerequisite chain, then writes ONE self-contained HTML document with one section per
+// step and teaches it step by step. The DB keeps the link and the progress; the document lives at
+// ~/.devcoach/courses/<id>/index.html.
+export const CourseStatusSchema = z.enum(["active", "completed", "abandoned"]);
+export type CourseStatus = z.infer<typeof CourseStatusSchema>;
+export const CourseStepKindSchema = z.enum(["concept", "example", "practice", "check"]);
+export type CourseStepKind = z.infer<typeof CourseStepKindSchema>;
+export const CourseStepStatusSchema = z.enum(["todo", "done", "skipped"]);
+export type CourseStepStatus = z.infer<typeof CourseStepStatusSchema>;
+export const PrerequisiteSchema = z.object({ concept: z.string().min(1), known: z.boolean() });
+export type Prerequisite = z.infer<typeof PrerequisiteSchema>;
+
+export const CourseStepSchema = z.object({
+  course_id: z.string(),
+  position: z.number().int().min(1),
+  title: z.string().min(1),
+  kind: CourseStepKindSchema,
+  /** The `id` of the step's `<section>` inside the course document, e.g. `step-3`. */
+  anchor: z.string().regex(/^[a-z0-9][a-z0-9-]*$/),
+  status: CourseStepStatusSchema.default("todo"),
+  done_at: nullableStr,
+});
+export type CourseStep = z.infer<typeof CourseStepSchema>;
+
+export const CourseSchema = z.object({
+  id: z.string().regex(/^[a-z0-9-]+$/),
+  lesson_id: nullableStr,
+  topic_id: z.string().min(1),
+  title: z.string().min(1),
+  goal: nullableStr,
+  prerequisites: z.array(PrerequisiteSchema).default([]),
+  status: CourseStatusSchema.default("active"),
+  created_at: z.string(),
+  updated_at: z.string(),
+  completed_at: nullableStr,
+});
+export type Course = z.infer<typeof CourseSchema>;
+export type CourseWithSteps = Course & { steps: CourseStep[] };
+
 export function parseLesson(input: unknown): Lesson {
   return LessonSchema.parse(input);
 }

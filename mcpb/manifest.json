@@ -111,6 +111,22 @@
     {
       "name": "complete_onboarding",
       "description": "Save the initial profile"
+    },
+    {
+      "name": "create_course",
+      "description": "Start a step-by-step course from a lesson or a concept"
+    },
+    {
+      "name": "add_course_step",
+      "description": "Register a section of the course document as a step"
+    },
+    {
+      "name": "update_course_progress",
+      "description": "Mark a step done/skipped or set the course status"
+    },
+    {
+      "name": "get_courses",
+      "description": "List courses with steps and progress"
     }
   ],
   "prompts": [

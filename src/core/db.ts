@@ -2,7 +2,7 @@
 // Uses Node's embedded node:sqlite (DatabaseSync, synchronous) so the port maps 1:1 onto the
 // Python sqlite3 code. The schema MUST stay byte-identical with db.py — both runtimes share
 // ~/.devcoach/coaching.db (idempotent CREATE TABLE IF NOT EXISTS / INSERT OR IGNORE).
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
@@ -16,6 +16,10 @@ const { DatabaseSync: DatabaseSyncImpl } = createRequire(import.meta.url)(
 ) as typeof import("node:sqlite");
 
 import {
+  type Course,
+  CourseSchema,
+  type CourseStep,
+  CourseStepSchema,
   type KnowledgeEntry,
   type KnowledgeGroup,
   type Lesson,
@@ -33,11 +37,15 @@ import {
 export const DEVCOACH_DIR = process.env.DEVCOACH_DIR ?? join(homedir(), ".devcoach");
 export const DB_PATH = join(DEVCOACH_DIR, "coaching.db");
 export const LEARNING_STATE_PATH = join(DEVCOACH_DIR, "learning-state.md");
+/** One directory per course, each holding the self-contained `index.html` the AI writes. */
+export const COURSES_DIR = join(DEVCOACH_DIR, "courses");
 
 const ZIP_SETTINGS = "settings.json";
 const ZIP_LESSONS = "lessons.json";
 const ZIP_KNOWLEDGE = "knowledge.json";
 const ZIP_NOTEBOOK = "learning-state.md";
+const ZIP_COURSES = "courses.json";
+const ZIP_COURSE_DOC = /^courses\/([a-z0-9-]+)\/index\.html$/;
 
 export const DEFAULT_PROFILE: Record<string, number> = {
   engineering: 8,
@@ -119,7 +127,7 @@ export function getConnection(dbPath: string = DB_PATH): DatabaseSync {
  * idempotent statements). Bump it whenever initSchema/migrate changes. The legacy Python
  * runtime ignores user_version, so stamping is safe on the shared DB.
  */
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 5;
 
 export function getInitializedConnection(dbPath: string = DB_PATH): DatabaseSync {
   const db = getConnection(dbPath);
@@ -206,6 +214,34 @@ export function initSchema(db: DatabaseSync, fromVersion = 0): void {
         topic      TEXT NOT NULL,
         PRIMARY KEY (group_name, topic)
     );
+
+    -- Courses (v5): the index of ~/.devcoach/courses/<id>/index.html — one rich document per
+    -- course, steps are its sections. prerequisites = JSON [{concept, known}] from the Q&A.
+    CREATE TABLE IF NOT EXISTS courses (
+        id            TEXT PRIMARY KEY,
+        lesson_id     TEXT,
+        topic_id      TEXT NOT NULL,
+        title         TEXT NOT NULL,
+        goal          TEXT,
+        prerequisites TEXT NOT NULL DEFAULT '[]',
+        status        TEXT NOT NULL DEFAULT 'active',
+        created_at    TEXT NOT NULL,
+        updated_at    TEXT NOT NULL,
+        completed_at  TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS course_steps (
+        course_id  TEXT NOT NULL,
+        position   INTEGER NOT NULL,
+        title      TEXT NOT NULL,
+        kind       TEXT NOT NULL,
+        anchor     TEXT NOT NULL,
+        status     TEXT NOT NULL DEFAULT 'todo',
+        done_at    TEXT,
+        PRIMARY KEY (course_id, position)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_courses_lesson_id ON courses (lesson_id);
 
     -- Runtime-only: per-session interaction counter for lesson-cue pacing.
     -- Never exported/imported (backup carries config, not this state).
@@ -790,6 +826,134 @@ export function getUsageDefaults(db: DatabaseSync): Record<string, string | null
   return result;
 }
 
+// ── Courses (rows only; files + validation live in core/courses.ts) ─────────
+
+function rowToCourse(r: Row): Course {
+  return CourseSchema.parse({
+    ...r,
+    prerequisites: JSON.parse(String(r.prerequisites ?? "[]")),
+  });
+}
+
+function rowToCourseStep(r: Row): CourseStep {
+  return CourseStepSchema.parse(r);
+}
+
+export function insertCourse(db: DatabaseSync, course: Course): void {
+  runSql(
+    db,
+    "INSERT INTO courses (id, lesson_id, topic_id, title, goal, prerequisites, status, created_at, updated_at, completed_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    course.id,
+    course.lesson_id,
+    course.topic_id,
+    course.title,
+    course.goal,
+    JSON.stringify(course.prerequisites),
+    course.status,
+    course.created_at,
+    course.updated_at,
+    course.completed_at,
+  );
+}
+
+export function getCourseRow(db: DatabaseSync, id: string): Course | null {
+  const r = getRow(db, "SELECT * FROM courses WHERE id = ?", id);
+  return r ? rowToCourse(r) : null;
+}
+
+export interface CourseFilters {
+  status?: string | null;
+  lesson_id?: string | null;
+}
+
+export function listCourseRows(db: DatabaseSync, f: CourseFilters = {}): Course[] {
+  const where: string[] = [];
+  const params: SqlParam[] = [];
+  if (f.status != null) {
+    where.push("status = ?");
+    params.push(f.status);
+  }
+  if (f.lesson_id != null) {
+    where.push("lesson_id = ?");
+    params.push(f.lesson_id);
+  }
+  const sql = `SELECT * FROM courses ${where.length ? `WHERE ${where.join(" AND ")}` : ""} ORDER BY updated_at DESC`;
+  return allRows(db, sql, ...params).map(rowToCourse);
+}
+
+export function getCourseSteps(db: DatabaseSync, courseId: string): CourseStep[] {
+  return allRows(
+    db,
+    "SELECT * FROM course_steps WHERE course_id = ? ORDER BY position",
+    courseId,
+  ).map(rowToCourseStep);
+}
+
+export function insertCourseStep(db: DatabaseSync, step: CourseStep): void {
+  runSql(
+    db,
+    "INSERT INTO course_steps (course_id, position, title, kind, anchor, status, done_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+    step.course_id,
+    step.position,
+    step.title,
+    step.kind,
+    step.anchor,
+    step.status,
+    step.done_at,
+  );
+}
+
+export function updateCourseStepStatus(
+  db: DatabaseSync,
+  courseId: string,
+  position: number,
+  status: string,
+  doneAt: string | null,
+): boolean {
+  return (
+    runSql(
+      db,
+      "UPDATE course_steps SET status = ?, done_at = ? WHERE course_id = ? AND position = ?",
+      status,
+      doneAt,
+      courseId,
+      position,
+    ) > 0
+  );
+}
+
+export function updateCourseStatus(
+  db: DatabaseSync,
+  courseId: string,
+  status: string,
+  now: string,
+): boolean {
+  return (
+    runSql(
+      db,
+      "UPDATE courses SET status = ?, updated_at = ?, completed_at = CASE WHEN ? = 'completed' THEN ? ELSE NULL END WHERE id = ?",
+      status,
+      now,
+      status,
+      now,
+      courseId,
+    ) > 0
+  );
+}
+
+export function touchCourse(db: DatabaseSync, courseId: string, now: string): void {
+  runSql(db, "UPDATE courses SET updated_at = ? WHERE id = ?", now, courseId);
+}
+
+export function deleteCourseRows(db: DatabaseSync, courseId: string): boolean {
+  runSql(db, "DELETE FROM course_steps WHERE course_id = ?", courseId);
+  return runSql(db, "DELETE FROM courses WHERE id = ?", courseId) > 0;
+}
+
+export function hasActiveCourse(db: DatabaseSync): boolean {
+  return getRow(db, "SELECT 1 AS one FROM courses WHERE status = 'active' LIMIT 1") !== undefined;
+}
+
 // ── Backup / restore (ZIP, byte-compatible with the Python .zip) ─────────────
 
 export function createBackupZip(db: DatabaseSync): Uint8Array {
@@ -817,8 +981,27 @@ export function createBackupZip(db: DatabaseSync): Uint8Array {
   if (existsSync(LEARNING_STATE_PATH)) {
     files[ZIP_NOTEBOOK] = strToU8(readFileSync(LEARNING_STATE_PATH, "utf8"));
   }
+  const courses = listCourseRows(db);
+  if (courses.length) {
+    const steps = courses.flatMap((c) => getCourseSteps(db, c.id));
+    files[ZIP_COURSES] = strToU8(JSON.stringify({ courses, steps }, null, 2));
+    for (const c of courses) {
+      const doc = join(COURSES_DIR, c.id, "index.html");
+      try {
+        const st = lstatSync(doc);
+        if (st.isFile() && st.size <= MAX_COURSE_DOCUMENT_BYTES) {
+          files[`courses/${c.id}/index.html`] = new Uint8Array(readFileSync(doc));
+        }
+      } catch {
+        // no document yet — the rows still travel
+      }
+    }
+  }
   return zipSync(files);
 }
+
+/** Course documents are written by the AI; anything larger is a mistake, not a course. */
+export const MAX_COURSE_DOCUMENT_BYTES = 2 * 1024 * 1024;
 
 export interface RestoreResult {
   settings: number;
@@ -828,6 +1011,7 @@ export interface RestoreResult {
   skipped: number;
   invalid: number;
   learning_state: number;
+  courses: number;
 }
 
 type Unzipped = Record<string, Uint8Array>;
@@ -900,6 +1084,58 @@ function restoreNotebookSection(unzipped: Unzipped, result: RestoreResult): void
   result.learning_state = 1;
 }
 
+/**
+ * Courses: rows first (INSERT OR IGNORE — an existing course wins), then documents, but ONLY for
+ * entry names that match `courses/<id>/index.html` with an id present in courses.json, within the
+ * size cap, and never over a file that already exists. Nothing else in the archive can reach the
+ * filesystem.
+ */
+function restoreCoursesSection(db: DatabaseSync, unzipped: Unzipped, result: RestoreResult): void {
+  if (!(ZIP_COURSES in unzipped)) return;
+  const data = JSON.parse(strFromU8(unzipped[ZIP_COURSES])) as {
+    courses?: unknown[];
+    steps?: unknown[];
+  };
+  const known = new Set<string>();
+  for (const raw of data.courses ?? []) {
+    try {
+      const course = CourseSchema.parse(raw);
+      const before = getCourseRow(db, course.id);
+      if (!before) {
+        insertCourse(db, course);
+        result.courses += 1;
+      }
+      known.add(course.id);
+    } catch {
+      result.invalid += 1;
+    }
+  }
+  for (const raw of data.steps ?? []) {
+    try {
+      const step = CourseStepSchema.parse(raw);
+      if (!known.has(step.course_id)) continue;
+      const exists = getRow(
+        db,
+        "SELECT 1 AS one FROM course_steps WHERE course_id = ? AND position = ?",
+        step.course_id,
+        step.position,
+      );
+      if (!exists) insertCourseStep(db, step);
+    } catch {
+      result.invalid += 1;
+    }
+  }
+  for (const [name, bytes] of Object.entries(unzipped)) {
+    const id = ZIP_COURSE_DOC.exec(name)?.[1];
+    if (!id || !known.has(id) || bytes.length > MAX_COURSE_DOCUMENT_BYTES) continue;
+    const dir = join(COURSES_DIR, id);
+    const target = join(dir, "index.html");
+    if (existsSync(target)) continue;
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(target, bytes);
+  }
+}
+
 export function restoreBackupZip(db: DatabaseSync, data: Uint8Array): RestoreResult {
   const result: RestoreResult = {
     settings: 0,
@@ -909,12 +1145,14 @@ export function restoreBackupZip(db: DatabaseSync, data: Uint8Array): RestoreRes
     skipped: 0,
     invalid: 0,
     learning_state: 0,
+    courses: 0,
   };
   const unzipped = unzipSync(data);
   restoreSettingsSection(db, unzipped, result);
   restoreKnowledgeSection(db, unzipped, result);
   restoreLessonsSection(db, unzipped, result);
   restoreNotebookSection(unzipped, result);
+  restoreCoursesSection(db, unzipped, result);
   return result;
 }
 
