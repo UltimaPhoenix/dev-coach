@@ -50,9 +50,11 @@ and hands you the URL. No install, no PATH needed.
 
 ## Pages
 
-The top nav has **Profile** (`/`), **Lessons**, and **Settings**, plus a light/dark theme toggle.
+The top nav has **Profile** (`/knowledge`), **Lessons**, and **Settings**, plus a light/dark theme
+toggle. The root URL (`/`, what `devcoach ui` prints) opens **Lessons** once you have at least one
+lesson and the **knowledge map** before that; pick one explicitly under Settings → Home page.
 
-### Knowledge map (`/`)
+### Knowledge map (`/knowledge`)
 
 Displays your full knowledge map with colour-coded confidence bars:
 
@@ -254,6 +256,8 @@ Three panels:
 - **Your name (for sharing)** — the sender name proposed when you share a lesson; empty means your
   git `user.name` (`share_name`)
 - **UI theme** — 🌓 System / ☀️ Light / 🌙 Dark (`ui_theme`)
+- **Home page** — 🏠 Auto / 📚 Lessons / 🧭 Knowledge map (`ui_home`): where `/` lands. Auto opens
+  Lessons once you have one, the knowledge map before
 
 **Backup & Restore**:
 - **Download backup** — a full zip (settings + knowledge map + lessons + notebook)

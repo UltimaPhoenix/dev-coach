@@ -66,7 +66,7 @@ export function layout(o: {
     <a href="/" class="font-extrabold text-lg tracking-tight text-gray-900 dark:text-gray-100 hover:opacity-80 transition"
       >🎓 dev<span class="text-teal-600 dark:text-teal-300">coach</span></a
     >
-    ${link("/", "Profile", o.currentPath === "/")}
+    ${link("/knowledge", "Profile", o.currentPath === "/knowledge")}
     ${link("/lessons", "Lessons", o.currentPath.includes("/lessons"))}
     ${link("/settings", "Settings", o.currentPath === "/settings")}
     <div class="ml-auto">
@@ -259,7 +259,12 @@ ${Object.entries(d.categorised).map(([category, topics]) => {
 })}
 </div>`;
 
-  return layout({ title: "Profile — devcoach", currentPath: "/", uiTheme: d.uiTheme, body });
+  return layout({
+    title: "Profile — devcoach",
+    currentPath: "/knowledge",
+    uiTheme: d.uiTheme,
+    body,
+  });
 }
 
 // ── Lessons (lessons.html) ───────────────────────────────────────────────────
@@ -1052,6 +1057,11 @@ export function settingsPage(d: SettingsData): Html {
     ["light", "Light", "☀️"],
     ["dark", "Dark", "🌙"],
   ];
+  const homeRadios: [string, string, string][] = [
+    ["auto", "Auto", "🏠"],
+    ["lessons", "Lessons", "📚"],
+    ["knowledge", "Knowledge map", "🧭"],
+  ];
   const f = d.flash;
 
   const body = html`
@@ -1112,6 +1122,18 @@ ${
           )}
         </div>
         <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">System follows your OS preference.</p>
+      </fieldset>
+      <fieldset class="border-0 p-0 m-0">
+        <legend class="block text-sm text-gray-600 dark:text-gray-400 mb-1">Home page</legend>
+        <div class="flex gap-2">
+          ${homeRadios.map(
+            ([value, label, icon]) => html`<label class="flex-1 cursor-pointer">
+            <input type="radio" name="ui_home" value="${value}" ${d.settings.ui_home === value ? "checked" : ""} class="sr-only peer" />
+            <span class="flex flex-col items-center justify-center gap-1 px-3 py-2 rounded border border-gray-300 dark:border-gray-700 peer-checked:border-indigo-500 peer-checked:bg-indigo-50 dark:peer-checked:bg-indigo-900/30 peer-checked:text-indigo-700 dark:peer-checked:text-indigo-300 text-gray-500 dark:text-gray-400 text-xs font-medium transition select-none"><span class="text-base leading-none">${icon}</span>${label}</span>
+          </label>`,
+          )}
+        </div>
+        <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">Auto opens Lessons once you have one, the knowledge map before.</p>
       </fieldset>
       <button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded px-4 py-2 text-sm transition">Save settings</button>
     </form>

@@ -22,6 +22,7 @@ import {
   type NudgeScope,
   parseLesson,
   type Settings,
+  type UiHome,
   type UiTheme,
 } from "./models";
 
@@ -77,6 +78,7 @@ export const DEFAULT_SETTINGS: Record<string, string> = {
   max_per_day: "2",
   min_gap_minutes: "240",
   ui_theme: "system",
+  ui_home: "auto",
   nudge_every: "10",
   nudge_scope: "session",
   share_name: "",
@@ -618,6 +620,9 @@ export function getSettings(db: DatabaseSync): Settings {
   const rawTheme = data.ui_theme ?? "system";
   const theme: UiTheme =
     rawTheme === "dark" || rawTheme === "light" || rawTheme === "system" ? rawTheme : "system";
+  const rawHome = data.ui_home ?? "auto";
+  const home: UiHome =
+    rawHome === "lessons" || rawHome === "knowledge" || rawHome === "auto" ? rawHome : "auto";
   const nudgeEveryRaw = data.nudge_every;
   const nudgeEvery = nudgeEveryRaw !== undefined ? Number.parseInt(nudgeEveryRaw, 10) : 10;
   const nudgeScope: NudgeScope = data.nudge_scope === "global" ? "global" : "session";
@@ -625,6 +630,7 @@ export function getSettings(db: DatabaseSync): Settings {
     max_per_day: maxRaw !== undefined ? Number.parseInt(maxRaw, 10) : 2,
     min_gap_minutes: gap,
     ui_theme: theme,
+    ui_home: home,
     nudge_every: Number.isFinite(nudgeEvery) && nudgeEvery >= 0 ? nudgeEvery : 10,
     nudge_scope: nudgeScope,
     share_name: data.share_name?.trim() || null,
@@ -818,6 +824,9 @@ function restoreSettingsSection(db: DatabaseSync, unzipped: Unzipped, result: Re
   if ("min_gap_minutes" in s) setSetting(db, "min_gap_minutes", String(s.min_gap_minutes));
   if (s.ui_theme === "system" || s.ui_theme === "dark" || s.ui_theme === "light") {
     setSetting(db, "ui_theme", s.ui_theme);
+  }
+  if (s.ui_home === "auto" || s.ui_home === "lessons" || s.ui_home === "knowledge") {
+    setSetting(db, "ui_home", s.ui_home);
   }
   if ("nudge_every" in s) setSetting(db, "nudge_every", String(s.nudge_every));
   if (s.nudge_scope === "session" || s.nudge_scope === "global") {

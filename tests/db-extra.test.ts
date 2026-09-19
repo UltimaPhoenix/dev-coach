@@ -74,6 +74,8 @@ describe("db edge cases", () => {
     for (const t of ["dark", "light", "system", "bogus"]) {
       db.setSetting(c, "ui_theme", t);
       expect(["dark", "light", "system"]).toContain(db.getSettings(c).ui_theme);
+      db.setSetting(c, "ui_home", t);
+      expect(["auto", "lessons", "knowledge"]).toContain(db.getSettings(c).ui_home);
     }
     c.exec("DELETE FROM settings WHERE key = 'max_per_day'");
     expect(db.getSettings(c).max_per_day).toBe(2);

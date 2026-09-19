@@ -9,7 +9,7 @@ import { c, link } from "../cli/term";
 import * as coach from "../core/coach";
 import * as db from "../core/db";
 import { detectGitUserName } from "../core/git";
-import type { KnowledgeEntry, Lesson } from "../core/models";
+import type { KnowledgeEntry, Lesson, UiHome } from "../core/models";
 import {
   buildSharePayload,
   decodeShareCode,
@@ -131,6 +131,13 @@ function shareState(
   };
 }
 
+/** Where `/` lands: the lessons list is the daily activity, but only once there is one to show. */
+export function resolveHomePath(home: UiHome, hasLessons: boolean): "/lessons" | "/knowledge" {
+  if (home === "lessons") return "/lessons";
+  if (home === "knowledge") return "/knowledge";
+  return hasLessons ? "/lessons" : "/knowledge";
+}
+
 function uiTheme(): string {
   try {
     return db.withConnection((c) => db.getSettings(c).ui_theme);
@@ -177,8 +184,17 @@ export function createApp(opts: AppOptions = {}): Hono {
   });
   app.get("/shutdown", (c) => c.text("Method Not Allowed", 405));
 
-  // ── Profile ──────────────────────────────────────────────────────────────
+  // ── Home: a router, not a page (302 — the answer depends on state) ──────────
   app.get("/", (c) => {
+    const { home, hasLessons } = db.withConnection((conn) => ({
+      home: db.getSettings(conn).ui_home,
+      hasLessons: db.countFilteredLessons(conn) > 0,
+    }));
+    return c.redirect(resolveHomePath(home, hasLessons), 302);
+  });
+
+  // ── Profile (the knowledge map) ─────────────────────────────────────────────
+  app.get("/knowledge", (c) => {
     const { profile, stats, rateLimit, settings } = db.withConnection((conn) => ({
       profile: coach.getProfile(conn),
       stats: coach.getStats(conn),
@@ -218,12 +234,12 @@ export function createApp(opts: AppOptions = {}): Hono {
         if (group && group !== "Other") db.assignTopicToGroup(conn, topic, group);
       });
     }
-    return c.redirect("/", 303);
+    return c.redirect("/knowledge", 303);
   });
 
   app.post("/knowledge/:topic/delete", (c) => {
     db.withConnection((conn) => db.deleteKnowledge(conn, c.req.param("topic")));
-    return c.redirect("/", 303);
+    return c.redirect("/knowledge", 303);
   });
 
   app.post("/knowledge/:topic/group", async (c) => {
@@ -233,24 +249,24 @@ export function createApp(opts: AppOptions = {}): Hono {
       if (group && group !== "Other") db.assignTopicToGroup(conn, topic, group);
       else db.unassignTopicFromGroup(conn, topic);
     });
-    return c.redirect("/", 303);
+    return c.redirect("/knowledge", 303);
   });
 
   app.post("/knowledge/:topic", async (c) => {
     const delta = Number.parseInt(textField(await c.req.parseBody(), "delta", "0"), 10) || 0;
     db.withConnection((conn) => coach.applyKnowledgeDelta(conn, c.req.param("topic"), delta));
-    return c.redirect("/", 303);
+    return c.redirect("/knowledge", 303);
   });
 
   app.post("/groups", async (c) => {
     const name = textField(await c.req.parseBody(), "group_name").trim();
     if (name && name !== "Other") db.withConnection((conn) => db.addGroup(conn, name));
-    return c.redirect("/", 303);
+    return c.redirect("/knowledge", 303);
   });
 
   app.post("/groups/:group_name/delete", (c) => {
     db.withConnection((conn) => db.deleteGroup(conn, c.req.param("group_name")));
-    return c.redirect("/", 303);
+    return c.redirect("/knowledge", 303);
   });
 
   // ── Lessons (static sub-paths before :lesson_id) ───────────────────────────
@@ -550,6 +566,8 @@ export function createApp(opts: AppOptions = {}): Hono {
     const minGap = Number.parseInt(textField(body, "min_gap_minutes", "240"), 10);
     let theme = textField(body, "ui_theme", "system");
     if (!["system", "dark", "light"].includes(theme)) theme = "system";
+    let home = textField(body, "ui_home", "auto");
+    if (!["auto", "lessons", "knowledge"].includes(home)) home = "auto";
     const nudgeEvery = Math.max(0, Number.parseInt(textField(body, "nudge_every", "10"), 10) || 0);
     let nudgeScope = textField(body, "nudge_scope", "session");
     if (nudgeScope !== "session" && nudgeScope !== "global") nudgeScope = "session";
@@ -557,6 +575,7 @@ export function createApp(opts: AppOptions = {}): Hono {
       db.setSetting(conn, "max_per_day", String(maxPerDay));
       db.setSetting(conn, "min_gap_minutes", String(Number.isNaN(minGap) ? 240 : minGap));
       db.setSetting(conn, "ui_theme", theme);
+      db.setSetting(conn, "ui_home", home);
       db.setSetting(conn, "nudge_every", String(nudgeEvery));
       db.setSetting(conn, "nudge_scope", nudgeScope);
       db.setSetting(conn, "share_name", db.normalizeShareName(textField(body, "share_name")));

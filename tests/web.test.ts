@@ -2,7 +2,7 @@ import { beforeAll, describe, expect, it, vi } from "vitest";
 import * as db from "../src/core/db";
 import { parseLesson } from "../src/core/models";
 import { fetchSharedInput } from "../src/core/share-fetch";
-import { createApp } from "../src/web/app";
+import { createApp, resolveHomePath } from "../src/web/app";
 
 vi.mock("../src/core/share-fetch", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../src/core/share-fetch")>();
@@ -46,11 +46,26 @@ beforeAll(() => {
 });
 
 describe("web app", () => {
-  it("GET / renders profile and reflects added topic", async () => {
-    expect(
-      (await post("/knowledge", { topic: "rust", confidence: "7", group: "Languages" })).status,
-    ).toBe(303);
-    const r = await get("/");
+  it("GET / lands on lessons once there is one; the setting overrides", async () => {
+    const home = await get("/");
+    expect(home.status).toBe(302);
+    expect(home.headers.get("location")).toBe("/lessons"); // the fixture seeded w1
+    await post("/settings", { max_per_day: "2", min_gap_minutes: "240", ui_home: "knowledge" });
+    expect((await get("/")).headers.get("location")).toBe("/knowledge");
+    await post("/settings", { max_per_day: "2", min_gap_minutes: "240", ui_home: "bogus" });
+    expect((await get("/")).headers.get("location")).toBe("/lessons"); // bogus → auto
+    expect(resolveHomePath("auto", false)).toBe("/knowledge");
+    expect(resolveHomePath("lessons", false)).toBe("/lessons");
+    expect(resolveHomePath("knowledge", true)).toBe("/knowledge");
+    const settings = await (await get("/settings")).text();
+    expect(settings).toContain('name="ui_home" value="auto" checked');
+  });
+
+  it("GET /knowledge renders profile and reflects added topic", async () => {
+    const added = await post("/knowledge", { topic: "rust", confidence: "7", group: "Languages" });
+    expect(added.status).toBe(303);
+    expect(added.headers.get("location")).toBe("/knowledge");
+    const r = await get("/knowledge");
     expect(r.status).toBe(200);
     const html = await r.text();
     expect(html).toContain("Knowledge Map");
@@ -295,7 +310,7 @@ describe("web view branches — exhaustive", () => {
   it("profile: low/mid/high confidence tiers + ungrouped Other section", async () => {
     await post("/knowledge", { topic: "lowconf", confidence: "2" }); // red tier, Other group
     await post("/knowledge", { topic: "midconf", confidence: "5" }); // yellow tier
-    const html = await (await get("/")).text();
+    const html = await (await get("/knowledge")).text();
     expect(html).toContain("lowconf");
     expect(html).toContain("midconf");
     expect(html).toContain("Other"); // ungrouped section header
@@ -336,7 +351,7 @@ describe("web view branches — exhaustive", () => {
         );
       }
     });
-    const html = await (await get("/")).text();
+    const html = await (await get("/knowledge")).text();
     // rateLimit.allowed === false → yellow reason branch instead of "Available now"
     expect(html).not.toContain("Available now");
   });

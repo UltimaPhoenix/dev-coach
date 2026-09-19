@@ -22,6 +22,7 @@ import {
   NudgeScopeSchema,
   parseLesson,
   RepositoryPlatformSchema,
+  UiHomeSchema,
   UiThemeSchema,
 } from "../core/models";
 import {
@@ -97,6 +98,7 @@ const settingsOutput = z.object({
   max_per_day: z.number().int(),
   min_gap_minutes: z.number().int(),
   ui_theme: UiThemeSchema,
+  ui_home: UiHomeSchema,
   nudge_every: z.number().int(),
   nudge_scope: NudgeScopeSchema,
   share_name: z.string().nullable(),

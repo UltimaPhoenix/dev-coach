@@ -124,6 +124,7 @@ describe("db knowledge + groups + settings", () => {
       max_per_day: 2,
       min_gap_minutes: 240,
       ui_theme: "system",
+      ui_home: "auto",
       nudge_every: 10,
       nudge_scope: "session",
       share_name: null,
