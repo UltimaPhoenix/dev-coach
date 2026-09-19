@@ -1,9 +1,13 @@
 version: 2
 
-# One PR per ecosystem, not one per package: every npm bump (root + website, minor/patch AND
-# major) lands in a single grouped PR, and security bumps land in a single grouped PR of their
-# own — Dependabot keeps version updates and security updates in separate groups by design
-# (`applies-to`), and never mixes ecosystems.
+# One PR per ecosystem, not one per package: every bump (root + website, minor/patch AND major)
+# lands in a single grouped weekly PR — Dependabot keeps version updates and security updates in
+# separate groups by design (`applies-to`), and never mixes ecosystems.
+#
+# Direct dependencies only (`allow`, which also governs security updates): transitive
+# vulnerabilities are left to upstream — most of the PR noise was lockfile-only security bumps
+# of packages we don't depend on directly (postcss, nanoid, qs, …). Dependabot ALERTS still
+# open for them; only the automatic PRs stop.
 updates:
   # Node dependencies (npm / package.json) — root package + the Docusaurus docs site
   - package-ecosystem: npm
@@ -19,6 +23,8 @@ updates:
       day: monday
       time: "06:00"
       timezone: "Europe/Rome"
+    allow:
+      - dependency-type: direct
     groups:
       npm:
         applies-to: version-updates
@@ -26,7 +32,7 @@ updates:
       npm-security:
         applies-to: security-updates
         patterns: ["*"]
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 1
     commit-message:
       prefix: "deps"
     labels:
@@ -41,6 +47,8 @@ updates:
       day: monday
       time: "06:00"
       timezone: "Europe/Rome"
+    allow:
+      - dependency-type: direct
     groups:
       github-actions:
         applies-to: version-updates
@@ -48,6 +56,7 @@ updates:
       github-actions-security:
         applies-to: security-updates
         patterns: ["*"]
+    open-pull-requests-limit: 1
     commit-message:
       prefix: "ci"
     labels:
