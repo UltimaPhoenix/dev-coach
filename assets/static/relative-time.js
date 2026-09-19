@@ -2,8 +2,9 @@
    gets a relative label; when its cell is too narrow for the long form ("17 minutes ago") it
    switches to the compact one ("17m"), and it is re-evaluated after column drags and resizes. */
 (function () {
-  /* "yesterday" / "today" are only right at day granularity; for weeks, months and years the
-     number is always spelled out — "last month" for something 45 days old is a lie. */
+  /* "yesterday" / "today" are only right at day granularity; for weeks the number is always
+     spelled out — "last week" for something 13 days old is a lie — and from two months on the
+     relative label stops being useful at all: the ISO date is printed instead. */
   var rtfAuto = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
   var rtfExact = new Intl.RelativeTimeFormat('en', { numeric: 'always' });
   var COMPACT_BELOW = 120; // cell width (px) under which the compact form is used
@@ -28,8 +29,12 @@
     if (p.days === 1)   return 'yesterday';
     if (p.days < 7)     return rtfAuto.format(-p.days, 'day');
     if (p.months < 1)   return rtfExact.format(-Math.floor(p.days / 7), 'week');
-    if (p.months < 12)  return rtfExact.format(-p.months, 'month');
-    return rtfExact.format(-Math.floor(p.months / 12), 'year');
+    if (p.months < 2)   return rtfExact.format(-p.months, 'month');
+    return isoDate(iso);
+  }
+
+  function isoDate(iso) {
+    return iso.slice(0, 10);
   }
 
   function compactTime(iso) {
@@ -39,8 +44,8 @@
     if (p.days === 0)   return 'today';
     if (p.days < 7)     return p.days + 'd';
     if (p.months < 1)   return Math.floor(p.days / 7) + 'w';
-    if (p.months < 12)  return p.months + 'mo';
-    return Math.floor(p.months / 12) + 'y';
+    if (p.months < 2)   return p.months + 'mo';
+    return isoDate(iso);
   }
 
   function isNarrow(el) {

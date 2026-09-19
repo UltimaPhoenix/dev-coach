@@ -133,7 +133,8 @@ on one side grows exactly as much as its neighbour shrinks, so the table never c
 column can be pushed out of view. The title column takes whatever its neighbours give or take and never
 drops below a readable width. Widths are remembered in this browser (and dropped if they no longer fit
 the window); double-click a boundary to reset the two columns beside it, or use **⋯ → Reset column
-widths**. When the Date column gets narrow, dates switch to a compact form (`17m`, `3d`, `2w`).
+widths**. When the Date column gets narrow, recent dates switch to a compact form (`17m`, `3d`, `2w`). Lessons
+two months old or older always show their date (`2026-07-03`) instead of a relative label.
 
 **＋ Import** (toolbar, right) — add a lesson someone shared with you: paste the code, the link, a
 URL, or the whole copied card into the box, pick a `.devcoach.md` file, or simply **drop the file

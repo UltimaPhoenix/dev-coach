@@ -700,7 +700,7 @@ describe("web lesson delete", () => {
     expect(list).toContain('data-resizable="lessons"');
     expect(list).toContain("<colgroup>");
     expect(list).toContain('<col data-col="title" data-flex data-min="220" />');
-    expect(list).toContain('<col data-col="date" data-min="72"');
+    expect(list).toContain('<col data-col="date" data-min="96"');
     expect(list).toContain("table-resize.js");
     expect(list).not.toContain(">↗</a>");
     expect(list).toContain('data-id="del1"');
