@@ -33,6 +33,13 @@
   function clamp(v, lo, hi) {
     return Math.min(hi, Math.max(lo, v));
   }
+  // Each column declares the narrowest width its content survives (`data-min`); the flex column
+  // falls back to MIN_FLEX, the others to MIN.
+  function minOf(col) {
+    var m = Number(col.dataset.min);
+    if (m > 0) return m;
+    return col.hasAttribute("data-flex") ? MIN_FLEX : MIN;
+  }
   function setWidth(col, px) {
     col.style.width = Math.round(px) + "px";
   }
@@ -60,7 +67,7 @@
     function apply() {
       cols.forEach(function (col) {
         var px = widths[col.dataset.col];
-        if (typeof px === "number" && px >= MIN) col.style.width = px + "px";
+        if (typeof px === "number" && px >= minOf(col)) col.style.width = px + "px";
         else restore(col);
       });
       if (flexWidth() < MIN_FLEX) {
@@ -118,16 +125,19 @@
         var startL = th.getBoundingClientRect().width;
         var startR = ths[j].getBoundingClientRect().width;
         var total = startL + startR;
+        var minL = minOf(left);
+        var minR = minOf(right);
+        if (total < minL + minR) return; // nothing to give either way
         handle.setPointerCapture(e.pointerId);
         table.classList.add("dc-resizing");
         function move(ev) {
           var dx = ev.clientX - startX;
           if (leftFlex) {
-            setWidth(right, clamp(startR - dx, MIN, total - MIN_FLEX));
+            setWidth(right, clamp(startR - dx, minR, total - minL));
           } else if (rightFlex) {
-            setWidth(left, clamp(startL + dx, MIN, total - MIN_FLEX));
+            setWidth(left, clamp(startL + dx, minL, total - minR));
           } else {
-            var l = clamp(startL + dx, MIN, total - MIN);
+            var l = clamp(startL + dx, minL, total - minR);
             setWidth(left, l);
             setWidth(right, total - l);
           }

@@ -639,12 +639,12 @@ ${
   <table class="w-full text-sm table-fixed" data-resizable="lessons">
     <colgroup>
       <col data-col="star" style="width:2.75rem" />
-      <col data-col="date" style="width:8rem" />
-      <col data-col="topic" class="hidden sm:table-column" style="width:11rem" />
-      <col data-col="title" data-flex />
-      <col data-col="level" style="width:5.5rem" />
-      <col data-col="categories" class="hidden lg:table-column" style="width:24%" />
-      <col data-col="feedback" class="hidden xl:table-column" style="width:7rem" />
+      <col data-col="date" data-min="128" style="width:8rem" />
+      <col data-col="topic" data-min="88" class="hidden sm:table-column" style="width:11rem" />
+      <col data-col="title" data-flex data-min="220" />
+      <col data-col="level" data-min="88" style="width:5.5rem" />
+      <col data-col="categories" data-min="120" class="hidden lg:table-column" style="width:24%" />
+      <col data-col="feedback" data-min="112" class="hidden xl:table-column" style="width:7rem" />
       <col data-col="share" style="width:2.5rem" />
     </colgroup>
     <thead>
