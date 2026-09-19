@@ -50,8 +50,8 @@ and hands you the URL. No install, no PATH needed.
 
 ## Pages
 
-The top nav has **Profile** (`/knowledge`), **Lessons**, and **Settings**, plus a light/dark theme
-toggle. The root URL (`/`, what `devcoach ui` prints) opens **Lessons** once you have at least one
+The top nav has **Profile** (`/knowledge`) and **Lessons**; top-right, a ⚙️ gear opens **Settings**
+and the sun/moon toggles the light/dark theme. The root URL (`/`, what `devcoach ui` prints) opens **Lessons** once you have at least one
 lesson and the **knowledge map** before that; pick one explicitly under Settings → Home page.
 
 ### Knowledge map (`/knowledge`)

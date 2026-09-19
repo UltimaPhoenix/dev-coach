@@ -105,11 +105,10 @@ export function layout(o: {
     >
     ${link("/knowledge", "Profile", o.currentPath === "/knowledge")}
     ${link("/lessons", "Lessons", o.currentPath.includes("/lessons"))}
-    ${link("/settings", "Settings", o.currentPath === "/settings")}
-    <div class="ml-auto">
-      <button id="theme-toggle" onclick="toggleTheme()"
-              class="text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-200 transition text-lg leading-none px-1"
-              title="Toggle theme"></button>
+    <div class="ml-auto flex items-center gap-1.5">
+      <a href="/settings" aria-label="Settings" title="Settings" ${o.currentPath === "/settings" ? raw('aria-current="page"') : ""} class="w-8 h-8 inline-flex items-center justify-center rounded-lg border transition ${o.currentPath === "/settings" ? "bg-white dark:bg-gray-900 border-indigo-400 text-gray-900 dark:text-white" : "bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-indigo-400 hover:text-gray-800 dark:hover:text-gray-100"}"><svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1.11-1.56 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.56-1.03H3a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.65 8.9a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.6h.09A1.7 1.7 0 0 0 10.1 3.1V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1.03 1.56 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.4 9v.09a1.7 1.7 0 0 0 1.56 1.03H21a2 2 0 1 1 0 4h-.09A1.7 1.7 0 0 0 19.4 15Z"/></svg></a>
+      <button id="theme-toggle" onclick="toggleTheme()" title="Toggle theme" aria-label="Toggle theme"
+              class="w-8 h-8 inline-flex items-center justify-center rounded-lg border transition bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-indigo-400 text-base leading-none"></button>
     </div>
   </nav>
   <main class="max-w-7xl mx-auto px-4 sm:px-6 py-8">${o.body}</main>

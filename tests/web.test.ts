@@ -108,7 +108,13 @@ describe("web app", () => {
   });
 
   it("settings page, update, notebook save", async () => {
-    expect((await get("/settings")).status).toBe(200);
+    const settingsPage = await get("/settings");
+    expect(settingsPage.status).toBe(200);
+    const nav = await settingsPage.text();
+    expect(nav).toContain('href="/settings" aria-label="Settings"');
+    expect(nav).toContain('aria-current="page"');
+    expect(nav).not.toContain(">Settings</a>");
+    expect(await (await get("/lessons")).text()).not.toContain('aria-current="page"');
     expect(
       (await post("/settings", { max_per_day: "5", min_gap_minutes: "120", ui_theme: "dark" }))
         .status,
