@@ -7,11 +7,15 @@ Notable changes to devcoach. Versions follow [Semantic Versioning](https://semve
 ## [Unreleased]
 
 ### Added
-- **Delete lessons from the dashboard**, kept out of the way until you ask: **☑ Select** on the
-  Lessons page turns on checkboxes and a *Delete selected* bar (one confirmation, one request for
-  all of them); on a lesson page the **⋯** menu holds *Delete lesson…*. Same-origin only, like
-  share/import. A lesson someone shared with you deletes the same way, and the same share is
-  accepted again afterwards.
+- **Delete lessons from the dashboard**, kept out of the way until you ask: the **⋯ More** button
+  (the same on the Lessons toolbar and on a lesson page) holds the rare actions — *Select lessons…*
+  turns the star column into checkboxes with a *Delete selected* bar (one confirmation, one request
+  for all of them); on a lesson page it holds *Delete lesson…*. Same-origin only, like share/import.
+  A lesson someone shared with you deletes the same way, and the same share is accepted again
+  afterwards.
+- **Lessons table**: the title gets the width and categories wrap instead of squeezing it; columns are
+  **resizable** by dragging a header edge (remembered in the browser, double-click or *⋯ → Reset
+  column widths* to reset); the share arrow appears on hover.
 - **Filter lessons by sender**: the dashboard's new **🤝 Shared** dropdown (All / My own / Shared with
   me / from `<name>`), a `🤝 <sender>` badge under the topic, `devcoach lessons --from <name>`,
   `get_lessons({shared_by})`, and the skill answers "what did Ada send me". The free-text search now

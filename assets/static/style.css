@@ -28,6 +28,9 @@
   --md-table-even-bg: #f9fafb;
   --md-strong: #111827;
   --md-em: #7c3aed;
+
+  --check-border: #cbd5e1;
+  --check-bg: #ffffff;
 }
 
 .dark {
@@ -56,6 +59,9 @@
   --md-table-even-bg: #111827;
   --md-strong: #f3f4f6;
   --md-em: #c4b5fd;
+
+  --check-border: #4b5563;
+  --check-bg: #111827;
 }
 
 /* ── Scrollbar ──────────────────────────────────────────────────────────── */
@@ -162,3 +168,55 @@
   color: var(--md-table-td-color);
 }
 .markdown-body tr:nth-child(even) td { background: var(--md-table-even-bg); }
+
+/* ── Lessons table: Select-mode checkboxes + drag-to-resize handles ─────────── */
+
+.dc-check {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  border: 1.5px solid var(--check-border);
+  background: var(--check-bg);
+  vertical-align: middle;
+  cursor: pointer;
+  transition: background-color 0.12s, border-color 0.12s;
+}
+.dc-check:checked {
+  background-color: #4f46e5;
+  border-color: #4f46e5;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 10.5l3.5 3.5L15 7'/%3E%3C/svg%3E");
+  background-size: 72%;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+.dc-check:focus-visible {
+  outline: 2px solid #6366f1;
+  outline-offset: 2px;
+}
+
+.dc-resize-handle {
+  position: absolute;
+  top: 0;
+  right: -4px;
+  width: 8px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 1;
+  border-radius: 2px;
+  transition: background-color 0.12s;
+}
+.dc-resize-handle:hover,
+.dc-resizing .dc-resize-handle:active {
+  background-color: rgba(99, 102, 241, 0.45);
+}
+.dc-resizing {
+  user-select: none;
+  cursor: col-resize;
+}
+/* In Select mode every click on a row means "toggle it": links and forms inside stop reacting. */
+.dc-selecting tbody a,
+.dc-selecting tbody form {
+  pointer-events: none;
+}

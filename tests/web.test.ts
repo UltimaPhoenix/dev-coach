@@ -165,6 +165,10 @@ describe("web app", () => {
 
   it("static handler 404s missing files", async () => {
     expect((await get("/static/does-not-exist.css")).status).toBe(404);
+    const js = await get("/static/table-resize.js");
+    expect(js.status).toBe(200);
+    expect(js.headers.get("content-type")).toContain("text/javascript");
+    expect(await js.text()).toContain("resetLessonColumns");
   });
 });
 
@@ -675,7 +679,15 @@ describe("web lesson delete", () => {
     seedDel("del1", "Doomed <lesson>");
     seedDel("del3", "Doomed too");
     const list = await (await get("/lessons?search=Doomed")).text();
-    expect(list).toContain("☑ Select");
+    expect(list).toContain('aria-label="More actions"');
+    expect(list).toContain("☑ Select lessons…");
+    expect(list).toContain("↔ Reset column widths");
+    expect(list).not.toContain("☑ Select</button>");
+    expect(list).toContain('class="dc-check');
+    expect(list).toContain('data-resizable="lessons"');
+    expect(list).toContain("<colgroup>");
+    expect(list).toContain("table-resize.js");
+    expect(list).not.toContain(">↗</a>");
     expect(list).toContain('data-id="del1"');
     expect(list).toContain('action="/lessons/delete"');
     expect(list).toContain("Delete selected");
@@ -685,7 +697,8 @@ describe("web lesson delete", () => {
       'value="/lessons?period=all&amp;search=Doomed&amp;sort=timestamp&amp;order=desc&amp;page=1"',
     );
     const detail = await (await get("/lessons/del1")).text();
-    expect(detail).toContain("⋯");
+    expect(detail).toContain('aria-label="More actions"');
+    expect(detail).not.toContain(">⋯</button>");
     expect(detail).toContain("🗑 Delete lesson…");
     expect(detail).toContain('name="id" value="del1"');
     expect(detail).toContain(

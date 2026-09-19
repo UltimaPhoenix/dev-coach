@@ -23,6 +23,22 @@ function domId(prefix: string, key: string): string {
   );
 }
 
+const MORE_ICON = html`<svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><circle cx="4" cy="10" r="1.75"/><circle cx="10" cy="10" r="1.75"/><circle cx="16" cy="10" r="1.75"/></svg>`;
+
+/**
+ * The one "more" button, shared by the lessons toolbar and the lesson page: rare actions live behind
+ * an icon button instead of standing in the toolbar. `attrs` is a static string of extra attributes
+ * (never user data).
+ */
+function moreMenu(items: Html, className = "", attrs = ""): Html {
+  return html`<div class="relative ${className}" ${raw(attrs)} x-data="{ open: false }" @click.outside="open = false" @keydown.escape="open = false">
+      <button type="button" @click="open = !open" :aria-expanded="open" aria-label="More actions" title="More actions" class="w-8 h-8 inline-flex items-center justify-center rounded-lg border transition bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-indigo-400 hover:text-gray-800 dark:hover:text-gray-100">${MORE_ICON}</button>
+      <div x-show="open" x-transition:enter="transition ease-out duration-100" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100" class="absolute right-0 top-full mt-1 z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg w-56 p-1" style="display:none">
+        ${items}
+      </div>
+    </div>`;
+}
+
 // ── Layout (base.html) ───────────────────────────────────────────────────────
 
 export function layout(o: {
@@ -402,7 +418,7 @@ export function lessonsPage(d: LessonsData): Html {
   const sortTh = (label: string, col: string, extra = "") => {
     const active = s.sort === col;
     const next = active && s.order === "desc" ? "asc" : "desc";
-    return html`<th class="px-3 py-3 whitespace-nowrap ${extra}">
+    return html`<th class="px-3 py-3 whitespace-nowrap relative ${extra}">
       <a href="${lessonsQs(s, { sort: col, order: next })}" class="inline-flex items-center gap-1 hover:text-gray-700 dark:hover:text-gray-200 transition group/sort">${label}
         ${
           active
@@ -436,7 +452,7 @@ export function lessonsPage(d: LessonsData): Html {
 
   const pageIds = JSON.stringify(d.lessons.map((l) => l.id));
   const body = html`
-<div x-data="{ selectMode: false, selected: [], toggle(id) { const i = this.selected.indexOf(id); if (i < 0) this.selected.push(id); else this.selected.splice(i, 1) }, setAll(ids, on) { this.selected = on ? ids.slice() : [] }, leave() { this.selectMode = false; this.selected = [] } }" @keydown.escape.window="leave()">
+<div :class="selectMode && 'dc-selecting'" x-data="{ selectMode: false, selected: [], toggle(id) { const i = this.selected.indexOf(id); if (i < 0) this.selected.push(id); else this.selected.splice(i, 1) }, setAll(ids, on) { this.selected = on ? ids.slice() : [] }, leave() { this.selectMode = false; this.selected = [] } }" @keydown.escape.window="leave()">
 <form id="filter-form" method="get" action="/lessons">
   <input type="hidden" name="period" id="h-period" value="${s.period}">
   <input type="hidden" name="date_from" id="h-date-from" value="${s.date_from}">
@@ -554,7 +570,12 @@ export function lessonsPage(d: LessonsData): Html {
 
     ${anyFilter ? html`<a href="/lessons" class="ml-auto text-xs text-gray-400 hover:text-gray-700 dark:hover:text-white transition">Clear all</a>` : ""}
 
-    <button type="button" x-show="!selectMode" @click="selectMode = true" title="Select lessons to delete" class="${anyFilter ? "" : "ml-auto"} inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-indigo-400 hover:text-gray-700 dark:hover:text-gray-200">☑ Select</button>
+    ${moreMenu(
+      html`<button type="button" @click="selectMode = true; open = false" class="w-full text-left px-3 py-2 rounded-lg text-sm transition flex items-center gap-2 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800">☑ Select lessons…</button>
+        <button type="button" @click="window.resetLessonColumns && window.resetLessonColumns(); open = false" class="w-full text-left px-3 py-2 rounded-lg text-sm transition flex items-center gap-2 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800">↔ Reset column widths</button>`,
+      anyFilter ? "" : "ml-auto",
+      'x-show="!selectMode"',
+    )}
     <button type="button" x-show="selectMode" style="display:none" @click="leave()" class="${anyFilter ? "" : "ml-auto"} inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition bg-indigo-600 text-white border-indigo-600 hover:bg-indigo-500">✓ Done</button>
     <div class="relative" x-data="{ open: ${String(d.importOpen)} }" @click.outside="open = false" @keydown.escape="open = false">
       <button type="button" @click="open = !open" title="Import a lesson someone shared" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-indigo-400">＋ Import</button>
@@ -595,16 +616,25 @@ export function lessonsPage(d: LessonsData): Html {
 ${
   d.lessons.length
     ? html`<div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm overflow-hidden">
-  <table class="w-full text-sm">
+  <table class="w-full text-sm table-fixed" data-resizable="lessons">
+    <colgroup>
+      <col data-col="star" style="width:2.75rem" />
+      <col data-col="date" style="width:8rem" />
+      <col data-col="topic" class="hidden sm:table-column" style="width:11rem" />
+      <col data-col="title" />
+      <col data-col="level" style="width:5.5rem" />
+      <col data-col="categories" class="hidden lg:table-column" style="width:24%" />
+      <col data-col="feedback" class="hidden xl:table-column" style="width:7rem" />
+      <col data-col="share" style="width:2.5rem" />
+    </colgroup>
     <thead>
       <tr class="bg-gray-50 dark:bg-gray-800/60 border-b border-gray-200 dark:border-gray-800 text-left text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">
-        <th class="w-8 px-3 py-3" x-show="selectMode" style="display:none"><input type="checkbox" tabindex="-1" aria-label="Select all on this page" class="accent-indigo-600" :checked="selected.length > 0 && ${pageIds}.every((id) => selected.includes(id))" @change="setAll(${pageIds}, $event.target.checked)" /></th>
-        <th class="w-8 px-3 py-3"></th>
+        <th class="px-3 py-3"><input type="checkbox" tabindex="-1" aria-label="Select all on this page" class="dc-check" x-show="selectMode" style="display:none" :checked="selected.length > 0 && ${pageIds}.every((id) => selected.includes(id))" @change="setAll(${pageIds}, $event.target.checked)" /></th>
         ${sortTh("Date", "timestamp")}
         ${sortTh("Topic", "topic_id", "hidden sm:table-cell")}
         ${sortTh("Title", "title")}
         ${sortTh("Level", "level")}
-        <th class="px-3 py-3 hidden lg:table-cell">Categories</th>
+        <th class="px-3 py-3 hidden lg:table-cell relative">Categories</th>
         ${sortTh("Feedback", "feedback", "hidden xl:table-cell")}
         <th class="px-2 py-3 w-8"><span class="sr-only">Share</span></th>
       </tr>
@@ -615,24 +645,24 @@ ${
         const date = lesson.timestamp.slice(0, 10);
         const tip = lesson.timestamp.slice(0, 16).replace("T", " ");
         return html`<tr id="${rowId}" data-id="${lesson.id}" data-href="/lessons/${encodeURIComponent(lesson.id)}" class="hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors group cursor-pointer" tabindex="0" role="link" @click="selectMode ? toggle($el.dataset.id) : (window.location = $el.dataset.href)" @keydown.enter="selectMode ? toggle($el.dataset.id) : (window.location = $el.dataset.href)" @keydown.space.prevent="selectMode && toggle($el.dataset.id)" :class="selected.includes($el.dataset.id) && 'bg-indigo-50 dark:bg-indigo-900/20'">
-        <td class="px-3 py-3" x-show="selectMode" style="display:none"><input type="checkbox" tabindex="-1" class="accent-indigo-600 pointer-events-none" :checked="selected.includes($el.closest('tr').dataset.id)" /></td>
-        <td class="px-3 py-3" onclick="event.stopPropagation()" onkeydown="event.stopPropagation()">
-          <form method="post" action="/lessons/${encodeURIComponent(lesson.id)}/star" hx-post="/lessons/${encodeURIComponent(lesson.id)}/star" hx-target="#${rowId}" hx-select="#${rowId}" hx-swap="outerHTML">
+        <td class="px-3 py-3" @click="selectMode || $event.stopPropagation()" @keydown="selectMode || $event.stopPropagation()">
+          <form x-show="!selectMode" method="post" action="/lessons/${encodeURIComponent(lesson.id)}/star" hx-post="/lessons/${encodeURIComponent(lesson.id)}/star" hx-target="#${rowId}" hx-select="#${rowId}" hx-swap="outerHTML">
             <input type="hidden" name="starred" value="${lesson.starred ? "0" : "1"}" />
             <input type="hidden" name="next" value="/lessons${lessonsQs(s)}" />
             <button type="submit" title="${lesson.starred ? "Unstar" : "Star"}" class="w-6 text-lg text-center leading-none transition ${lesson.starred ? "text-yellow-400 hover:text-yellow-300" : "text-gray-300 dark:text-gray-600 hover:text-yellow-400"}">${lesson.starred ? "★" : "☆"}</button>
           </form>
+          <input type="checkbox" tabindex="-1" aria-hidden="true" class="dc-check pointer-events-none" x-show="selectMode" style="display:none" :checked="selected.includes($el.closest('tr').dataset.id)" />
         </td>
         <td class="px-3 py-3 whitespace-nowrap tabular-nums relative group/date">
           <span class="text-gray-400 dark:text-gray-500 cursor-default" data-ts="${lesson.timestamp}">${date}</span>
           <div class="absolute z-10 bottom-full left-0 mb-1 px-2 py-1 rounded bg-gray-800 dark:bg-gray-700 text-white text-xs whitespace-nowrap pointer-events-none opacity-0 group-hover/date:opacity-100 transition-opacity duration-150">${tip}</div>
         </td>
-        <td class="px-3 py-3 hidden sm:table-cell"><span class="text-xs font-mono text-cyan-600 dark:text-cyan-400">${lesson.topic_id}</span>${lesson.imported ? html`<span class="block text-[11px] text-gray-400 dark:text-gray-500 truncate max-w-[10rem]" title="This lesson was shared with you">🤝 ${lesson.shared_by ?? "anonymous"}</span>` : ""}</td>
-        <td class="px-3 py-3 max-w-xs"><a href="/lessons/${encodeURIComponent(lesson.id)}" class="font-medium text-gray-800 dark:text-gray-100 hover:text-indigo-600 dark:hover:text-indigo-400 transition line-clamp-2">${lesson.title}</a></td>
-        <td class="px-3 py-3" onclick="event.stopPropagation()" onkeydown="event.stopPropagation()"><a href="${lessonsQs(s, { level: lesson.level })}" class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${levelTextColor[lesson.level] ?? ""} hover:ring-2 hover:ring-current hover:ring-offset-1 transition-shadow">${lesson.level}</a></td>
-        <td class="px-3 py-3 hidden lg:table-cell" onclick="event.stopPropagation()" onkeydown="event.stopPropagation()"><div class="flex flex-wrap gap-1">${lesson.categories.map((cat) => html`<a href="${lessonsQs(s, { category: cat })}" class="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors">${cat}</a>`)}</div></td>
-        <td class="px-3 py-3 hidden xl:table-cell" onclick="event.stopPropagation()" onkeydown="event.stopPropagation()">${lesson.feedback === "know" ? html`<span class="text-xs text-teal-600 dark:text-teal-400 font-medium">✓ Known</span>` : lesson.feedback === "dont_know" ? html`<span class="text-xs text-rose-500 dark:text-rose-400 font-medium">✗ Unknown</span>` : ""}</td>
-        <td class="px-2 py-3 text-center" onclick="event.stopPropagation()" onkeydown="event.stopPropagation()"><a href="/lessons/${encodeURIComponent(lesson.id)}?share=1" title="Share this lesson" class="text-gray-300 dark:text-gray-600 hover:text-indigo-500 dark:hover:text-indigo-400 transition text-base leading-none">↗</a></td>
+        <td class="px-3 py-3 hidden sm:table-cell"><span class="block truncate text-xs font-mono text-cyan-600 dark:text-cyan-400">${lesson.topic_id}</span>${lesson.imported ? html`<span class="block text-[11px] text-gray-400 dark:text-gray-500 truncate max-w-[10rem]" title="This lesson was shared with you">🤝 ${lesson.shared_by ?? "anonymous"}</span>` : ""}</td>
+        <td class="px-3 py-3"><a href="/lessons/${encodeURIComponent(lesson.id)}" class="font-semibold text-[15px] leading-snug text-gray-800 dark:text-gray-100 hover:text-indigo-600 dark:hover:text-indigo-400 transition line-clamp-2">${lesson.title}</a></td>
+        <td class="px-3 py-3" @click="selectMode || $event.stopPropagation()" @keydown="selectMode || $event.stopPropagation()"><a href="${lessonsQs(s, { level: lesson.level })}" class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${levelTextColor[lesson.level] ?? ""} hover:ring-2 hover:ring-current hover:ring-offset-1 transition-shadow">${lesson.level}</a></td>
+        <td class="px-3 py-3 hidden lg:table-cell" @click="selectMode || $event.stopPropagation()" @keydown="selectMode || $event.stopPropagation()"><div class="flex flex-wrap gap-1">${lesson.categories.map((cat) => html`<a href="${lessonsQs(s, { category: cat })}" class="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors">${cat}</a>`)}</div></td>
+        <td class="px-3 py-3 hidden xl:table-cell" @click="selectMode || $event.stopPropagation()" @keydown="selectMode || $event.stopPropagation()">${lesson.feedback === "know" ? html`<span class="text-xs text-teal-600 dark:text-teal-400 font-medium">✓ Known</span>` : lesson.feedback === "dont_know" ? html`<span class="text-xs text-rose-500 dark:text-rose-400 font-medium">✗ Unknown</span>` : ""}</td>
+        <td class="px-2 py-3 text-center" @click="selectMode || $event.stopPropagation()" @keydown="selectMode || $event.stopPropagation()"><a href="/lessons/${encodeURIComponent(lesson.id)}?share=1" title="Share this lesson" class="inline-flex text-gray-400 dark:text-gray-500 hover:text-indigo-500 dark:hover:text-indigo-400 transition opacity-0 group-hover:opacity-100 focus-visible:opacity-100"><svg class="w-4 h-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 14 14 6M8 6h6v6"/></svg></a></td>
       </tr>`;
       })}
     </tbody>
@@ -672,20 +702,23 @@ ${
 }
 <div x-show="selectMode" style="display:none" x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0 translate-y-2" x-transition:enter-end="opacity-100 translate-y-0" class="fixed inset-x-0 bottom-0 z-50 border-t border-gray-200 dark:border-gray-800 bg-white/95 dark:bg-gray-900/95 backdrop-blur px-4 sm:px-6 py-3">
   <div class="max-w-7xl mx-auto flex items-center gap-3">
-    <p class="text-sm text-gray-700 dark:text-gray-200"><span x-text="selected.length"></span> selected</p>
-    <button type="button" x-show="selected.length" style="display:none" @click="selected = []" class="text-xs text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-200 transition">Clear</button>
-    <form method="post" action="/lessons/delete" class="ml-auto flex items-center gap-2" @submit="if (!confirm('Delete ' + selected.length + (selected.length === 1 ? ' lesson' : ' lessons') + '? This cannot be undone.')) $event.preventDefault()">
-      <template x-for="id in selected" :key="id"><input type="hidden" name="id" :value="id" /></template>
-      <input type="hidden" name="next" value="/lessons${lessonsQs(s, { page: String(d.page) })}" />
-      <button type="button" @click="leave()" class="inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium border transition bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-indigo-400">Cancel</button>
-      <button type="submit" :disabled="!selected.length" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition bg-rose-600 text-white border-rose-600 hover:bg-rose-500 disabled:opacity-40 disabled:cursor-not-allowed">🗑 Delete selected</button>
-    </form>
+    <button type="button" @click="leave()" class="inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium border transition bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-indigo-400">Cancel</button>
+    <div class="ml-auto flex items-center gap-3">
+      <p class="text-sm text-gray-700 dark:text-gray-200 tabular-nums"><span x-text="selected.length"></span> selected</p>
+      <button type="button" x-show="selected.length" style="display:none" @click="selected = []" class="text-xs text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-200 transition">Clear</button>
+      <form method="post" action="/lessons/delete" class="flex items-center gap-2" @submit="if (!confirm('Delete ' + selected.length + (selected.length === 1 ? ' lesson' : ' lessons') + '? This cannot be undone.')) $event.preventDefault()">
+        <template x-for="id in selected" :key="id"><input type="hidden" name="id" :value="id" /></template>
+        <input type="hidden" name="next" value="/lessons${lessonsQs(s, { page: String(d.page) })}" />
+        <button type="submit" :disabled="!selected.length" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition bg-rose-600 text-white border-rose-600 hover:bg-rose-500 disabled:opacity-40 disabled:cursor-not-allowed">🗑 Delete selected</button>
+      </form>
+    </div>
   </div>
 </div>
 </div>`;
 
   const scripts = html`<script src="/static/vendor/flatpickr.min.js"></script>
 <script src="/static/relative-time.js"></script>
+<script src="/static/table-resize.js"></script>
 <script src="/static/share.js"></script>
 <script>
 function periodPicker() {
@@ -852,16 +885,14 @@ ${
         ${shareFragment(sh)}
       </div>
     </div>
-    <div class="relative shrink-0" x-data="{ open: false }" @click.outside="open = false" @keydown.escape="open = false">
-      <button type="button" @click="open = !open" title="More actions" aria-label="More actions" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-indigo-400 !text-xs !px-2.5 !py-1">⋯</button>
-      <div x-show="open" x-transition:enter="transition ease-out duration-100" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100" class="absolute right-0 top-full mt-1 z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg w-48 p-1" style="display:none">
-        <form method="post" action="/lessons/delete" data-confirm="Delete “${l.title}”? This cannot be undone." onsubmit="return confirm(this.dataset.confirm)">
+    ${moreMenu(
+      html`<form method="post" action="/lessons/delete" data-confirm="Delete “${l.title}”? This cannot be undone." onsubmit="return confirm(this.dataset.confirm)">
           <input type="hidden" name="id" value="${l.id}" />
           <input type="hidden" name="next" value="/lessons" />
-          <button type="submit" class="w-full text-left px-3 py-2 rounded-lg text-sm transition text-gray-700 dark:text-gray-200 hover:bg-rose-50 dark:hover:bg-rose-900/30 hover:text-rose-700 dark:hover:text-rose-300">🗑 Delete lesson…</button>
-        </form>
-      </div>
-    </div>
+          <button type="submit" class="w-full text-left px-3 py-2 rounded-lg text-sm transition flex items-center gap-2 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 hover:!bg-rose-50 dark:hover:!bg-rose-900/30 hover:text-rose-700 dark:hover:text-rose-300">🗑 Delete lesson…</button>
+        </form>`,
+      "shrink-0",
+    )}
   </div>
   <div id="lesson-meta" class="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-500 dark:text-gray-400 mb-5">
     <span class="relative group/date cursor-default">🗓 <span data-ts="${l.timestamp}">${date}</span>
