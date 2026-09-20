@@ -21,7 +21,10 @@ Notable changes to devcoach. Versions follow [Semantic Versioning](https://semve
   the dashboard frame grows to the step so the page scrolls, editable JavaScript examples really
   run (the document CSP allows `eval` inside its sandbox) while other languages get simulations,
   predict-the-output, fill-the-blank or spot-the-bug, and the coach offers once to publish the
-  document as a private Claude artifact (nothing stored).
+  document as a private Claude artifact (nothing stored). Starting a course on a lesson that
+  already has one asks first (continue / redo / keep both); a step can be inserted mid-course
+  (`add_course_step` `after`) when one gets split; `get_lessons` `search` matches every word,
+  in any order, instead of the literal phrase.
 
 ### Changed
 - **Three answers under a lesson card**: `✅ knew it (y)` · `💡 understood (u)` · `❌ couldn't follow

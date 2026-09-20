@@ -1208,8 +1208,9 @@ export function createServer(): McpServer {
     {
       title: "Add Course Step",
       description:
-        "Register the next step of a course: the section with id=<anchor> must already exist in the " +
-        "course document. Steps are numbered in call order.",
+        "Register a step of a course: the section with id=<anchor> must already exist in the " +
+        "course document. Appended by default; pass `after` to insert it after that step (0 = first) — " +
+        "the following steps are renumbered.",
       inputSchema: z.object({
         course_id: z.string().describe("Course id (from create_course)"),
         title: z.string().min(1).describe("Step title"),
@@ -1218,6 +1219,12 @@ export function createServer(): McpServer {
           .string()
           .regex(/^[a-z0-9][a-z0-9-]*$/)
           .describe("The section's id in the document, e.g. step-1"),
+        after: z
+          .number()
+          .int()
+          .min(0)
+          .nullish()
+          .describe("Insert after this step number (0 = first); omit to append"),
       }),
       outputSchema: courseOutput.extend({ step: courseStepOutput }),
       annotations: {
@@ -1234,6 +1241,7 @@ export function createServer(): McpServer {
             title: args.title,
             kind: args.kind,
             anchor: args.anchor,
+            after: args.after,
           });
           return { ...courses.getCourse(c, args.course_id), step };
         });

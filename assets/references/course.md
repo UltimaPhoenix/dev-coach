@@ -29,6 +29,12 @@ text form with the options in parentheses.
   (title · date · feedback icon) plus a last *"None of these — a free concept"*. None → a
   free concept. No argument at all → the newest `get_lessons({feedback: "dont_know", limit: 1})`,
   else the newest lesson.
+- **A course may already exist for that seed**: check `get_courses({lesson_id})` (or
+  `get_courses({status: "active"})` for a free concept with the same title). If one does,
+  ask before anything else, as choices: **Continue it** (only when active — resume at its
+  first `todo` step), **Redo it** (set it `abandoned`, then create a fresh one), **Keep both**
+  (a second course, the id gets a `-2` suffix), **Cancel**. Never overwrite a course
+  document without this question.
 - Keep the lesson's `topic_id`; its `task_context` and git metadata come back from
   `create_course` as `seed_context` — draw examples from that work.
 - From a free concept ("teach me logarithms"): pick a `topic_id` as for a lesson.
@@ -167,7 +173,9 @@ follows the same rule.
 - Correct → `update_course_progress({course_id, position, status: "done"})` and the next
   step in the next message.
 - Wrong or unsure → re-explain from a different angle (a new example, a smaller piece);
-  never advance silently. Two misses → offer to split the step.
+  never advance silently. Two misses → offer to split the step: add the new `<section>` to
+  the document right after the current one (update the nav and the pagers) and register it
+  with `add_course_step({…, after: <current position>})` so the order matches.
 - "skip" → `status: "skipped"` and move on. "stop" / "later" → leave it `active`; it
   resumes with `get_courses({status: "active"})` ("continue the course").
 

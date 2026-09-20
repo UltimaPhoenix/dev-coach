@@ -53,7 +53,7 @@ local server.
 | `stop_ui` | Stop the dashboard listening on `port` (whoever started it) — graceful, in-flight requests finish; `stopped: false` when nothing runs there | open-world, idempotent |
 | `complete_onboarding` | Save the initial profile (topics + groups) and mark onboarding done; guarantees a non-empty notebook placeholder (the model writes the real notebook directly, see [privacy.md](privacy.md)) | **destructive** |
 | `create_course` | Start a [course](../usage/courses.md) from a lesson or a concept with the explored prerequisite chain; returns `course_dir` + `document_path` — the model writes the single HTML document there itself | write |
-| `add_course_step` | Register a section of the course document (`anchor` = its `id`) as the next step; the section must already exist | write |
+| `add_course_step` | Register a section of the course document (`anchor` = its `id`) as a step — appended, or inserted with `after` (the following steps are renumbered); the section must already exist | write |
 | `update_course_progress` | A step's `todo` / `done` / `skipped` (the course completes itself once every step is done or skipped), or the course's `active` / `completed` / `abandoned` | write |
 | `get_courses` | Courses with their steps, filtered by `course_id`, seed `lesson_id` or `status` | read-only |
 

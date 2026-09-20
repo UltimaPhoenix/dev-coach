@@ -80,6 +80,10 @@ describe("db lessons", () => {
     expect(db.getLessons(c, { level: "senior" })[0]?.id).toBe("l2");
     expect(db.getLessons(c, { starred: true })).toHaveLength(1);
     expect(db.getLessons(c, { search: "Generators" })[0]?.id).toBe("l1");
+    // every word must match somewhere, in any order and across fields — not the literal phrase
+    expect(db.getLessons(c, { search: "lazy generators" })[0]?.id).toBe("l1");
+    expect(db.getLessons(c, { search: "python  lazy" })).toHaveLength(1);
+    expect(db.getLessons(c, { search: "lazy kubernetes" })).toHaveLength(0);
     expect(db.getLessons(c, { page: 1, per_page: 1 })).toHaveLength(1);
     expect(db.getAllCategories(c)).toEqual(["docker", "perf", "python"]);
     expect(db.getDistinctColumn(c, "project")).toEqual([]);
@@ -591,12 +595,33 @@ describe("courses — storage, validation, backup", () => {
       /No element/,
     );
     courses.addStep(c, a.id, { title: "Powers", kind: "example", anchor: "step-2" });
+    // insert in the middle: the later steps are renumbered, the primary key stays unique
+    writeFileSync(
+      courses.documentPath(a.id),
+      '<section id="step-1"></section><section id="step-1b"></section><div id="step-2">',
+    );
+    const mid = courses.addStep(c, a.id, {
+      title: "Half",
+      kind: "concept",
+      anchor: "step-1b",
+      after: 1,
+    });
+    expect(mid.position).toBe(2);
+    expect(courses.getCourse(c, a.id)?.steps.map((s) => `${s.position}:${s.anchor}`)).toEqual([
+      "1:step-1",
+      "2:step-1b",
+      "3:step-2",
+    ]);
+    expect(() =>
+      courses.addStep(c, a.id, { title: "x", kind: "concept", anchor: "step-9", after: 7 }),
+    ).toThrow(/'after' must be between 0 and 3/);
+    courses.setStepStatus(c, a.id, 2, "skipped"); // the inserted one, out of the way below
     expect(courses.hasActiveCourse(c)).toBe(true);
     expect(courses.setStepStatus(c, a.id, 1, "done")?.status).toBe("active");
-    expect(courses.setStepStatus(c, a.id, 2, "done")?.status).toBe("completed");
-    expect(courses.setStepStatus(c, a.id, 2, "todo")?.status).toBe("active"); // reopened
+    expect(courses.setStepStatus(c, a.id, 3, "done")?.status).toBe("completed");
+    expect(courses.setStepStatus(c, a.id, 3, "todo")?.status).toBe("active"); // reopened
     expect(courses.setStepStatus(c, a.id, 9, "done")).toBeNull();
-    expect(courses.progress(courses.getCourse(c, a.id)!)).toEqual({ done: 1, total: 2 });
+    expect(courses.progress(courses.getCourse(c, a.id)!)).toEqual({ done: 2, total: 3 });
     expect(courses.setCourseStatus(c, b.id, "abandoned")?.status).toBe("abandoned");
     expect(courses.listCourses(c, { status: "active" }).map((x) => x.id)).toEqual([a.id]);
     // a symlinked document is refused at read time

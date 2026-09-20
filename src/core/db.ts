@@ -407,15 +407,19 @@ function lessonWhere(f: LessonFilters): { where: string; params: SqlParam[] } {
   if (f.imported != null) add("imported = ?", f.imported ? 1 : 0);
   if (f.shared_by != null) add("imported = 1 AND shared_by = ?", f.shared_by);
   if (f.search != null) {
-    const like = `%${f.search}%`;
-    add(
-      "(title LIKE ? OR topic_id LIKE ? OR summary LIKE ? OR body LIKE ? OR shared_by LIKE ?)",
-      like,
-      like,
-      like,
-      like,
-      like,
-    );
+    // Every word must match somewhere ("node error" finds a lesson titled "In Node, 'error' is
+    // an event…"), not the literal phrase.
+    for (const word of f.search.split(/\s+/).filter(Boolean)) {
+      const like = `%${word}%`;
+      add(
+        "(title LIKE ? OR topic_id LIKE ? OR summary LIKE ? OR body LIKE ? OR shared_by LIKE ?)",
+        like,
+        like,
+        like,
+        like,
+        like,
+      );
+    }
   }
   if (f.feedback === "none") add("feedback IS NULL");
   else if (f.feedback != null) add("feedback = ?", f.feedback);
@@ -887,6 +891,26 @@ export function getCourseSteps(db: DatabaseSync, courseId: string): CourseStep[]
     "SELECT * FROM course_steps WHERE course_id = ? ORDER BY position",
     courseId,
   ).map(rowToCourseStep);
+}
+
+/** Make room at `position` (1-based) by shifting that step and the ones after it down by one. */
+export function shiftCourseStepsFrom(db: DatabaseSync, courseId: string, position: number): void {
+  // Two hops keep the (course_id, position) primary key unique while rows move.
+  const HOP = 100000;
+  runSql(
+    db,
+    "UPDATE course_steps SET position = position + ? WHERE course_id = ? AND position >= ?",
+    HOP,
+    courseId,
+    position,
+  );
+  runSql(
+    db,
+    "UPDATE course_steps SET position = position - ? WHERE course_id = ? AND position >= ?",
+    HOP - 1,
+    courseId,
+    HOP,
+  );
 }
 
 export function insertCourseStep(db: DatabaseSync, step: CourseStep): void {

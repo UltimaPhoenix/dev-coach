@@ -14,6 +14,7 @@ import {
   insertCourseStep,
   listCourseRows,
   MAX_COURSE_DOCUMENT_BYTES,
+  shiftCourseStepsFrom,
   touchCourse,
   updateCourseStatus,
   updateCourseStepStatus,
@@ -119,6 +120,8 @@ export interface NewStep {
   title: string;
   kind: CourseStepKind;
   anchor: string;
+  /** Insert after this step (0 = first); omitted = append. */
+  after?: number | null;
 }
 
 /**
@@ -128,6 +131,11 @@ export interface NewStep {
 export function addStep(db: DatabaseSync, courseId: string, input: NewStep): CourseStep {
   const course = getCourse(db, courseId);
   if (!course) throw new CourseError(`Course '${courseId}' not found`);
+  const count = course.steps.length;
+  const after = input.after ?? count;
+  if (!Number.isInteger(after) || after < 0 || after > count) {
+    throw new CourseError(`'after' must be between 0 and ${count} (the course has ${count} steps)`);
+  }
   const doc = courseDocument(courseId);
   if (!doc) {
     throw new CourseError(
@@ -143,7 +151,7 @@ export function addStep(db: DatabaseSync, courseId: string, input: NewStep): Cou
   }
   const step: CourseStep = {
     course_id: courseId,
-    position: course.steps.length + 1,
+    position: after + 1,
     title: input.title,
     kind: input.kind,
     anchor: input.anchor,
@@ -151,6 +159,7 @@ export function addStep(db: DatabaseSync, courseId: string, input: NewStep): Cou
     done_at: null,
   };
   return withTransaction(db, () => {
+    if (after < count) shiftCourseStepsFrom(db, courseId, after + 1);
     insertCourseStep(db, step);
     touchCourse(db, courseId, new Date().toISOString());
     return step;

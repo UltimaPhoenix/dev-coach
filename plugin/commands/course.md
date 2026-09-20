@@ -10,7 +10,8 @@ seed from $ARGUMENTS: `continue` → `get_courses` with `status: "active"` and r
 `feedback: "dont_know"`, `limit: 1`), else the newest lesson; anything else → first look for a
 lesson it describes (`get_lessons` with `search` on its 2–3 most specific words, `limit: 5`): one
 match is the seed, several are offered as choices plus "none — a free concept", none means a free
-concept with no seed lesson. Read `get_briefing` once, then explore the prerequisites ONE question
+concept with no seed lesson; if a course already exists for that seed (`get_courses`), ask first
+whether to continue, redo or keep both. Read `get_briefing` once, then explore the prerequisites ONE question
 per message — offered as Yes / Roughly / No choices when the client has a question UI — until you
 reach something the user knows, call `create_course` with the chain, write the single HTML document
 at the returned `document_path` with your file tools (self-contained, one step shown at a time with

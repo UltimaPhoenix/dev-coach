@@ -28,8 +28,10 @@ begins right there. You can also start one on any lesson or any concept at all:
 ```
 
 or just ask — *"explain this properly"*, *"teach me X from the basics"*, *"start a course on the
-HTMX redirect lesson"*. You never need a lesson's id: a few words of its title are enough, and
-when several lessons match you pick one from a list (or choose *none* for a free concept).
+HTMX redirect lesson"*. You never need a lesson's id: a few words of its title are enough (every
+word has to match somewhere, in any order), and when several lessons match you pick one from a
+list (or choose *none* for a free concept). If that lesson already has a course, the coach asks
+first: continue it, redo it, or keep both.
 
 ## What happens next
 
@@ -51,7 +53,8 @@ when several lessons match you pick one from a list (or choose *none* for a free
    step in the dashboard, then the check question — as choices when the answer is a pick (an
    order, a yes/no, one of a few candidates), as free text when you have to write an output or
    an explanation. A correct answer marks the step done and moves on; a wrong one gets a fresh
-   angle, never a silent skip. Say *skip* to skip a step, *later* to pause —
+   angle, never a silent skip; two misses and the coach offers to split the step in two, right
+   there in the document. Say *skip* to skip a step, *later* to pause —
    `/devcoach:course continue` resumes.
 4. **At the end**, if the course grew from a lesson you couldn't follow, it offers once to mark that
    lesson as understood.
