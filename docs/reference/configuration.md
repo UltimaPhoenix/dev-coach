@@ -164,6 +164,7 @@ course_steps (course_id TEXT NOT NULL, position INTEGER NOT NULL, title TEXT NOT
               anchor TEXT NOT NULL,      -- the section id in the document
               status TEXT NOT NULL DEFAULT 'todo',  -- todo | done | skipped
               done_at TEXT, PRIMARY KEY (course_id, position))
+              -- plus UNIQUE (course_id, anchor): one step per section
 
 -- Runtime-only pacing state (never included in backups)
 nudge_state (session_id TEXT PRIMARY KEY, interactions INTEGER, updated_at TEXT)

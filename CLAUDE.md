@@ -184,7 +184,7 @@ because Homebrew formulae have no uninstall hook, so the formula's `caveats` tel
 `knowledge` (topic, confidence 0–10, updated_at), `settings`, `knowledge_group_names`,
 `knowledge_groups` (composite PK), `nudge_state` (per-session lesson-cue counter) and `cue_state`
 (single row: `pending`, `last_cue_at`, `last_skip_reason` — cue lifecycle; both runtime only,
-never backed up), plus 4 indexes. All DDL is `CREATE … IF NOT EXISTS` + `INSERT OR IGNORE`
+never backed up), plus 6 indexes (incl. the unique `(course_id, anchor)` on `course_steps`). All DDL is `CREATE … IF NOT EXISTS` + `INSERT OR IGNORE`
 (idempotent). Connections set `PRAGMA busy_timeout = 3000` (concurrent hook + MCP writers).
 `DEFAULT_SETTINGS`: `max_per_day=2`, `min_gap_minutes=240`, `ui_theme=system`, `ui_home=auto` (`/` → `/lessons` once a lesson exists, else `/knowledge`), `share_name=""`,
 `nudge_every=10` (interactions between lesson cues; 0 = every turn), `nudge_scope=session` (count

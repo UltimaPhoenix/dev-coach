@@ -5,6 +5,7 @@ import { existsSync, lstatSync, mkdirSync, readFileSync, rmSync } from "node:fs"
 import { join, sep } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
 import {
+  COURSE_DOCUMENT_NAME,
   COURSES_DIR,
   deleteCourseRows,
   getCourseRow,
@@ -32,7 +33,7 @@ import type {
 import { slugify } from "./share";
 
 export const COURSE_ID_RE = /^[a-z0-9-]+$/;
-export const DOCUMENT_NAME = "index.html";
+export const DOCUMENT_NAME = COURSE_DOCUMENT_NAME;
 
 export class CourseError extends Error {}
 
@@ -129,36 +130,42 @@ export interface NewStep {
  * steps are an index over sections the AI has actually written, never promises.
  */
 export function addStep(db: DatabaseSync, courseId: string, input: NewStep): CourseStep {
-  const course = getCourse(db, courseId);
-  if (!course) throw new CourseError(`Course '${courseId}' not found`);
-  const count = course.steps.length;
-  const after = input.after ?? count;
-  if (!Number.isInteger(after) || after < 0 || after > count) {
-    throw new CourseError(`'after' must be between 0 and ${count} (the course has ${count} steps)`);
-  }
-  const doc = courseDocument(courseId);
-  if (!doc) {
-    throw new CourseError(
-      `Course '${courseId}' has no document yet — write ${documentPath(courseId)} first`,
-    );
-  }
-  const html = readFileSync(doc, "utf8");
-  if (!new RegExp(`\\bid=["']${input.anchor}["']`).test(html)) {
-    throw new CourseError(`No element with id="${input.anchor}" in ${doc}`);
-  }
-  if (course.steps.some((s) => s.anchor === input.anchor)) {
-    throw new CourseError(`Step anchor '${input.anchor}' is already registered`);
-  }
-  const step: CourseStep = {
-    course_id: courseId,
-    position: after + 1,
-    title: input.title,
-    kind: input.kind,
-    anchor: input.anchor,
-    status: "todo",
-    done_at: null,
-  };
+  // Everything inside the write transaction (BEGIN IMMEDIATE): the snapshot the checks read is
+  // the one the insert lands on, so two writers cannot both pass the anchor check. The unique
+  // index on (course_id, anchor) is the backstop.
   return withTransaction(db, () => {
+    const course = getCourse(db, courseId);
+    if (!course) throw new CourseError(`Course '${courseId}' not found`);
+    const count = course.steps.length;
+    const after = input.after ?? count;
+    if (!Number.isInteger(after) || after < 0 || after > count) {
+      throw new CourseError(
+        `'after' must be between 0 and ${count} (the course has ${count} steps)`,
+      );
+    }
+    const doc = courseDocument(courseId);
+    if (!doc) {
+      throw new CourseError(
+        `Course '${courseId}' has no document yet — write ${documentPath(courseId)} first`,
+      );
+    }
+    const html = readFileSync(doc, "utf8");
+    // A real attribute boundary (whitespace before `id=`), not `data-id=` or `xml:id=`.
+    if (!new RegExp(`\\sid=["']${input.anchor}["']`).test(html)) {
+      throw new CourseError(`No element with id="${input.anchor}" in ${doc}`);
+    }
+    if (course.steps.some((s) => s.anchor === input.anchor)) {
+      throw new CourseError(`Step anchor '${input.anchor}' is already registered`);
+    }
+    const step: CourseStep = {
+      course_id: courseId,
+      position: after + 1,
+      title: input.title,
+      kind: input.kind,
+      anchor: input.anchor,
+      status: "todo",
+      done_at: null,
+    };
     if (after < count) shiftCourseStepsFrom(db, courseId, after + 1);
     insertCourseStep(db, step);
     touchCourse(db, courseId, new Date().toISOString());

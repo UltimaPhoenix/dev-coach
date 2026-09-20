@@ -45,7 +45,11 @@ const ZIP_LESSONS = "lessons.json";
 const ZIP_KNOWLEDGE = "knowledge.json";
 const ZIP_NOTEBOOK = "learning-state.md";
 const ZIP_COURSES = "courses.json";
-const ZIP_COURSE_DOC = /^courses\/([a-z0-9-]+)\/index\.html$/;
+/** The one document each course keeps in its directory. */
+export const COURSE_DOCUMENT_NAME = "index.html";
+const ZIP_COURSE_DOC = new RegExp(
+  `^courses/([a-z0-9-]+)/${COURSE_DOCUMENT_NAME.replace(".", "\\.")}$`,
+);
 
 export const DEFAULT_PROFILE: Record<string, number> = {
   engineering: 8,
@@ -242,6 +246,7 @@ export function initSchema(db: DatabaseSync, fromVersion = 0): void {
     );
 
     CREATE INDEX IF NOT EXISTS idx_courses_lesson_id ON courses (lesson_id);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_course_steps_anchor ON course_steps (course_id, anchor);
 
     -- Runtime-only: per-session interaction counter for lesson-cue pacing.
     -- Never exported/imported (backup carries config, not this state).
@@ -1010,11 +1015,11 @@ export function createBackupZip(db: DatabaseSync): Uint8Array {
     const steps = courses.flatMap((c) => getCourseSteps(db, c.id));
     files[ZIP_COURSES] = strToU8(JSON.stringify({ courses, steps }, null, 2));
     for (const c of courses) {
-      const doc = join(COURSES_DIR, c.id, "index.html");
+      const doc = join(COURSES_DIR, c.id, COURSE_DOCUMENT_NAME);
       try {
         const st = lstatSync(doc);
         if (st.isFile() && st.size <= MAX_COURSE_DOCUMENT_BYTES) {
-          files[`courses/${c.id}/index.html`] = new Uint8Array(readFileSync(doc));
+          files[`courses/${c.id}/${COURSE_DOCUMENT_NAME}`] = new Uint8Array(readFileSync(doc));
         }
       } catch {
         // no document yet — the rows still travel
@@ -1153,7 +1158,7 @@ function restoreCoursesSection(db: DatabaseSync, unzipped: Unzipped, result: Res
     const id = ZIP_COURSE_DOC.exec(name)?.[1];
     if (!id || !known.has(id) || bytes.length > MAX_COURSE_DOCUMENT_BYTES) continue;
     const dir = join(COURSES_DIR, id);
-    const target = join(dir, "index.html");
+    const target = join(dir, COURSE_DOCUMENT_NAME);
     if (existsSync(target)) continue;
     mkdirSync(dir, { recursive: true });
     writeFileSync(target, bytes);

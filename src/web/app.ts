@@ -649,8 +649,6 @@ export function createApp(opts: AppOptions = {}): Hono {
   });
 
   // ── Settings ───────────────────────────────────────────────────────────────
-
-  // ── Settings ───────────────────────────────────────────────────────────────
   app.get("/settings/export", () => {
     const data = db.withConnection((conn) => db.createBackupZip(conn));
     return new Response(new Uint8Array(data), {

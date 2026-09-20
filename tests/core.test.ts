@@ -594,6 +594,14 @@ describe("courses — storage, validation, backup", () => {
     expect(() => courses.addStep(c, a.id, { title: "x", kind: "check", anchor: "step-3" })).toThrow(
       /No element/,
     );
+    writeFileSync(
+      courses.documentPath(a.id),
+      '<section id="step-1"></section><b data-id="step-2">',
+    );
+    expect(() => courses.addStep(c, a.id, { title: "x", kind: "check", anchor: "step-2" })).toThrow(
+      /No element/,
+    ); // data-id= is not an id
+    writeFileSync(courses.documentPath(a.id), '<section id="step-1"></section><div id="step-2">');
     courses.addStep(c, a.id, { title: "Powers", kind: "example", anchor: "step-2" });
     // insert in the middle: the later steps are renumbered, the primary key stays unique
     writeFileSync(
