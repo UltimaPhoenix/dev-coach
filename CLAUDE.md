@@ -207,11 +207,23 @@ Tools: `create_course` (returns `course_dir`, `document_path`, `seed_context`, a
 has the model write the file), `add_course_step`, `update_course_progress`, `get_courses`.
 Dashboard: `/courses`, `/courses/:id` (steps + `<iframe sandbox="allow-scripts allow-forms">`),
 `/courses/:id/index.html` served under `Content-Security-Policy: sandbox …; default-src 'none';
-form-action 'none'; base-uri 'none'; frame-ancestors 'self'` so a top-level open is as confined as
-the frame — course HTML is never inlined or DOMPurify'd. The skill flow (`references/course.md`) is
-user-initiated, never starts inside a cued turn, explores prerequisites one yes/no question per
-message, and **both hooks pause lesson cues while a course is active** (`db.hasActiveCourse`, no
-counter bump). `/devcoach:course` is the plugin command.
+script-src 'unsafe-inline' 'unsafe-eval'; form-action 'none'; base-uri 'none'; frame-ancestors
+'self'` so a top-level open is as confined as the frame — course HTML is never inlined or
+DOMPurify'd; `eval` is allowed on purpose so editable JS examples run (the sandbox leaves it
+nothing to reach). The document shows **one step at a time** (its own `nav.steps` + hash routing,
+per the contract in `references/course.md`; `<title>` is short and the tokens/dark-mode rules make
+the same file publishable as a Claude artifact — an offer the skill makes once, nothing stored).
+The server appends `assets/static/course-frame.js` to every served document (sets `data-embedded`,
+which hides the in-document menu, and `postMessage`s height + current anchor); the page's
+`assets/static/course-viewer.js` grows the frame so the **page** scrolls, keeps the pinned step list
+in sync and turns step clicks into a hash change on the frame (no reload). The skill flow
+(`references/course.md`) is user-initiated, never starts inside a cued turn, finds a seed lesson
+from a few words of its title (`get_lessons` `search`, several matches → a pick), explores
+prerequisites one question per message as Yes / Roughly / No choices, asks pick-type checks as
+choices and typed ones as text, keeps code in the seed's language (only JS-family code gets a real
+runner; the rest get simulations / predict-the-output / spot-the-bug), and **both hooks pause
+lesson cues while a course is active** (`db.hasActiveCourse`, no counter bump). `/devcoach:course`
+is the plugin command.
 
 ## Rate-limit logic (`core/coach.ts`)
 

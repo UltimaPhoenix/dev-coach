@@ -1,4 +1,4 @@
-import { existsSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import * as courses from "../src/core/courses";
 import * as db from "../src/core/db";
@@ -811,6 +811,41 @@ describe("web shared-with-me filters", () => {
   });
 });
 
+describe("web courses over a real socket", () => {
+  it("serves each document at its own length (node-server mutates plain header objects)", async () => {
+    const { startUi } = await import("../src/web/app");
+    const one = db.withConnection((c) =>
+      courses.createCourse(c, { title: "Short doc", topic_id: "node", prerequisites: [] }),
+    );
+    const two = db.withConnection((c) =>
+      courses.createCourse(c, { title: "Long doc", topic_id: "node", prerequisites: [] }),
+    );
+    writeFileSync(courses.documentPath(one.id), '<section id="step-1">short → ✓</section>');
+    writeFileSync(
+      courses.documentPath(two.id),
+      `<section id="step-1">${"long — ✗ ".repeat(400)}</section>`,
+    );
+    const server = startUi(0, { handleSignals: false });
+    try {
+      await new Promise<void>((r) => server.once("listening", () => r()));
+      const port = (server.address() as { port: number }).port;
+      const url = (id: string) => `http://127.0.0.1:${port}/courses/${id}/index.html`;
+      const first = await (await fetch(url(one.id))).text();
+      const second = await (await fetch(url(two.id))).text();
+      expect(first).toContain("short → ✓");
+      expect(first.trim().endsWith("</script>")).toBe(true);
+      expect(second).toContain("</section>");
+      expect(second.trim().endsWith("</script>")).toBe(true); // not cut to the first one's length
+    } finally {
+      await new Promise<void>((r) => server.close(() => r()));
+      db.withConnection((c) => {
+        courses.deleteCourse(c, one.id);
+        courses.deleteCourse(c, two.id);
+      });
+    }
+  });
+});
+
 describe("web courses", () => {
   it("lists, shows the sandboxed document, tracks progress, deletes", async () => {
     const empty = await (await get("/courses")).text();
@@ -833,7 +868,7 @@ describe("web courses", () => {
     expect(await (await get(`/courses/${course.id}`)).text()).toContain("hasn't been written yet");
     writeFileSync(
       courses.documentPath(course.id),
-      '<!doctype html><section id="step-1">one</section><section id="step-2">two</section>',
+      '<!doctype html><section id="step-1">one → ✓</section><section id="step-2">two — ✗</section>',
     );
     db.withConnection((c) => {
       courses.addStep(c, course.id, { title: "Sums", kind: "concept", anchor: "step-1" });
@@ -848,6 +883,11 @@ describe("web courses", () => {
     const detail = await (await get(`/courses/${course.id}`)).text();
     expect(detail).toContain(`src="/courses/${course.id}/index.html#step-1"`);
     expect(detail).toContain('sandbox="allow-scripts allow-forms"');
+    expect(detail).toContain('id="course-frame"');
+    expect(detail).toContain('scrolling="no"'); // the page scrolls, never the frame
+    expect(detail).not.toContain("h-[75vh]");
+    expect(detail).toContain('<script src="/static/course-viewer.js"></script>');
+    expect(detail).toContain('data-anchor="step-2"');
     expect(detail).toContain("✗ powers");
     expect(detail).toContain("✓ sums");
     expect(detail).toContain("Delete course…");
@@ -856,9 +896,17 @@ describe("web courses", () => {
     expect(doc.status).toBe(200);
     expect(doc.headers.get("content-security-policy")).toContain("sandbox allow-scripts");
     expect(doc.headers.get("content-security-policy")).toContain("form-action 'none'");
+    expect(doc.headers.get("content-security-policy")).toContain("'unsafe-eval'");
     expect(doc.headers.get("x-content-type-options")).toBe("nosniff");
     expect(doc.headers.get("referrer-policy")).toBe("no-referrer");
-    expect(await doc.text()).toContain("<section");
+    const docText = await doc.text();
+    expect(docText).toContain("<section");
+    expect(docText).toContain("two — ✗"); // multi-byte content survives Content-Length
+    // the resize bridge is appended on the way out, never written to the file
+    expect(docText).toContain('setAttribute("data-embedded", "1")');
+    expect(docText.trim().endsWith("</script>")).toBe(true);
+    expect(readFileSync(courses.documentPath(course.id), "utf8")).not.toContain("data-embedded");
+    expect((await get("/static/course-viewer.js")).status).toBe(200);
     expect((await get("/courses/../etc/index.html")).status).toBe(404);
 
     // the seed lesson links to its course

@@ -69,6 +69,8 @@ export function layout(o: {
   head?: Html | string;
   scripts?: Html | string;
   body: Html;
+  /** Use the whole viewport width (the course viewer) instead of the 7xl reading column. */
+  wide?: boolean;
 }): Html {
   const link = (href: string, label: string, active: boolean) =>
     html`<a href="${href}" class="text-gray-500 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition ${active ? "text-gray-900 dark:text-white font-semibold" : ""}">${label}</a>`;
@@ -112,7 +114,7 @@ export function layout(o: {
               class="w-8 h-8 inline-flex items-center justify-center rounded-lg border transition bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-indigo-400 text-base leading-none"></button>
     </div>
   </nav>
-  <main class="max-w-7xl mx-auto px-4 sm:px-6 py-8">${o.body}</main>
+  <main class="${o.wide ? "max-w-none" : "max-w-7xl"} mx-auto px-4 sm:px-6 py-8">${o.body}</main>
   <script>
     function isDark() { return document.documentElement.classList.contains('dark'); }
     function updateThemeIcon() { var b = document.getElementById('theme-toggle'); if (b) b.textContent = isDark() ? '☀️' : '🌙'; }
@@ -1245,63 +1247,63 @@ export function courseDetailPage(d: CourseDetailData): Html {
     html`<form method="post" action="/courses/${encodeURIComponent(c.id)}/steps/${position}" class="inline"><input type="hidden" name="status" value="${status}" /><input type="hidden" name="next" value="/courses/${encodeURIComponent(c.id)}?step=${position}" /><button type="submit" class="${cls}">${label}</button></form>`;
   const btn =
     "inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium border transition bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-indigo-400";
+  // The document carries its own title and intro, so the page adds nothing above it: a slim
+  // sticky bar (back · title · status · progress · ⋯) that is only navigation, a pinned step
+  // list at the side, and the frame itself — the page scrolls as one.
   const body = html`
 <div x-data="{ confirmOpen: false }" @keydown.escape.window="confirmOpen = false">
-<div class="mb-4"><a href="/courses" class="text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-white text-sm transition">← Back to courses</a></div>
-<div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-6 mb-4">
-  <div class="flex flex-wrap items-center gap-3 mb-2">
-    <h1 class="text-xl font-bold text-gray-900 dark:text-white flex-1 min-w-0">${c.title}</h1>
-    ${statusBadge(c.status)}
-    ${moreMenu(
-      html`<button type="button" @click="confirmOpen = true; open = false" class="w-full text-left px-3 py-2 rounded-lg text-sm transition flex items-center gap-2 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 hover:!bg-rose-50 dark:hover:!bg-rose-900/30 hover:text-rose-700 dark:hover:text-rose-300"><span class="w-4 h-4 inline-flex items-center justify-center shrink-0 text-[13px] leading-none" aria-hidden="true">🗑</span>Delete course…</button>`,
-      "shrink-0",
-    )}
-  </div>
-  <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-500 dark:text-gray-400">
-    <span>🏷 <span class="text-cyan-600 dark:text-cyan-400">${c.topic_id}</span></span>
-    <span>${done}/${c.steps.length} steps</span>
-    ${c.lesson_id ? html`<span>from <a href="/lessons/${encodeURIComponent(c.lesson_id)}" class="text-gray-700 dark:text-gray-200 hover:text-indigo-500 hover:underline">${d.lessonTitle ?? c.lesson_id}</a></span>` : ""}
-  </div>
-  ${c.goal ? html`<p class="mt-3 text-sm text-gray-700 dark:text-gray-200">${c.goal}</p>` : ""}
-  ${
-    c.prerequisites.length
-      ? html`<div class="mt-3 flex flex-wrap items-center gap-1.5 text-xs" title="The prerequisite chain explored before writing the course">
-    ${c.prerequisites.map((p) => html`<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border ${p.known ? "bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800" : "bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800"}">${p.known ? "✓" : "✗"} ${p.concept}</span>`)}
-  </div>`
-      : ""
-  }
+<div class="sticky top-0 z-20 -mx-4 sm:-mx-6 -mt-8 mb-5 px-4 sm:px-6 h-12 flex items-center gap-3 bg-gray-50/95 dark:bg-gray-950/95 backdrop-blur border-b border-gray-200 dark:border-gray-800">
+  <a href="/courses" title="Back to courses" class="text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-white text-sm transition shrink-0">←</a>
+  <span class="text-sm font-semibold text-gray-900 dark:text-white truncate min-w-0">${c.title}</span>
+  ${statusBadge(c.status)}
+  <span class="text-xs text-gray-500 dark:text-gray-400 shrink-0">${done}/${c.steps.length} steps</span>
+  ${moreMenu(
+    html`<button type="button" @click="confirmOpen = true; open = false" class="w-full text-left px-3 py-2 rounded-lg text-sm transition flex items-center gap-2 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 hover:!bg-rose-50 dark:hover:!bg-rose-900/30 hover:text-rose-700 dark:hover:text-rose-300"><span class="w-4 h-4 inline-flex items-center justify-center shrink-0 text-[13px] leading-none" aria-hidden="true">🗑</span>Delete course…</button>`,
+    "ml-auto shrink-0",
+  )}
 </div>
-<div class="grid grid-cols-1 lg:grid-cols-[18rem_1fr] gap-4">
-  <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-3">
+<div class="grid grid-cols-1 lg:grid-cols-[15rem_minmax(0,1fr)] gap-6 lg:gap-8">
+  <aside id="course-steps" class="lg:sticky lg:top-16 self-start">
     <p class="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500 px-2 mb-2">Steps</p>
     ${
       c.steps.length
-        ? html`<ol class="space-y-1">${c.steps.map(
+        ? html`<ol class="space-y-0.5">${c.steps.map(
             (
               s,
-            ) => html`<li class="rounded-lg px-2 py-2 ${current && s.position === current.position ? "bg-indigo-50 dark:bg-indigo-900/30" : ""}">
-        <a href="/courses/${encodeURIComponent(c.id)}?step=${s.position}" class="flex items-start gap-2 text-sm">
+            ) => html`<li data-anchor="${s.anchor}" class="rounded-lg px-2 py-1.5 ${current && s.position === current.position ? "bg-indigo-50 dark:bg-indigo-900/30" : ""}">
+        <a href="/courses/${encodeURIComponent(c.id)}?step=${s.position}" data-anchor="${s.anchor}" class="flex items-start gap-2 text-sm">
           <span class="${s.status === "done" ? "text-green-500" : s.status === "skipped" ? "text-gray-400" : "text-indigo-400"}">${STEP_ICON[s.status] ?? "○"}</span>
           <span class="min-w-0 flex-1"><span class="block text-gray-800 dark:text-gray-100">${s.position}. ${s.title}</span><span class="block text-[11px] text-gray-400 dark:text-gray-500">${s.kind}${s.status !== "todo" ? ` · ${s.status}` : ""}</span></span>
         </a>
-        ${
-          current && s.position === current.position
-            ? html`<div class="flex flex-wrap gap-1.5 mt-2 pl-6">
+        <div data-step-actions class="flex flex-wrap gap-1.5 mt-2 pl-6 ${current && s.position === current.position ? "" : "hidden"}">
           ${s.status !== "done" ? stepAction(s.position, "done", "✓ Mark done", `${btn} hover:border-green-400 hover:text-green-700 dark:hover:text-green-300`) : stepAction(s.position, "todo", "↺ Reopen", btn)}
           ${s.status === "todo" ? stepAction(s.position, "skipped", "Skip", btn) : ""}
-        </div>`
-            : ""
-        }
+        </div>
       </li>`,
           )}</ol>`
         : html`<p class="text-sm text-gray-500 dark:text-gray-400 px-2">No steps registered yet.</p>`
     }
-  </div>
-  <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl overflow-hidden min-h-[60vh]">
+    <details class="mt-4 px-2 text-xs text-gray-500 dark:text-gray-400">
+      <summary class="cursor-pointer font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500 select-none">About this course</summary>
+      <div class="mt-2 space-y-2">
+        <p>🏷 <span class="text-cyan-600 dark:text-cyan-400">${c.topic_id}</span></p>
+        ${c.lesson_id ? html`<p>from <a href="/lessons/${encodeURIComponent(c.lesson_id)}" class="text-gray-700 dark:text-gray-200 hover:text-indigo-500 hover:underline">${d.lessonTitle ?? c.lesson_id}</a></p>` : ""}
+        ${c.goal ? html`<p class="text-gray-600 dark:text-gray-300">${c.goal}</p>` : ""}
+        ${
+          c.prerequisites.length
+            ? html`<div class="flex flex-wrap items-center gap-1" title="The prerequisite chain explored before writing the course">
+          ${c.prerequisites.map((p) => html`<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full border ${p.known ? "bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800" : "bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800"}">${p.known ? "✓" : "✗"} ${p.concept}</span>`)}
+        </div>`
+            : ""
+        }
+      </div>
+    </details>
+  </aside>
+  <div class="min-w-0">
     ${
       d.hasDocument
-        ? html`<iframe src="${frameSrc}" title="${c.title}" sandbox="allow-scripts allow-forms" referrerpolicy="no-referrer" class="w-full h-[75vh] bg-white"></iframe>`
-        : html`<div class="p-8 text-center text-sm text-gray-500 dark:text-gray-400"><p class="text-3xl mb-3">✍️</p>The course document hasn't been written yet. Ask your agent to continue the course — it writes <span class="font-mono">index.html</span> in the course folder, and it appears here.</div>`
+        ? html`<iframe id="course-frame" src="${frameSrc}" title="${c.title}" sandbox="allow-scripts allow-forms" referrerpolicy="no-referrer" scrolling="no" class="w-full block min-h-[40vh]"></iframe>`
+        : html`<div class="p-8 text-center text-sm text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl"><p class="text-3xl mb-3">✍️</p>The course document hasn't been written yet. Ask your agent to continue the course — it writes <span class="font-mono">index.html</span> in the course folder, and it appears here.</div>`
     }
   </div>
 </div>
@@ -1323,6 +1325,8 @@ ${dangerDialog(
     currentPath: "/courses",
     uiTheme: d.uiTheme,
     body,
+    scripts: html`<script src="/static/course-viewer.js"></script>`,
+    wide: true,
   });
 }
 

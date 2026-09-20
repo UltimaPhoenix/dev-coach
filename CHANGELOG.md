@@ -15,6 +15,13 @@ Notable changes to devcoach. Versions follow [Semantic Versioning](https://semve
   `add_course_step`, `update_course_progress`, `get_courses`; 21 → 25), a **Courses** page in the
   dashboard with the document in a sandboxed frame, `devcoach courses` / `course <id>`, backups carry
   courses, and lesson cues pause while a course is active. **Schema v5** (additive, automatic).
+  A course starts from a few words of a lesson's title (no id needed; several matches become a
+  pick), the yes / no / roughly questions and the pick-type checks arrive as selectable choices in
+  Claude Code, the document shows one step at a time with a side step menu and *Previous / Next*,
+  the dashboard frame grows to the step so the page scrolls, editable JavaScript examples really
+  run (the document CSP allows `eval` inside its sandbox) while other languages get simulations,
+  predict-the-output, fill-the-blank or spot-the-bug, and the coach offers once to publish the
+  document as a private Claude artifact (nothing stored).
 
 ### Changed
 - **Three answers under a lesson card**: `✅ knew it (y)` · `💡 understood (u)` · `❌ couldn't follow

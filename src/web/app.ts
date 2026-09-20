@@ -545,17 +545,28 @@ export function createApp(opts: AppOptions = {}): Hono {
   // ── Courses ────────────────────────────────────────────────────────────────
   // The viewer. The course document is model-written HTML: it is served as its own resource
   // under a CSP that sandboxes it (also when opened top-level), forbids every network channel
-  // (default-src 'none', form-action 'none') and never inlined into a dashboard page.
+  // (default-src 'none', form-action 'none') and never inlined into a dashboard page. `eval` is
+  // allowed so a course can run the reader's own edits of a JS example: inside this sandbox
+  // (opaque origin, no network, no forms, no navigation) it reaches nothing more than inline code.
   const COURSE_DOC_HEADERS = {
     "content-type": "text/html; charset=utf-8",
     "content-security-policy":
-      "sandbox allow-scripts allow-forms; default-src 'none'; script-src 'unsafe-inline'; " +
-      "style-src 'unsafe-inline'; img-src data:; font-src data:; form-action 'none'; " +
-      "base-uri 'none'; frame-ancestors 'self'",
+      "sandbox allow-scripts allow-forms; default-src 'none'; " +
+      "script-src 'unsafe-inline' 'unsafe-eval'; style-src 'unsafe-inline'; img-src data:; " +
+      "font-src data:; form-action 'none'; base-uri 'none'; frame-ancestors 'self'",
     "referrer-policy": "no-referrer",
     "x-content-type-options": "nosniff",
     "cache-control": "no-cache",
   };
+  // Appended to every served document: the frame reports its height and current step to the
+  // course page (see assets/static/course-frame.js). The file on disk is never modified.
+  const COURSE_FRAME_SCRIPT = (() => {
+    try {
+      return `\n<script>${readFileSync(join(STATIC_DIR, "course-frame.js"), "utf8")}</script>\n`;
+    } catch {
+      return "";
+    }
+  })();
 
   app.get("/courses", (c) => {
     const data = db.withConnection((conn) => ({
@@ -576,7 +587,11 @@ export function createApp(opts: AppOptions = {}): Hono {
     const path = courses.courseDocument(id);
     if (!path) return c.notFound();
     try {
-      return new Response(new Uint8Array(readFileSync(path)), { headers: COURSE_DOC_HEADERS });
+      const page = Buffer.concat([readFileSync(path), Buffer.from(COURSE_FRAME_SCRIPT)]);
+      // A fresh Headers object per response: @hono/node-server writes Content-Length INTO a
+      // plain headers object it is handed, so a shared constant would pin every later document
+      // to the first one's length (observed: documents cut short at the same byte count).
+      return new Response(new Uint8Array(page), { headers: new Headers(COURSE_DOC_HEADERS) });
     } catch {
       return c.notFound();
     }
