@@ -7,6 +7,7 @@ import { type ServerType, serve } from "@hono/node-server";
 import { type Context, Hono } from "hono";
 import { c, link } from "../cli/term";
 import * as coach from "../core/coach";
+import * as courses from "../core/courses";
 import * as db from "../core/db";
 import { detectGitUserName } from "../core/git";
 import type { KnowledgeEntry, Lesson, UiHome } from "../core/models";
@@ -25,6 +26,8 @@ import {
 import { fetchSharedInput, isHttpUrl } from "../core/share-fetch";
 import { VERSION } from "../version";
 import {
+  courseDetailPage,
+  coursesPage,
   importPage,
   type LessonsSelected,
   lessonDetailPage,
@@ -438,6 +441,9 @@ export function createApp(opts: AppOptions = {}): Hono {
   app.post("/lessons/:lesson_id/feedback", async (c) => {
     const body = await c.req.parseBody();
     const fb = textField(body, "feedback");
+    if (!["", "clear", "know", "understood", "dont_know"].includes(fb)) {
+      return c.text("Unknown feedback value", 400);
+    }
     const value = fb === "" || fb === "clear" ? null : fb;
     db.withConnection((conn) => coach.recordFeedback(conn, c.req.param("lesson_id"), value));
     return c.redirect(safeRedirect(textField(body, "next") || undefined), 303);
@@ -511,7 +517,16 @@ export function createApp(opts: AppOptions = {}): Hono {
       const lesson = db.getLessonById(conn, c.req.param("lesson_id"));
       if (!lesson) return null;
       const settings = db.getSettings(conn);
-      return { lesson, settingName: settings.share_name, uiTheme: settings.ui_theme };
+      const seeded = courses.listCourses(conn, { lesson_id: lesson.id })[0];
+      const course = seeded
+        ? {
+            id: seeded.id,
+            title: seeded.title,
+            status: seeded.status,
+            ...courses.progress(seeded),
+          }
+        : null;
+      return { lesson, course, settingName: settings.share_name, uiTheme: settings.ui_theme };
     });
     if (!found) return c.html("<h1>Lesson not found</h1>", 404);
     const q = c.req.query();
@@ -522,8 +537,115 @@ export function createApp(opts: AppOptions = {}): Hono {
         uiTheme: found.uiTheme,
         share: shareState(found.lesson, found.settingName, { open: q.share === "1" }).state,
         imported,
+        course: found.course,
       }),
     );
+  });
+
+  // ── Courses ────────────────────────────────────────────────────────────────
+  // The viewer. The course document is model-written HTML: it is served as its own resource
+  // under a CSP that sandboxes it (also when opened top-level), forbids every network channel
+  // (default-src 'none', form-action 'none') and never inlined into a dashboard page. `eval` is
+  // allowed so a course can run the reader's own edits of a JS example: inside this sandbox
+  // (opaque origin, no network, no forms, no navigation) it reaches nothing more than inline code.
+  const COURSE_DOC_HEADERS = {
+    "content-type": "text/html; charset=utf-8",
+    "content-security-policy":
+      "sandbox allow-scripts allow-forms; default-src 'none'; " +
+      "script-src 'unsafe-inline' 'unsafe-eval'; style-src 'unsafe-inline'; img-src data:; " +
+      "font-src data:; form-action 'none'; base-uri 'none'; frame-ancestors 'self'",
+    "referrer-policy": "no-referrer",
+    "x-content-type-options": "nosniff",
+    "cache-control": "no-cache",
+  };
+  // Appended to every served document: the frame reports its height and current step to the
+  // course page (see assets/static/course-frame.js). The file on disk is never modified.
+  const COURSE_FRAME_SCRIPT = (() => {
+    try {
+      return `\n<script>${readFileSync(join(STATIC_DIR, "course-frame.js"), "utf8")}</script>\n`;
+    } catch {
+      return "";
+    }
+  })();
+
+  app.get("/courses", (c) => {
+    const data = db.withConnection((conn) => ({
+      courses: courses.listCourses(conn).map((course) => ({
+        ...course,
+        lesson_title: course.lesson_id
+          ? (db.getLessonById(conn, course.lesson_id)?.title ?? null)
+          : null,
+      })),
+      uiTheme: db.getSettings(conn).ui_theme,
+    }));
+    return c.html(coursesPage(data));
+  });
+
+  app.get("/courses/:course_id/index.html", (c) => {
+    const id = c.req.param("course_id");
+    if (!courses.COURSE_ID_RE.test(id)) return c.notFound();
+    const path = courses.courseDocument(id);
+    if (!path) return c.notFound();
+    try {
+      const page = Buffer.concat([readFileSync(path), Buffer.from(COURSE_FRAME_SCRIPT)]);
+      // A fresh Headers object per response: @hono/node-server writes Content-Length INTO a
+      // plain headers object it is handed, so a shared constant would pin every later document
+      // to the first one's length (observed: documents cut short at the same byte count).
+      return new Response(new Uint8Array(page), { headers: new Headers(COURSE_DOC_HEADERS) });
+    } catch {
+      return c.notFound();
+    }
+  });
+
+  app.get("/courses/:course_id", (c) => {
+    const id = c.req.param("course_id");
+    const found = db.withConnection((conn) => {
+      const course = courses.getCourse(conn, id);
+      if (!course) return null;
+      return {
+        course,
+        lessonTitle: course.lesson_id
+          ? (db.getLessonById(conn, course.lesson_id)?.title ?? null)
+          : null,
+        uiTheme: db.getSettings(conn).ui_theme,
+      };
+    });
+    if (!found) return c.html("<h1>Course not found</h1>", 404);
+    const firstTodo = found.course.steps.find((s) => s.status === "todo")?.position ?? 1;
+    const selected = Number.parseInt(c.req.query("step") ?? "", 10) || firstTodo;
+    return c.html(
+      courseDetailPage({
+        ...found,
+        selected,
+        hasDocument: courses.courseDocument(id) !== null,
+      }),
+    );
+  });
+
+  app.post("/courses/:course_id/steps/:position", async (c) => {
+    if (isCrossSite(c)) return c.text("Forbidden", 403);
+    const body = await c.req.parseBody();
+    const status = textField(body, "status");
+    if (!["todo", "done", "skipped"].includes(status)) return c.text("Unknown status", 400);
+    const position = Number.parseInt(c.req.param("position"), 10);
+    const id = c.req.param("course_id");
+    const updated = db.withConnection((conn) =>
+      Number.isFinite(position)
+        ? courses.setStepStatus(conn, id, position, status as "todo" | "done" | "skipped")
+        : null,
+    );
+    if (!updated) return c.text("Step not found", 404);
+    return c.redirect(
+      safeRedirect(textField(body, "next") || undefined, `/courses/${encodeURIComponent(id)}`),
+      303,
+    );
+  });
+
+  app.post("/courses/delete", async (c) => {
+    if (isCrossSite(c)) return c.text("Forbidden", 403);
+    const body = await c.req.parseBody();
+    db.withConnection((conn) => courses.deleteCourse(conn, textField(body, "id")));
+    return c.redirect("/courses", 303);
   });
 
   // ── Settings ───────────────────────────────────────────────────────────────

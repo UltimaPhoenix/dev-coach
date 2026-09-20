@@ -27,7 +27,7 @@ clients can look it up by that name and install it directly; the entry resolves 
 `npx -y devcoach mcp` command as the manual configuration above, so both paths run the identical
 local server.
 
-## Tools (21)
+## Tools (25)
 
 | Tool | Purpose | Annotation |
 |---|---|---|
@@ -41,7 +41,7 @@ local server.
 | `get_lessons` | Query lesson history (period, category, level, git, starred, imported, `shared_by`, feedback, search, date range); `limit` defaults to 10, `0` = all | read-only |
 | `star_lesson` | Star / unstar a lesson | write |
 | `delete_lesson` | Permanently delete a lesson | **destructive** |
-| `submit_feedback` | Record `know` / `dont_know` / `clear`; adjusts confidence ±1 (idempotent) | write |
+| `submit_feedback` | Record `know` / `understood` / `dont_know` / `clear`; only `know` moves confidence (+1, undone on change; idempotent) | write |
 | `add_topic` | Add/update a topic (confidence 0–10, default 5), optionally in a group | write |
 | `remove_topic` | Remove a topic from the knowledge map | **destructive** |
 | `add_group` | Create a knowledge group | write |
@@ -52,6 +52,10 @@ local server.
 | `open_ui` | Launch the web dashboard in the background on `127.0.0.1` (`port` 1024–65535, default 7860) | open-world |
 | `stop_ui` | Stop the dashboard listening on `port` (whoever started it) — graceful, in-flight requests finish; `stopped: false` when nothing runs there | open-world, idempotent |
 | `complete_onboarding` | Save the initial profile (topics + groups) and mark onboarding done; guarantees a non-empty notebook placeholder (the model writes the real notebook directly, see [privacy.md](privacy.md)) | **destructive** |
+| `create_course` | Start a [course](../usage/courses.md) from a lesson or a concept with the explored prerequisite chain; returns `course_dir` + `document_path` — the model writes the single HTML document there itself | write |
+| `add_course_step` | Register a section of the course document (`anchor` = its `id`) as a step — appended, or inserted with `after` (the following steps are renumbered); the section must already exist | write |
+| `update_course_progress` | A step's `todo` / `done` / `skipped` (the course completes itself once every step is done or skipped), or the course's `active` / `completed` / `abandoned` | write |
+| `get_courses` | Courses with their steps, filtered by `course_id`, seed `lesson_id` or `status` | read-only |
 
 Each tool declares a `title` and read-only/destructive hints, validates input with Zod, returns typed
 `structuredContent` where applicable, and reports failures as `{ isError: true, … }` with a recovery hint.

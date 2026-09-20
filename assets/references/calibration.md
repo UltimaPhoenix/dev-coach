@@ -15,7 +15,7 @@ Group the 10 lessons by `topic_id`. For each topic that appeared:
 
 | Signal | Condition | Action |
 |---|---|---|
-| Consistent mastery | All feedback `know`, no `dont_know` | `update_knowledge(topic, +1)` if confidence < 9 |
+| Consistent mastery | All feedback `know` or `understood`, no `dont_know` | `update_knowledge(topic, +1)` if confidence < 9 |
 | Persistent gap | 2+ lessons on same topic, any `dont_know` | `update_knowledge(topic, -1)` if confidence > 1 |
 | Recurring topic | 3+ lessons on same topic, mixed or no feedback | no confidence change — note in notebook |
 | New topic | `topic_id` absent from `get_profile` | `add_topic` — see Step 3 |

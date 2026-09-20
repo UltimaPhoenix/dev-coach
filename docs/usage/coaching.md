@@ -93,16 +93,20 @@ never have to branch on `status` strings.
 
 ### ──────── typescript · mid ────────
 
-Did that land? ✅ know (y) · ❌ don't know (n)
+Did that land? ✅ knew it (y) · 💡 understood (u) · ❌ couldn't follow (n)
 ```
 
 ## The feedback loop
 
-Answer on the line under the card — a bare `y` or `n` is enough — and your reply tunes future coaching:
+Answer on the line under the card — a bare `y`, `u` or `n` is enough — and your reply tunes future
+coaching:
 
-- **✅ know** (`y`, `yes`) — raises your confidence on that topic by one; you'll see fewer, deeper
-  lessons there.
-- **❌ don't know** (`n`, `no`) — lowers it by one; devcoach revisits the area sooner.
+- **✅ knew it** (`y`, `yes`) — you already knew this: your confidence on that topic goes up by one,
+  and you'll see fewer, deeper lessons there.
+- **💡 understood** (`u`, `got it`) — it was new and it landed: the coach pitched the right level, so
+  nothing changes.
+- **❌ couldn't follow** (`n`, `no`) — too dense for this session: confidence stays where it is, and
+  the lesson is kept as a seed for a step-by-step course you can start whenever you like.
 - **Anything else, or no reply** — no change; the question is dropped silently and you carry on.
 
 ## Sharing a lesson with a teammate

@@ -1,9 +1,19 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
+import { strToU8, unzipSync, zipSync } from "fflate";
 import { afterEach, describe, expect, it } from "vitest";
 import * as coach from "../src/core/coach";
+import * as courses from "../src/core/courses";
 import * as db from "../src/core/db";
 import { detectStack, mergeStacks } from "../src/core/detect";
 import { detectGitContext } from "../src/core/git";
@@ -70,6 +80,10 @@ describe("db lessons", () => {
     expect(db.getLessons(c, { level: "senior" })[0]?.id).toBe("l2");
     expect(db.getLessons(c, { starred: true })).toHaveLength(1);
     expect(db.getLessons(c, { search: "Generators" })[0]?.id).toBe("l1");
+    // every word must match somewhere, in any order and across fields — not the literal phrase
+    expect(db.getLessons(c, { search: "lazy generators" })[0]?.id).toBe("l1");
+    expect(db.getLessons(c, { search: "python  lazy" })).toHaveLength(1);
+    expect(db.getLessons(c, { search: "lazy kubernetes" })).toHaveLength(0);
     expect(db.getLessons(c, { page: 1, per_page: 1 })).toHaveLength(1);
     expect(db.getAllCategories(c)).toEqual(["docker", "perf", "python"]);
     expect(db.getDistinctColumn(c, "project")).toEqual([]);
@@ -301,7 +315,25 @@ describe("coach", () => {
     expect(coach.applyKnowledgeDelta(c, "python", 2)).toBe(6);
     expect(coach.applyKnowledgeDelta(c, "newtopic", 1)).toBe(6); // base 5 + 1
     db.insertLesson(c, lesson());
-    expect(coach.recordFeedback(c, "l1", "know")).toBe("python");
+    expect(coach.recordFeedback(c, "l1", "know")).toMatchObject({
+      topic_id: "python",
+      previous: null,
+      delta: 1,
+    });
+    expect(db.getAllKnowledge(c).python).toBe(7); // 6 after the +2 delta above, +1 for know
+    // understood / dont_know never move confidence; leaving `know` undoes its +1; idempotent
+    expect(coach.recordFeedback(c, "l1", "understood")).toMatchObject({
+      previous: "know",
+      delta: -1,
+    });
+    expect(db.getAllKnowledge(c).python).toBe(6);
+    expect(coach.recordFeedback(c, "l1", "dont_know")).toMatchObject({
+      previous: "understood",
+      delta: 0,
+    });
+    expect(coach.recordFeedback(c, "l1", "dont_know")).toMatchObject({ delta: 0 });
+    expect(db.getAllKnowledge(c).python).toBe(6);
+    expect(coach.recordFeedback(c, "missing", "know")).toBeNull();
     const stats = coach.getStats(c);
     expect(stats.total_lessons).toBe(1);
     expect((stats.weakest_topics as unknown[]).length).toBeGreaterThan(0);
@@ -385,9 +417,24 @@ describe("lesson sharing — storage & pacing", () => {
     expect(cols).toContain("imported");
     expect(cols).toContain("shared_by");
     expect((c.prepare("PRAGMA user_version").get() as { user_version: number }).user_version).toBe(
-      3,
+      db.SCHEMA_VERSION,
     );
     expect(coach.importSharedLesson(c, payloadFor("m1")).inserted).toBe(1);
+  });
+
+  it("v4 rewrites pre-existing dont_know answers to understood — once", () => {
+    const path = join(mkdtempSync(join(tmpdir(), "dc-db-")), "v3.db");
+    const old = db.getInitializedConnection(path);
+    db.insertLesson(old, lesson({ id: "old", feedback: "dont_know" }));
+    old.exec("PRAGMA user_version = 3");
+    old.close();
+    c = db.getInitializedConnection(path);
+    expect(db.getLessonById(c, "old")?.feedback).toBe("understood");
+    // a fresh answer on a v4 database is what the user meant: couldn't follow
+    db.insertLesson(c, lesson({ id: "fresh", feedback: "dont_know" }));
+    c.close();
+    c = db.getInitializedConnection(path);
+    expect(db.getLessonById(c, "fresh")?.feedback).toBe("dont_know");
   });
 
   it("an imported lesson is ours (taught topic, feedback works) but never touches pacing", () => {
@@ -412,7 +459,7 @@ describe("lesson sharing — storage & pacing", () => {
     });
     // …but taught, and feedback calibrates the profile as for any lesson.
     expect(db.getTaughtTopicIds(c)).toEqual(["docker"]);
-    expect(coach.recordFeedback(c, "p1", "know")).toBe("docker");
+    expect(coach.recordFeedback(c, "p1", "know")?.topic_id).toBe("docker");
     expect(db.getAllKnowledge(c).docker).toBe(6);
     // an own lesson right after still counts as usual
     db.insertLesson(c, lesson({ id: "own", timestamp: new Date() }));
@@ -517,6 +564,113 @@ describe("lesson sharing — storage & pacing", () => {
     const restored = db.getLessonById(c2, "ctx");
     expect(restored).toMatchObject({ imported: true, shared_by: "Bob", project: "their-project" });
     expect(db.getSettings(c2).share_name).toBe("Ada");
+    c2.close();
+  });
+});
+
+describe("courses — storage, validation, backup", () => {
+  let c: DatabaseSync;
+  afterEach(() => c?.close());
+
+  it("creates a slugged directory, indexes real sections only, tracks progress", () => {
+    c = freshDb();
+    const a = courses.createCourse(c, { title: "Sums & Powers!", topic_id: "math" });
+    expect(a.id).toBe("sums-powers");
+    expect(existsSync(courses.courseDir(a.id))).toBe(true);
+    const b = courses.createCourse(c, { title: "Sums & Powers!", topic_id: "math" });
+    expect(b.id).toBe("sums-powers-2");
+    expect(() => courses.courseDir("../etc")).toThrow(/Invalid course id/);
+    expect(courses.courseDocument(a.id)).toBeNull(); // nothing written yet
+    expect(() =>
+      courses.addStep(c, a.id, { title: "x", kind: "concept", anchor: "step-1" }),
+    ).toThrow(/no document yet/);
+    writeFileSync(courses.documentPath(a.id), '<section id="step-1"></section><div id="step-2">');
+    expect(courses.courseDocument(a.id)).toBe(courses.documentPath(a.id));
+    const s1 = courses.addStep(c, a.id, { title: "Sums", kind: "concept", anchor: "step-1" });
+    expect(s1.position).toBe(1);
+    expect(() =>
+      courses.addStep(c, a.id, { title: "dup", kind: "concept", anchor: "step-1" }),
+    ).toThrow(/already registered/);
+    expect(() => courses.addStep(c, a.id, { title: "x", kind: "check", anchor: "step-3" })).toThrow(
+      /No element/,
+    );
+    writeFileSync(
+      courses.documentPath(a.id),
+      '<section id="step-1"></section><b data-id="step-2">',
+    );
+    expect(() => courses.addStep(c, a.id, { title: "x", kind: "check", anchor: "step-2" })).toThrow(
+      /No element/,
+    ); // data-id= is not an id
+    writeFileSync(courses.documentPath(a.id), '<section id="step-1"></section><div id="step-2">');
+    courses.addStep(c, a.id, { title: "Powers", kind: "example", anchor: "step-2" });
+    // insert in the middle: the later steps are renumbered, the primary key stays unique
+    writeFileSync(
+      courses.documentPath(a.id),
+      '<section id="step-1"></section><section id="step-1b"></section><div id="step-2">',
+    );
+    const mid = courses.addStep(c, a.id, {
+      title: "Half",
+      kind: "concept",
+      anchor: "step-1b",
+      after: 1,
+    });
+    expect(mid.position).toBe(2);
+    expect(courses.getCourse(c, a.id)?.steps.map((s) => `${s.position}:${s.anchor}`)).toEqual([
+      "1:step-1",
+      "2:step-1b",
+      "3:step-2",
+    ]);
+    expect(() =>
+      courses.addStep(c, a.id, { title: "x", kind: "concept", anchor: "step-9", after: 7 }),
+    ).toThrow(/'after' must be between 0 and 3/);
+    courses.setStepStatus(c, a.id, 2, "skipped"); // the inserted one, out of the way below
+    expect(courses.hasActiveCourse(c)).toBe(true);
+    expect(courses.setStepStatus(c, a.id, 1, "done")?.status).toBe("active");
+    expect(courses.setStepStatus(c, a.id, 3, "done")?.status).toBe("completed");
+    expect(courses.setStepStatus(c, a.id, 3, "todo")?.status).toBe("active"); // reopened
+    expect(courses.setStepStatus(c, a.id, 9, "done")).toBeNull();
+    expect(courses.progress(courses.getCourse(c, a.id)!)).toEqual({ done: 2, total: 3 });
+    expect(courses.setCourseStatus(c, b.id, "abandoned")?.status).toBe("abandoned");
+    expect(courses.listCourses(c, { status: "active" }).map((x) => x.id)).toEqual([a.id]);
+    // a symlinked document is refused at read time
+    rmSync(courses.documentPath(b.id), { force: true });
+    symlinkSync(courses.documentPath(a.id), courses.documentPath(b.id));
+    expect(courses.courseDocument(b.id)).toBeNull();
+    expect(courses.deleteCourse(c, a.id)).toBe(true);
+    expect(existsSync(courses.courseDir(a.id))).toBe(false);
+    expect(courses.getCourse(c, a.id)).toBeNull();
+    expect(courses.deleteCourse(c, "../x")).toBe(false);
+  });
+
+  it("backup carries courses + documents; restore refuses stray paths and never overwrites", () => {
+    c = freshDb();
+    const a = courses.createCourse(c, { title: "Backed up", topic_id: "math" });
+    writeFileSync(courses.documentPath(a.id), '<section id="step-1">hi</section>');
+    courses.addStep(c, a.id, { title: "One", kind: "concept", anchor: "step-1" });
+    const zip = db.createBackupZip(c);
+    const names = Object.keys(unzipSync(zip));
+    expect(names).toContain("courses.json");
+    expect(names).toContain(`courses/${a.id}/index.html`);
+    // wipe, then restore into a fresh DB + a fresh disk
+    courses.deleteCourse(c, a.id);
+    const c2 = freshDb();
+    const r = db.restoreBackupZip(c2, zip);
+    expect(r.courses).toBe(1);
+    expect(courses.getCourse(c2, a.id)?.steps).toHaveLength(1);
+    expect(readFileSync(courses.documentPath(a.id), "utf8")).toContain("hi");
+    // a second restore is a no-op (rows ignored, file kept as is)
+    writeFileSync(courses.documentPath(a.id), "edited");
+    expect(db.restoreBackupZip(c2, zip).courses).toBe(0);
+    expect(readFileSync(courses.documentPath(a.id), "utf8")).toBe("edited");
+    // a crafted archive: unknown course id, traversal, oversized — nothing reaches the disk
+    const evil = zipSync({
+      "courses.json": strToU8(JSON.stringify({ courses: [], steps: [] })),
+      "courses/../escape.html": strToU8("x"),
+      "courses/not-a-course/index.html": strToU8("x"),
+    });
+    db.restoreBackupZip(c2, evil);
+    expect(existsSync(join(db.COURSES_DIR, "..", "escape.html"))).toBe(false);
+    expect(existsSync(join(db.COURSES_DIR, "not-a-course"))).toBe(false);
     c2.close();
   });
 });

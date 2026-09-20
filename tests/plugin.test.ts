@@ -143,6 +143,7 @@ describe("claude code plugin packaging", () => {
     ["ui", ["open_ui", "stop_ui"]],
     ["share", ["share_lesson", "get_lessons"]],
     ["import", ["import_lesson", "add_topic"]],
+    ["course", ["create_course", "add_course_step", "update_course_progress", "get_courses"]],
   ])("ships the /devcoach:%s command wired to its tools", (name, tools) => {
     const cmd = read("plugin", "commands", `${name}.md`);
     expect(cmd).toMatch(/^---\ndescription: .+/);

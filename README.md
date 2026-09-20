@@ -108,7 +108,7 @@ The simplest way to add devcoach to **Claude Code** — one click, nothing to co
 /plugin install devcoach@ultimaphoenix
 ```
 
-The MCP server, hooks, and skill activate on install — no restart needed. Open the [web dashboard](#web-dashboard) right from Claude Code with `/devcoach:ui` (or just ask — the `open_ui` tool); `/devcoach:share` and `/devcoach:import` hand lessons around. Update later with `/plugin marketplace update ultimaphoenix`.
+The MCP server, hooks, and skill activate on install — no restart needed. Open the [web dashboard](#web-dashboard) right from Claude Code with `/devcoach:ui` (or just ask — the `open_ui` tool); `/devcoach:share` and `/devcoach:import` hand lessons around; `/devcoach:course` turns a lesson you couldn't follow into a step-by-step course. Update later with `/plugin marketplace update ultimaphoenix`.
 
 The plugin **does not** add the `devcoach` CLI, but the CLI stays a handy companion when you want the dashboard or your data without going through Claude — `devcoach ui`, `stats`, `lessons`, `share` / `import`, `backup`: run them with `npx -y devcoach …`, or install Homebrew / `npm i -g devcoach` for a bare `devcoach`. Just never run `devcoach install` next to the plugin — it owns the hooks.
 
@@ -358,10 +358,10 @@ an AbortController shared across the requests gives you all-or-nothing with
 prompt cancellation — the structured-concurrency middle ground.
 ### ──────── typescript · mid ────────
 
-Did that land? ✅ know (y) · ❌ don't know (n)
+Did that land? ✅ knew it (y) · 💡 understood (u) · ❌ couldn't follow (n)
 ```
 
-Reply `y` or `n` (or ✅ / ❌) to adjust your confidence on that topic and shape future lessons — or just move on: no reply means no change.
+Reply `y` (already knew it — confidence goes up), `u` (new and clear) or `n` (too dense — kept as a seed for a step-by-step course) to shape future lessons — or just move on: no reply means no change.
 
 ---
 
@@ -428,7 +428,7 @@ The CLI is a secondary interface for querying and managing your coaching data. E
 | `devcoach lessons` | Browse lesson history with filters |
 | `devcoach lesson <id>` | Show a single lesson in full |
 | `devcoach star <id>` | Mark a lesson as starred |
-| `devcoach feedback <id> <know\|dont_know\|clear>` | Record comprehension |
+| `devcoach feedback <id> <know\|understood\|dont_know\|clear>` | Record your answer under a lesson |
 | `devcoach share [id] [--last] [--link] [--file]` | Hand a lesson to a teammate (copyable text, link or `.devcoach.md`) |
 | `devcoach import [source]` | Add a shared lesson — code, link, URL or file; no argument reads the clipboard |
 | `devcoach set max_per_day <n>` | Max lessons per day (default 2) |

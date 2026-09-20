@@ -4,6 +4,7 @@ import { dirname, join } from "node:path";
 import { Readable } from "node:stream";
 import { describe, expect, it, vi } from "vitest";
 import { parseHookPayload, runCli } from "../src/cli/commands";
+import * as courses from "../src/core/courses";
 import * as db from "../src/core/db";
 import { parseLesson } from "../src/core/models";
 import { fetchSharedInput } from "../src/core/share-fetch";
@@ -262,6 +263,35 @@ describe("cli", () => {
     expect((await run(["set", "bad", "5"])).code).toBe(1);
     expect((await run(["settings"])).out).toContain("max_per_day");
     expect((await run(["stats"])).out).toContain("Coaching Stats");
+  });
+
+  it("courses / course list and show a course", async () => {
+    expect((await run(["courses"])).out).toContain("No courses yet");
+    const course = db.withConnection((c) =>
+      courses.createCourse(c, {
+        title: "CLI course",
+        topic_id: "python",
+        goal: "See it in the terminal",
+        prerequisites: [{ concept: "loops", known: true }],
+      }),
+    );
+    const before = (await run(["course", course.id])).out;
+    expect(before).toContain("not written yet");
+    expect(before).toContain("No steps registered yet");
+    writeFileSync(courses.documentPath(course.id), '<section id="step-1">x</section>');
+    db.withConnection((c) => {
+      courses.addStep(c, course.id, { title: "Loops", kind: "concept", anchor: "step-1" });
+      courses.setStepStatus(c, course.id, 1, "done");
+    });
+    const list = (await run(["courses"])).out;
+    expect(list).toContain("CLI course");
+    expect(list).toContain("1/1");
+    expect(list).toContain("completed");
+    const show = (await run(["course", course.id])).out;
+    expect(show).toContain("✓ loops");
+    expect(show).toContain("1. Loops");
+    expect(show).toContain("index.html");
+    expect((await run(["course", "missing"])).code).toBe(1);
   });
 
   it("lesson commands (lesson/star/feedback/delete)", async () => {
@@ -697,13 +727,18 @@ describe("cli rich rendering branches", () => {
     expect(sr).toContain("folder=/f");
     expect(sr).toContain("Context:");
     expect(sr).toContain("★ starred");
-    expect(sr).toContain("I know this");
+    expect(sr).toContain("I knew this");
     const jr = (await run(["lesson", "jr"])).out;
-    expect(jr).toContain("I don't know this");
+    expect(jr).toContain("Couldn't follow");
   });
 
-  it("feedback dont_know lowers confidence", async () => {
-    expect((await run(["feedback", "sr", "dont_know"])).out).toContain("confidence");
+  it("leaving know undoes its +1; understood and dont_know leave confidence alone", async () => {
+    const left = (await run(["feedback", "sr", "dont_know"])).out;
+    const m = left.match(/confidence: (\d+) → (\d+)/);
+    expect(m).not.toBeNull();
+    expect(Number(m?.[2])).toBe(Number(m?.[1]) - 1); // leaving `know` undoes its +1
+    expect((await run(["feedback", "sr", "understood"])).out).toContain("confidence unchanged");
+    expect((await run(["feedback", "sr", "understood"])).out).toContain("💡 Understood");
   });
 
   it("stats shows weakest and strongest topics", async () => {

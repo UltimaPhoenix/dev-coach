@@ -252,6 +252,10 @@ function decideStop(
     if (!opts.onboardCue || plan) return { kind: "silent", note: "onboarding not complete" };
     return { kind: "onboard", note: "onboarding cue (empty knowledge)" };
   }
+  // A course in progress is a multi-turn conversation (prerequisite Q&A, one step per message):
+  // a lesson cue landing in the middle would force a dead skip_lesson turn. Pause without
+  // touching the counters; cues resume as soon as the course is completed or abandoned.
+  if (db.hasActiveCourse(conn)) return { kind: "silent", note: "course in progress — cues paused" };
   const d = coach.evaluateCue(conn, payload.session_id, { planMode: plan });
   return d.cue
     ? { kind: "cue", nextLessonNumber: d.nextLessonNumber, note: d.reason }
@@ -357,7 +361,9 @@ export function cmdPromptHook(
   if (!existsSync(db.DB_PATH)) process.exit(0);
   let wouldCue: boolean;
   try {
-    wouldCue = db.withConnection((conn) => coach.explainCue(conn, payload.session_id).wouldCue);
+    wouldCue = db.withConnection(
+      (conn) => !db.hasActiveCourse(conn) && coach.explainCue(conn, payload.session_id).wouldCue,
+    );
   } catch (err) {
     hookDebugLog(hookName, payload.session_id, `error: ${err}`);
     process.exit(0);

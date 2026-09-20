@@ -92,7 +92,7 @@ Filterable, sortable table of all delivered lessons.
 **Filters:**
 - Period — All time / Today / Last 7 days / Last 30 days / Last year / Custom range (the date range
   accepts an optional time: `2026-04-25T14:30`)
-- Feedback — All feedback / ✓ Known / ✗ Don't know / — No response
+- Feedback — All feedback / ✓ Knew it / 💡 Understood / ✗ Couldn't follow / — No response
 - Level — All levels / 🟢 Junior / 🟡 Mid / 🔴 Senior
 - Filters popover — Category / Project / Repository / Branch / Commit
 - Starred only
@@ -105,7 +105,7 @@ current filters."
 **Sort:** click the Date, Topic, Title, Level or Feedback column header. Ascending or descending.
 
 **Table columns:** ★, Date, Topic, Title, Level, Categories, Feedback, ↗ — the title gets the width
-(categories wrap onto a second line when needed); the feedback cell shows `✓ Known` / `✗ Unknown`
+(categories wrap onto a second line when needed); the feedback cell shows `✓ Knew it` / `💡 Understood` / `✗ Couldn't follow`
 (or nothing yet); `↗` opens the Share panel right there; a shared lesson shows `🤝 <sender>`
 under its topic.
 
@@ -177,7 +177,7 @@ Full lesson content laid out in reading order:
   - **commit** — the exact commit (clickable to view on GitHub/GitLab/Bitbucket or as a local hash)
   - **folder** — a VS Code icon link that opens the project folder in VS Code, so you can immediately
     review the code that triggered the lesson
-- **Feedback buttons** — `✓ I know this` / `✗ I don't know this` (hidden once feedback is recorded)
+- **Feedback buttons** — `✓ I knew this` / `💡 Understood` / `✗ Couldn't follow` (hidden once feedback is recorded)
 - **ID line** — the full lesson ID, for `devcoach lesson <id>` and friends
 
 <Tabs>
@@ -217,6 +217,22 @@ Full lesson content laid out in reading order:
     />
   </TabItem>
 </Tabs>
+
+---
+
+### Courses (`/courses`)
+
+Every step-by-step [course](./courses.md) with its progress, its status and the lesson it grew
+from. A course page is the document itself, one step at a time, with a slim sticky bar on top (back ·
+title · status · progress · **⋯**) and a pinned step list at the side (**Mark done** / **Skip** /
+**Reopen**; clicking a step switches the document to that section without a reload; *About this
+course* folds away the goal, the seed lesson and the ✓/✗ prerequisite chain). The document sits in
+a sandboxed frame (`sandbox="allow-scripts allow-forms"` plus a `Content-Security-Policy` that also
+sandboxes it when opened on its own: no network, no form posts, no navigation out — `eval` is
+allowed so editable JS examples can run). The frame grows to the height of the step it shows, so
+the page scrolls, never the frame. The **⋯** menu holds **Delete course…** — rows and folder go,
+the seed lesson stays. A lesson that seeded a course shows a `🎓 Course · N/M` link in its
+metadata row.
 
 ---
 

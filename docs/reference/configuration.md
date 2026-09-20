@@ -95,6 +95,7 @@ How the counter behaves:
 ```
 ~/.devcoach/coaching.db         — SQLite database
 ~/.devcoach/learning-state.md   — coaching notebook (markdown)
+~/.devcoach/courses/<id>/       — one folder per course, holding its index.html
 ~/.devcoach/hook.log            — hook trace, only when DEVCOACH_HOOK_DEBUG=1 is set
 ```
 
@@ -132,7 +133,7 @@ lessons (
   branch              TEXT,
   commit_hash         TEXT,
   folder              TEXT,
-  feedback            TEXT,            -- know | dont_know | NULL
+  feedback            TEXT,            -- know | understood | dont_know | NULL
   repository_platform TEXT,            -- github | gitlab | bitbucket | local
   starred             INTEGER NOT NULL DEFAULT 0,
   imported            INTEGER NOT NULL DEFAULT 0,  -- 1 = shared by someone else (ignored by the rate limit)
@@ -152,6 +153,18 @@ knowledge_groups (group_name TEXT, topic TEXT, PRIMARY KEY (group_name, topic))
 
 -- Settings
 settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)
+
+-- Courses (schema v5): the index of ~/.devcoach/courses/<id>/index.html
+courses (id TEXT PRIMARY KEY, lesson_id TEXT, topic_id TEXT NOT NULL, title TEXT NOT NULL,
+         goal TEXT, prerequisites TEXT NOT NULL DEFAULT '[]',  -- JSON [{concept, known}]
+         status TEXT NOT NULL DEFAULT 'active',                -- active | completed | abandoned
+         created_at TEXT NOT NULL, updated_at TEXT NOT NULL, completed_at TEXT)
+course_steps (course_id TEXT NOT NULL, position INTEGER NOT NULL, title TEXT NOT NULL,
+              kind TEXT NOT NULL,        -- concept | example | practice | check
+              anchor TEXT NOT NULL,      -- the section id in the document
+              status TEXT NOT NULL DEFAULT 'todo',  -- todo | done | skipped
+              done_at TEXT, PRIMARY KEY (course_id, position))
+              -- plus UNIQUE (course_id, anchor): one step per section
 
 -- Runtime-only pacing state (never included in backups)
 nudge_state (session_id TEXT PRIMARY KEY, interactions INTEGER, updated_at TEXT)
@@ -173,11 +186,12 @@ devcoach backup ~/Dropbox/devcoach-$(date +%Y%m%d).zip
 devcoach backup devcoach-before-reset.zip
 ```
 
-The backup zip contains four files:
-- `settings.json` — all five settings
+The backup zip contains:
+- `settings.json` — all settings
 - `knowledge.json` — topics, confidence scores, and group assignments
 - `lessons.json` — full lesson history
 - `learning-state.md` — the coaching notebook (when present)
+- `courses.json` + `courses/<id>/index.html` — every course's index, steps and document (when any)
 
 All of them are restored by `devcoach restore <zip>`.
 

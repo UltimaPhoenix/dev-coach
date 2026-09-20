@@ -6,14 +6,16 @@ description: >
   up, redoing onboarding, resetting topics, or reviewing/rebuilding their profile
   or notebook; (2) the user asks about their own learning or skill level — what
   they learned recently, their coaching log or lesson history (by period, starred,
-  or marked don't-know), how good they are at a technology, lessons to revisit,
+  or marked couldn't-follow), how good they are at a technology, lessons to revisit,
   or whether new tech from their recent work should be tracked; (3) a devcoach
   hook cue requests a lesson; (4) you just completed substantial technical work
   (code, review, commit, debugging, config, queries, infra) — then evaluate
   silently whether ONE lesson is due, even when coaching is never mentioned;
   (5) the user wants to share a lesson with someone, or hands you a lesson they
   were given — a `devcoach:lesson:` code, a share link, a URL, or a
-  `.devcoach.md` file — to import.
+  `.devcoach.md` file — to import; (6) the user wants to be taught something
+  properly — "explain this step by step", "start a course", "teach me X from the
+  basics", `/devcoach:course` — or asks about their courses.
   Do NOT use for ordinary development tasks on code, apps, or documents that
   merely contain words like profile, lessons, or notebook — only when the subject
   is the user's own coaching data.
@@ -55,6 +57,15 @@ profile/notebook", "rebuild/refresh my notebook", "refresh my profile from my
 projects", "any new tech I should track?" — read `references/review.md` in this
 skill's directory and follow it. Those flows are incremental and non-destructive;
 only an explicit "redo onboarding" goes through `references/onboarding.md`.
+
+## Courses
+
+When the user wants to be taught something properly — "explain this step by step", "start
+a course on X", "teach me from the basics", "continue the course", `/devcoach:course` — or
+says *yes* to the one offer you make after a ❌ *couldn't follow* — read
+`references/course.md` in this skill's directory and follow it. A course is user-initiated,
+never starts inside a cued turn, explores what the user already knows one question at a
+time, and lives in ONE HTML document you write yourself.
 
 ## Before delivering a lesson
 
@@ -154,20 +165,27 @@ turn**: both bands, the title line, the same prose you passed as `body`, the tip
 final message is the only place the user ever sees the lesson.
 
 `log_lesson` never asks the user anything — it only saves. Feedback is collected as
-text under the card: append the prompt "Did that land? ✅ know (y) · ❌ don't know
-(n)" DIRECTLY BENEATH the card's closing band — it is the only line allowed after
-the card, and it may never appear without the card right above it. Read the user's
-next message loosely: `y` / `yes` / ✅ → know · `n` / `no` / ❌ → dont_know ·
-anything else — including no reply at all, the user just moving on — → no
-feedback, drop the question silently. On know/dont_know call
-`submit_feedback(id, value)` — but only when confidence is below the lesson's band
-for "know" (within/above band → already calibrated, skip the call). Never call
-`update_knowledge` on top of feedback.
+text under the card: append the prompt "Did that land? ✅ knew it (y) · 💡 understood
+(u) · ❌ couldn't follow (n)" DIRECTLY BENEATH the card's closing band — it is the only
+line allowed after the card, and it may never appear without the card right above it.
+Read the user's next message loosely: `y` / `yes` / "knew it" / ✅ → `know` ·
+`u` / "understood" / "got it" / 💡 → `understood` · `n` / `no` / "lost me" / ❌ →
+`dont_know` · anything else — including no reply at all, the user just moving on —
+→ no feedback, drop the question silently. The three answers mean: **know** = already
+knew it (the only one that moves confidence, +1) · **understood** = new, and now
+clear — the level was right · **dont_know** = couldn't follow this session — no
+confidence change; the lesson is kept as a seed for a step-by-step course. Call
+`submit_feedback(id, value)` for `understood` and `dont_know` always, and for `know`
+only when confidence is below the lesson's band (within/above band → already
+calibrated, skip the call). Never call `update_knowledge` on top of feedback.
 
-**Starring:** after feedback, if it was `dont_know` on a mid/senior lesson, or
-`get_lessons({search: topic_id})` shows 2+ lessons on the topic, offer *"Want to save
-this one? ⭐"* — `star_lesson` only if the user agrees, never silently. A star is also
-the one moment to offer sharing (see `references/sharing.md`).
+**After a ❌:** offer ONCE, in one line — *"Want a step-by-step course on this? 🎓"* — and
+on a *yes* start it on that message (`references/course.md`). No other follow-up.
+
+**Starring:** after feedback, if `get_lessons({search: topic_id})` shows 2+ lessons on
+the topic, offer *"Want to save this one? ⭐"* — `star_lesson` only if the user agrees,
+never silently. A star is also the one moment to offer sharing (see
+`references/sharing.md`).
 
 **Sharing:** user-initiated — the user asks to share a lesson, hands you one to import,
 or asks to see one they were given; the only unprompted offer is the one after a star.
@@ -190,7 +208,9 @@ checkpoints, never touch the notebook.
 - "Show me lessons about X" → `get_lessons({category: X})` or `({search: keyword})`
 - "How good am I at X?" / "Show my profile" → `get_profile`
 - "Coaching log" → `get_lessons({period: "all"})`
-- "Lessons to revisit" → `get_lessons({feedback: "dont_know"})`
+- "Lessons to revisit" / "the ones I couldn't follow" → `get_lessons({feedback: "dont_know"})`
+- "My courses" → `get_courses` · "Continue the course" → `get_courses({status: "active"})`
+  then `references/course.md` §5 · "Start a course on X" → `references/course.md`
 - "Share this / the last lesson" / "share the lesson about X" → `get_lessons` then
   `share_lesson({lesson_id})` (see Sharing)
 - "Import this lesson" / a pasted `devcoach:lesson:` code, link or URL →

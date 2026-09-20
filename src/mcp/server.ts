@@ -1,5 +1,5 @@
 // MCP server on the official MCP TypeScript SDK v2 (@modelcontextprotocol/server).
-// 21 tools, 11 resources, and the devcoach_instructions prompt. Tools follow the build-mcp-server
+// 25 tools, 11 resources, and the devcoach_instructions prompt. Tools follow the build-mcp-server
 // review: title + hint annotations, tight Zod schemas with .describe(), outputSchema/structuredContent
 // for model returns, isError on failure. log_lesson is a pure save (never elicits);
 // feedback arrives next turn via submit_feedback.
@@ -11,10 +11,14 @@ import { StdioServerTransport } from "@modelcontextprotocol/server/stdio";
 import { z } from "zod";
 import { scanClaudeHistory, scanRecentProjectWindow } from "../core/claude-history";
 import * as coach from "../core/coach";
+import * as courses from "../core/courses";
 import * as db from "../core/db";
 import { detectStack, mergeStacks } from "../core/detect";
 import { detectGitContext, detectGitUserName } from "../core/git";
 import {
+  CourseStatusSchema,
+  CourseStepKindSchema,
+  CourseStepStatusSchema,
   confidenceInputSchema,
   FeedbackSchema,
   type Lesson,
@@ -416,9 +420,12 @@ export function createServer(): McpServer {
           .nullish()
           .describe("Only lessons shared by this person (exact sender name; implies imported)"),
         feedback: z
-          .enum(["know", "dont_know", "none"])
+          .enum(["know", "understood", "dont_know", "none"])
           .nullish()
-          .describe("Filter by feedback ('none' = no response)"),
+          .describe(
+            "Filter by feedback: know (already knew), understood (new, now clear), " +
+              "dont_know (couldn't follow — a course seed), none (no response)",
+          ),
         search: z
           .string()
           .nullish()
@@ -522,12 +529,15 @@ export function createServer(): McpServer {
     {
       title: "Submit Feedback",
       description:
-        "Record comprehension feedback for a lesson and adjust knowledge confidence. " +
-        "know = +1, dont_know = -1, clear = remove feedback (no confidence change). " +
-        "Idempotent — the same feedback twice adjusts confidence only once.",
+        "Record the user's answer under a lesson card. know = already knew it (confidence +1); " +
+        "understood = new and now clear (no confidence change); dont_know = couldn't follow this " +
+        "session (no confidence change; the lesson becomes a course seed); clear = remove the " +
+        "answer. Idempotent — repeating the stored answer changes nothing.",
       inputSchema: z.object({
         lesson_id: z.string().describe("Lesson id"),
-        feedback: z.enum(["know", "dont_know", "clear"]).describe("know | dont_know | clear"),
+        feedback: z
+          .enum(["know", "understood", "dont_know", "clear"])
+          .describe("know | understood | dont_know | clear"),
       }),
       annotations: {
         title: "Submit Feedback",
@@ -539,19 +549,10 @@ export function createServer(): McpServer {
     async (args) => {
       try {
         const feedbackValue = args.feedback === "clear" ? null : args.feedback;
-        const ok = db.withConnection((c) => {
-          const row = c
-            .prepare("SELECT feedback, topic_id FROM lessons WHERE id = ?")
-            .get(args.lesson_id) as { feedback: string | null; topic_id: string } | undefined;
-          if (!row) return false;
-          if (row.feedback === feedbackValue) return true;
-          db.setFeedback(c, args.lesson_id, feedbackValue);
-          if ((feedbackValue === "know" || feedbackValue === "dont_know") && row.topic_id) {
-            coach.applyKnowledgeDelta(c, row.topic_id, feedbackValue === "know" ? 1 : -1);
-          }
-          return true;
-        });
-        return { content: [txt(String(ok))] };
+        const result = db.withConnection((c) =>
+          coach.recordFeedback(c, args.lesson_id, feedbackValue),
+        );
+        return { content: [txt(String(result !== null))] };
       } catch (err) {
         return errResult(`submit_feedback failed for '${args.lesson_id}': ${err}`);
       }
@@ -1083,6 +1084,256 @@ export function createServer(): McpServer {
       } catch (err) {
         if (err instanceof ShareInputError) return errResult(`import_lesson: ${err.message}`);
         return errResult(`import_lesson failed: ${err}`);
+      }
+    },
+  );
+
+  // ── Courses ──────────────────────────────────────────────────────────────
+  // A course is one rich, self-contained HTML document the model writes itself (like the
+  // notebook) at the path create_course returns; add_course_step registers each section as a
+  // step, update_course_progress tracks it, get_courses reads it all back. The dashboard shows
+  // the document in a sandboxed frame — the server never inlines or sanitises it.
+  // Plain z.object mirrors of the course models (no transforms/defaults — JSON Schema).
+  const courseStepOutput = z.object({
+    course_id: z.string(),
+    position: z.number().int(),
+    title: z.string(),
+    kind: CourseStepKindSchema,
+    anchor: z.string(),
+    status: CourseStepStatusSchema,
+    done_at: z.string().nullable(),
+  });
+  const courseOutput = z.object({
+    id: z.string(),
+    lesson_id: z.string().nullable(),
+    topic_id: z.string(),
+    title: z.string(),
+    goal: z.string().nullable(),
+    prerequisites: z.array(z.object({ concept: z.string(), known: z.boolean() })),
+    status: CourseStatusSchema,
+    created_at: z.string(),
+    updated_at: z.string(),
+    completed_at: z.string().nullable(),
+    steps: z.array(courseStepOutput),
+  });
+  const COURSE_REPLY_CHECK =
+    "Write ONE self-contained HTML document at document_path (inline CSS + JS, no external URLs, " +
+    'no fetch, no <form>, no alert/confirm/prompt) with one <section id="step-N"> per step, using ' +
+    "your file tools — never paste HTML into the chat. Then register every section with " +
+    "add_course_step (position order, anchor = the section id). Teach one step per message and " +
+    "tell the user the course is on the dashboard under Courses (/devcoach:ui).";
+
+  server.registerTool(
+    "create_course",
+    {
+      title: "Create Course",
+      description:
+        "Start a step-by-step course, usually from a lesson the user couldn't follow. Pass the " +
+        "prerequisite chain you explored ([{concept, known}], top-down). Returns the course row, " +
+        "course_dir and document_path — write the document there yourself, then call " +
+        "add_course_step for each section.",
+      inputSchema: z.object({
+        title: z.string().min(1).describe("Course title, e.g. 'From sums to logarithms'"),
+        topic_id: z.string().min(1).describe("The lesson-style topic id the course belongs to"),
+        goal: z.string().nullish().describe("One sentence: what the user will be able to do"),
+        lesson_id: z
+          .string()
+          .nullish()
+          .describe("The seed lesson's id, when the course grows from one"),
+        prerequisites: z
+          .array(z.object({ concept: z.string().min(1), known: z.boolean() }))
+          .default([])
+          .describe("The explored chain, top-down: [{concept, known}]"),
+      }),
+      outputSchema: courseOutput.extend({
+        course_dir: z.string(),
+        document_path: z.string(),
+        seed_context: z
+          .object({
+            task_context: z.string().nullable(),
+            project: z.string().nullable(),
+            repository: z.string().nullable(),
+            branch: z.string().nullable(),
+          })
+          .nullable(),
+        reply_check: z.string(),
+      }),
+      annotations: {
+        title: "Create Course",
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: false,
+      },
+    },
+    async (args) => {
+      try {
+        const created = db.withConnection((c) => {
+          const seed = args.lesson_id ? db.getLessonById(c, args.lesson_id) : null;
+          if (args.lesson_id && !seed) {
+            throw new courses.CourseError(
+              `lesson '${args.lesson_id}' not found — call get_lessons to pick one`,
+            );
+          }
+          const course = courses.createCourse(c, {
+            title: args.title,
+            topic_id: args.topic_id,
+            goal: args.goal ?? null,
+            lesson_id: args.lesson_id ?? null,
+            prerequisites: args.prerequisites,
+          });
+          return { course, seed };
+        });
+        return structured({
+          ...created.course,
+          course_dir: courses.courseDir(created.course.id),
+          document_path: courses.documentPath(created.course.id),
+          seed_context: created.seed
+            ? {
+                task_context: created.seed.task_context,
+                project: created.seed.project,
+                repository: created.seed.repository,
+                branch: created.seed.branch,
+              }
+            : null,
+          reply_check: COURSE_REPLY_CHECK,
+        });
+      } catch (err) {
+        return errResult(`create_course failed: ${err}`);
+      }
+    },
+  );
+
+  server.registerTool(
+    "add_course_step",
+    {
+      title: "Add Course Step",
+      description:
+        "Register a step of a course: the section with id=<anchor> must already exist in the " +
+        "course document. Appended by default; pass `after` to insert it after that step (0 = first) — " +
+        "the following steps are renumbered.",
+      inputSchema: z.object({
+        course_id: z.string().describe("Course id (from create_course)"),
+        title: z.string().min(1).describe("Step title"),
+        kind: CourseStepKindSchema.describe("concept | example | practice | check"),
+        anchor: z
+          .string()
+          .regex(/^[a-z0-9][a-z0-9-]*$/)
+          .describe("The section's id in the document, e.g. step-1"),
+        after: z
+          .number()
+          .int()
+          .min(0)
+          .nullish()
+          .describe("Insert after this step number (0 = first); omit to append"),
+      }),
+      outputSchema: courseOutput.extend({ step: courseStepOutput }),
+      annotations: {
+        title: "Add Course Step",
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: false,
+      },
+    },
+    async (args) => {
+      try {
+        const out = db.withConnection((c) => {
+          const step = courses.addStep(c, args.course_id, {
+            title: args.title,
+            kind: args.kind,
+            anchor: args.anchor,
+            after: args.after,
+          });
+          return { ...courses.getCourse(c, args.course_id), step };
+        });
+        return structured(out as Record<string, unknown>);
+      } catch (err) {
+        return errResult(`add_course_step failed: ${err}`);
+      }
+    },
+  );
+
+  server.registerTool(
+    "update_course_progress",
+    {
+      title: "Update Course Progress",
+      description:
+        "With position: set that step to todo | done | skipped (the course completes itself once " +
+        "every step is done or skipped). Without position: set the course to active | completed | " +
+        "abandoned.",
+      inputSchema: z.object({
+        course_id: z.string().describe("Course id"),
+        position: z
+          .number()
+          .int()
+          .min(1)
+          .nullish()
+          .describe("Step number (1-based); omit for the course"),
+        status: z
+          .string()
+          .describe("Step: todo | done | skipped — course: active | completed | abandoned"),
+      }),
+      outputSchema: courseOutput,
+      annotations: {
+        title: "Update Course Progress",
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (args) => {
+      try {
+        const out = db.withConnection((c) => {
+          if (args.position != null) {
+            const status = CourseStepStatusSchema.parse(args.status);
+            return courses.setStepStatus(c, args.course_id, args.position, status);
+          }
+          return courses.setCourseStatus(c, args.course_id, CourseStatusSchema.parse(args.status));
+        });
+        if (!out) {
+          return errResult(
+            `update_course_progress: course '${args.course_id}'${
+              args.position != null ? ` step ${args.position}` : ""
+            } not found — call get_courses`,
+          );
+        }
+        return structured(out);
+      } catch (err) {
+        return errResult(`update_course_progress failed: ${err}`);
+      }
+    },
+  );
+
+  server.registerTool(
+    "get_courses",
+    {
+      title: "Get Courses",
+      description:
+        "List courses with their steps and progress; filter by id, seed lesson or status. " +
+        "'continue the course' = status active.",
+      inputSchema: z.object({
+        course_id: z.string().nullish().describe("One course"),
+        lesson_id: z.string().nullish().describe("Courses seeded by this lesson"),
+        status: CourseStatusSchema.nullish().describe("active | completed | abandoned"),
+      }),
+      outputSchema: z.object({
+        courses: z.array(courseOutput.extend({ course_dir: z.string() })),
+      }),
+      annotations: readOnly("Get Courses"),
+    },
+    (args) => {
+      try {
+        const list = db.withConnection((c) => {
+          if (args.course_id) {
+            const one = courses.getCourse(c, args.course_id);
+            return one ? [one] : [];
+          }
+          return courses.listCourses(c, { lesson_id: args.lesson_id, status: args.status });
+        });
+        return structured({
+          courses: list.map((course) => ({ ...course, course_dir: courses.courseDir(course.id) })),
+        });
+      } catch {
+        return structured({ courses: [] });
       }
     },
   );

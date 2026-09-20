@@ -1,4 +1,6 @@
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { beforeAll, describe, expect, it, vi } from "vitest";
+import * as courses from "../src/core/courses";
 import * as db from "../src/core/db";
 import { parseLesson } from "../src/core/models";
 import { fetchSharedInput } from "../src/core/share-fetch";
@@ -92,6 +94,11 @@ describe("web app", () => {
 
   it("star + feedback redirect 303", async () => {
     expect((await post("/lessons/w1/star", { starred: "1", next: "/lessons" })).status).toBe(303);
+    expect(
+      (await post("/lessons/w1/feedback", { feedback: "bogus", next: "/lessons" })).status,
+    ).toBe(400);
+    expect((await post("/lessons/w1/feedback", { feedback: "understood" })).status).toBe(303);
+    expect(await (await get("/lessons/w1")).text()).toContain("💡 Understood");
     expect(
       (await post("/lessons/w1/feedback", { feedback: "know", next: "//evil.com" })).status,
     ).toBe(303);
@@ -204,7 +211,7 @@ describe("web view branches (rich rendering)", () => {
       ),
     );
     const html = await (await get("/lessons/g1")).text();
-    expect(html).toContain("I know this");
+    expect(html).toContain("I knew this");
     expect(html).toContain("github.com/UltimaPhoenix/dev-coach");
     expect(html).toContain("/commit/abcdef1234567");
     expect(html).toContain("vscode://file//home/x");
@@ -216,7 +223,7 @@ describe("web view branches (rich rendering)", () => {
     ).text();
     expect(html).toContain("Clear all");
     expect(html).toContain("Starred");
-    expect(html).toContain("Known");
+    expect(html).toContain("Knew it");
   });
 
   it("lessons page: custom date range label", async () => {
@@ -290,7 +297,7 @@ describe("web view branches — exhaustive", () => {
     });
     const gl = await (await get("/lessons/gl")).text();
     expect(gl).toContain("/-/commit/deadbeef1234"); // gitlab commit URL form
-    expect(gl).toContain("I don't know this"); // dont_know branch
+    expect(gl).toContain("Couldn't follow"); // dont_know branch
     expect(gl).toContain("Context:"); // task_context branch
     const bb = await (await get("/lessons/bb")).text();
     expect(bb).toContain("/commits/cafe123"); // bitbucket commit URL form
@@ -801,5 +808,130 @@ describe("web shared-with-me filters", () => {
     expect((await get("/lessons?shared_by=Nobody")).status).toBe(200);
     expect(await (await get("/lessons?shared_by=Nobody")).text()).toContain("No lessons match");
     db.withConnection((c) => db.deleteLesson(c, "from-ada"));
+  });
+});
+
+describe("web courses over a real socket", () => {
+  it("serves each document at its own length (node-server mutates plain header objects)", async () => {
+    const { startUi } = await import("../src/web/app");
+    const one = db.withConnection((c) =>
+      courses.createCourse(c, { title: "Short doc", topic_id: "node", prerequisites: [] }),
+    );
+    const two = db.withConnection((c) =>
+      courses.createCourse(c, { title: "Long doc", topic_id: "node", prerequisites: [] }),
+    );
+    writeFileSync(courses.documentPath(one.id), '<section id="step-1">short → ✓</section>');
+    writeFileSync(
+      courses.documentPath(two.id),
+      `<section id="step-1">${"long — ✗ ".repeat(400)}</section>`,
+    );
+    const server = startUi(0, { handleSignals: false });
+    try {
+      await new Promise<void>((r) => server.once("listening", () => r()));
+      const port = (server.address() as { port: number }).port;
+      const url = (id: string) => `http://127.0.0.1:${port}/courses/${id}/index.html`;
+      const first = await (await fetch(url(one.id))).text();
+      const second = await (await fetch(url(two.id))).text();
+      expect(first).toContain("short → ✓");
+      expect(first.trim().endsWith("</script>")).toBe(true);
+      expect(second).toContain("</section>");
+      expect(second.trim().endsWith("</script>")).toBe(true); // not cut to the first one's length
+    } finally {
+      await new Promise<void>((r) => server.close(() => r()));
+      db.withConnection((c) => {
+        courses.deleteCourse(c, one.id);
+        courses.deleteCourse(c, two.id);
+      });
+    }
+  });
+});
+
+describe("web courses", () => {
+  it("lists, shows the sandboxed document, tracks progress, deletes", async () => {
+    const empty = await (await get("/courses")).text();
+    expect(empty).toContain("No courses yet");
+    expect(empty).toContain('href="/courses"'); // nav entry
+    const course = db.withConnection((c) =>
+      courses.createCourse(c, {
+        title: "From sums to powers",
+        topic_id: "python",
+        goal: "Read 2³",
+        lesson_id: "w1",
+        prerequisites: [
+          { concept: "powers", known: false },
+          { concept: "sums", known: true },
+        ],
+      }),
+    );
+    // no document yet → 404 on the frame route, placeholder on the page
+    expect((await get(`/courses/${course.id}/index.html`)).status).toBe(404);
+    expect(await (await get(`/courses/${course.id}`)).text()).toContain("hasn't been written yet");
+    writeFileSync(
+      courses.documentPath(course.id),
+      '<!doctype html><section id="step-1">one → ✓</section><section id="step-2">two — ✗</section>',
+    );
+    db.withConnection((c) => {
+      courses.addStep(c, course.id, { title: "Sums", kind: "concept", anchor: "step-1" });
+      courses.addStep(c, course.id, { title: "Powers", kind: "check", anchor: "step-2" });
+    });
+
+    const list = await (await get("/courses")).text();
+    expect(list).toContain("From sums to powers");
+    expect(list).toContain("0/2");
+    expect(list).toContain("Webify"); // seeded-from lesson title
+
+    const detail = await (await get(`/courses/${course.id}`)).text();
+    expect(detail).toContain(`src="/courses/${course.id}/index.html#step-1"`);
+    expect(detail).toContain('sandbox="allow-scripts allow-forms"');
+    expect(detail).toContain('id="course-frame"');
+    expect(detail).toContain('scrolling="no"'); // the page scrolls, never the frame
+    expect(detail).not.toContain("h-[75vh]");
+    expect(detail).toContain('<script src="/static/course-viewer.js"></script>');
+    expect(detail).toContain('data-anchor="step-2"');
+    expect(detail).toContain("✗ powers");
+    expect(detail).toContain("✓ sums");
+    expect(detail).toContain("Delete course…");
+
+    const doc = await get(`/courses/${course.id}/index.html`);
+    expect(doc.status).toBe(200);
+    expect(doc.headers.get("content-security-policy")).toContain("sandbox allow-scripts");
+    expect(doc.headers.get("content-security-policy")).toContain("form-action 'none'");
+    expect(doc.headers.get("content-security-policy")).toContain("'unsafe-eval'");
+    expect(doc.headers.get("x-content-type-options")).toBe("nosniff");
+    expect(doc.headers.get("referrer-policy")).toBe("no-referrer");
+    const docText = await doc.text();
+    expect(docText).toContain("<section");
+    expect(docText).toContain("two — ✗"); // multi-byte content survives Content-Length
+    // the resize bridge is appended on the way out, never written to the file
+    expect(docText).toContain('setAttribute("data-embedded", "1")');
+    expect(docText.trim().endsWith("</script>")).toBe(true);
+    expect(readFileSync(courses.documentPath(course.id), "utf8")).not.toContain("data-embedded");
+    expect((await get("/static/course-viewer.js")).status).toBe(200);
+    expect((await get("/courses/../etc/index.html")).status).toBe(404);
+
+    // the seed lesson links to its course
+    expect(await (await get("/lessons/w1")).text()).toContain("🎓 Course · 0/2");
+
+    const bad = await post(`/courses/${course.id}/steps/1`, { status: "bogus" });
+    expect(bad.status).toBe(400);
+    const done = await post(`/courses/${course.id}/steps/1`, { status: "done" });
+    expect(done.status).toBe(303);
+    expect(done.headers.get("location")).toBe(`/courses/${course.id}`);
+    expect((await post(`/courses/${course.id}/steps/9`, { status: "done" })).status).toBe(404);
+    const after = await (await get(`/courses/${course.id}?step=2`)).text();
+    expect(after).toContain("1/2 steps");
+    expect(after).toContain(`#step-2"`);
+
+    const cross = await postForm(
+      "/courses/delete",
+      { id: course.id },
+      { "sec-fetch-site": "cross-site" },
+    );
+    expect(cross.status).toBe(403);
+    expect(existsSync(courses.courseDir(course.id))).toBe(true);
+    const del = await post("/courses/delete", { id: course.id });
+    expect(del.headers.get("location")).toBe("/courses");
+    expect(existsSync(courses.courseDir(course.id))).toBe(false);
+    expect((await get(`/courses/${course.id}`)).status).toBe(404);
   });
 });

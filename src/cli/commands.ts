@@ -5,6 +5,7 @@ import { text as readStream } from "node:stream/consumers";
 import { Command } from "commander";
 import { scanClaudeHistory } from "../core/claude-history";
 import * as coach from "../core/coach";
+import * as courses from "../core/courses";
 import * as db from "../core/db";
 import { detectStack, mergeStacks } from "../core/detect";
 import { detectGitContext, detectGitUserName } from "../core/git";
@@ -44,13 +45,22 @@ const levelColor = (lvl: string): string =>
         ? c.red(lvl)
         : lvl;
 const feedbackIcon = (fb: string | null): string =>
-  fb === "know" ? ` ${c.green("✓")}` : fb === "dont_know" ? ` ${c.red("✗")}` : "";
+  fb === "know"
+    ? ` ${c.green("✓")}`
+    : fb === "understood"
+      ? ` ${c.cyan("💡")}`
+      : fb === "dont_know"
+        ? ` ${c.red("✗")}`
+        : "";
 const feedbackLabel = (fb: string | null): string =>
   fb === "know"
-    ? c.green("✓ I know this")
-    : fb === "dont_know"
-      ? c.red("✗ I don't know this")
-      : c.dim("no feedback");
+    ? c.green("✓ I knew this")
+    : fb === "understood"
+      ? c.cyan("💡 Understood")
+      : fb === "dont_know"
+        ? c.red("✗ Couldn't follow")
+        : c.dim("no feedback");
+const FEEDBACK_VALUES = ["know", "understood", "dont_know", "clear"];
 
 // ── Display commands ─────────────────────────────────────────────────────────
 
@@ -219,38 +229,99 @@ function cmdDelete(id: string): void {
   log(`Lesson ${c.cyan(id)} deleted.`);
 }
 
+const courseStatusLabel = (status: string): string =>
+  status === "completed"
+    ? c.green(status)
+    : status === "abandoned"
+      ? c.dim(status)
+      : c.cyan(status);
+
+function cmdCourses(): void {
+  const list = db.withConnection((conn) => courses.listCourses(conn));
+  if (list.length === 0) {
+    log(c.dim("No courses yet. Start one in your agent: /devcoach:course, or say yes after a ❌."));
+    return;
+  }
+  const columns: Column[] = [
+    { header: "ID" },
+    { header: "Title" },
+    { header: "Progress", justify: "center" },
+    { header: "Status" },
+    { header: "Updated" },
+  ];
+  const rows = list.map((course) => {
+    const p = courses.progress(course);
+    return [
+      c.cyan(course.id),
+      course.title,
+      `${p.done}/${p.total}`,
+      courseStatusLabel(course.status),
+      course.updated_at.slice(0, 10),
+    ];
+  });
+  log(renderTable("Courses", columns, rows));
+}
+
+function cmdCourse(id: string): void {
+  const course = db.withConnection((conn) => courses.getCourse(conn, id));
+  if (course === null) {
+    log(c.red(`Course '${id}' not found.`));
+    process.exit(1);
+  }
+  const p = courses.progress(course);
+  log(rule(c.bold(course.title)));
+  log(`${c.dim("ID:")}        ${course.id}`);
+  log(
+    `${c.dim("Topic:")}     ${c.cyan(course.topic_id)}   ${c.dim("Status:")} ${courseStatusLabel(course.status)}   ${c.dim("Progress:")} ${p.done}/${p.total}`,
+  );
+  if (course.goal) log(`${c.dim("Goal:")}      ${course.goal}`);
+  if (course.lesson_id) log(`${c.dim("From:")}      lesson ${c.cyan(course.lesson_id)}`);
+  const doc = courses.courseDocument(course.id);
+  log(
+    `${c.dim("Document:")}  ${doc ?? c.dim(`not written yet → ${courses.documentPath(course.id)}`)}`,
+  );
+  if (course.prerequisites.length) {
+    log(
+      `${c.dim("Chain:")}     ${course.prerequisites
+        .map((q) => (q.known ? c.green(`✓ ${q.concept}`) : c.red(`✗ ${q.concept}`)))
+        .join(c.dim(" → "))}`,
+    );
+  }
+  log("");
+  if (course.steps.length === 0) {
+    log(c.dim("No steps registered yet."));
+    return;
+  }
+  for (const step of course.steps) {
+    const icon =
+      step.status === "done" ? c.green("●") : step.status === "skipped" ? c.dim("◌") : c.cyan("○");
+    log(
+      `  ${icon} ${step.position}. ${step.title}  ${c.dim(`${step.kind} · #${step.anchor}${step.status !== "todo" ? ` · ${step.status}` : ""}`)}`,
+    );
+  }
+}
+
 function cmdFeedback(id: string, feedback: string): void {
-  if (!["know", "dont_know", "clear"].includes(feedback)) {
-    log(c.red(`Invalid feedback '${feedback}'. Use: know | dont_know | clear`));
+  if (!FEEDBACK_VALUES.includes(feedback)) {
+    log(c.red(`Invalid feedback '${feedback}'. Use: ${FEEDBACK_VALUES.join(" | ")}`));
     process.exit(1);
   }
   const feedbackValue = feedback === "clear" ? null : feedback;
-  const result = db.withConnection((conn) => {
-    const topicId = coach.recordFeedback(conn, id, feedbackValue);
-    if (topicId === null) return null;
-    const row = conn.prepare("SELECT confidence FROM knowledge WHERE topic = ?").get(topicId) as
-      | { confidence: number }
-      | undefined;
-    return { topicId, newConf: row ? row.confidence : 5 };
-  });
+  const result = db.withConnection((conn) => coach.recordFeedback(conn, id, feedbackValue));
   if (result === null) {
     log(c.red(`Lesson '${id}' not found.`));
     process.exit(1);
   }
   let confLabel: string;
-  if (feedbackValue === "know" || feedbackValue === "dont_know") {
-    const oldConf = result.newConf + (feedbackValue === "know" ? -1 : 1);
-    confLabel = `${c.cyan(result.topicId)} confidence: ${oldConf} → ${c.bold(String(result.newConf))}`;
-  } else {
+  if (feedbackValue === null) {
     confLabel = "feedback cleared";
+  } else if (result.delta !== 0 && result.confidence !== null) {
+    const oldConf = result.confidence - result.delta;
+    confLabel = `${c.cyan(result.topic_id)} confidence: ${oldConf} → ${c.bold(String(result.confidence))}`;
+  } else {
+    confLabel = `${c.cyan(result.topic_id)} confidence unchanged`;
   }
-  const icon =
-    feedbackValue === "know"
-      ? c.green("✓ I know this")
-      : feedbackValue === "dont_know"
-        ? c.red("✗ I don't know this")
-        : c.dim("cleared");
-  log(`Lesson ${c.cyan(id)} → ${icon}  (${confLabel})`);
+  log(`Lesson ${c.cyan(id)} → ${feedbackLabel(feedbackValue)}  (${confLabel})`);
 }
 
 function cmdSettings(): void {
@@ -750,8 +821,9 @@ function printWelcome(): void {
     ["stats", "Coaching statistics and rate-limit status"],
     ["settings / set", "Show / update settings (max_per_day | min_gap_minutes)"],
     ["lessons / lesson", "List past lessons / show one in detail"],
+    ["courses / course", "List your courses / show one with its steps"],
     ["star / unstar / delete", "Manage a lesson"],
-    ["feedback <id>", "Record know / dont_know feedback"],
+    ["feedback <id>", "Record know / understood / dont_know feedback"],
     ["share / import", "Hand a lesson to a teammate / add a shared lesson to your log"],
     ["knowledge-add / -remove", "Add / remove a topic"],
     ["group-add / -remove / -assign", "Manage knowledge groups"],
@@ -829,7 +901,7 @@ function buildProgram(): Command {
     .option("--starred", "Show only starred lessons")
     .option("--imported", "Show only lessons shared with you")
     .option("--from <name>", "Show only lessons shared by this person")
-    .option("--feedback <feedback>", "know | dont_know | none")
+    .option("--feedback <feedback>", "know | understood | dont_know | none")
     .option("--level <level>", "junior | mid | senior")
     .option("--date-from <date>", "Show lessons on or after this date (YYYY-MM-DD[THH:MM])")
     .option("--date-to <date>", "Show lessons on or before this date (YYYY-MM-DD[THH:MM])")
@@ -862,6 +934,17 @@ function buildProgram(): Command {
     .action((id: string) => cmdLesson(id));
 
   program
+    .command("courses")
+    .description("List your step-by-step courses")
+    .action(() => cmdCourses());
+
+  program
+    .command("course")
+    .description("Show a course: steps, progress, document path")
+    .argument("<id>", "Course ID")
+    .action((id: string) => cmdCourse(id));
+
+  program
     .command("star")
     .description("Mark a lesson as starred")
     .argument("<id>", "Lesson ID")
@@ -881,9 +964,9 @@ function buildProgram(): Command {
 
   program
     .command("feedback")
-    .description("Record know/dont_know feedback for a lesson")
+    .description("Record your answer under a lesson: know / understood / dont_know")
     .argument("<id>", "Lesson ID")
-    .argument("<value>", "know | dont_know | clear")
+    .argument("<value>", "know | understood | dont_know | clear")
     .action((id: string, value: string) => cmdFeedback(id, value));
 
   program
