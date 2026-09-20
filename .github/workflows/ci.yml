@@ -191,8 +191,10 @@ jobs:
   # A separate marketplace, so the plugin keeps its name: it installs as
   # devcoach@ultimaphoenix-beta with the same tools/commands/skill as the release. The entry is an
   # `archive` source (the prerelease's plugin zip + sha256): that zip is the only artifact whose
-  # launcher pins the canary npm version. Same environment/token as the release marketplace job;
-  # kept out of `prerelease` because an `environment:` key would change its npm OIDC subject.
+  # launcher pins the canary npm version. Pushes with a write deploy key scoped to the beta repo
+  # alone (secret BETA_MARKETPLACE_DEPLOY_KEY in the claude-marketplace environment) — the token
+  # that guards the release marketplace never leaves that job. Kept out of `prerelease` because
+  # an `environment:` key would change its npm OIDC subject.
   marketplace-beta:
     needs: prerelease
     if: ${{ needs.prerelease.result == 'success' }}
@@ -201,7 +203,7 @@ jobs:
       name: claude-marketplace
       url: https://github.com/UltimaPhoenix/claude-plugins-marketplace-beta
     env:
-      MARKETPLACE_TOKEN: ${{ secrets.CLAUDE_PLUGIN_MARKETPLACE }}
+      DEPLOY_KEY: ${{ secrets.BETA_MARKETPLACE_DEPLOY_KEY }}
       GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v7
@@ -209,7 +211,7 @@ jobs:
         with:
           node-version-file: .node-version
       - name: Pin the canary in UltimaPhoenix/claude-plugins-marketplace-beta
-        if: ${{ env.MARKETPLACE_TOKEN != '' }}
+        if: ${{ env.DEPLOY_KEY != '' }}
         run: |
           set -euo pipefail
           VERSION="${{ needs.prerelease.outputs.version }}"
@@ -219,7 +221,11 @@ jobs:
           gh release download next -p "$ASSET" --dir dl
           SHA="$(sha256sum "dl/$ASSET" | cut -d' ' -f1)"
           URL="https://github.com/UltimaPhoenix/dev-coach/releases/download/next/${ASSET}"
-          git clone --depth 1 "https://x-access-token:${MARKETPLACE_TOKEN}@github.com/UltimaPhoenix/claude-plugins-marketplace-beta.git" mkt
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/beta_deploy_key && chmod 600 ~/.ssh/beta_deploy_key
+          ssh-keyscan -t ed25519 github.com >> ~/.ssh/known_hosts 2>/dev/null
+          export GIT_SSH_COMMAND="ssh -i ~/.ssh/beta_deploy_key -o IdentitiesOnly=yes"
+          git clone --depth 1 git@github.com:UltimaPhoenix/claude-plugins-marketplace-beta.git mkt
           node scripts/update-beta-marketplace.mjs "$VERSION" "$URL" "$SHA" mkt/.claude-plugin/marketplace.json
           cd mkt
           git config user.name  "github-actions[bot]"
