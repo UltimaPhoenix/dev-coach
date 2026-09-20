@@ -134,6 +134,8 @@ jobs:
     needs: check
     if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.ver.outputs.version }}
     # A newer push supersedes a canary still in flight.
     concurrency:
       group: prerelease
@@ -184,6 +186,47 @@ jobs:
           NOTES="$(printf 'Canary build **%s** from `develop` @ %s — unreleased, may break.\n\nInstall: `npx -y devcoach@next` · docs: https://ultimaphoenix.github.io/dev-coach/next/' "$VERSION" "$GITHUB_SHA")"
           gh release create next --target "$GITHUB_SHA" --prerelease --title "next (canary)" --notes "$NOTES" \
             dist-mcpb/*.mcpb dist-plugin/*.zip dist-gemini/*.zip
+
+  # ── Beta channel: pin the canary in UltimaPhoenix/claude-plugins-marketplace-beta ──
+  # A separate marketplace, so the plugin keeps its name: it installs as
+  # devcoach@ultimaphoenix-beta with the same tools/commands/skill as the release. The entry is an
+  # `archive` source (the prerelease's plugin zip + sha256): that zip is the only artifact whose
+  # launcher pins the canary npm version. Same environment/token as the release marketplace job;
+  # kept out of `prerelease` because an `environment:` key would change its npm OIDC subject.
+  marketplace-beta:
+    needs: prerelease
+    if: ${{ needs.prerelease.result == 'success' }}
+    runs-on: ubuntu-latest
+    environment:
+      name: claude-marketplace
+      url: https://github.com/UltimaPhoenix/claude-plugins-marketplace-beta
+    env:
+      MARKETPLACE_TOKEN: ${{ secrets.CLAUDE_PLUGIN_MARKETPLACE }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+      - name: Pin the canary in UltimaPhoenix/claude-plugins-marketplace-beta
+        if: ${{ env.MARKETPLACE_TOKEN != '' }}
+        run: |
+          set -euo pipefail
+          VERSION="${{ needs.prerelease.outputs.version }}"
+          ASSET="devcoach-plugin-${VERSION}.zip"
+          # Download what the prerelease actually published: the URL is verified and the digest
+          # is taken from the bytes users will fetch.
+          gh release download next -p "$ASSET" --dir dl
+          SHA="$(sha256sum "dl/$ASSET" | cut -d' ' -f1)"
+          URL="https://github.com/UltimaPhoenix/dev-coach/releases/download/next/${ASSET}"
+          git clone --depth 1 "https://x-access-token:${MARKETPLACE_TOKEN}@github.com/UltimaPhoenix/claude-plugins-marketplace-beta.git" mkt
+          node scripts/update-beta-marketplace.mjs "$VERSION" "$URL" "$SHA" mkt/.claude-plugin/marketplace.json
+          cd mkt
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .claude-plugin/marketplace.json
+          git diff --staged --quiet || git commit -m "devcoach ${VERSION} (canary)"
+          git push
 
   # ── Version bump → commit → tag (workflow_dispatch only) ───────────────────
   bump:

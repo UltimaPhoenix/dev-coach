@@ -214,11 +214,16 @@ function desiredCodexHooks(): Record<string, HookEntry> {
   };
 }
 
-/** True when the devcoach Claude Code plugin is enabled — it ships the same hooks. */
+/** The enabled devcoach Claude Code plugins (`devcoach@<marketplace>`), release and beta alike. */
+function enabledDevcoachPlugins(data: HooksFile): string[] {
+  return Object.entries(data.enabledPlugins ?? {})
+    .filter(([name, enabled]) => enabled && name.startsWith("devcoach@"))
+    .map(([name]) => name);
+}
+
+/** True when a devcoach Claude Code plugin is enabled — it ships the same hooks. */
 function pluginHooksActive(data: HooksFile): boolean {
-  return Object.entries(data.enabledPlugins ?? {}).some(
-    ([name, enabled]) => enabled && name.startsWith("devcoach@"),
-  );
+  return enabledDevcoachPlugins(data).length > 0;
 }
 
 /** True when the devcoach Gemini extension is installed — it ships the same hooks + skill. */
@@ -626,6 +631,14 @@ export function cmdDoctor(): void {
   } else {
     const pluginOn = pluginHooksActive(read.data);
     const ours = collectDevcoachHooks(read.data);
+    const plugins = enabledDevcoachPlugins(read.data);
+    if (plugins.length > 1) {
+      // Release + beta channel both on: each ships the Stop hooks, so every stop counts twice.
+      bad(
+        `${plugins.length} devcoach plugins enabled (${plugins.join(", ")}) — their hooks fire ` +
+          "twice and interactions are double-counted. Keep one enabled (/plugin).",
+      );
+    }
     if (pluginOn && ours.length) {
       bad(
         "devcoach hooks are registered TWICE (plugin + settings.json) — interactions are " +
