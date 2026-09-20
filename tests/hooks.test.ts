@@ -179,6 +179,25 @@ describe("hooks in-process (runHook dispatcher + payload-injected entrypoints)",
     expect(capture(() => runHook("codex-prompt-hook", fresh)).out).toContain("UserPromptSubmit");
   });
 
+  it("a database newer than this build never breaks a hook: silent exit 0, stamp untouched", () => {
+    db.withConnection(() => undefined);
+    const raw = db.getConnection(db.DB_PATH);
+    raw.exec("PRAGMA user_version = 99");
+    raw.close();
+    try {
+      expect(capture(() => cmdStopHook(payload()))).toEqual({ out: "", code: 0 });
+      expect(capture(() => cmdPromptHook(payload()))).toEqual({ out: "", code: 0 });
+      expect(capture(() => cmdOnboardHook(payload()))).toEqual({ out: "", code: 0 });
+      const check = db.getConnection(db.DB_PATH);
+      expect(
+        (check.prepare("PRAGMA user_version").get() as { user_version: number }).user_version,
+      ).toBe(99);
+      check.close();
+    } finally {
+      rmSync(db.DB_PATH, { force: true });
+    }
+  });
+
   it("a broken DB never breaks a hook: every entrypoint exits 0 silently", () => {
     rmSync(db.DB_PATH, { force: true });
     mkdirSync(db.DB_PATH); // a directory at DB_PATH → opening the DB throws

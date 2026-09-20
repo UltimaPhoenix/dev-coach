@@ -25,6 +25,12 @@ try {
     await runCli();
   }
 } catch (err) {
+  // A write refused because the database was upgraded by a newer devcoach: the message says
+  // which versions, no stack. Exit 3 tells it apart from a crash (1) and a usage error (2).
+  if ((err as { name?: string } | null)?.name === "SchemaTooNewError") {
+    console.error((err as Error).message);
+    process.exit(3);
+  }
   console.error(err);
   process.exit(1);
 }

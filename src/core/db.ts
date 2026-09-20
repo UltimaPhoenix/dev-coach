@@ -8,6 +8,7 @@ import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
 import { strFromU8, strToU8, unzipSync, zipSync } from "fflate";
+import { VERSION } from "../version";
 
 // Load node:sqlite via createRequire so the bundler can't rewrite the "node:" specifier
 // (esbuild's builtin list predates node:sqlite and emits a bare, unresolvable "sqlite" import).
@@ -116,9 +117,9 @@ function runSql(db: DatabaseSync, sql: string, ...params: SqlParam[]): number {
 
 // ── Connection ───────────────────────────────────────────────────────────────
 
-export function getConnection(dbPath: string = DB_PATH): DatabaseSync {
+export function getConnection(dbPath: string = DB_PATH, readOnly = false): DatabaseSync {
   if (dbPath !== ":memory:") mkdirSync(dirname(dbPath), { recursive: true });
-  const db = new DatabaseSyncImpl(dbPath);
+  const db = new DatabaseSyncImpl(dbPath, { readOnly });
   // Two writers can collide (the MCP server plus a Stop hook from a concurrent
   // session); wait briefly instead of failing SQLITE_BUSY and dropping a cue.
   db.exec("PRAGMA busy_timeout = 3000");
@@ -130,14 +131,97 @@ export function getConnection(dbPath: string = DB_PATH): DatabaseSync {
  * DDL/seed batch is skipped (hooks run on every agent stop — one pragma read beats ~14
  * idempotent statements). Bump it whenever initSchema/migrate changes. The legacy Python
  * runtime ignores user_version, so stamping is safe on the shared DB.
+ *
+ * A stamp NEWER than ours means a newer devcoach upgraded the file (two channels share one
+ * database: release plugin, beta plugin, Homebrew CLI). This build then opens it READ-ONLY —
+ * never its DDL, never a downgraded stamp (an older build once re-stamped a v5 file as v3, and
+ * the newer build re-ran a one-shot data migration on top). Reads keep working; every write
+ * fails with `SchemaTooNewError`, which names both versions.
  */
-export const SCHEMA_VERSION = 5;
+export const SCHEMA_VERSION = 6;
+/** The oldest release able to WRITE a database at SCHEMA_VERSION — bump with the schema. */
+export const SCHEMA_MIN_APP_VERSION = "2.5.0";
+const SCHEMA_APP_VERSION_KEY = "schema_app_version";
+const SCHEMA_MIN_APP_VERSION_KEY = "schema_min_app_version";
+
+/** How this connection relates to the file's schema (see `compatOf`). */
+export interface SchemaCompat {
+  /** The file was upgraded by a newer devcoach: this connection is read-only. */
+  readOnly: true;
+  dbSchema: number;
+  appSchema: number;
+  /** The devcoach version that last upgraded the schema, when the file recorded it. */
+  upgradedBy: string | null;
+  /** The oldest devcoach that can write this file, when the file recorded it. */
+  minApp: string | null;
+}
+
+/** The one message every surface prints for a write refused on a newer database. */
+export function readOnlyMessage(compat: SchemaCompat): string {
+  const by = compat.upgradedBy ? `devcoach ${compat.upgradedBy}` : "a newer devcoach";
+  const need = compat.minApp ? `devcoach ≥ ${compat.minApp}` : "a newer devcoach";
+  return (
+    `The coaching database was upgraded by ${by} (schema v${compat.dbSchema}); this is ` +
+    `devcoach ${VERSION} (schema v${compat.appSchema}). Reads work; writes need ${need} — ` +
+    "update this install, or use the newer channel."
+  );
+}
+
+export class SchemaTooNewError extends Error {
+  constructor(readonly compat: SchemaCompat) {
+    super(readOnlyMessage(compat));
+    this.name = "SchemaTooNewError";
+  }
+}
+
+// Tagged per connection object, so the ~60 `(db: DatabaseSync) => T` call sites stay as they are.
+const COMPAT = new WeakMap<object, SchemaCompat>();
+
+/** Non-null when `db` was opened read-only because the file's schema is newer than this build. */
+export function compatOf(db: DatabaseSync): SchemaCompat | null {
+  return COMPAT.get(db) ?? null;
+}
+
+/** What the file says about its own schema (`initSchema` writes both rows on every upgrade). */
+export function getSchemaMeta(db: DatabaseSync): {
+  upgradedBy: string | null;
+  minApp: string | null;
+} {
+  try {
+    const rows = allRows(
+      db,
+      "SELECT key, value FROM settings WHERE key IN (?, ?)",
+      SCHEMA_APP_VERSION_KEY,
+      SCHEMA_MIN_APP_VERSION_KEY,
+    );
+    const get = (k: string) => (rows.find((r) => r.key === k)?.value as string | undefined) ?? null;
+    return { upgradedBy: get(SCHEMA_APP_VERSION_KEY), minApp: get(SCHEMA_MIN_APP_VERSION_KEY) };
+  } catch {
+    return { upgradedBy: null, minApp: null };
+  }
+}
+
+function readUserVersion(db: DatabaseSync): number {
+  const row = db.prepare("PRAGMA user_version").get() as { user_version?: number } | undefined;
+  return Number(row?.user_version ?? 0);
+}
 
 export function getInitializedConnection(dbPath: string = DB_PATH): DatabaseSync {
-  const db = getConnection(dbPath);
-  const row = db.prepare("PRAGMA user_version").get() as { user_version?: number } | undefined;
-  const fromVersion = Number(row?.user_version ?? 0);
-  if (fromVersion !== SCHEMA_VERSION) {
+  let db = getConnection(dbPath);
+  const fromVersion = readUserVersion(db);
+  if (fromVersion > SCHEMA_VERSION) {
+    db.close();
+    db = getConnection(dbPath, true);
+    db.exec("PRAGMA query_only = 1"); // belt and braces on top of the read-only open
+    COMPAT.set(db, {
+      readOnly: true,
+      dbSchema: fromVersion,
+      appSchema: SCHEMA_VERSION,
+      ...getSchemaMeta(db),
+    });
+    return db;
+  }
+  if (fromVersion < SCHEMA_VERSION) {
     initSchema(db, fromVersion);
     db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
   }
@@ -146,6 +230,8 @@ export function getInitializedConnection(dbPath: string = DB_PATH): DatabaseSync
 
 /** Run `fn` atomically: one IMMEDIATE transaction — a single lock/journal cycle. */
 export function withTransaction<T>(db: DatabaseSync, fn: () => T): T {
+  const compat = compatOf(db);
+  if (compat) throw new SchemaTooNewError(compat); // every transactional write, refused up front
   db.exec("BEGIN IMMEDIATE");
   try {
     const result = fn();
@@ -166,8 +252,27 @@ export function withConnection<T>(fn: (db: DatabaseSync) => T, dbPath: string = 
   const db = getInitializedConnection(dbPath);
   try {
     return fn(db);
+  } catch (err) {
+    // A non-transactional write on a read-only connection (setSetting, setStar, deletes…):
+    // SQLite says "attempt to write a readonly database" — surface it as the versions message.
+    const compat = compatOf(db);
+    if (compat && !(err instanceof SchemaTooNewError) && /readonly database/i.test(String(err))) {
+      throw new SchemaTooNewError(compat);
+    }
+    throw err;
   } finally {
     db.close();
+  }
+}
+
+function tableExists(db: DatabaseSync, name: string): boolean {
+  try {
+    return (
+      db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(name) !==
+      undefined
+    );
+  } catch {
+    return false;
   }
 }
 
@@ -175,6 +280,9 @@ export function withConnection<T>(fn: (db: DatabaseSync) => T, dbPath: string = 
 
 /** `fromVersion` is the stored `user_version` before this run (0 for a brand-new file). */
 export function initSchema(db: DatabaseSync, fromVersion = 0): void {
+  // Read before the DDL below creates it: the presence of `courses` proves a v5+ build already
+  // upgraded this file, whatever an older build may have re-stamped since (see `migrate`).
+  const upgradedBefore = tableExists(db, "courses");
   db.exec(`
     CREATE TABLE IF NOT EXISTS lessons (
         id                  TEXT PRIMARY KEY,
@@ -245,6 +353,13 @@ export function initSchema(db: DatabaseSync, fromVersion = 0): void {
         PRIMARY KEY (course_id, position)
     );
 
+    -- One-shot data migrations, by name: a stamp downgraded by an older build must never
+    -- make a newer one repeat them (v6; runtime metadata, not backed up).
+    CREATE TABLE IF NOT EXISTS schema_migrations (
+        name       TEXT PRIMARY KEY,
+        applied_at TEXT NOT NULL
+    );
+
     CREATE INDEX IF NOT EXISTS idx_courses_lesson_id ON courses (lesson_id);
     CREATE UNIQUE INDEX IF NOT EXISTS idx_course_steps_anchor ON course_steps (course_id, anchor);
 
@@ -270,11 +385,29 @@ export function initSchema(db: DatabaseSync, fromVersion = 0): void {
     CREATE INDEX IF NOT EXISTS idx_lessons_feedback ON lessons (feedback);
     CREATE INDEX IF NOT EXISTS idx_lessons_topic_id ON lessons (topic_id);
   `);
-  migrate(db, fromVersion);
+  migrate(db, fromVersion, upgradedBefore);
   seedDefaults(db);
+  // The handshake: which build upgraded the schema, and the oldest one that may write it.
+  setSetting(db, SCHEMA_APP_VERSION_KEY, VERSION);
+  setSetting(db, SCHEMA_MIN_APP_VERSION_KEY, SCHEMA_MIN_APP_VERSION);
 }
 
-function migrate(db: DatabaseSync, fromVersion: number): void {
+const MIGRATION_V4_FEEDBACK = "v4-feedback-understood";
+
+function hasMigration(db: DatabaseSync, name: string): boolean {
+  return db.prepare("SELECT 1 FROM schema_migrations WHERE name = ?").get(name) !== undefined;
+}
+
+function recordMigration(db: DatabaseSync, name: string): void {
+  runSql(
+    db,
+    "INSERT OR IGNORE INTO schema_migrations (name, applied_at) VALUES (?, ?)",
+    name,
+    new Date().toISOString(),
+  );
+}
+
+function migrate(db: DatabaseSync, fromVersion: number, upgradedBefore: boolean): void {
   for (const ddl of [
     "ALTER TABLE lessons ADD COLUMN body TEXT",
     "ALTER TABLE lessons ADD COLUMN imported INTEGER NOT NULL DEFAULT 0",
@@ -288,9 +421,15 @@ function migrate(db: DatabaseSync, fromVersion: number): void {
   }
   // v4 — feedback grew a third answer. Under the old two-answer model "don't know" mostly meant
   // "new to me", which is now `understood`; `dont_know` is reserved for "couldn't follow" and
-  // seeds courses. One-shot: only a database coming from before v4 is rewritten.
-  if (fromVersion < 4) {
-    db.exec("UPDATE lessons SET feedback = 'understood' WHERE feedback = 'dont_know'");
+  // seeds courses. One-shot, by ledger: the stamp alone cannot be trusted, an older build
+  // re-stamps a newer file with its own number. A file with no ledger row is genuinely pre-v4
+  // only when its stamp says so AND no v5+ build has been here (`upgradedBefore`); otherwise
+  // the rewrite already happened under the pre-ledger scheme and is recorded as done.
+  if (!hasMigration(db, MIGRATION_V4_FEEDBACK)) {
+    if (fromVersion < 4 && !upgradedBefore) {
+      db.exec("UPDATE lessons SET feedback = 'understood' WHERE feedback = 'dont_know'");
+    }
+    recordMigration(db, MIGRATION_V4_FEEDBACK);
   }
 }
 
