@@ -108,7 +108,7 @@ The simplest way to add devcoach to **Claude Code** — one click, nothing to co
 /plugin install devcoach@ultimaphoenix
 ```
 
-The MCP server, hooks, and skill activate on install — no restart needed. Open the [web dashboard](#web-dashboard) right from Claude Code with `/devcoach:ui` (or just ask — the `open_ui` tool); `/devcoach:share` and `/devcoach:import` hand lessons around; `/devcoach:course` turns a lesson you couldn't follow into a step-by-step course. Update later with `/plugin marketplace update ultimaphoenix`.
+The MCP server, hooks, and skill activate on install — no restart needed. Open the [web dashboard](#web-dashboard) right from Claude Code with `/devcoach:ui` (or just ask — the `open_ui` tool); `/devcoach:share` and `/devcoach:import` hand lessons around; `/devcoach:course` turns a lesson you couldn't follow into a step-by-step course. Update later with `/plugin marketplace update ultimaphoenix`. Want what's coming next? The [beta channel](https://ultimaphoenix.github.io/dev-coach/install/claude-code-plugin#beta-channel) installs the latest canary as `devcoach@ultimaphoenix-beta`.
 
 The plugin **does not** add the `devcoach` CLI, but the CLI stays a handy companion when you want the dashboard or your data without going through Claude — `devcoach ui`, `stats`, `lessons`, `share` / `import`, `backup`: run them with `npx -y devcoach …`, or install Homebrew / `npm i -g devcoach` for a bare `devcoach`. Just never run `devcoach install` next to the plugin — it owns the hooks.
 

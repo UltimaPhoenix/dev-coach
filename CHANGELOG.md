@@ -26,6 +26,11 @@ Notable changes to devcoach. Versions follow [Semantic Versioning](https://semve
   (`add_course_step` `after`) when one gets split; `get_lessons` `search` matches every word,
   in any order, instead of the literal phrase.
 
+- **Beta channel**: `/plugin marketplace add UltimaPhoenix/claude-plugins-marketplace-beta` +
+  `/plugin install devcoach@ultimaphoenix-beta` runs the latest canary from `develop` as a plugin,
+  same name, tools and commands as the release (enable one channel at a time — `devcoach doctor`
+  warns when both are on). CI pins the beta marketplace on every green push to `develop`.
+
 ### Changed
 - **Three answers under a lesson card**: `✅ knew it (y)` · `💡 understood (u)` · `❌ couldn't follow
   (n)`. Only *knew it* moves confidence (+1, undone if you change your answer); *understood* means the

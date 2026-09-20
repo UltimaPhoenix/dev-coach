@@ -68,6 +68,41 @@ describe("claude code plugin packaging", () => {
     expect(entry.tags).toEqual(expect.arrayContaining(["coaching", "mcp"]));
   });
 
+  it("update-beta-marketplace.mjs pins the canary zip (archive + sha256) in the beta catalog", () => {
+    const manifest = readJson("plugin", ".claude-plugin", "plugin.json");
+    const dir = mkdtempSync(join(tmpdir(), "devcoach-beta-mkt-"));
+    const file = join(dir, ".claude-plugin", "marketplace.json");
+    const sha = "a".repeat(64);
+    const url =
+      "https://github.com/UltimaPhoenix/dev-coach/releases/download/next/devcoach-plugin-9.9.0-next.1.gabc1234.zip";
+    const args = [
+      join(root, "scripts", "update-beta-marketplace.mjs"),
+      "9.9.0-next.1.gabc1234",
+      url,
+      sha,
+      file,
+    ];
+    execFileSync(process.execPath, args); // scaffolds the catalog on first run
+    execFileSync(process.execPath, args); // idempotent
+    const market = JSON.parse(readFileSync(file, "utf8"));
+    expect(market.name).toBe("ultimaphoenix-beta");
+    expect(market.description).toContain("canaries");
+    expect(market.owner.name).toBe("UltimaPhoenix");
+    expect(market.plugins).toHaveLength(1);
+    expect(market.plugins[0]).toMatchObject({
+      name: "devcoach", // same plugin name: installs as devcoach@ultimaphoenix-beta
+      version: "9.9.0-next.1.gabc1234",
+      description: manifest.description,
+      tags: expect.arrayContaining(["beta"]),
+      source: { source: "archive", url, sha256: sha },
+    });
+    expect(() =>
+      execFileSync(process.execPath, [args[0], "1.0.0", "http://insecure", sha, file], {
+        stdio: "pipe",
+      }),
+    ).toThrow();
+  });
+
   it("update-marketplace.mjs enriches only the devcoach entry of the shared tap catalog", () => {
     const manifest = readJson("plugin", ".claude-plugin", "plugin.json");
     const dir = mkdtempSync(join(tmpdir(), "devcoach-mkt-"));

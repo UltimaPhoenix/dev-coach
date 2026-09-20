@@ -204,6 +204,17 @@ describe("cli", () => {
       }),
     );
     expect((await run(["doctor"])).out).toContain("registered TWICE");
+
+    // release + beta channel both enabled → each ships the hooks
+    writeFileSync(
+      join(process.env.HOME as string, ".claude", "settings.json"),
+      JSON.stringify({
+        enabledPlugins: { "devcoach@ultimaphoenix": true, "devcoach@ultimaphoenix-beta": true },
+      }),
+    );
+    const both = (await run(["doctor"])).out;
+    expect(both).toContain("2 devcoach plugins enabled");
+    expect(both).toContain("devcoach@ultimaphoenix-beta");
   });
 
   it("DEVCOACH_HOOK_DEBUG=1 logs hook decisions to ~/.devcoach/hook.log", async () => {

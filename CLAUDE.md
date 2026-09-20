@@ -353,7 +353,11 @@ the tag (a non-fast-forward `main` rejects all three); dispatched on `main` it i
 job computes `<next minor>-next.<run>.g<sha>` in the runner (never committed, never a `v*` tag —
 the release preflight derives versions from `v*` tags only), publishes it to npm under the dist-tag
 `next` (`npx -y devcoach@next`), and recreates the rolling GitHub prerelease `next` with the
-`.mcpb` + plugin/Gemini zips. The docs site deploys both branches from one Pages artifact:
+`.mcpb` + plugin/Gemini zips, and the `marketplace-beta` job pins that plugin zip (archive source +
+sha256, via `scripts/update-beta-marketplace.mjs`) in `UltimaPhoenix/claude-plugins-marketplace-beta`
+— a **separate** marketplace so the plugin keeps its name (`devcoach@ultimaphoenix-beta`, same
+tools/commands/skill as the release; `doctor` warns when both channels are enabled). The docs site
+deploys both branches from one Pages artifact:
 `main` at `/dev-coach/`, `develop` at `/dev-coach/next/` (`DOCS_NEXT=1` build: noindex, no sitemap,
 banner). Then `publish` (`npm publish`, OIDC
 trusted publishing, tokenless), `release` (GitHub Release with the self-signed `.mcpb`, the Claude

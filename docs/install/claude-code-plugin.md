@@ -59,6 +59,24 @@ Move over once:
 /plugin install devcoach@ultimaphoenix
 ```
 
+### Beta channel
+
+Every green push to `develop` builds a canary (`npx -y devcoach@next`, the `next` prerelease on
+GitHub) and pins it in a **separate beta marketplace**, so you can run what is coming next as a
+plugin without touching the release:
+
+```bash
+/plugin marketplace add UltimaPhoenix/claude-plugins-marketplace-beta
+/plugin install devcoach@ultimaphoenix-beta
+```
+
+The beta keeps the plugin name, so its tools, commands and skill are exactly the release's. Two
+copies of the hooks would count every interaction twice, so **enable one at a time**: turn
+`devcoach@ultimaphoenix` off while the beta is on (`/plugin`, or `enabledPlugins` in your settings),
+and `devcoach doctor` warns if both are enabled. `/plugin marketplace update ultimaphoenix-beta`
+picks up the newest canary; the [`next` prerelease](https://github.com/UltimaPhoenix/dev-coach/releases/tag/next)
+notes say which commit it is. Canaries are unreleased and may break.
+
 ### Offline install
 
 Download `devcoach-plugin-<version>.zip` from the [GitHub Releases](https://github.com/UltimaPhoenix/dev-coach/releases),
