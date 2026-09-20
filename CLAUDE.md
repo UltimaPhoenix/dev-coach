@@ -356,7 +356,9 @@ the release preflight derives versions from `v*` tags only), publishes it to npm
 `.mcpb` + plugin/Gemini zips, and the `marketplace-beta` job pins that plugin zip (archive source +
 sha256, via `scripts/update-beta-marketplace.mjs`) in `UltimaPhoenix/claude-plugins-marketplace-beta`
 — a **separate** marketplace so the plugin keeps its name (`devcoach@ultimaphoenix-beta`, same
-tools/commands/skill as the release; `doctor` warns when both channels are enabled). The docs site
+tools/commands/skill as the release; `doctor` warns when both channels are enabled); it pushes with
+a write deploy key scoped to the beta repo (`BETA_MARKETPLACE_DEPLOY_KEY`, `claude-marketplace`
+environment), not the release marketplace token. The docs site
 deploys both branches from one Pages artifact:
 `main` at `/dev-coach/`, `develop` at `/dev-coach/next/` (`DOCS_NEXT=1` build: noindex, no sitemap,
 banner). Then `publish` (`npm publish`, OIDC
