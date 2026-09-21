@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSyn
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { unzipSync } from "fflate";
 import { describe, expect, it } from "vitest";
 
 // Repo root = tests/ → ..  (these are static repo files, not runtime code).
@@ -68,13 +69,43 @@ describe("claude code plugin packaging", () => {
     expect(entry.tags).toEqual(expect.arrayContaining(["coaching", "mcp"]));
   });
 
+  it("build-plugin-zip.mjs packs the offline-marketplace zip AND a plugin-root zip for archive sources", () => {
+    const dist = mkdtempSync(join(tmpdir(), "devcoach-zip-"));
+    execFileSync(process.execPath, [join(root, "scripts", "build-plugin-zip.mjs")], {
+      env: { ...process.env, DEVCOACH_DIST_PLUGIN: dist },
+      stdio: "pipe",
+    });
+    const version = readJson("package.json").version;
+    const entries = (name: string) => Object.keys(unzipSync(readFileSync(join(dist, name))));
+    const offline = entries(`devcoach-plugin-${version}.zip`);
+    expect(offline).toContain(".claude-plugin/marketplace.json");
+    expect(offline).toContain("plugin/.claude-plugin/plugin.json");
+    expect(offline).toContain("plugin/hooks/hooks.json");
+    // The archive layout: the plugin root at the top, no marketplace manifest, no plugin/ prefix.
+    const archive = entries(`devcoach-plugin-archive-${version}.zip`);
+    for (const path of [
+      ".claude-plugin/plugin.json",
+      ".mcp.json",
+      "hooks/hooks.json",
+      "scripts/launch.mjs",
+      "skills/devcoach/SKILL.md",
+      "commands/course.md",
+      "package.json",
+    ]) {
+      expect(archive, path).toContain(path);
+    }
+    expect(archive.some((p) => p.startsWith("plugin/"))).toBe(false);
+    expect(archive.some((p) => p.endsWith("marketplace.json"))).toBe(false);
+    expect(archive).toHaveLength(offline.length - 1);
+  });
+
   it("update-beta-marketplace.mjs pins the canary zip (archive + sha256) in the beta catalog", () => {
     const manifest = readJson("plugin", ".claude-plugin", "plugin.json");
     const dir = mkdtempSync(join(tmpdir(), "devcoach-beta-mkt-"));
     const file = join(dir, ".claude-plugin", "marketplace.json");
     const sha = "a".repeat(64);
     const url =
-      "https://github.com/UltimaPhoenix/dev-coach/releases/download/next/devcoach-plugin-9.9.0-next.1.gabc1234.zip";
+      "https://github.com/UltimaPhoenix/dev-coach/releases/download/next/devcoach-plugin-archive-9.9.0-next.1.gabc1234.zip";
     const args = [
       join(root, "scripts", "update-beta-marketplace.mjs"),
       "9.9.0-next.1.gabc1234",
