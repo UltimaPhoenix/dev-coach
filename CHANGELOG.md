@@ -29,7 +29,9 @@ Notable changes to devcoach. Versions follow [Semantic Versioning](https://semve
 - **Beta channel**: `/plugin marketplace add UltimaPhoenix/claude-plugins-marketplace-beta` +
   `/plugin install devcoach@ultimaphoenix-beta` runs the latest canary from `develop` as a plugin,
   same name, tools and commands as the release (enable one channel at a time — `devcoach doctor`
-  warns when both are on). CI pins the beta marketplace on every green push to `develop`.
+  warns when both are on). CI pins the beta marketplace on every green push to `develop` — to a
+  dedicated plugin-root zip (`devcoach-plugin-archive-<version>.zip`); the marketplace-layout
+  zip keeps serving offline installs.
 
 ### Changed
 - **Three answers under a lesson card**: `✅ knew it (y)` · `💡 understood (u)` · `❌ couldn't follow

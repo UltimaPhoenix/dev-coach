@@ -75,7 +75,8 @@ copies of the hooks would count every interaction twice, so **enable one at a ti
 `devcoach@ultimaphoenix` off while the beta is on (`/plugin`, or `enabledPlugins` in your settings),
 and `devcoach doctor` warns if both are enabled. `/plugin marketplace update ultimaphoenix-beta`
 picks up the newest canary; the [`next` prerelease](https://github.com/UltimaPhoenix/dev-coach/releases/tag/next)
-notes say which commit it is. Canaries are unreleased and may break.
+notes say which commit it is (the beta pulls the prerelease's `devcoach-plugin-archive-<version>.zip`,
+a plugin-root layout; nothing to do on your side). Canaries are unreleased and may break.
 
 ### Offline install
 
