@@ -148,7 +148,10 @@ export function cmdOnboardHook(payload: HookPayload = readHookPayload()): void {
   if (existsSync(db.DB_PATH)) {
     let ready: boolean;
     try {
-      ready = db.withConnection((conn) => db.isOnboardingComplete(conn).knowledge_ready);
+      // Read-only on a newer database: complete_onboarding could not save anyway — stay silent.
+      ready = db.withConnection(
+        (conn) => db.compatOf(conn) !== null || db.isOnboardingComplete(conn).knowledge_ready,
+      );
     } catch (err) {
       hookDebugLog("onboard-hook", payload.session_id, `error: ${err}`);
       process.exit(0);
@@ -248,6 +251,8 @@ function decideStop(
 ): StopDecision {
   const plan = payload.permission_mode === "plan";
   if (payload.stop_hook_active) return { kind: "silent", note: "hook-forced continuation" };
+  if (db.compatOf(conn))
+    return { kind: "silent", note: "read-only: database newer than this build" };
   if (!db.isOnboardingComplete(conn).knowledge_ready) {
     if (!opts.onboardCue || plan) return { kind: "silent", note: "onboarding not complete" };
     return { kind: "onboard", note: "onboarding cue (empty knowledge)" };
@@ -361,8 +366,12 @@ export function cmdPromptHook(
   if (!existsSync(db.DB_PATH)) process.exit(0);
   let wouldCue: boolean;
   try {
+    // Read-only on a newer database: a primed lesson could not be saved — never prime.
     wouldCue = db.withConnection(
-      (conn) => !db.hasActiveCourse(conn) && coach.explainCue(conn, payload.session_id).wouldCue,
+      (conn) =>
+        db.compatOf(conn) === null &&
+        !db.hasActiveCourse(conn) &&
+        coach.explainCue(conn, payload.session_id).wouldCue,
     );
   } catch (err) {
     hookDebugLog(hookName, payload.session_id, `error: ${err}`);

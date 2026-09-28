@@ -58,6 +58,14 @@ projects", "any new tech I should track?" — read `references/review.md` in thi
 skill's directory and follow it. Those flows are incremental and non-destructive;
 only an explicit "redo onboarding" goes through `references/onboarding.md`.
 
+## Read-only database
+
+If `get_briefing` (or `get_profile`) carries a non-null `compat`, this devcoach is older than
+the database another channel upgraded: reads work, every write (`log_lesson`, feedback, courses,
+settings) will fail. Say so to the user in ONE line before anything else — *"devcoach here is
+older than your coaching database (upgraded by devcoach X); update it or use the newer channel"*
+— then do not attempt lessons or courses in this session.
+
 ## Courses
 
 When the user wants to be taught something properly — "explain this step by step", "start
