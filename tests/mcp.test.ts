@@ -395,45 +395,6 @@ describe("mcp server error paths", () => {
     ["update_course_progress", { course_id: "x", position: 1, status: "done" }],
   ];
 
-  it("on a database newer than this build: reads work, writes refuse, the briefing says so", async () => {
-    const { client, server } = await connect();
-    await client.callTool({
-      name: "log_lesson",
-      arguments: {
-        id: "ro-mcp",
-        topic_id: "python",
-        categories: ["python"],
-        title: "Read me",
-        level: "mid",
-        summary: "s",
-        body: "b",
-      },
-    });
-    const raw = db.getConnection(db.DB_PATH);
-    raw.exec("PRAGMA user_version = 99");
-    raw.close();
-    try {
-      const lessons: any = await client.callTool({ name: "get_lessons", arguments: { limit: 5 } });
-      expect(text(lessons)).toContain("ro-mcp");
-      const briefing: any = await client.callTool({ name: "get_briefing", arguments: {} });
-      expect(briefing.structuredContent.compat).toMatchObject({ readOnly: true, dbSchema: 99 });
-      const profile: any = await client.callTool({ name: "get_profile", arguments: {} });
-      expect(profile.structuredContent.compat.dbSchema).toBe(99);
-      const write: any = await client.callTool({
-        name: "submit_feedback",
-        arguments: { lesson_id: "ro-mcp", feedback: "know" },
-      });
-      expect(write.isError).toBe(true);
-      expect(text(write)).toContain("schema v99");
-    } finally {
-      const back = db.getConnection(db.DB_PATH);
-      back.exec(`PRAGMA user_version = ${db.SCHEMA_VERSION}`);
-      back.close();
-      await client.close();
-      await server.close();
-    }
-  });
-
   it("DB-backed tools return isError when the DB throws", async () => {
     const { client, server } = await connect();
     const spy = vi.spyOn(db, "withConnection").mockImplementation(() => {

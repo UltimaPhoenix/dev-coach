@@ -97,17 +97,6 @@ export function layout(o: {
   <script src="/static/vendor/alpinejs.min.js" defer></script>
   <link rel="stylesheet" href="/static/style.css" />
   ${o.head ?? ""}
-  <script>
-    // Older devcoach on a newer database → the dashboard is read-only: one banner on every page.
-    fetch('/ping').then(function (r) { return r.json(); }).then(function (p) {
-      if (!p || !p.compat) return;
-      var b = document.createElement('div');
-      b.setAttribute('role', 'status');
-      b.className = 'bg-amber-100 dark:bg-amber-900/40 text-amber-900 dark:text-amber-200 border-b border-amber-300 dark:border-amber-700 px-6 py-2 text-sm';
-      b.textContent = '⚠ Read-only: ' + p.compat.message;
-      document.body.prepend(b);
-    }).catch(function () {});
-  </script>
 </head>
 <body class="bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-100 min-h-screen font-mono transition-colors duration-200">
   <nav class="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-6 py-3 flex items-center gap-6">
@@ -1238,17 +1227,6 @@ ${
     body,
     scripts,
   });
-}
-
-/** The 503 a write gets when this devcoach is older than the database (see core/db). */
-export function readOnlyPage(message: string): Html {
-  return html`<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8" /><title>Read-only — devcoach</title>
-<link rel="stylesheet" href="/static/style.css" /></head>
-<body style="font-family: ui-monospace, monospace; max-width: 40rem; margin: 4rem auto; padding: 0 1rem; line-height: 1.5">
-<h1 style="font-size: 1.25rem">This devcoach is older than your database</h1>
-<p>${message}</p>
-<p><a href="javascript:history.back()">← Back</a></p>
-</body></html>`;
 }
 
 export interface CourseDetailData {

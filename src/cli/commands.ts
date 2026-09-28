@@ -91,22 +91,9 @@ function renderProfileTable(profile: ReturnType<typeof coach.getProfile>, title:
   );
 }
 
-/**
- * Read commands still work on a database a newer devcoach upgraded (the connection is
- * read-only); they end with one line saying so, so the silence of a refused write later is no
- * surprise. `compat` is captured inside the command's own connection.
- */
-function readOnlyNotice(compat: db.SchemaCompat | null): void {
-  if (compat) log(c.yellow(`→ ${db.readOnlyMessage(compat)}`));
-}
-
 function cmdProfile(): void {
-  const { profile, compat } = db.withConnection((conn) => ({
-    profile: coach.getProfile(conn),
-    compat: db.compatOf(conn),
-  }));
+  const profile = db.withConnection((conn) => coach.getProfile(conn));
   log(renderProfileTable(profile, "Knowledge Map"));
-  readOnlyNotice(compat);
 }
 
 interface LessonsOpts {
@@ -128,10 +115,8 @@ interface LessonsOpts {
 }
 
 function cmdLessons(o: LessonsOpts): void {
-  let compat: db.SchemaCompat | null = null;
-  const lessons = db.withConnection((conn) => {
-    compat = db.compatOf(conn);
-    return db.getLessons(conn, {
+  const lessons = db.withConnection((conn) =>
+    db.getLessons(conn, {
       period: o.period === "all" ? null : o.period,
       category: o.category,
       level: o.level,
@@ -147,9 +132,8 @@ function cmdLessons(o: LessonsOpts): void {
       date_to: o.dateTo,
       sort: o.sort,
       order: o.order,
-    });
-  });
-
+    }),
+  );
   if (lessons.length === 0) {
     log(c.dim("No lessons found."));
     return;
@@ -186,7 +170,6 @@ function cmdLessons(o: LessonsOpts): void {
     return row;
   });
   log(renderTable("Lessons", columns, rows));
-  readOnlyNotice(compat);
 }
 
 function cmdLesson(id: string): void {
@@ -362,11 +345,10 @@ function cmdSettings(): void {
 }
 
 function cmdStats(): void {
-  const { stats, rateLimit, settings, compat } = db.withConnection((conn) => ({
+  const { stats, rateLimit, settings } = db.withConnection((conn) => ({
     stats: coach.getStats(conn),
     rateLimit: coach.checkRateLimit(conn),
     settings: db.getSettings(conn),
-    compat: db.compatOf(conn),
   }));
   const num = (k: string): number => Number(stats[k] ?? 0);
   const rlLabel = rateLimit.allowed ? c.green("Available now") : c.yellow(rateLimit.reason ?? "");
@@ -403,7 +385,6 @@ function cmdStats(): void {
 
   const hint = skillHint();
   if (hint) log(`\n${hint}`);
-  readOnlyNotice(compat);
 }
 
 function cmdSet(key: string, value: string): void {

@@ -33,7 +33,6 @@ import {
   lessonDetailPage,
   lessonsPage,
   profilePage,
-  readOnlyPage,
   type ShareState,
   settingsPage,
   shareFragment,
@@ -161,14 +160,6 @@ export interface AppOptions {
 export function createApp(opts: AppOptions = {}): Hono {
   const app = new Hono();
 
-  // A write refused because a newer devcoach upgraded the database: say so, with both versions,
-  // instead of a bare 500. Everything else keeps Hono's default behaviour.
-  app.onError((err, c) => {
-    if (err instanceof db.SchemaTooNewError) return c.html(readOnlyPage(err.message), 503);
-    console.error(err);
-    return c.text("Internal Server Error", 500);
-  });
-
   app.get("/static/*", (c) => {
     const rel = decodeURIComponent(c.req.path.slice("/static/".length));
     const filePath = join(STATIC_DIR, rel);
@@ -188,20 +179,7 @@ export function createApp(opts: AppOptions = {}): Hono {
   });
 
   // ── Ping (the docs site's share page asks "is a dashboard running?") ─────
-  app.get("/ping", (c) => {
-    // `compat` is non-null when this devcoach is older than the database (read-only): the
-    // layout's banner reads it here, so every page carries the notice with no per-route work.
-    let compat: (db.SchemaCompat & { message: string }) | null = null;
-    try {
-      compat = db.withConnection((conn) => {
-        const found = db.compatOf(conn);
-        return found ? { ...found, message: db.readOnlyMessage(found) } : null;
-      });
-    } catch {
-      // no database yet, or unreadable — the dashboard pages report that themselves
-    }
-    return c.json({ ok: true, version: VERSION, compat }, 200, PING_HEADERS);
-  });
+  app.get("/ping", (c) => c.json({ ok: true, version: VERSION }, 200, PING_HEADERS));
   app.options("/ping", (c) => c.body(null, 204, PING_HEADERS));
 
   // ── Shutdown (`devcoach ui --stop`, the stop_ui tool) ─────────────────────

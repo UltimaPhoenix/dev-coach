@@ -4,7 +4,7 @@ Notable changes to devcoach. Versions follow [Semantic Versioning](https://semve
 
 ---
 
-## [2.5.0] — 2026-09-28
+## [Unreleased]
 
 ### Added
 - **Courses** — a step-by-step path out of a lesson you couldn't follow (or into any concept). The
@@ -32,14 +32,6 @@ Notable changes to devcoach. Versions follow [Semantic Versioning](https://semve
   warns when both are on). CI pins the beta marketplace on every green push to `develop` — to a
   dedicated plugin-root zip (`devcoach-plugin-archive-<version>.zip`); the marketplace-layout
   zip keeps serving offline installs.
-
-- **Older devcoach, newer database: read-only, never destructive.** When the shared database was
-  upgraded by a newer devcoach (another channel), this build opens it read-only: reads and the
-  dashboard keep working, writes fail with a message naming both versions (CLI exit 3, a 503 page,
-  `isError` in MCP, a banner in the dashboard), hooks stay silent, `doctor` explains — and the
-  file is never migrated or re-stamped. The database records which devcoach upgraded it and the
-  oldest one allowed to write it, and one-shot data migrations are tracked by name so a stamp
-  downgraded by an old build never repeats them. **Schema v6** (additive, automatic).
 
 ### Changed
 - **Three answers under a lesson card**: `✅ knew it (y)` · `💡 understood (u)` · `❌ couldn't follow

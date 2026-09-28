@@ -20,7 +20,6 @@ import { detectGitContext } from "../src/core/git";
 import { normalizeTimestamp, parseLesson } from "../src/core/models";
 import { buildPromptForLevel, formatLessonForDisplay } from "../src/core/prompts";
 import { buildSharePayload, renderShareText, ShareInputError } from "../src/core/share";
-import { VERSION } from "../src/version";
 
 function freshDb(): DatabaseSync {
   return db.getInitializedConnection(join(mkdtempSync(join(tmpdir(), "dc-db-")), "c.db"));
@@ -427,8 +426,6 @@ describe("lesson sharing — storage & pacing", () => {
     const path = join(mkdtempSync(join(tmpdir(), "dc-db-")), "v3.db");
     const old = db.getInitializedConnection(path);
     db.insertLesson(old, lesson({ id: "old", feedback: "dont_know" }));
-    // a genuine pre-v4 file: no ledger, no course tables, stamp 3
-    old.exec("DELETE FROM schema_migrations; DROP TABLE course_steps; DROP TABLE courses;");
     old.exec("PRAGMA user_version = 3");
     old.close();
     c = db.getInitializedConnection(path);
@@ -438,66 +435,6 @@ describe("lesson sharing — storage & pacing", () => {
     c.close();
     c = db.getInitializedConnection(path);
     expect(db.getLessonById(c, "fresh")?.feedback).toBe("dont_know");
-  });
-
-  it("a stamp downgraded by an older build never repeats the v4 rewrite (ledger)", () => {
-    const path = join(mkdtempSync(join(tmpdir(), "dc-db-")), "downgraded.db");
-    const fresh = db.getInitializedConnection(path);
-    db.insertLesson(fresh, lesson({ id: "fresh", feedback: "dont_know" }));
-    fresh.exec("PRAGMA user_version = 3"); // what 2.4.0 does to a newer file
-    fresh.close();
-    c = db.getInitializedConnection(path);
-    expect(db.getLessonById(c, "fresh")?.feedback).toBe("dont_know");
-    expect((c.prepare("PRAGMA user_version").get() as { user_version: number }).user_version).toBe(
-      db.SCHEMA_VERSION,
-    );
-    expect(c.prepare("SELECT name FROM schema_migrations").all()).toEqual([
-      { name: "v4-feedback-understood" },
-    ]);
-    // a pre-ledger v5 file (courses table, no ledger, stamp 3) is recognised the same way
-    c.exec("DELETE FROM schema_migrations; PRAGMA user_version = 3");
-    c.close();
-    c = db.getInitializedConnection(path);
-    expect(db.getLessonById(c, "fresh")?.feedback).toBe("dont_know");
-  });
-
-  it("a newer database opens read-only: reads work, writes are refused with both versions", () => {
-    const path = join(mkdtempSync(join(tmpdir(), "dc-db-")), "newer.db");
-    const writer = db.getInitializedConnection(path);
-    db.insertLesson(writer, lesson({ id: "l1" }));
-    expect(db.getSchemaMeta(writer)).toEqual({
-      upgradedBy: VERSION,
-      minApp: db.SCHEMA_MIN_APP_VERSION,
-    });
-    expect(db.compatOf(writer)).toBeNull();
-    writer.exec("PRAGMA user_version = 99");
-    writer.close();
-
-    c = db.getInitializedConnection(path);
-    const compat = db.compatOf(c);
-    expect(compat).toEqual({
-      readOnly: true,
-      dbSchema: 99,
-      appSchema: db.SCHEMA_VERSION,
-      upgradedBy: VERSION,
-      minApp: db.SCHEMA_MIN_APP_VERSION,
-    });
-    expect(db.getLessonById(c, "l1")?.id).toBe("l1"); // reads
-    expect(() => db.withTransaction(c, () => 1)).toThrow(db.SchemaTooNewError); // transactional writes
-    const msg = db.readOnlyMessage(compat as db.SchemaCompat);
-    expect(msg).toContain(`devcoach ${VERSION} (schema v${db.SCHEMA_VERSION})`);
-    expect(msg).toContain("schema v99");
-    expect(msg).toContain(db.SCHEMA_MIN_APP_VERSION);
-    c.close();
-    // non-transactional writes surface as the same error through withConnection
-    expect(() => db.withConnection((conn) => db.setStar(conn, "l1", true), path)).toThrow(
-      db.SchemaTooNewError,
-    );
-    // …and nothing was touched: the stamp stays 99, no DDL ran
-    c = db.getConnection(path);
-    expect((c.prepare("PRAGMA user_version").get() as { user_version: number }).user_version).toBe(
-      99,
-    );
   });
 
   it("an imported lesson is ours (taught topic, feedback works) but never touches pacing", () => {
