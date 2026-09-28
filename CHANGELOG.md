@@ -4,6 +4,13 @@ Notable changes to devcoach. Versions follow [Semantic Versioning](https://semve
 
 ---
 
+## [2.6.1] — 2026-09-28
+
+### Changed
+- Dependencies: MCP TypeScript SDK 2.1.0 (server and the test client), hono 4.13.9, zod 4.6.5;
+  tooling: Biome 2.5.14, Vitest 5.0.2, tsx 4.23.15, @types/node 26.6.2; docs site: DOMPurify and
+  marked.
+
 ## [2.6.0] — 2026-09-28
 
 ### Added
