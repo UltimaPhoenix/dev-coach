@@ -703,6 +703,20 @@ export function cmdDoctor(): void {
   try {
     db.withConnection((conn) => {
       ok(`database opens (${db.DB_PATH})`);
+      const compat = db.compatOf(conn);
+      if (compat) {
+        bad(db.readOnlyMessage(compat));
+        log(
+          `    this build is READ-ONLY on it: hooks cannot count interactions, lessons cannot be ` +
+            `saved — update this install (brew upgrade devcoach / npm, or the plugin) or run the newer channel`,
+        );
+      } else {
+        const meta = db.getSchemaMeta(conn);
+        ok(
+          `schema v${db.SCHEMA_VERSION}` +
+            (meta.upgradedBy ? `, last upgraded by devcoach ${meta.upgradedBy}` : ""),
+        );
+      }
       if (db.isOnboardingComplete(conn).knowledge_ready) ok("onboarding complete");
       else warn("onboarding not complete — the next stop cues it");
       const settings = db.getSettings(conn);

@@ -93,9 +93,22 @@ const CARD_REPLY_CHECK =
   "plain reply text, outside any tool call? If yes: output nothing. If no: write the " +
   "card now, as the final text of your reply. Never write it twice.";
 
+/** Present when this devcoach is older than the database it opened (read-only, see core/db). */
+const compatOutput = z
+  .object({
+    readOnly: z.literal(true),
+    dbSchema: z.number().int(),
+    appSchema: z.number().int(),
+    upgradedBy: z.string().nullable(),
+    minApp: z.string().nullable(),
+  })
+  .nullable()
+  .optional();
+
 const profileOutput = z.object({
   knowledge: z.array(z.object({ topic: z.string(), confidence: z.number().int() })),
   groups: z.array(z.object({ name: z.string(), topics: z.array(z.string()) })),
+  compat: compatOutput,
 });
 
 const settingsOutput = z.object({
@@ -178,7 +191,7 @@ type Payload = Record<string, unknown>;
 
 function profilePayload(): Payload {
   try {
-    return { ...db.withConnection((c) => coach.getProfile(c)) };
+    return db.withConnection((c) => ({ ...coach.getProfile(c), compat: db.compatOf(c) }));
   } catch (err) {
     return { error: String(err) };
   }
@@ -211,6 +224,8 @@ function briefingPayload(): Payload {
         rate_limit: rateLimit,
         taught_topics: coach.listTaughtTopics(c),
         profile: coach.getProfile(c),
+        // Non-null when this devcoach is older than the file: reads work, writes will fail.
+        compat: db.compatOf(c),
       };
     });
     return { ...data, notebook, notebook_path: db.LEARNING_STATE_PATH };
@@ -221,7 +236,10 @@ function briefingPayload(): Payload {
 
 function onboardingPayload(): Payload {
   try {
-    const status = db.withConnection((c) => db.isOnboardingComplete(c));
+    const { status, compat } = db.withConnection((c) => ({
+      status: db.isOnboardingComplete(c),
+      compat: db.compatOf(c),
+    }));
     const knowledgeReady = status.knowledge_ready;
     const notebookReady =
       existsSync(db.LEARNING_STATE_PATH) && statSync(db.LEARNING_STATE_PATH).size > 0;
@@ -229,6 +247,7 @@ function onboardingPayload(): Payload {
     const scan = scanClaudeHistory();
     const detected = mergeStacks(detectStack(git.folder ?? process.cwd()), scan.detected_stack);
     return {
+      compat,
       knowledge_ready: knowledgeReady,
       notebook_ready: notebookReady,
       needs_onboarding: !(knowledgeReady && notebookReady),
