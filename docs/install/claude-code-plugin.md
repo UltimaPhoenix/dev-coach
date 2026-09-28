@@ -78,11 +78,6 @@ picks up the newest canary; the [`next` prerelease](https://github.com/UltimaPho
 notes say which commit it is (the beta pulls the prerelease's `devcoach-plugin-archive-<version>.zip`,
 a plugin-root layout; nothing to do on your side). Canaries are unreleased and may break.
 
-A canary may upgrade the shared database schema. An **older** devcoach (the release plugin, a
-Homebrew or npm CLI behind the canary) then opens it read-only: `stats`, `lessons` and the
-dashboard keep working, writes are refused with a message naming both versions, and
-`devcoach doctor` says so. Keep the CLI you use for writes on the same channel as the plugin.
-
 ### Offline install
 
 Download `devcoach-plugin-<version>.zip` from the [GitHub Releases](https://github.com/UltimaPhoenix/dev-coach/releases),

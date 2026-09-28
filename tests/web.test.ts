@@ -811,42 +811,6 @@ describe("web shared-with-me filters", () => {
   });
 });
 
-describe("web on a database newer than this build (read-only)", () => {
-  it("pages render, /ping carries the notice, a write answers 503 with the message", async () => {
-    db.withConnection((c) =>
-      db.insertLesson(
-        c,
-        parseLesson({
-          id: "ro-web",
-          timestamp: "2026-01-01T00:00:00Z",
-          topic_id: "python",
-          categories: [],
-          title: "Still readable",
-          level: "mid",
-          summary: "s",
-        }),
-      ),
-    );
-    const raw = db.getConnection(db.DB_PATH);
-    raw.exec("PRAGMA user_version = 99");
-    raw.close();
-    try {
-      const page = await get("/lessons/ro-web");
-      expect(page.status).toBe(200);
-      expect(await page.text()).toContain("Still readable");
-      const ping = (await (await get("/ping")).json()) as { compat: { message: string } };
-      expect(ping.compat.message).toContain("schema v99");
-      const write = await post("/lessons/ro-web/feedback", { feedback: "know" });
-      expect(write.status).toBe(503);
-      expect(await write.text()).toContain("older than your database");
-    } finally {
-      const back = db.getConnection(db.DB_PATH);
-      back.exec(`PRAGMA user_version = ${db.SCHEMA_VERSION}`);
-      back.close();
-    }
-  });
-});
-
 describe("web courses over a real socket", () => {
   it("serves each document at its own length (node-server mutates plain header objects)", async () => {
     const { startUi } = await import("../src/web/app");

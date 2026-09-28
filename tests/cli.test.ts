@@ -689,55 +689,6 @@ describe("cli", () => {
   });
 });
 
-describe("cli on a database newer than this build (read-only)", () => {
-  const stamp = (v: number) => {
-    const raw = db.getConnection(db.DB_PATH);
-    raw.exec(`PRAGMA user_version = ${v}`);
-    raw.close();
-  };
-
-  it("read commands work and say so; a write is refused with the versions; doctor explains", async () => {
-    db.withConnection((c) =>
-      db.insertLesson(
-        c,
-        parseLesson({
-          id: "ro1",
-          timestamp: "2026-01-01T00:00:00Z",
-          topic_id: "python",
-          categories: [],
-          title: "Read me",
-          level: "mid",
-          summary: "s",
-        }),
-      ),
-    );
-    stamp(99);
-    try {
-      const stats = await run(["stats"]);
-      expect(stats.code).toBeNull();
-      expect(stats.out).toContain("Reads work; writes need");
-      const lessons = await run(["lessons"]);
-      expect(lessons.out).toContain("Read me");
-      expect(lessons.out).toContain("schema v99");
-      await expect(run(["feedback", "ro1", "know"])).rejects.toThrow(db.SchemaTooNewError);
-      const doctor = await run(["doctor"]);
-      expect(doctor.code).toBeNull();
-      expect(doctor.out).toContain("READ-ONLY");
-      expect(doctor.out).toContain(`devcoach ${VERSION} (schema v${db.SCHEMA_VERSION})`);
-      const check = db.getConnection(db.DB_PATH);
-      expect(
-        (check.prepare("PRAGMA user_version").get() as { user_version: number }).user_version,
-      ).toBe(99);
-      check.close();
-    } finally {
-      stamp(db.SCHEMA_VERSION);
-    }
-    expect((await run(["doctor"])).out).toContain(
-      `schema v${db.SCHEMA_VERSION}, last upgraded by devcoach ${VERSION}`,
-    );
-  });
-});
-
 describe("cli rich rendering branches", () => {
   function seed() {
     db.withConnection((c) => {

@@ -184,24 +184,8 @@ because Homebrew formulae have no uninstall hook, so the formula's `caveats` tel
 `knowledge` (topic, confidence 0–10, updated_at), `settings`, `knowledge_group_names`,
 `knowledge_groups` (composite PK), `nudge_state` (per-session lesson-cue counter) and `cue_state`
 (single row: `pending`, `last_cue_at`, `last_skip_reason` — cue lifecycle; both runtime only,
-never backed up), `schema_migrations` (one-shot data migrations by name — runtime, never backed
-up) plus 6 indexes (incl. the unique `(course_id, anchor)` on `course_steps`). All DDL is
-`CREATE … IF NOT EXISTS` + `INSERT OR IGNORE` (idempotent). Connections set
-`PRAGMA busy_timeout = 3000` (concurrent hook + MCP writers).
-**Schema guard (v6)**: `PRAGMA user_version` is the fast-path stamp; a stamp NEWER than
-`SCHEMA_VERSION` means another channel (release/beta plugin, Homebrew CLI — they share one file)
-upgraded it, and `getInitializedConnection` then opens the file **read-only** (`compatOf(conn)`
-non-null): no DDL, no re-stamp; `withTransaction` and the read-only SQLite error both surface as
-`SchemaTooNewError` (`readOnlyMessage`: both versions, taken from the `schema_app_version` /
-`schema_min_app_version` settings rows `initSchema` writes; bump `SCHEMA_MIN_APP_VERSION` with
-the schema). Surfaces: hooks silent (no prime, no onboarding cue), MCP `isError` + `compat` in
-`get_briefing`/`get_profile`/`get_onboarding` (SKILL.md says it in one line), CLI read commands
-end with a yellow notice and a refused write exits 3 (`bin.ts`), dashboard banner via `/ping`
-`compat` + a 503 page from `app.onError`, `doctor` red line. One-shot data migrations (the v4
-`dont_know → understood` rewrite) are gated by the `schema_migrations` ledger, seeded on first run
-from the stamp OR the presence of `courses` (a v5+ build was here) — a stamp an old build
-downgraded never repeats them. An already-shipped build without the guard (≤ 2.4.0) is not
-protected; the ledger protects the data from it.
+never backed up), plus 6 indexes (incl. the unique `(course_id, anchor)` on `course_steps`). All DDL is `CREATE … IF NOT EXISTS` + `INSERT OR IGNORE`
+(idempotent). Connections set `PRAGMA busy_timeout = 3000` (concurrent hook + MCP writers).
 `DEFAULT_SETTINGS`: `max_per_day=2`, `min_gap_minutes=240`, `ui_theme=system`, `ui_home=auto` (`/` → `/lessons` once a lesson exists, else `/knowledge`), `share_name=""`,
 `nudge_every=10` (interactions between lesson cues; 0 = every turn), `nudge_scope=session` (count
 per chat session, or `global`) — the quiet session-scoped pacing is an explicit product decision;
