@@ -4,7 +4,7 @@ Notable changes to devcoach. Versions follow [Semantic Versioning](https://semve
 
 ---
 
-## [Unreleased]
+## [2.5.0] — 2026-09-28
 
 ### Added
 - **Courses** — a step-by-step path out of a lesson you couldn't follow (or into any concept). The
