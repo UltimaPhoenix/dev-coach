@@ -4,6 +4,17 @@ Notable changes to devcoach. Versions follow [Semantic Versioning](https://semve
 
 ---
 
+## [2.6.0] — 2026-09-28
+
+### Added
+- **Older devcoach, newer database: read-only, never destructive.** When the shared database was
+  upgraded by a newer devcoach (another channel), this build opens it read-only: reads and the
+  dashboard keep working, writes fail with a message naming both versions (CLI exit 3, a 503 page,
+  `isError` in MCP, a banner in the dashboard), hooks stay silent, `doctor` explains — and the
+  file is never migrated or re-stamped. The database records which devcoach upgraded it and the
+  oldest one allowed to write it, and one-shot data migrations are tracked by name so a stamp
+  downgraded by an old build never repeats them. **Schema v6** (additive, automatic).
+
 ## [2.5.0] — 2026-09-28
 
 ### Added

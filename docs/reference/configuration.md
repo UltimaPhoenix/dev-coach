@@ -154,6 +154,14 @@ knowledge_groups (group_name TEXT, topic TEXT, PRIMARY KEY (group_name, topic))
 -- Settings
 settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)
 
+-- Schema handshake (v6): settings rows `schema_app_version` (the devcoach that last upgraded
+-- the schema) and `schema_min_app_version` (the oldest devcoach that may write it), plus
+-- schema_migrations (name TEXT PRIMARY KEY, applied_at TEXT) — one-shot data migrations by
+-- name, so a stamp downgraded by an older build never makes a newer one repeat them.
+-- An OLDER devcoach opening a NEWER database (user_version above what it knows) opens it
+-- READ-ONLY: reads work, every write fails with a message naming both versions, nothing is
+-- migrated or re-stamped. `devcoach doctor` reports it; the CLI exits 3 on a refused write.
+
 -- Courses (schema v5): the index of ~/.devcoach/courses/<id>/index.html
 courses (id TEXT PRIMARY KEY, lesson_id TEXT, topic_id TEXT NOT NULL, title TEXT NOT NULL,
          goal TEXT, prerequisites TEXT NOT NULL DEFAULT '[]',  -- JSON [{concept, known}]
