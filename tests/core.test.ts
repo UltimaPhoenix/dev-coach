@@ -17,6 +17,14 @@ import * as courses from "../src/core/courses";
 import * as db from "../src/core/db";
 import { detectStack, mergeStacks } from "../src/core/detect";
 import { detectGitContext } from "../src/core/git";
+import {
+  fillHighlighter,
+  HIGHLIGHTER_PLACEHOLDER,
+  hasCode,
+  hasHighlighter,
+  highlighterBlock,
+  stripHighlighter,
+} from "../src/core/highlighter";
 import { normalizeTimestamp, parseLesson } from "../src/core/models";
 import { buildPromptForLevel, formatLessonForDisplay } from "../src/core/prompts";
 import { buildSharePayload, renderShareText, ShareInputError } from "../src/core/share";
@@ -734,6 +742,89 @@ describe("courses — storage, validation, backup", () => {
     db.restoreBackupZip(c2, evil);
     expect(existsSync(join(db.COURSES_DIR, "..", "escape.html"))).toBe(false);
     expect(existsSync(join(db.COURSES_DIR, "not-a-course"))).toBe(false);
+    c2.close();
+  });
+});
+
+describe("courses — the inlined highlighter", () => {
+  let c: DatabaseSync;
+  afterEach(() => c?.close());
+  const CODE = '<pre><code class="language-js">const a = 1;</code></pre>';
+  const doc = (body: string) =>
+    `<!doctype html><section id="step-1">${body}</section>${HIGHLIGHTER_PLACEHOLDER}<script>1</script>`;
+
+  it("the block is the vendored library with its licence text, built once", () => {
+    const block = highlighterBlock() as string;
+    expect(block).toContain("Copyright (c) 2006, Ivan Sagalaev");
+    expect(block).toContain("Redistributions in binary form must reproduce");
+    expect(block).toContain("hljs.highlightElement");
+    expect(block).toContain("--syn-keyword:");
+    expect(block.match(/<\/script/g)).toHaveLength(1); // nothing inside ends the element early
+    expect(highlighterBlock()).toBe(block);
+  });
+
+  it("fills the placeholder once, and only in a document that shows code", () => {
+    const filled = fillHighlighter(doc(CODE)) as string;
+    expect(hasHighlighter(filled)).toBe(true);
+    expect(filled).toContain(highlighterBlock() as string);
+    expect(filled.endsWith("<script>1</script>")).toBe(true);
+    expect(fillHighlighter(filled)).toBeNull(); // idempotent: never a second copy
+    expect(fillHighlighter(doc("no code here"))).toBeNull(); // nothing to colour, nothing carried
+    expect(fillHighlighter(`<section>${CODE}</section>`)).toBeNull(); // no placeholder: untouched
+    expect(hasCode("<pre>\n<code>x</code></pre>")).toBe(true);
+    expect(hasCode('<pre class="log"></pre>')).toBe(false);
+  });
+
+  it("strip is the exact inverse of fill, and leaves a foreign block alone", () => {
+    const plain = doc(CODE);
+    const filled = fillHighlighter(plain) as string;
+    expect(stripHighlighter(filled)).toBe(plain);
+    expect(fillHighlighter(stripHighlighter(filled))).toBe(filled);
+    expect(stripHighlighter(plain)).toBe(plain);
+    const foreign = '<script data-devcoach="highlighter">/* another build */</script>';
+    expect(stripHighlighter(foreign)).toBe(foreign);
+  });
+
+  it("registering a step fills the document; a rewrite gets it back on the next progress", () => {
+    c = freshDb();
+    const a = courses.createCourse(c, { title: "Highlighted", topic_id: "js" });
+    writeFileSync(courses.documentPath(a.id), doc(CODE));
+    courses.addStep(c, a.id, { title: "One", kind: "example", anchor: "step-1" });
+    const first = readFileSync(courses.documentPath(a.id), "utf8");
+    expect(hasHighlighter(first)).toBe(true);
+    expect(courses.ensureHighlighter(a.id)).toBe(false); // already there
+    expect(readFileSync(courses.documentPath(a.id), "utf8")).toBe(first);
+    writeFileSync(courses.documentPath(a.id), doc(CODE)); // the model rewrote the file
+    courses.setStepStatus(c, a.id, 1, "done");
+    expect(readFileSync(courses.documentPath(a.id), "utf8")).toBe(first);
+    expect(courses.ensureHighlighter("../x")).toBe(false);
+    expect(courses.ensureHighlighter("no-such-course")).toBe(false);
+  });
+
+  it("never pushes a document past the size cap", () => {
+    c = freshDb();
+    const a = courses.createCourse(c, { title: "Too big", topic_id: "js" });
+    const padding = "x".repeat(db.MAX_COURSE_DOCUMENT_BYTES - 50_000);
+    writeFileSync(courses.documentPath(a.id), doc(CODE + padding));
+    expect(courses.ensureHighlighter(a.id)).toBe(false);
+    expect(hasHighlighter(readFileSync(courses.documentPath(a.id), "utf8"))).toBe(false);
+  });
+
+  it("a backup carries the placeholder, not a copy of the library per course; restore refills", () => {
+    c = freshDb();
+    const a = courses.createCourse(c, { title: "Archived code", topic_id: "js" });
+    writeFileSync(courses.documentPath(a.id), doc(CODE));
+    courses.addStep(c, a.id, { title: "One", kind: "example", anchor: "step-1" });
+    const onDisk = readFileSync(courses.documentPath(a.id), "utf8");
+    const zip = db.createBackupZip(c);
+    const archived = Buffer.from(unzipSync(zip)[`courses/${a.id}/index.html`]).toString("utf8");
+    expect(archived).toBe(doc(CODE));
+    expect(readFileSync(courses.documentPath(a.id), "utf8")).toBe(onDisk); // the file is not touched
+    courses.deleteCourse(c, a.id);
+    const c2 = freshDb();
+    db.restoreBackupZip(c2, zip);
+    expect(readFileSync(courses.documentPath(a.id), "utf8")).toBe(onDisk); // self-contained again
+    courses.deleteCourse(c2, a.id);
     c2.close();
   });
 });

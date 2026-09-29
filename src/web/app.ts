@@ -10,6 +10,7 @@ import * as coach from "../core/coach";
 import * as courses from "../core/courses";
 import * as db from "../core/db";
 import { detectGitUserName } from "../core/git";
+import { hasCode, hasHighlighter, highlighterBlock } from "../core/highlighter";
 import type { KnowledgeEntry, Lesson, UiHome } from "../core/models";
 import {
   buildSharePayload,
@@ -609,7 +610,13 @@ export function createApp(opts: AppOptions = {}): Hono {
     const path = courses.courseDocument(id);
     if (!path) return c.notFound();
     try {
-      const page = Buffer.concat([readFileSync(path), Buffer.from(COURSE_FRAME_SCRIPT)]);
+      const file = readFileSync(path);
+      const text = file.toString("utf8");
+      // A document written before the highlighter existed (or whose placeholder is still
+      // empty) is highlighted on the way out, like the bridge: the file is not modified.
+      const highlighter =
+        !hasHighlighter(text) && hasCode(text) ? `\n${highlighterBlock() ?? ""}` : "";
+      const page = Buffer.concat([file, Buffer.from(COURSE_FRAME_SCRIPT + highlighter)]);
       // A fresh Headers object per response: @hono/node-server writes Content-Length INTO a
       // plain headers object it is handed, so a shared constant would pin every later document
       // to the first one's length (observed: documents cut short at the same byte count).

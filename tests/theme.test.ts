@@ -6,6 +6,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { SYNTAX_TOKENS } from "../src/core/highlighter";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const read = (...p: string[]) => readFileSync(join(root, ...p), "utf8");
@@ -195,5 +196,41 @@ describe("no colour typed by hand in the views", () => {
     const hexes = code.flatMap((line) => line.match(/#[0-9a-fA-F]{6}\b/g) ?? []);
     expect(hexes).toEqual([]);
     expect(read("src", "web", "views.ts")).not.toContain("indigo-");
+  });
+});
+
+describe("course syntax colours (src/core/highlighter.ts)", () => {
+  const md = read("assets", "references", "course.md");
+  const frame = read("assets", "static", "course-frame.js");
+  const embedded = (mode: string): Rgb => {
+    const m = new RegExp(`\\[data-theme="${mode}"\\]\\{[^}]*--code-bg:(#[0-9a-f]{6})`).exec(
+      frame.replace(/['"]\s*\+\s*['"]/g, ""),
+    );
+    expect(m, `embedded ${mode} --code-bg`).not.toBeNull();
+    return hex((m as RegExpExecArray)[1]);
+  };
+  const backgrounds = {
+    light: [courseTokens(md, ":root { --bg")["code-bg"], embedded("light")],
+    dark: [courseTokens(md, ':root[data-theme="dark"]')["code-bg"], embedded("dark")],
+  };
+
+  it("light and dark define the same tokens", () => {
+    expect(Object.keys(SYNTAX_TOKENS.dark)).toEqual(Object.keys(SYNTAX_TOKENS.light));
+  });
+
+  it.each(Object.keys(SYNTAX_TOKENS.light))(
+    "--syn-%s reads at 4.5:1 or better on --code-bg, standalone and embedded",
+    (name) => {
+      for (const mode of ["light", "dark"] as const) {
+        const colour = hex(SYNTAX_TOKENS[mode][name as keyof typeof SYNTAX_TOKENS.light]);
+        for (const bg of backgrounds[mode]) {
+          expect(contrast(colour, bg), `${mode} --syn-${name}`).toBeGreaterThanOrEqual(4.5);
+        }
+      }
+    },
+  );
+
+  it("the skill names every token the stylesheet defines", () => {
+    for (const name of Object.keys(SYNTAX_TOKENS.light)) expect(md).toContain(`--syn-${name}`);
   });
 });

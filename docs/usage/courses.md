@@ -101,6 +101,15 @@ devcoach course <id>      # chain, steps, document path
 
 ## Writing courses by hand
 
+**Code is highlighted.** A course that shows code carries highlight.js (BSD-3-Clause) inside the
+file: devcoach fills a placeholder the document leaves for it, licence text included, so the
+code is coloured in the dashboard, from disk and in a published artifact alike. Colours follow
+the palette and the theme. Documents written before this existed are highlighted by the dashboard
+when it serves them; the file on disk stays as it was. A course
+without code never carries the library, and a backup stores the placeholder rather than one copy
+of the library per course: restore puts it back, so a restored course is self-contained again. See
+[`THIRD_PARTY_NOTICES.md`](https://github.com/UltimaPhoenix/dev-coach/blob/main/THIRD_PARTY_NOTICES.md).
+
 A course document is plain HTML. If you want to polish one, edit `index.html` in its folder — the
 dashboard reloads it on the next view. Colours are CSS variables on `:root` (`--bg --panel --text
 --muted --line --code-bg --accent --accent-soft --on-accent --ok --ok-soft --warn --warn-soft

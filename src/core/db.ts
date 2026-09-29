@@ -9,6 +9,7 @@ import { dirname, join } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
 import { strFromU8, strToU8, unzipSync, zipSync } from "fflate";
 import { VERSION } from "../version";
+import { fillHighlighter, stripHighlighter } from "./highlighter";
 
 // Load node:sqlite via createRequire so the bundler can't rewrite the "node:" specifier
 // (esbuild's builtin list predates node:sqlite and emits a bare, unresolvable "sqlite" import).
@@ -1158,7 +1159,11 @@ export function createBackupZip(db: DatabaseSync): Uint8Array {
       try {
         const st = lstatSync(doc);
         if (st.isFile() && st.size <= MAX_COURSE_DOCUMENT_BYTES) {
-          files[`courses/${c.id}/${COURSE_DOCUMENT_NAME}`] = new Uint8Array(readFileSync(doc));
+          // The inlined highlighter is devcoach's own bundle: the archive keeps the placeholder
+          // and restore fills it back, instead of one copy of the library per course.
+          files[`courses/${c.id}/${COURSE_DOCUMENT_NAME}`] = strToU8(
+            stripHighlighter(readFileSync(doc, "utf8")),
+          );
         }
       } catch {
         // no document yet — the rows still travel
@@ -1299,8 +1304,10 @@ function restoreCoursesSection(db: DatabaseSync, unzipped: Unzipped, result: Res
     const dir = join(COURSES_DIR, id);
     const target = join(dir, COURSE_DOCUMENT_NAME);
     if (existsSync(target)) continue;
+    const filled = fillHighlighter(strFromU8(bytes));
+    const fits = filled !== null && Buffer.byteLength(filled) <= MAX_COURSE_DOCUMENT_BYTES;
     mkdirSync(dir, { recursive: true });
-    writeFileSync(target, bytes);
+    writeFileSync(target, fits ? filled : bytes);
   }
 }
 
