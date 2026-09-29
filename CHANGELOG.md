@@ -4,6 +4,12 @@ Notable changes to devcoach. Versions follow [Semantic Versioning](https://semve
 
 ---
 
+## [2.6.3] — 2026-09-30
+
+### Changed
+- Documentation screenshots regenerated: they show the IDE-style dark theme, the teal accent and
+  the theme toggle of 2.6.2. No change to the package itself.
+
 ## [2.6.2] — 2026-09-30
 
 ### Added
