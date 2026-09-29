@@ -1,12 +1,13 @@
 // Course page: the sandboxed frame reports its height and current step (course-frame.js, injected
 // by the server); this side sizes the frame to the document so the page scrolls, keeps the step
 // list in sync, and turns step clicks into in-frame navigation (a fragment navigation of the
-// cross-origin frame) instead of a page reload.
+// cross-origin frame) instead of a page reload. It also tells the frame which theme the
+// dashboard is in: the framed document cannot see the toggle, only the OS preference.
 (function () {
   var frame = document.getElementById("course-frame");
   var list = document.getElementById("course-steps");
   if (!frame || !list) return;
-  var CURRENT = ["bg-indigo-50", "dark:bg-indigo-900/30"];
+  var CURRENT = ["bg-accent-50", "dark:bg-accent-900/30"];
   var shown = null;
 
   function select(anchor) {
@@ -22,6 +23,15 @@
     });
   }
 
+  // The frame's origin is opaque (sandbox without allow-same-origin): "*" is the only target
+  // that reaches it, and the payload is one word.
+  function sendTheme() {
+    if (!frame.contentWindow) return;
+    var dark = document.documentElement.classList.contains("dark");
+    frame.contentWindow.postMessage({ type: "devcoach:theme", theme: dark ? "dark" : "light" }, "*");
+  }
+  document.addEventListener("dc:theme", sendTheme);
+
   function scrollToFrame() {
     var top = frame.getBoundingClientRect().top + window.scrollY - 16;
     window.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
@@ -35,6 +45,9 @@
       frame.style.height = Math.min(50000, Math.max(320, Math.ceil(height))) + "px";
     }
     if (typeof data.anchor === "string") select(data.anchor);
+    // Every report is answered with the theme: the first one is the handshake, so the message
+    // can never arrive before the frame listens.
+    sendTheme();
   });
 
   list.addEventListener("click", function (event) {

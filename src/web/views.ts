@@ -32,7 +32,7 @@ const MORE_ICON = html`<svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentCol
  */
 function moreMenu(items: Html, className = "", attrs = ""): Html {
   return html`<div class="relative ${className}" ${raw(attrs)} x-data="{ open: false }" @click.outside="open = false" @keydown.escape="open = false">
-      <button type="button" @click="open = !open" :aria-expanded="open" aria-label="More actions" title="More actions" class="w-8 h-8 inline-flex items-center justify-center rounded-lg border transition bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-indigo-400 hover:text-gray-800 dark:hover:text-gray-100">${MORE_ICON}</button>
+      <button type="button" @click="open = !open" :aria-expanded="open" aria-label="More actions" title="More actions" class="w-8 h-8 inline-flex items-center justify-center rounded-lg border transition bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-accent-400 hover:text-gray-800 dark:hover:text-gray-100">${MORE_ICON}</button>
       <div x-show="open" x-transition:enter="transition ease-out duration-100" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100" class="absolute right-0 top-full mt-1 z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg w-56 p-1" style="display:none">
         ${items}
       </div>
@@ -83,20 +83,44 @@ export function layout(o: {
   <link rel="icon" type="image/svg+xml" href="/static/favicon.svg" />
   <meta name="devcoach-theme" content="${o.uiTheme}" />
   <script>
+    // Before first paint: the nav toggle's choice (this browser) wins over the saved setting;
+    // "system" follows the OS. Saving Settings clears the toggle's choice.
     (function () {
       var serverTheme = document.querySelector('meta[name="devcoach-theme"]').content;
-      var session = localStorage.getItem('theme-override');
-      var active = session || serverTheme;
+      var chosen = null;
+      try { chosen = localStorage.getItem('theme-override'); } catch (e) {}
+      var active = chosen || serverTheme;
       var dark = active === 'dark' || (active === 'system' && globalThis.matchMedia('(prefers-color-scheme: dark)').matches);
-      if (dark) document.documentElement.classList.add('dark');
+      document.documentElement.classList.toggle('dark', dark);
     })();
   </script>
   <script src="/static/vendor/tailwind.js"></script>
-  <script>tailwind.config = { darkMode: 'class' }</script>
+  <script>
+    // The palette lives in style.css as RGB triplets (--dc-gray-*, --dc-accent-*): Tailwind's
+    // gray scale and the accent family point at them, light and dark.
+    (function () {
+      var scale = function (name) {
+        var out = {};
+        [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950].forEach(function (n) {
+          out[n] = 'rgb(var(--dc-' + name + '-' + n + ') / <alpha-value>)';
+        });
+        return out;
+      };
+      tailwind.config = { darkMode: 'class', theme: { extend: { colors: { gray: scale('gray'), accent: scale('accent') } } } };
+    })();
+  </script>
   <script src="/static/vendor/htmx.min.js"></script>
   <script src="/static/vendor/alpinejs.min.js" defer></script>
   <link rel="stylesheet" href="/static/style.css" />
   ${o.head ?? ""}
+  <script>
+    // Pages with code blocks ship the dark highlighter stylesheet: point it at the light one
+    // before first paint when the page is light.
+    (function () {
+      var sheet = document.getElementById('hljs-theme');
+      if (sheet && !document.documentElement.classList.contains('dark')) sheet.href = '/static/vendor/hljs-light.min.css';
+    })();
+  </script>
   <script>
     // Older devcoach on a newer database → the dashboard is read-only: one banner on every page.
     fetch('/ping').then(function (r) { return r.json(); }).then(function (p) {
@@ -120,29 +144,47 @@ export function layout(o: {
     ${link("/lessons", "Lessons", o.currentPath.includes("/lessons"))}
     ${link("/courses", "Courses", o.currentPath.includes("/courses"))}
     <div class="ml-auto flex items-center gap-1.5">
-      <a href="/settings" title="Settings" ${o.currentPath === "/settings" ? raw('aria-current="page"') : ""} class="h-8 px-2.5 inline-flex items-center gap-1.5 rounded-lg border text-sm font-medium transition ${o.currentPath === "/settings" ? "bg-white dark:bg-gray-900 border-indigo-400 text-gray-900 dark:text-white" : "bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-indigo-400 hover:text-gray-800 dark:hover:text-gray-100"}"><svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1.11-1.56 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.56-1.03H3a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.65 8.9a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.6h.09A1.7 1.7 0 0 0 10.1 3.1V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1.03 1.56 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.4 9v.09a1.7 1.7 0 0 0 1.56 1.03H21a2 2 0 1 1 0 4h-.09A1.7 1.7 0 0 0 19.4 15Z"/></svg><span>Settings</span></a>
-      <button id="theme-toggle" onclick="toggleTheme()" title="Toggle theme" aria-label="Toggle theme"
-              class="w-8 h-8 inline-flex items-center justify-center rounded-lg border transition bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-indigo-400 text-base leading-none"></button>
+      <a href="/settings" title="Settings" ${o.currentPath === "/settings" ? raw('aria-current="page"') : ""} class="h-8 px-2.5 inline-flex items-center gap-1.5 rounded-lg border text-sm font-medium transition ${o.currentPath === "/settings" ? "bg-white dark:bg-gray-900 border-accent-400 text-gray-900 dark:text-white" : "bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-accent-400 hover:text-gray-800 dark:hover:text-gray-100"}"><svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1.11-1.56 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.56-1.03H3a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.65 8.9a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.6h.09A1.7 1.7 0 0 0 10.1 3.1V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1.03 1.56 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.4 9v.09a1.7 1.7 0 0 0 1.56 1.03H21a2 2 0 1 1 0 4h-.09A1.7 1.7 0 0 0 19.4 15Z"/></svg><span>Settings</span></a>
+      <!-- Shows the CURRENT scheme (both glyphs ship, the .dark class picks one: right from the
+           first paint, no script needed); the label says what a click does. -->
+      <button id="theme-toggle" onclick="toggleTheme()" title="Switch theme" aria-label="Switch theme"
+              class="w-8 h-8 inline-flex items-center justify-center rounded-lg border transition bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-accent-400 text-base leading-none"><span class="dark:hidden" aria-hidden="true">☀️</span><span class="hidden dark:inline" aria-hidden="true">🌙</span></button>
     </div>
   </nav>
   <main class="${o.wide ? "max-w-none" : "max-w-7xl"} mx-auto px-4 sm:px-6 py-8">${o.body}</main>
   <script>
     function isDark() { return document.documentElement.classList.contains('dark'); }
-    function updateThemeIcon() { var b = document.getElementById('theme-toggle'); if (b) b.textContent = isDark() ? '☀️' : '🌙'; }
     function updateHljsTheme() {
       var link = document.getElementById('hljs-theme'); if (!link) return;
       link.href = isDark() ? '/static/vendor/hljs-dark.min.css' : '/static/vendor/hljs-light.min.css';
     }
+    // The one place a theme is applied: class, the toggle's label, the highlighter, and the
+    // dc:theme event other scripts listen to (the course viewer forwards it into its frame).
+    function applyTheme(dark) {
+      document.documentElement.classList.toggle('dark', dark);
+      var b = document.getElementById('theme-toggle');
+      if (b) {
+        var label = dark ? 'Dark theme — switch to light' : 'Light theme — switch to dark';
+        b.title = label;
+        b.setAttribute('aria-label', label);
+      }
+      updateHljsTheme();
+      document.dispatchEvent(new CustomEvent('dc:theme', { detail: { dark: dark } }));
+    }
+    function themeChoice() { try { return localStorage.getItem('theme-override'); } catch (e) { return null; } }
     function toggleTheme() {
-      document.documentElement.classList.toggle('dark');
-      localStorage.setItem('theme-override', isDark() ? 'dark' : 'light');
-      updateThemeIcon(); updateHljsTheme();
+      var dark = !isDark();
+      try { localStorage.setItem('theme-override', dark ? 'dark' : 'light'); } catch (e) {}
+      applyTheme(dark);
     }
     (function () {
       var serverTheme = document.querySelector('meta[name="devcoach-theme"]').content;
-      if (serverTheme !== 'system') localStorage.removeItem('theme-override');
+      // "System" follows the OS live, until the toggle makes a choice in this browser.
+      globalThis.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function (e) {
+        if (serverTheme === 'system' && !themeChoice()) applyTheme(e.matches);
+      });
+      applyTheme(isDark());
     })();
-    updateThemeIcon(); updateHljsTheme();
   </script>
   ${o.scripts ?? ""}
 </body>
@@ -170,45 +212,45 @@ export function profilePage(d: ProfileData): Html {
 <div id="knowledge-map" x-data="{ editMode: JSON.parse(localStorage.getItem('km-edit-mode') || 'false'), toggle() { this.editMode = !this.editMode; localStorage.setItem('km-edit-mode', this.editMode); } }">
 
 <div class="flex items-center justify-between mb-6">
-  <h1 class="text-2xl font-bold text-indigo-600 dark:text-indigo-400">Knowledge Map</h1>
+  <h1 class="text-2xl font-bold text-accent-600 dark:text-accent-400">Knowledge Map</h1>
   <div class="flex items-center gap-2">
     <div x-show="editMode" style="display:none" x-data="{ open: false }" class="relative">
       <button type="button" @click="open = !open"
-              class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-indigo-400">+ Add group</button>
+              class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-accent-400">+ Add group</button>
       <div x-show="open" @click.outside="open = false" class="absolute right-0 top-full mt-1 z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg p-3 w-56" style="display:none">
         <form method="post" action="/groups" hx-post="/groups" hx-target="#knowledge-map" hx-select="#knowledge-map" hx-swap="outerHTML" class="flex gap-2">
-          <input type="text" name="group_name" placeholder="Group name…" required class="flex-1 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-          <button type="submit" class="px-3 py-1.5 rounded-lg text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-500 transition">Add</button>
+          <input type="text" name="group_name" placeholder="Group name…" required class="flex-1 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-accent-500" />
+          <button type="submit" class="px-3 py-1.5 rounded-lg text-sm font-medium bg-accent-600 text-white hover:bg-accent-500 transition">Add</button>
         </form>
       </div>
     </div>
     <div x-show="editMode" style="display:none" x-data="{ open: false }" class="relative">
-      <button type="button" @click="open = !open" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-indigo-400">+ Add topic</button>
+      <button type="button" @click="open = !open" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-accent-400">+ Add topic</button>
       <div x-show="open" @click.outside="open = false" class="absolute right-0 top-full mt-1 z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg p-4 w-72" style="display:none">
         <form method="post" action="/knowledge" hx-post="/knowledge" hx-target="#knowledge-map" hx-select="#knowledge-map" hx-swap="outerHTML" class="space-y-3">
           <div>
             <label for="add-topic-id" class="block text-xs text-gray-400 dark:text-gray-500 mb-1">Topic ID</label>
-            <input id="add-topic-id" type="text" name="topic" placeholder="e.g. rust_lifetimes" required class="w-full text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            <input id="add-topic-id" type="text" name="topic" placeholder="e.g. rust_lifetimes" required class="w-full text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-accent-500" />
           </div>
           <div class="flex gap-2">
             <div class="w-24">
               <label for="add-topic-confidence" class="block text-xs text-gray-400 dark:text-gray-500 mb-1">Confidence</label>
-              <input id="add-topic-confidence" type="number" name="confidence" value="5" min="0" max="10" class="w-full text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              <input id="add-topic-confidence" type="number" name="confidence" value="5" min="0" max="10" class="w-full text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-accent-500" />
             </div>
             <div class="flex-1">
               <label for="add-topic-group" class="block text-xs text-gray-400 dark:text-gray-500 mb-1">Group</label>
-              <select id="add-topic-group" name="group" class="w-full text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+              <select id="add-topic-group" name="group" class="w-full text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-accent-500">
                 <option value="">Other (ungrouped)</option>
                 ${groupOptions("")}
               </select>
             </div>
           </div>
-          <button type="submit" class="w-full px-3 py-1.5 rounded-lg text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-500 transition">Add</button>
+          <button type="submit" class="w-full px-3 py-1.5 rounded-lg text-sm font-medium bg-accent-600 text-white hover:bg-accent-500 transition">Add</button>
         </form>
       </div>
     </div>
     <button type="button" @click="toggle()"
-            :class="editMode ? 'bg-indigo-600 text-white border-indigo-600 hover:bg-indigo-500' : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-indigo-400'"
+            :class="editMode ? 'bg-accent-600 text-white border-accent-600 hover:bg-accent-500' : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-accent-400'"
             class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition">
       <span x-text="editMode ? '✓ Done' : '✎ Edit'">✎ Edit</span>
     </button>
@@ -244,15 +286,15 @@ ${Object.entries(d.categorised).map(([category, topics]) => {
       }
     </div>
     <div x-show="editMode" style="display:none" x-data="{ open: false }" class="relative">
-      <button type="button" @click="open = !open" class="text-xs text-gray-300 dark:text-gray-600 hover:text-indigo-500 dark:hover:text-indigo-400 transition px-1">+ topic</button>
+      <button type="button" @click="open = !open" class="text-xs text-gray-300 dark:text-gray-600 hover:text-accent-500 dark:hover:text-accent-400 transition px-1">+ topic</button>
       <div x-show="open" @click.outside="open = false" class="absolute right-0 top-full mt-1 z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg p-3 w-64" style="display:none">
         <form method="post" action="/knowledge" hx-post="/knowledge" hx-target="#knowledge-map" hx-select="#knowledge-map" hx-swap="outerHTML" class="space-y-2">
           <input type="hidden" name="group" value="${category !== "Other" ? category : ""}" />
-          <input type="text" name="topic" placeholder="topic_id (e.g. rust_lifetimes)" required class="w-full text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          <input type="text" name="topic" placeholder="topic_id (e.g. rust_lifetimes)" required class="w-full text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-accent-500" />
           <div class="flex items-center gap-2">
             <label class="text-xs text-gray-400 dark:text-gray-500 shrink-0">Confidence</label>
-            <input type="number" name="confidence" value="5" min="0" max="10" class="w-16 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2 py-1 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-            <button type="submit" class="flex-1 px-3 py-1.5 rounded-lg text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-500 transition">Add</button>
+            <input type="number" name="confidence" value="5" min="0" max="10" class="w-16 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2 py-1 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-accent-500" />
+            <button type="submit" class="flex-1 px-3 py-1.5 rounded-lg text-sm font-medium bg-accent-600 text-white hover:bg-accent-500 transition">Add</button>
           </div>
         </form>
       </div>
@@ -273,7 +315,7 @@ ${Object.entries(d.categorised).map(([category, topics]) => {
       return html`
     <div id="${rowId}" class="flex items-center gap-2 py-1.5 border-b border-gray-100 dark:border-gray-800/50 group/row">
       <div x-show="editMode" style="display:none" x-data="{ open: false }" class="relative shrink-0 flex items-center">
-        <button type="button" @click="open = !open" class="text-xs text-gray-200 dark:text-gray-700 hover:text-indigo-500 dark:hover:text-indigo-400 transition w-4 text-center opacity-0 group-hover/row:opacity-100" title="Move to group">⇄</button>
+        <button type="button" @click="open = !open" class="text-xs text-gray-200 dark:text-gray-700 hover:text-accent-500 dark:hover:text-accent-400 transition w-4 text-center opacity-0 group-hover/row:opacity-100" title="Move to group">⇄</button>
         <div x-show="open" @click.outside="open = false" class="absolute left-0 top-full mt-1 z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg p-1 w-40" style="display:none">
           <form method="post" action="/knowledge/${encodeURIComponent(entry.topic)}/group" hx-post="/knowledge/${encodeURIComponent(entry.topic)}/group" hx-target="#knowledge-map" hx-select="#knowledge-map" hx-swap="outerHTML">
             <select name="group" onchange="this.form.requestSubmit()" class="w-full text-xs bg-transparent text-gray-700 dark:text-gray-200 px-2 py-1 focus:outline-none">
@@ -284,7 +326,7 @@ ${Object.entries(d.categorised).map(([category, topics]) => {
         </div>
       </div>
       <div class="flex items-center gap-1 flex-1 min-w-0">
-        <a x-show="!editMode" href="/lessons?search=${encodeURIComponent(entry.topic)}" class="text-sm text-gray-700 dark:text-gray-200 min-w-0 truncate hover:text-indigo-600 dark:hover:text-indigo-400 hover:underline transition" title="${entry.topic}">${entry.topic}</a>
+        <a x-show="!editMode" href="/lessons?search=${encodeURIComponent(entry.topic)}" class="text-sm text-gray-700 dark:text-gray-200 min-w-0 truncate hover:text-accent-600 dark:hover:text-accent-400 hover:underline transition" title="${entry.topic}">${entry.topic}</a>
         <span x-show="editMode" style="display:none" class="text-sm text-gray-700 dark:text-gray-200 min-w-0 truncate" title="${entry.topic}">${entry.topic}</span>
         <form x-show="editMode" style="display:none" method="post" action="/knowledge/${encodeURIComponent(entry.topic)}/delete" hx-post="/knowledge/${encodeURIComponent(entry.topic)}/delete" hx-target="#knowledge-map" hx-select="#knowledge-map" hx-swap="outerHTML" hx-confirm="Remove ${entry.topic} from your knowledge map?" class="shrink-0 flex items-center">
           <button type="submit" class="text-xs text-gray-200 dark:text-gray-700 hover:text-red-500 dark:hover:text-red-400 transition w-4 text-center opacity-0 group-hover/row:opacity-100" title="Remove topic">×</button>
@@ -448,7 +490,7 @@ export function lessonsPage(d: LessonsData): Html {
   };
 
   const chip = (label: string, clearUrl: string) =>
-    html`<span class="inline-flex items-center gap-1 pl-2.5 pr-1 py-0.5 rounded-full text-xs bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">${label}<a href="${clearUrl}" class="ml-0.5 w-4 h-4 flex items-center justify-center rounded-full hover:bg-indigo-200 dark:hover:bg-indigo-700 transition">×</a></span>`;
+    html`<span class="inline-flex items-center gap-1 pl-2.5 pr-1 py-0.5 rounded-full text-xs bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-300 border border-accent-200 dark:border-accent-800">${label}<a href="${clearUrl}" class="ml-0.5 w-4 h-4 flex items-center justify-center rounded-full hover:bg-accent-200 dark:hover:bg-accent-700 transition">×</a></span>`;
 
   const sortTh = (label: string, col: string, extra = "") => {
     const active = s.sort === col;
@@ -457,7 +499,7 @@ export function lessonsPage(d: LessonsData): Html {
       <a href="${lessonsQs(s, { sort: col, order: next })}" class="hover:text-gray-700 dark:hover:text-gray-200 transition group/sort">${label}
         ${
           active
-            ? html`<span class="text-indigo-400">${s.order === "asc" ? "↑" : "↓"}</span>`
+            ? html`<span class="text-accent-400">${s.order === "asc" ? "↑" : "↓"}</span>`
             : html`<span class="text-gray-200 dark:text-gray-700 group-hover/sort:text-gray-400 dark:group-hover/sort:text-gray-500 transition">↕</span>`
         }
       </a></th>`;
@@ -467,15 +509,15 @@ export function lessonsPage(d: LessonsData): Html {
 
   const head = html`<link rel="stylesheet" href="/static/vendor/flatpickr.min.css" />
 <style>
-  .dark .flatpickr-calendar { background:#1f2937; border-color:#374151; }
-  .dark .flatpickr-day { color:#e5e7eb; }
-  .dark .flatpickr-day:hover { background:#374151; }
-  .dark .flatpickr-day.selected, .dark .flatpickr-day.startRange, .dark .flatpickr-day.endRange, .dark .flatpickr-day.inRange { background:#4f46e5; border-color:#4f46e5; color:#fff; }
-  .dark .flatpickr-day.today { border-color:#6366f1; }
-  .dark .flatpickr-months, .dark .flatpickr-month { background:#1f2937; color:#e5e7eb; fill:#e5e7eb; }
-  .dark .flatpickr-current-month, .dark .flatpickr-monthDropdown-months { color:#e5e7eb; background:#1f2937; }
-  .dark .flatpickr-weekday { color:#9ca3af; background:#1f2937; }
-  .dark .flatpickr-prev-month svg, .dark .flatpickr-next-month svg { fill:#9ca3af; }
+  .dark .flatpickr-calendar { background:rgb(var(--dc-gray-900)); border-color:rgb(var(--dc-gray-700)); }
+  .dark .flatpickr-day { color:rgb(var(--dc-gray-200)); }
+  .dark .flatpickr-day:hover { background:rgb(var(--dc-gray-800)); }
+  .flatpickr-day.selected, .flatpickr-day.startRange, .flatpickr-day.endRange, .dark .flatpickr-day.inRange { background:rgb(var(--dc-accent-600)); border-color:rgb(var(--dc-accent-600)); color:white; }
+  .flatpickr-day.today { border-color:rgb(var(--dc-accent-500)); }
+  .dark .flatpickr-months, .dark .flatpickr-month { background:rgb(var(--dc-gray-900)); color:rgb(var(--dc-gray-200)); fill:rgb(var(--dc-gray-200)); }
+  .dark .flatpickr-current-month, .dark .flatpickr-monthDropdown-months { color:rgb(var(--dc-gray-200)); background:rgb(var(--dc-gray-900)); }
+  .dark .flatpickr-weekday { color:rgb(var(--dc-gray-400)); background:rgb(var(--dc-gray-900)); }
+  .dark .flatpickr-prev-month svg, .dark .flatpickr-next-month svg { fill:rgb(var(--dc-gray-400)); }
 </style>`;
 
   const countLabel =
@@ -506,7 +548,7 @@ export function lessonsPage(d: LessonsData): Html {
   <div class="flex items-center gap-3 mb-4">
     <div class="relative flex-1">
       <span class="absolute inset-y-0 left-3.5 flex items-center text-gray-400 pointer-events-none text-sm">🔍</span>
-      <input type="text" name="search" value="${s.search}" placeholder="Search lessons…" autocomplete="off" class="w-full pl-9 pr-10 py-3 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-100 placeholder-gray-400 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
+      <input type="text" name="search" value="${s.search}" placeholder="Search lessons…" autocomplete="off" class="w-full pl-9 pr-10 py-3 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-100 placeholder-gray-400 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent" />
       ${s.search ? html`<button type="submit" name="search" value="" class="absolute inset-y-0 right-3 flex items-center text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 text-xl leading-none">×</button>` : ""}
     </div>
     <p class="text-sm text-gray-400 dark:text-gray-500 whitespace-nowrap shrink-0">${countLabel}</p>
@@ -517,40 +559,40 @@ export function lessonsPage(d: LessonsData): Html {
             class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition ${s.starred ? "bg-yellow-400 text-yellow-900 border-yellow-400" : "bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-yellow-400 hover:text-yellow-500"}">★ Starred</button>
 
     <div class="relative" x-data="{ open: false }" @click.outside="open = false" @keydown.escape="open = false">
-      <button type="button" @click="open = !open" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition ${s.imported || s.shared_by ? "bg-indigo-600 text-white border-indigo-600" : "bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-indigo-400"}">${sharedLabel}${caret}</button>
+      <button type="button" @click="open = !open" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition ${s.imported || s.shared_by ? "bg-accent-600 text-white border-accent-600" : "bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-accent-400"}">${sharedLabel}${caret}</button>
       <div x-show="open" x-transition:enter="transition ease-out duration-100" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100" class="absolute left-0 top-full mt-1 z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg w-52 p-1 overflow-hidden" style="display:none">
         ${sharedOptions.map(([val, name, lbl]) => {
           const active = s.imported === val && s.shared_by === name;
-          return html`<button type="button" data-imported="${val}" data-shared-by="${name}" onclick="var d=this.dataset; document.getElementById('h-imported').value=d.imported; document.getElementById('h-shared-by').value=d.sharedBy; document.getElementById('filter-form').submit()" class="w-full text-left px-3 py-2 rounded-lg text-sm transition flex items-center justify-between ${active ? "bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 font-medium" : "text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"}"><span class="truncate">${lbl}</span>${active ? html`<span class="text-indigo-500 ml-auto">✓</span>` : ""}</button>`;
+          return html`<button type="button" data-imported="${val}" data-shared-by="${name}" onclick="var d=this.dataset; document.getElementById('h-imported').value=d.imported; document.getElementById('h-shared-by').value=d.sharedBy; document.getElementById('filter-form').submit()" class="w-full text-left px-3 py-2 rounded-lg text-sm transition flex items-center justify-between ${active ? "bg-accent-50 dark:bg-accent-900/30 text-accent-700 dark:text-accent-300 font-medium" : "text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"}"><span class="truncate">${lbl}</span>${active ? html`<span class="text-accent-500 ml-auto">✓</span>` : ""}</button>`;
         })}
       </div>
     </div>
 
     <div class="relative" x-data="periodPicker()" @keydown.escape="close()">
-      <button type="button" @click="toggle()" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition ${customDate || s.period !== "all" ? "bg-indigo-600 text-white border-indigo-600" : "bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-indigo-400"}">
+      <button type="button" @click="toggle()" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition ${customDate || s.period !== "all" ? "bg-accent-600 text-white border-accent-600" : "bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-accent-400"}">
         <span>📅</span><span x-text="label">${periodLabel}</span>${caret}
       </button>
       <div x-show="open" x-transition:enter="transition ease-out duration-100" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100" x-transition:leave="transition ease-in duration-75" x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95" @click.outside="close()" class="absolute left-0 top-full mt-1 z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg w-64 overflow-hidden" style="display:none">
         <div class="p-1">
           ${(Object.entries(PERIOD_LABELS) as [string, string][]).map(([val, lbl]) => {
             const sel = s.period === val && !customDate;
-            return html`<button type="button" @click="selectPreset('${val}', '${lbl}')" class="w-full text-left px-3 py-2 rounded-lg text-sm transition flex items-center justify-between ${sel ? "bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 font-medium" : "text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"}">${lbl}${sel ? html`<span class="text-indigo-500">✓</span>` : ""}</button>`;
+            return html`<button type="button" @click="selectPreset('${val}', '${lbl}')" class="w-full text-left px-3 py-2 rounded-lg text-sm transition flex items-center justify-between ${sel ? "bg-accent-50 dark:bg-accent-900/30 text-accent-700 dark:text-accent-300 font-medium" : "text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"}">${lbl}${sel ? html`<span class="text-accent-500">✓</span>` : ""}</button>`;
           })}
         </div>
         <div class="border-t border-gray-100 dark:border-gray-800 p-1">
-          <button type="button" @click="showCustom = !showCustom" class="w-full text-left px-3 py-2 rounded-lg text-sm transition flex items-center justify-between ${customDate ? "bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 font-medium" : "text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"}">
+          <button type="button" @click="showCustom = !showCustom" class="w-full text-left px-3 py-2 rounded-lg text-sm transition flex items-center justify-between ${customDate ? "bg-accent-50 dark:bg-accent-900/30 text-accent-700 dark:text-accent-300 font-medium" : "text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"}">
             <span>Custom range</span>
             <svg class="w-3 h-3 opacity-60 transition-transform" :class="showCustom ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/></svg>
           </button>
           <div x-show="showCustom" class="px-2 pb-2 pt-1">
-            <input type="text" x-ref="fp" placeholder="Select date range…" class="w-full text-xs bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2 py-1.5 text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer" />
+            <input type="text" x-ref="fp" placeholder="Select date range…" class="w-full text-xs bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2 py-1.5 text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-accent-500 cursor-pointer" />
           </div>
         </div>
       </div>
     </div>
 
     <div class="relative" x-data="{ open: false }" @click.outside="open = false" @keydown.escape="open = false">
-      <button type="button" @click="open = !open" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition ${s.feedback ? "bg-indigo-600 text-white border-indigo-600" : "bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-indigo-400"}">${feedbackLabel}${caret}</button>
+      <button type="button" @click="open = !open" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition ${s.feedback ? "bg-accent-600 text-white border-accent-600" : "bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-accent-400"}">${feedbackLabel}${caret}</button>
       <div x-show="open" x-transition:enter="transition ease-out duration-100" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100" class="absolute left-0 top-full mt-1 z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg w-44 p-1 overflow-hidden" style="display:none">
         ${(
           [
@@ -562,13 +604,13 @@ export function lessonsPage(d: LessonsData): Html {
           ] as [string, string][]
         ).map(
           ([val, lbl]) =>
-            html`<button type="button" onclick="document.getElementById('h-feedback').value='${val}'; document.getElementById('filter-form').submit()" class="w-full text-left px-3 py-2 rounded-lg text-sm transition flex items-center justify-between ${s.feedback === val ? "bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 font-medium" : "text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"}">${lbl}${s.feedback === val ? html`<span class="text-indigo-500 ml-auto">✓</span>` : ""}</button>`,
+            html`<button type="button" onclick="document.getElementById('h-feedback').value='${val}'; document.getElementById('filter-form').submit()" class="w-full text-left px-3 py-2 rounded-lg text-sm transition flex items-center justify-between ${s.feedback === val ? "bg-accent-50 dark:bg-accent-900/30 text-accent-700 dark:text-accent-300 font-medium" : "text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"}">${lbl}${s.feedback === val ? html`<span class="text-accent-500 ml-auto">✓</span>` : ""}</button>`,
         )}
       </div>
     </div>
 
     <div class="relative" x-data="{ open: false }" @click.outside="open = false" @keydown.escape="open = false">
-      <button type="button" @click="open = !open" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition ${s.level ? "bg-indigo-600 text-white border-indigo-600" : "bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-indigo-400"}">${s.level ? `${LEVEL_EMOJI[s.level] ?? ""} ${s.level}` : "Level"}${caret}</button>
+      <button type="button" @click="open = !open" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition ${s.level ? "bg-accent-600 text-white border-accent-600" : "bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-accent-400"}">${s.level ? `${LEVEL_EMOJI[s.level] ?? ""} ${s.level}` : "Level"}${caret}</button>
       <div x-show="open" x-transition:enter="transition ease-out duration-100" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100" class="absolute left-0 top-full mt-1 z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg w-40 p-1 overflow-hidden" style="display:none">
         ${(
           [
@@ -579,7 +621,7 @@ export function lessonsPage(d: LessonsData): Html {
           ] as [string, string][]
         ).map(
           ([val, lbl]) =>
-            html`<button type="button" onclick="document.getElementById('h-level').value='${val}'; document.getElementById('filter-form').submit()" class="w-full text-left px-3 py-2 rounded-lg text-sm transition flex items-center justify-between ${s.level === val ? "bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 font-medium" : "text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"}">${lbl}${s.level === val ? html`<span class="text-indigo-500 ml-auto">✓</span>` : ""}</button>`,
+            html`<button type="button" onclick="document.getElementById('h-level').value='${val}'; document.getElementById('filter-form').submit()" class="w-full text-left px-3 py-2 rounded-lg text-sm transition flex items-center justify-between ${s.level === val ? "bg-accent-50 dark:bg-accent-900/30 text-accent-700 dark:text-accent-300 font-medium" : "text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"}">${lbl}${s.level === val ? html`<span class="text-accent-500 ml-auto">✓</span>` : ""}</button>`,
         )}
       </div>
     </div>
@@ -591,14 +633,14 @@ export function lessonsPage(d: LessonsData): Html {
       d.allBranches.length ||
       d.allCommits.length
         ? html`<div class="relative" x-data="{ open: false }" @click.outside="open = false" @keydown.escape="open = false">
-      <button type="button" @click="open = !open" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition ${s.category || s.project || s.repository || s.branch || s.commit ? "bg-indigo-600 text-white border-indigo-600" : "bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-indigo-400"}">Filters${caret}</button>
+      <button type="button" @click="open = !open" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition ${s.category || s.project || s.repository || s.branch || s.commit ? "bg-accent-600 text-white border-accent-600" : "bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-accent-400"}">Filters${caret}</button>
       <div x-show="open" x-transition:enter="transition ease-out duration-100" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100" class="absolute left-0 top-full mt-1 z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg w-64 p-3 space-y-2.5" style="display:none">
-        ${d.allCategories.length ? html`<div><label class="block text-xs text-gray-400 dark:text-gray-500 mb-1">Category</label><select name="category" onchange="this.form.submit()" class="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"><option value="">All categories</option>${d.allCategories.map((cat) => html`<option value="${cat}" ${s.category === cat ? "selected" : ""}>${cat}</option>`)}</select></div>` : ""}
-        ${d.allProjects.length ? html`<div><label class="block text-xs text-gray-400 dark:text-gray-500 mb-1">Project</label><select name="project" onchange="this.form.submit()" class="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"><option value="">All projects</option>${d.allProjects.map((p) => html`<option value="${p}" ${s.project === p ? "selected" : ""}>${p}</option>`)}</select></div>` : ""}
-        ${d.allRepositories.length ? html`<div><label class="block text-xs text-gray-400 dark:text-gray-500 mb-1">Repository</label><select name="repository" onchange="this.form.submit()" class="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"><option value="">All repositories</option>${d.allRepositories.map((r) => html`<option value="${r}" ${s.repository === r ? "selected" : ""}>${r}</option>`)}</select></div>` : ""}
-        ${d.allBranches.length ? html`<div><label class="block text-xs text-gray-400 dark:text-gray-500 mb-1">Branch</label><input type="text" name="branch" value="${s.branch}" placeholder="e.g. main" list="branch-list" autocomplete="off" class="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500" /><datalist id="branch-list">${d.allBranches.map((b) => html`<option value="${b}">`)}</datalist></div>` : ""}
-        ${d.allCommits.length ? html`<div><label class="block text-xs text-gray-400 dark:text-gray-500 mb-1">Commit</label><input type="text" name="commit" value="${s.commit}" placeholder="hash prefix…" list="commit-list" autocomplete="off" class="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded-lg px-2.5 py-1.5 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500" /><datalist id="commit-list">${d.allCommits.map((c) => html`<option value="${c.slice(0, 7)}">`)}</datalist></div>` : ""}
-        <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg px-3 py-1.5 text-xs font-medium transition">Apply</button>
+        ${d.allCategories.length ? html`<div><label class="block text-xs text-gray-400 dark:text-gray-500 mb-1">Category</label><select name="category" onchange="this.form.submit()" class="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-accent-500"><option value="">All categories</option>${d.allCategories.map((cat) => html`<option value="${cat}" ${s.category === cat ? "selected" : ""}>${cat}</option>`)}</select></div>` : ""}
+        ${d.allProjects.length ? html`<div><label class="block text-xs text-gray-400 dark:text-gray-500 mb-1">Project</label><select name="project" onchange="this.form.submit()" class="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-accent-500"><option value="">All projects</option>${d.allProjects.map((p) => html`<option value="${p}" ${s.project === p ? "selected" : ""}>${p}</option>`)}</select></div>` : ""}
+        ${d.allRepositories.length ? html`<div><label class="block text-xs text-gray-400 dark:text-gray-500 mb-1">Repository</label><select name="repository" onchange="this.form.submit()" class="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-accent-500"><option value="">All repositories</option>${d.allRepositories.map((r) => html`<option value="${r}" ${s.repository === r ? "selected" : ""}>${r}</option>`)}</select></div>` : ""}
+        ${d.allBranches.length ? html`<div><label class="block text-xs text-gray-400 dark:text-gray-500 mb-1">Branch</label><input type="text" name="branch" value="${s.branch}" placeholder="e.g. main" list="branch-list" autocomplete="off" class="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-accent-500" /><datalist id="branch-list">${d.allBranches.map((b) => html`<option value="${b}">`)}</datalist></div>` : ""}
+        ${d.allCommits.length ? html`<div><label class="block text-xs text-gray-400 dark:text-gray-500 mb-1">Commit</label><input type="text" name="commit" value="${s.commit}" placeholder="hash prefix…" list="commit-list" autocomplete="off" class="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded-lg px-2.5 py-1.5 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-accent-500" /><datalist id="commit-list">${d.allCommits.map((c) => html`<option value="${c.slice(0, 7)}">`)}</datalist></div>` : ""}
+        <button type="submit" class="w-full bg-accent-600 hover:bg-accent-500 text-white rounded-lg px-3 py-1.5 text-xs font-medium transition">Apply</button>
       </div>
     </div>`
         : ""
@@ -614,14 +656,14 @@ export function lessonsPage(d: LessonsData): Html {
     )}
     <button type="button" x-show="selectMode" style="display:none" @click="leave()" class="${anyFilter ? "" : "ml-auto"} inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-rose-400 hover:text-rose-600 dark:hover:text-rose-400">✕ Cancel</button>
     <div class="relative" x-data="{ open: ${String(d.importOpen)} }" @click.outside="open = false" @keydown.escape="open = false">
-      <button type="button" @click="open = !open" title="Import a lesson someone shared" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-indigo-400">＋ Import</button>
+      <button type="button" @click="open = !open" title="Import a lesson someone shared" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-accent-400">＋ Import</button>
       <div x-show="open" x-transition:enter="transition ease-out duration-100" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100" class="absolute right-0 top-full mt-1 z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg w-80 p-3 space-y-2.5" style="display:none">
         <p class="text-xs text-gray-500 dark:text-gray-400">Paste the lesson code, the link, a URL or the whole text — or drop a <code>.devcoach.md</code> anywhere on this page.</p>
         ${d.importError === "invalid" ? html`<p class="text-xs text-rose-600 dark:text-rose-400">That doesn't look like a devcoach lesson — copy the whole text again.</p>` : d.importError === "cross" ? html`<p class="text-xs text-rose-600 dark:text-rose-400">Imports only work from this dashboard — paste the lesson here.</p>` : ""}
-        <textarea name="text" form="import-form" rows="4" placeholder="devcoach:lesson:1:…" autocomplete="off" class="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono" x-ref="importText" x-effect="if (open) $nextTick(() => $refs.importText.focus())"></textarea>
+        <textarea name="text" form="import-form" rows="4" placeholder="devcoach:lesson:1:…" autocomplete="off" class="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-accent-500 font-mono" x-ref="importText" x-effect="if (open) $nextTick(() => $refs.importText.focus())"></textarea>
         <div class="flex items-center gap-2">
-          <label class="cursor-pointer text-xs text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition">📄 Choose file<input id="import-file" type="file" name="file" form="import-form" accept=".md,.json,.txt" class="hidden" onchange="document.getElementById('import-form').submit()" /></label>
-          <button type="submit" form="import-form" class="ml-auto bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg px-3 py-1.5 text-xs font-medium transition">Import</button>
+          <label class="cursor-pointer text-xs text-gray-500 dark:text-gray-400 hover:text-accent-600 dark:hover:text-accent-400 transition">📄 Choose file<input id="import-file" type="file" name="file" form="import-form" accept=".md,.json,.txt" class="hidden" onchange="document.getElementById('import-form').submit()" /></label>
+          <button type="submit" form="import-form" class="ml-auto bg-accent-600 hover:bg-accent-500 text-white rounded-lg px-3 py-1.5 text-xs font-medium transition">Import</button>
         </div>
       </div>
     </div>
@@ -647,7 +689,7 @@ export function lessonsPage(d: LessonsData): Html {
   }
 </form>
 <form id="import-form" method="post" action="/lessons/import" enctype="multipart/form-data" class="hidden"><input type="hidden" name="from" value="lessons" /></form>
-<div id="drop-hint" class="hidden fixed inset-0 z-[60] bg-indigo-500/10 border-4 border-dashed border-indigo-400 pointer-events-none items-center justify-center"><p class="bg-white dark:bg-gray-900 text-indigo-700 dark:text-indigo-300 font-semibold rounded-xl px-6 py-3 shadow-lg">Drop to import the lesson</p></div>
+<div id="drop-hint" class="hidden fixed inset-0 z-[60] bg-accent-500/10 border-4 border-dashed border-accent-400 pointer-events-none items-center justify-center"><p class="bg-white dark:bg-gray-900 text-accent-700 dark:text-accent-300 font-semibold rounded-xl px-6 py-3 shadow-lg">Drop to import the lesson</p></div>
 
 ${
   d.lessons.length
@@ -680,7 +722,7 @@ ${
         const rowId = domId("lesson-row-", lesson.id);
         const date = lesson.timestamp.slice(0, 10);
         const tip = lesson.timestamp.slice(0, 16).replace("T", " ");
-        return html`<tr id="${rowId}" data-id="${lesson.id}" data-title="${lesson.title}" data-href="/lessons/${encodeURIComponent(lesson.id)}" class="hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors group cursor-pointer" tabindex="0" role="link" @click="if (selectMode) toggle($el.dataset.id); else if (!$event.target.closest('a, button, input, label')) window.location = $el.dataset.href" @keydown.enter="if (selectMode) toggle($el.dataset.id); else if ($event.target === $el) window.location = $el.dataset.href" @keydown.space.prevent="selectMode && toggle($el.dataset.id)" :class="selected.includes($el.dataset.id) && 'bg-indigo-50 dark:bg-indigo-900/20'">
+        return html`<tr id="${rowId}" data-id="${lesson.id}" data-title="${lesson.title}" data-href="/lessons/${encodeURIComponent(lesson.id)}" class="hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors group cursor-pointer" tabindex="0" role="link" @click="if (selectMode) toggle($el.dataset.id); else if (!$event.target.closest('a, button, input, label')) window.location = $el.dataset.href" @keydown.enter="if (selectMode) toggle($el.dataset.id); else if ($event.target === $el) window.location = $el.dataset.href" @keydown.space.prevent="selectMode && toggle($el.dataset.id)" :class="selected.includes($el.dataset.id) && 'bg-accent-50 dark:bg-accent-900/20'">
         <td class="px-3 py-3">
           <form x-show="!selectMode" method="post" action="/lessons/${encodeURIComponent(lesson.id)}/star" hx-post="/lessons/${encodeURIComponent(lesson.id)}/star" hx-target="#${rowId}" hx-select="#${rowId}" hx-swap="outerHTML">
             <input type="hidden" name="starred" value="${lesson.starred ? "0" : "1"}" />
@@ -694,11 +736,11 @@ ${
           <div class="absolute z-10 bottom-full left-0 mb-1 px-2 py-1 rounded bg-gray-800 dark:bg-gray-700 text-white text-xs whitespace-nowrap pointer-events-none opacity-0 group-hover/date:opacity-100 transition-opacity duration-150">${tip}</div>
         </td>
         <td class="px-3 py-3 hidden sm:table-cell"><span class="block truncate text-xs font-mono text-cyan-600 dark:text-cyan-400">${lesson.topic_id}</span>${lesson.imported ? html`<span class="block text-[11px] text-gray-400 dark:text-gray-500 truncate max-w-[10rem]" title="This lesson was shared with you">🤝 ${lesson.shared_by ?? "anonymous"}</span>` : ""}</td>
-        <td class="px-3 py-3"><a href="/lessons/${encodeURIComponent(lesson.id)}" class="font-semibold text-[15px] leading-snug text-gray-800 dark:text-gray-100 hover:text-indigo-600 dark:hover:text-indigo-400 transition line-clamp-2">${lesson.title}</a></td>
+        <td class="px-3 py-3"><a href="/lessons/${encodeURIComponent(lesson.id)}" class="font-semibold text-[15px] leading-snug text-gray-800 dark:text-gray-100 hover:text-accent-600 dark:hover:text-accent-400 transition line-clamp-2">${lesson.title}</a></td>
         <td class="px-3 py-3"><a href="${lessonsQs(s, { level: lesson.level })}" class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${levelTextColor[lesson.level] ?? ""} hover:ring-2 hover:ring-current hover:ring-offset-1 transition-shadow">${lesson.level}</a></td>
-        <td class="px-3 py-3 hidden lg:table-cell"><div class="flex flex-wrap gap-1">${lesson.categories.map((cat) => html`<a href="${lessonsQs(s, { category: cat })}" class="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors">${cat}</a>`)}</div></td>
-        <td class="px-3 py-3 hidden xl:table-cell">${lesson.feedback === "know" ? html`<span class="text-xs text-teal-600 dark:text-teal-400 font-medium">✓ Knew it</span>` : lesson.feedback === "understood" ? html`<span class="text-xs text-indigo-500 dark:text-indigo-400 font-medium">💡 Understood</span>` : lesson.feedback === "dont_know" ? html`<span class="text-xs text-rose-500 dark:text-rose-400 font-medium">✗ Couldn't follow</span>` : ""}</td>
-        <td class="px-2 py-3 text-center"><button type="button" hx-get="/lessons/${encodeURIComponent(lesson.id)}/share?format=panel" hx-target="#share-modal-body" hx-swap="innerHTML" @click="openShare($el)" title="Share this lesson" aria-label="Share this lesson" class="inline-flex text-gray-400 dark:text-gray-500 hover:text-indigo-500 dark:hover:text-indigo-400 transition opacity-0 group-hover:opacity-100 focus-visible:opacity-100"><svg class="w-4 h-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 14 14 6M8 6h6v6"/></svg></button></td>
+        <td class="px-3 py-3 hidden lg:table-cell"><div class="flex flex-wrap gap-1">${lesson.categories.map((cat) => html`<a href="${lessonsQs(s, { category: cat })}" class="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-accent-100 dark:hover:bg-accent-900/40 hover:text-accent-700 dark:hover:text-accent-300 transition-colors">${cat}</a>`)}</div></td>
+        <td class="px-3 py-3 hidden xl:table-cell">${lesson.feedback === "know" ? html`<span class="text-xs text-teal-600 dark:text-teal-400 font-medium">✓ Knew it</span>` : lesson.feedback === "understood" ? html`<span class="text-xs text-accent-500 dark:text-accent-400 font-medium">💡 Understood</span>` : lesson.feedback === "dont_know" ? html`<span class="text-xs text-rose-500 dark:text-rose-400 font-medium">✗ Couldn't follow</span>` : ""}</td>
+        <td class="px-2 py-3 text-center"><button type="button" hx-get="/lessons/${encodeURIComponent(lesson.id)}/share?format=panel" hx-target="#share-modal-body" hx-swap="innerHTML" @click="openShare($el)" title="Share this lesson" aria-label="Share this lesson" class="inline-flex text-gray-400 dark:text-gray-500 hover:text-accent-500 dark:hover:text-accent-400 transition opacity-0 group-hover:opacity-100 focus-visible:opacity-100"><svg class="w-4 h-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 14 14 6M8 6h6v6"/></svg></button></td>
       </tr>`;
       })}
     </tbody>
@@ -711,19 +753,19 @@ ${
   <div class="flex items-center gap-1">
     ${
       d.page > 1
-        ? html`<a href="${lessonsQs(s, { page: String(d.page - 1) })}" class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-medium bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-indigo-400 transition">← Prev</a>`
+        ? html`<a href="${lessonsQs(s, { page: String(d.page - 1) })}" class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-medium bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-accent-400 transition">← Prev</a>`
         : html`<span class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-medium border border-gray-100 dark:border-gray-800 text-gray-300 dark:text-gray-600 cursor-not-allowed">← Prev</span>`
     }
     ${pageNumbers(d.page, d.totalPages).map((p) =>
       p === 0
         ? html`<span class="text-gray-400 dark:text-gray-600 text-xs px-1">…</span>`
         : p === d.page
-          ? html`<span class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-medium bg-indigo-600 text-white border border-indigo-600">${p}</span>`
-          : html`<a href="${lessonsQs(s, { page: String(p) })}" class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-medium bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-indigo-400 transition">${p}</a>`,
+          ? html`<span class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-medium bg-accent-600 text-white border border-accent-600">${p}</span>`
+          : html`<a href="${lessonsQs(s, { page: String(p) })}" class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-medium bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-accent-400 transition">${p}</a>`,
     )}
     ${
       d.page < d.totalPages
-        ? html`<a href="${lessonsQs(s, { page: String(d.page + 1) })}" class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-medium bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-indigo-400 transition">Next →</a>`
+        ? html`<a href="${lessonsQs(s, { page: String(d.page + 1) })}" class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-medium bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-accent-400 transition">Next →</a>`
         : html`<span class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-medium border border-gray-100 dark:border-gray-800 text-gray-300 dark:text-gray-600 cursor-not-allowed">Next →</span>`
     }
   </div>
@@ -733,12 +775,12 @@ ${
     : html`<div class="flex flex-col items-center justify-center py-16 text-center">
   <p class="text-3xl mb-3">📭</p>
   <p class="text-gray-500 dark:text-gray-400 text-sm">No lessons match the current filters.</p>
-  ${anyFilter ? html`<a href="/lessons" class="mt-2 text-indigo-500 hover:text-indigo-400 text-sm transition">Clear all filters</a>` : ""}
+  ${anyFilter ? html`<a href="/lessons" class="mt-2 text-accent-500 hover:text-accent-400 text-sm transition">Clear all filters</a>` : ""}
 </div>`
 }
 <div x-show="selectMode" style="display:none" x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0 translate-y-2" x-transition:enter-end="opacity-100 translate-y-0" class="fixed inset-x-0 bottom-0 z-50 border-t border-gray-200 dark:border-gray-800 bg-white/95 dark:bg-gray-900/95 backdrop-blur px-4 sm:px-6 py-3">
   <div class="max-w-7xl mx-auto flex items-center gap-3">
-    <button type="button" @click="leave()" class="inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium border transition bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-indigo-400">Cancel</button>
+    <button type="button" @click="leave()" class="inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium border transition bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-accent-400">Cancel</button>
     <div class="ml-auto flex items-center gap-3">
       <p class="text-sm text-gray-700 dark:text-gray-200 tabular-nums"><span x-text="selected.length"></span> selected</p>
       <button type="button" x-show="selected.length" style="display:none" @click="selected = []" class="text-xs text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-200 transition">Clear</button>
@@ -755,7 +797,7 @@ ${dangerDialog(
     </ul>
     <p x-show="selected.length > 6" style="display:none" x-text="'…and ' + (selected.length - 6) + ' more'"></p>
     <p>They will be removed from your log. This cannot be undone.</p>`,
-  html`<button type="button" @click="confirmOpen = false" class="inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium border transition bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-indigo-400">Cancel</button>
+  html`<button type="button" @click="confirmOpen = false" class="inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium border transition bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-accent-400">Cancel</button>
     <form method="post" action="/lessons/delete" class="contents">
       <template x-for="id in selected" :key="id"><input type="hidden" name="id" :value="id" /></template>
       <input type="hidden" name="next" value="/lessons${lessonsQs(s, { page: String(d.page) })}" />
@@ -863,9 +905,9 @@ export function shareFragment(sh: ShareState): Html {
   const dl = `/lessons/${encodeURIComponent(sh.id)}/share?format=md&name=${encodeURIComponent(sh.name)}&include_context=${sh.includeContext ? "1" : "0"}`;
   return html`<div id="share-payloads" data-text="${sh.text}" data-link="${sh.link}" class="space-y-2">
   <div class="flex flex-wrap gap-2">
-    <button type="button" onclick="copyShare('text', this)" class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-gray-100 dark:bg-gray-800 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 text-gray-700 dark:text-gray-200 hover:text-indigo-700 dark:hover:text-indigo-300 transition">📋 Copy text</button>
-    <button type="button" onclick="copyShare('link', this)" class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-gray-100 dark:bg-gray-800 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 text-gray-700 dark:text-gray-200 hover:text-indigo-700 dark:hover:text-indigo-300 transition">🔗 Copy link</button>
-    <a href="${dl}" class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-gray-100 dark:bg-gray-800 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 text-gray-700 dark:text-gray-200 hover:text-indigo-700 dark:hover:text-indigo-300 transition">⬇ Download .md</a>
+    <button type="button" onclick="copyShare('text', this)" class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-gray-100 dark:bg-gray-800 hover:bg-accent-100 dark:hover:bg-accent-900/40 text-gray-700 dark:text-gray-200 hover:text-accent-700 dark:hover:text-accent-300 transition">📋 Copy text</button>
+    <button type="button" onclick="copyShare('link', this)" class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-gray-100 dark:bg-gray-800 hover:bg-accent-100 dark:hover:bg-accent-900/40 text-gray-700 dark:text-gray-200 hover:text-accent-700 dark:hover:text-accent-300 transition">🔗 Copy link</button>
+    <a href="${dl}" class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-gray-100 dark:bg-gray-800 hover:bg-accent-100 dark:hover:bg-accent-900/40 text-gray-700 dark:text-gray-200 hover:text-accent-700 dark:hover:text-accent-300 transition">⬇ Download .md</a>
   </div>
   <p class="text-[11px] text-gray-400 dark:text-gray-500">${sh.name ? html`Shared by <span class="text-gray-600 dark:text-gray-300">${sh.name}</span>` : "Shared anonymously"} · ${sh.includeContext ? "includes project, branch and commit" : "only the lesson travels — no paths, no project"}.</p>
 </div>`;
@@ -884,7 +926,7 @@ export function sharePanel(lessonId: string, sh: ShareState, heading: string | n
           <input type="hidden" name="persist" value="0" x-ref="persist" />
           <div>
             <label for="share-name" class="block text-xs text-gray-400 dark:text-gray-500 mb-1">Your name</label>
-            <input id="share-name" type="text" name="name" value="${sh.name}" maxlength="80" placeholder="anonymous" autocomplete="off" @input="$refs.persist.value = '0'" @change="$refs.persist.value = '1'" class="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            <input id="share-name" type="text" name="name" value="${sh.name}" maxlength="80" placeholder="anonymous" autocomplete="off" @input="$refs.persist.value = '0'" @change="$refs.persist.value = '1'" class="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-accent-500" />
           </div>
           <label class="flex items-start gap-2 text-xs text-gray-600 dark:text-gray-300 cursor-pointer"><input type="checkbox" name="include_context" value="1" ${sh.includeContext ? "checked" : ""} class="mt-0.5" /><span>Include where it happened <span class="text-gray-400 dark:text-gray-500">(project, branch, commit — never local paths)</span></span></label>
         </form>
@@ -953,7 +995,7 @@ ${
       "shrink-0",
     )}
     <div class="relative shrink-0" x-data="{ open: ${String(sh.open)} }" @click.outside="open = false" @keydown.escape="open = false">
-      <button type="button" @click="open = !open" title="Share this lesson" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-indigo-400">↗ Share</button>
+      <button type="button" @click="open = !open" title="Share this lesson" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-accent-400">↗ Share</button>
       <div x-show="open" x-transition:enter="transition ease-out duration-100" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100" class="absolute right-0 top-full mt-1 z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg w-80 p-4 space-y-3" style="display:none">
         ${sharePanel(l.id, sh)}
       </div>
@@ -965,35 +1007,35 @@ ${
     </span>
     <span>🏷 <span class="text-cyan-600 dark:text-cyan-400">${l.topic_id}</span></span>
     ${l.imported ? html`<span title="This lesson was shared with you">🤝 shared by <span class="text-gray-700 dark:text-gray-200">${l.shared_by ?? "anonymous"}</span></span>` : ""}
-    ${d.course ? html`<a href="/courses/${encodeURIComponent(d.course.id)}" title="${d.course.title}" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-700 hover:border-indigo-400 transition">🎓 Course · ${d.course.done}/${d.course.total}${d.course.status === "completed" ? " ✓" : ""}</a>` : ""}
-    ${l.categories.map((cat) => html`<a href="/lessons?category=${encodeURIComponent(cat)}" class="inline-block bg-gray-100 dark:bg-gray-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/50 text-gray-600 dark:text-gray-300 text-xs rounded px-2 py-0.5 transition border border-gray-200 dark:border-gray-700 hover:border-indigo-400 dark:hover:border-indigo-600">${cat}</a>`)}
+    ${d.course ? html`<a href="/courses/${encodeURIComponent(d.course.id)}" title="${d.course.title}" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-accent-50 dark:bg-accent-900/30 text-accent-700 dark:text-accent-300 border border-accent-200 dark:border-accent-700 hover:border-accent-400 transition">🎓 Course · ${d.course.done}/${d.course.total}${d.course.status === "completed" ? " ✓" : ""}</a>` : ""}
+    ${l.categories.map((cat) => html`<a href="/lessons?category=${encodeURIComponent(cat)}" class="inline-block bg-gray-100 dark:bg-gray-800 hover:bg-accent-50 dark:hover:bg-accent-900/50 text-gray-600 dark:text-gray-300 text-xs rounded px-2 py-0.5 transition border border-gray-200 dark:border-gray-700 hover:border-accent-400 dark:hover:border-accent-600">${cat}</a>`)}
     ${
       l.feedback
         ? html`${
             l.feedback === "know"
               ? html`<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-700">✓ I knew this</span>`
               : l.feedback === "understood"
-                ? html`<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-700">💡 Understood</span>`
+                ? html`<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-accent-100 dark:bg-accent-900/30 text-accent-700 dark:text-accent-300 border border-accent-200 dark:border-accent-700">💡 Understood</span>`
                 : html`<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-700">✗ Couldn't follow</span>`
           }
         <form method="post" action="/lessons/${encodeURIComponent(l.id)}/feedback" ${raw(feedbackHx)}><input type="hidden" name="feedback" value="clear" /><input type="hidden" name="next" value="/lessons/${encodeURIComponent(l.id)}" /><button type="submit" class="text-xs text-gray-400 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-400 transition">Clear</button></form>`
         : ""
     }
   </div>
-  <div class="my-5 pl-4 border-l-4 border-indigo-400 dark:border-indigo-500 bg-indigo-50 dark:bg-indigo-950/40 rounded-r-lg py-3 pr-4">
-    <p class="text-xs font-semibold uppercase tracking-wide text-indigo-500 dark:text-indigo-400 mb-1">TL;DR</p>
-    <div id="summary-content" class="markdown-body text-sm text-indigo-900 dark:text-indigo-100"></div>
+  <div class="my-5 pl-4 border-l-4 border-accent-400 dark:border-accent-500 bg-accent-50 dark:bg-accent-950/40 rounded-r-lg py-3 pr-4">
+    <p class="text-xs font-semibold uppercase tracking-wide text-accent-500 dark:text-accent-400 mb-1">TL;DR</p>
+    <div id="summary-content" class="markdown-body text-sm text-accent-900 dark:text-accent-100"></div>
   </div>
   <div id="body-content" class="markdown-body"></div>
   ${l.task_context ? html`<div class="mt-6 pt-4 border-t border-gray-100 dark:border-gray-800 text-sm text-gray-500 dark:text-gray-400"><span class="text-gray-400 dark:text-gray-500">Context:</span> ${l.task_context}</div>` : ""}
   ${
     hasMeta
       ? html`<div class="mt-4 pt-4 border-t border-gray-100 dark:border-gray-800"><div class="flex flex-wrap gap-x-5 gap-y-1.5 text-xs text-gray-400 dark:text-gray-500 font-mono">
-    ${l.project ? html`<span><span class="text-gray-400 dark:text-gray-600">project</span> ${repoUrl ? html`<a href="${repoUrl}" ${!isLocal ? raw('target="_blank" rel="noopener"') : ""} class="text-gray-600 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 transition">${l.project}</a>` : html`<span class="text-gray-600 dark:text-gray-300">${l.project}</span>`}</span>` : ""}
-    ${l.repository ? html`<span class="inline-flex items-center gap-1"><span class="text-gray-400 dark:text-gray-600">repo</span>${l.repository_platform && REPO_DOMAINS[l.repository_platform] ? html`<img src="/static/vendor/icons/${l.repository_platform}.svg" class="w-3 h-3 dark:invert opacity-60 shrink-0" alt="" />` : ""}${repoUrl ? html`<a href="${repoUrl}" ${!isLocal ? raw('target="_blank" rel="noopener"') : ""} class="text-gray-600 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 transition">${l.repository}</a>` : html`<span class="text-gray-600 dark:text-gray-300">${l.repository}</span>`}</span>` : ""}
-    ${l.branch ? html`<span><span class="text-gray-400 dark:text-gray-600">branch</span> <span class="text-indigo-600 dark:text-indigo-400">${l.branch}</span></span>` : ""}
-    ${l.commit_hash ? html`<span><span class="text-gray-400 dark:text-gray-600">commit</span> ${commitUrl ? html`<a href="${commitUrl}" target="_blank" rel="noopener" class="text-cyan-600 dark:text-cyan-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition">${l.commit_hash.slice(0, 7)}</a>` : html`<span class="text-cyan-600 dark:text-cyan-400">${l.commit_hash.slice(0, 7)}</span>`}</span>` : ""}
-    ${l.folder ? html`<span class="inline-flex items-center gap-1"><span class="text-gray-400 dark:text-gray-600">folder</span><a href="vscode://file/${l.folder}" class="inline-flex items-center gap-1 text-gray-600 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 transition"><img src="/static/vendor/icons/vscode.svg" class="w-3.5 h-3.5 shrink-0" alt="" />${l.folder}</a></span>` : ""}
+    ${l.project ? html`<span><span class="text-gray-400 dark:text-gray-600">project</span> ${repoUrl ? html`<a href="${repoUrl}" ${!isLocal ? raw('target="_blank" rel="noopener"') : ""} class="text-gray-600 dark:text-gray-300 hover:text-accent-600 dark:hover:text-accent-400 transition">${l.project}</a>` : html`<span class="text-gray-600 dark:text-gray-300">${l.project}</span>`}</span>` : ""}
+    ${l.repository ? html`<span class="inline-flex items-center gap-1"><span class="text-gray-400 dark:text-gray-600">repo</span>${l.repository_platform && REPO_DOMAINS[l.repository_platform] ? html`<img src="/static/vendor/icons/${l.repository_platform}.svg" class="w-3 h-3 dark:invert opacity-60 shrink-0" alt="" />` : ""}${repoUrl ? html`<a href="${repoUrl}" ${!isLocal ? raw('target="_blank" rel="noopener"') : ""} class="text-gray-600 dark:text-gray-300 hover:text-accent-600 dark:hover:text-accent-400 transition">${l.repository}</a>` : html`<span class="text-gray-600 dark:text-gray-300">${l.repository}</span>`}</span>` : ""}
+    ${l.branch ? html`<span><span class="text-gray-400 dark:text-gray-600">branch</span> <span class="text-accent-600 dark:text-accent-400">${l.branch}</span></span>` : ""}
+    ${l.commit_hash ? html`<span><span class="text-gray-400 dark:text-gray-600">commit</span> ${commitUrl ? html`<a href="${commitUrl}" target="_blank" rel="noopener" class="text-cyan-600 dark:text-cyan-400 hover:text-accent-600 dark:hover:text-accent-400 transition">${l.commit_hash.slice(0, 7)}</a>` : html`<span class="text-cyan-600 dark:text-cyan-400">${l.commit_hash.slice(0, 7)}</span>`}</span>` : ""}
+    ${l.folder ? html`<span class="inline-flex items-center gap-1"><span class="text-gray-400 dark:text-gray-600">folder</span><a href="vscode://file/${l.folder}" class="inline-flex items-center gap-1 text-gray-600 dark:text-gray-300 hover:text-accent-600 dark:hover:text-accent-400 transition"><img src="/static/vendor/icons/vscode.svg" class="w-3.5 h-3.5 shrink-0" alt="" />${l.folder}</a></span>` : ""}
   </div></div>`
       : ""
   }
@@ -1001,7 +1043,7 @@ ${
     !l.feedback
       ? html`<div class="mt-6 pt-4 border-t border-gray-100 dark:border-gray-800 flex flex-wrap gap-2">
     <form method="post" action="/lessons/${encodeURIComponent(l.id)}/feedback" ${raw(feedbackHx)}><input type="hidden" name="feedback" value="know" /><input type="hidden" name="next" value="/lessons/${encodeURIComponent(l.id)}" /><button type="submit" class="px-3 py-1 rounded text-sm font-medium transition bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-green-100 dark:hover:bg-green-800 hover:text-green-700 dark:hover:text-white">✓ I knew this</button></form>
-    <form method="post" action="/lessons/${encodeURIComponent(l.id)}/feedback" ${raw(feedbackHx)}><input type="hidden" name="feedback" value="understood" /><input type="hidden" name="next" value="/lessons/${encodeURIComponent(l.id)}" /><button type="submit" class="px-3 py-1 rounded text-sm font-medium transition bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-indigo-100 dark:hover:bg-indigo-900 hover:text-indigo-700 dark:hover:text-white">💡 Understood</button></form>
+    <form method="post" action="/lessons/${encodeURIComponent(l.id)}/feedback" ${raw(feedbackHx)}><input type="hidden" name="feedback" value="understood" /><input type="hidden" name="next" value="/lessons/${encodeURIComponent(l.id)}" /><button type="submit" class="px-3 py-1 rounded text-sm font-medium transition bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-accent-100 dark:hover:bg-accent-900 hover:text-accent-700 dark:hover:text-white">💡 Understood</button></form>
     <form method="post" action="/lessons/${encodeURIComponent(l.id)}/feedback" ${raw(feedbackHx)}><input type="hidden" name="feedback" value="dont_know" /><input type="hidden" name="next" value="/lessons/${encodeURIComponent(l.id)}" /><button type="submit" class="px-3 py-1 rounded text-sm font-medium transition bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-red-100 dark:hover:bg-red-900 hover:text-red-700 dark:hover:text-white">✗ Couldn't follow</button></form>
   </div>`
       : ""
@@ -1014,7 +1056,7 @@ ${dangerDialog(
   html`Delete this lesson?`,
   html`<p class="text-gray-700 dark:text-gray-200 font-medium">“${l.title}”</p>
     <p>${l.imported ? html`It was shared with you${l.shared_by ? html` by ${l.shared_by}` : ""}; you can import it again later. ` : ""}It will be removed from your log. This cannot be undone.</p>`,
-  html`<button type="button" @click="confirmOpen = false" class="inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium border transition bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-indigo-400">Cancel</button>
+  html`<button type="button" @click="confirmOpen = false" class="inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium border transition bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-accent-400">Cancel</button>
     <form method="post" action="/lessons/delete" class="contents">
       <input type="hidden" name="id" value="${l.id}" />
       <input type="hidden" name="next" value="/lessons" />
@@ -1076,10 +1118,10 @@ export function importPage(d: {
   const p = d.preview;
   const pasteForm = html`<form id="import-form" method="post" action="/lessons/import" enctype="multipart/form-data" class="space-y-3">
   <input type="hidden" name="from" value="lessons" />
-  <textarea name="text" rows="5" placeholder="devcoach:lesson:1:… — or the link, a URL, or the whole card" autocomplete="off" class="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono"></textarea>
+  <textarea name="text" rows="5" placeholder="devcoach:lesson:1:… — or the link, a URL, or the whole card" autocomplete="off" class="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-accent-500 font-mono"></textarea>
   <div class="flex items-center gap-3">
-    <label class="cursor-pointer text-xs text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition">📄 Choose a .devcoach.md file<input id="import-file" type="file" name="file" accept=".md,.json,.txt" class="hidden" onchange="document.getElementById('import-form').submit()" /></label>
-    <button type="submit" class="ml-auto bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-lg px-4 py-2 text-sm transition">Import</button>
+    <label class="cursor-pointer text-xs text-gray-500 dark:text-gray-400 hover:text-accent-600 dark:hover:text-accent-400 transition">📄 Choose a .devcoach.md file<input id="import-file" type="file" name="file" accept=".md,.json,.txt" class="hidden" onchange="document.getElementById('import-form').submit()" /></label>
+    <button type="submit" class="ml-auto bg-accent-600 hover:bg-accent-500 text-white font-semibold rounded-lg px-4 py-2 text-sm transition">Import</button>
   </div>
   <p class="text-xs text-gray-400 dark:text-gray-500">You can also drop the file anywhere on this page.</p>
 </form>`;
@@ -1100,19 +1142,19 @@ export function importPage(d: {
     ${p.lesson.categories.map((cat) => html`<span class="inline-block bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 text-xs rounded px-2 py-0.5 border border-gray-200 dark:border-gray-700">${cat}</span>`)}
     <span>🤝 shared by <span class="text-gray-700 dark:text-gray-200">${p.shared_by ?? "anonymous"}</span> · ${p.shared_at.slice(0, 10)}</span>
   </div>
-  <div class="my-5 pl-4 border-l-4 border-indigo-400 dark:border-indigo-500 bg-indigo-50 dark:bg-indigo-950/40 rounded-r-lg py-3 pr-4">
-    <p class="text-xs font-semibold uppercase tracking-wide text-indigo-500 dark:text-indigo-400 mb-1">TL;DR</p>
-    <div id="summary-content" class="markdown-body text-sm text-indigo-900 dark:text-indigo-100"></div>
+  <div class="my-5 pl-4 border-l-4 border-accent-400 dark:border-accent-500 bg-accent-50 dark:bg-accent-950/40 rounded-r-lg py-3 pr-4">
+    <p class="text-xs font-semibold uppercase tracking-wide text-accent-500 dark:text-accent-400 mb-1">TL;DR</p>
+    <div id="summary-content" class="markdown-body text-sm text-accent-900 dark:text-accent-100"></div>
   </div>
   <details class="group" open ${p.lesson.body ? "" : "hidden"}>
-    <summary class="cursor-pointer text-sm text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 select-none">Full lesson</summary>
+    <summary class="cursor-pointer text-sm text-accent-600 dark:text-accent-400 hover:text-accent-500 select-none">Full lesson</summary>
     <div id="body-content" class="markdown-body mt-3"></div>
   </details>
   ${p.lesson.task_context ? html`<div class="mt-6 pt-4 border-t border-gray-100 dark:border-gray-800 text-sm text-gray-500 dark:text-gray-400"><span class="text-gray-400 dark:text-gray-500">Context:</span> ${p.lesson.task_context}</div>` : ""}
   <form method="post" action="/lessons/import" class="mt-6 pt-4 border-t border-gray-100 dark:border-gray-800 flex flex-wrap items-center gap-3">
     <input type="hidden" name="from" value="lessons" />
     <input type="hidden" name="text" value="${d.code}" />
-    <button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-lg px-4 py-2 text-sm transition">＋ Add to my lessons</button>
+    <button type="submit" class="bg-accent-600 hover:bg-accent-500 text-white font-semibold rounded-lg px-4 py-2 text-sm transition">＋ Add to my lessons</button>
     <p class="text-xs text-gray-400 dark:text-gray-500">Nothing is saved until you click. It joins your log like your own lessons and never counts against the daily limit.</p>
   </form>`
       : pasteForm
@@ -1172,7 +1214,7 @@ const GAP_OPTIONS: [number, string][] = [
 
 const COURSE_STATUS_BADGE: Record<string, string> = {
   active:
-    "bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-700",
+    "bg-accent-50 dark:bg-accent-900/30 text-accent-700 dark:text-accent-300 border-accent-200 dark:border-accent-700",
   completed:
     "bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 border-green-200 dark:border-green-700",
   abandoned:
@@ -1192,7 +1234,7 @@ export interface CoursesData {
 export function coursesPage(d: CoursesData): Html {
   const body = html`
 <div class="flex items-center justify-between mb-6">
-  <h1 class="text-2xl font-bold text-indigo-600 dark:text-indigo-400">Courses</h1>
+  <h1 class="text-2xl font-bold text-accent-600 dark:text-accent-400">Courses</h1>
   <p class="text-sm text-gray-400 dark:text-gray-500">${d.courses.length} course${d.courses.length !== 1 ? "s" : ""}</p>
 </div>
 ${
@@ -1211,11 +1253,11 @@ ${
         const pct = c.steps.length ? Math.round((done / c.steps.length) * 100) : 0;
         return html`<tr class="hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors cursor-pointer" tabindex="0" role="link" data-href="/courses/${encodeURIComponent(c.id)}" @click="if (!$event.target.closest('a, button')) window.location = $el.dataset.href" @keydown.enter="window.location = $el.dataset.href">
         <td class="px-4 py-3">
-          <a href="/courses/${encodeURIComponent(c.id)}" class="font-semibold text-gray-800 dark:text-gray-100 hover:text-indigo-600 dark:hover:text-indigo-400 transition line-clamp-2">${c.title}</a>
-          ${c.lesson_id ? html`<span class="block text-[11px] text-gray-400 dark:text-gray-500 truncate">from <a href="/lessons/${encodeURIComponent(c.lesson_id)}" class="hover:text-indigo-500 hover:underline">${c.lesson_title ?? c.lesson_id}</a></span>` : ""}
+          <a href="/courses/${encodeURIComponent(c.id)}" class="font-semibold text-gray-800 dark:text-gray-100 hover:text-accent-600 dark:hover:text-accent-400 transition line-clamp-2">${c.title}</a>
+          ${c.lesson_id ? html`<span class="block text-[11px] text-gray-400 dark:text-gray-500 truncate">from <a href="/lessons/${encodeURIComponent(c.lesson_id)}" class="hover:text-accent-500 hover:underline">${c.lesson_title ?? c.lesson_id}</a></span>` : ""}
         </td>
         <td class="px-3 py-3">
-          <div class="flex items-center gap-2"><div class="flex-1 h-1.5 rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden"><div class="h-full bg-indigo-500" style="width:${pct}%"></div></div><span class="text-xs tabular-nums text-gray-500 dark:text-gray-400 shrink-0">${done}/${c.steps.length}</span></div>
+          <div class="flex items-center gap-2"><div class="flex-1 h-1.5 rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden"><div class="h-full bg-accent-500" style="width:${pct}%"></div></div><span class="text-xs tabular-nums text-gray-500 dark:text-gray-400 shrink-0">${done}/${c.steps.length}</span></div>
         </td>
         <td class="px-3 py-3">${statusBadge(c.status)}</td>
         <td class="px-3 py-3 whitespace-nowrap text-gray-400 dark:text-gray-500 tabular-nums"><span data-ts="${c.updated_at}">${c.updated_at.slice(0, 10)}</span></td>
@@ -1268,7 +1310,7 @@ export function courseDetailPage(d: CourseDetailData): Html {
   const stepAction = (position: number, status: string, label: string, cls: string) =>
     html`<form method="post" action="/courses/${encodeURIComponent(c.id)}/steps/${position}" class="inline"><input type="hidden" name="status" value="${status}" /><input type="hidden" name="next" value="/courses/${encodeURIComponent(c.id)}?step=${position}" /><button type="submit" class="${cls}">${label}</button></form>`;
   const btn =
-    "inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium border transition bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-indigo-400";
+    "inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium border transition bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-accent-400";
   // The document carries its own title and intro, so the page adds nothing above it: a slim
   // sticky bar (back · title · status · progress · ⋯) that is only navigation, a pinned step
   // list at the side, and the frame itself — the page scrolls as one.
@@ -1292,9 +1334,9 @@ export function courseDetailPage(d: CourseDetailData): Html {
         ? html`<ol class="space-y-0.5">${c.steps.map(
             (
               s,
-            ) => html`<li data-anchor="${s.anchor}" class="rounded-lg px-2 py-1.5 ${current && s.position === current.position ? "bg-indigo-50 dark:bg-indigo-900/30" : ""}">
+            ) => html`<li data-anchor="${s.anchor}" class="rounded-lg px-2 py-1.5 ${current && s.position === current.position ? "bg-accent-50 dark:bg-accent-900/30" : ""}">
         <a href="/courses/${encodeURIComponent(c.id)}?step=${s.position}" data-anchor="${s.anchor}" class="flex items-start gap-2 text-sm">
-          <span class="${s.status === "done" ? "text-green-500" : s.status === "skipped" ? "text-gray-400" : "text-indigo-400"}">${STEP_ICON[s.status] ?? "○"}</span>
+          <span class="${s.status === "done" ? "text-green-500" : s.status === "skipped" ? "text-gray-400" : "text-accent-400"}">${STEP_ICON[s.status] ?? "○"}</span>
           <span class="min-w-0 flex-1"><span class="block text-gray-800 dark:text-gray-100">${s.position}. ${s.title}</span><span class="block text-[11px] text-gray-400 dark:text-gray-500">${s.kind}${s.status !== "todo" ? ` · ${s.status}` : ""}</span></span>
         </a>
         <div data-step-actions class="flex flex-wrap gap-1.5 mt-2 pl-6 ${current && s.position === current.position ? "" : "hidden"}">
@@ -1309,7 +1351,7 @@ export function courseDetailPage(d: CourseDetailData): Html {
       <summary class="cursor-pointer font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500 select-none">About this course</summary>
       <div class="mt-2 space-y-2">
         <p>🏷 <span class="text-cyan-600 dark:text-cyan-400">${c.topic_id}</span></p>
-        ${c.lesson_id ? html`<p>from <a href="/lessons/${encodeURIComponent(c.lesson_id)}" class="text-gray-700 dark:text-gray-200 hover:text-indigo-500 hover:underline">${d.lessonTitle ?? c.lesson_id}</a></p>` : ""}
+        ${c.lesson_id ? html`<p>from <a href="/lessons/${encodeURIComponent(c.lesson_id)}" class="text-gray-700 dark:text-gray-200 hover:text-accent-500 hover:underline">${d.lessonTitle ?? c.lesson_id}</a></p>` : ""}
         ${c.goal ? html`<p class="text-gray-600 dark:text-gray-300">${c.goal}</p>` : ""}
         ${
           c.prerequisites.length
@@ -1335,7 +1377,7 @@ ${dangerDialog(
   html`Delete this course?`,
   html`<p class="text-gray-700 dark:text-gray-200 font-medium">“${c.title}”</p>
     <p>The course, its steps and its document folder will be removed. This cannot be undone.${c.lesson_id ? " The lesson it grew from stays." : ""}</p>`,
-  html`<button type="button" @click="confirmOpen = false" class="inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium border transition bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-indigo-400">Cancel</button>
+  html`<button type="button" @click="confirmOpen = false" class="inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium border transition bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-accent-400">Cancel</button>
     <form method="post" action="/courses/delete" class="contents">
       <input type="hidden" name="id" value="${c.id}" />
       <button type="submit" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition bg-rose-600 text-white border-rose-600 hover:bg-rose-500">🗑 Delete course</button>
@@ -1381,7 +1423,7 @@ export function settingsPage(d: SettingsData): Html {
   const f = d.flash;
 
   const body = html`
-<h1 class="text-2xl font-bold mb-6 text-indigo-600 dark:text-indigo-400">Settings</h1>
+<h1 class="text-2xl font-bold mb-6 text-accent-600 dark:text-accent-400">Settings</h1>
 ${
   f
     ? html`<div class="mb-4 px-4 py-2 rounded-lg border text-sm ${f.invalid ? "bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-700 text-yellow-800 dark:text-yellow-300" : "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-700 text-green-700 dark:text-green-300"}">
@@ -1392,16 +1434,16 @@ ${
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
   <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-6">
     <p class="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500 mb-5">Coaching</p>
-    <form method="post" action="/settings" class="space-y-4">
+    <form method="post" action="/settings" class="space-y-4" onsubmit="try { localStorage.removeItem('theme-override') } catch (e) {}">
       <div class="grid grid-cols-2 gap-4">
         <div>
           <label for="max-per-day" class="block text-sm text-gray-600 dark:text-gray-400 mb-1">Max lessons per day</label>
-          <input id="max-per-day" type="number" name="max_per_day" min="1" max="20" value="${d.settings.max_per_day}" class="w-full bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white rounded px-3 py-2 text-sm focus:outline-none focus:border-indigo-500" />
+          <input id="max-per-day" type="number" name="max_per_day" min="1" max="20" value="${d.settings.max_per_day}" class="w-full bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white rounded px-3 py-2 text-sm focus:outline-none focus:border-accent-500" />
           <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">Lessons in a 24h window.</p>
         </div>
         <div>
           <label for="min-gap-minutes" class="block text-sm text-gray-600 dark:text-gray-400 mb-1">Minimum gap between lessons</label>
-          <select id="min-gap-minutes" name="min_gap_minutes" class="w-full bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white rounded px-3 py-2 text-sm focus:outline-none focus:border-indigo-500">
+          <select id="min-gap-minutes" name="min_gap_minutes" class="w-full bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white rounded px-3 py-2 text-sm focus:outline-none focus:border-accent-500">
             ${GAP_OPTIONS.map(([val, lbl]) => html`<option value="${val}" ${gap === val ? "selected" : ""}>${lbl}</option>`)}
           </select>
           <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">Minimum gap between lessons.</p>
@@ -1410,12 +1452,12 @@ ${
       <div class="grid grid-cols-2 gap-4">
         <div>
           <label for="nudge-every" class="block text-sm text-gray-600 dark:text-gray-400 mb-1">Interactions between lessons</label>
-          <input id="nudge-every" type="number" name="nudge_every" min="0" max="1000" value="${d.settings.nudge_every}" class="w-full bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white rounded px-3 py-2 text-sm focus:outline-none focus:border-indigo-500" />
+          <input id="nudge-every" type="number" name="nudge_every" min="0" max="1000" value="${d.settings.nudge_every}" class="w-full bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white rounded px-3 py-2 text-sm focus:outline-none focus:border-accent-500" />
           <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">Cue at most once every N (0 = every turn).</p>
         </div>
         <div>
           <label for="nudge-scope" class="block text-sm text-gray-600 dark:text-gray-400 mb-1">Count interactions</label>
-          <select id="nudge-scope" name="nudge_scope" class="w-full bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white rounded px-3 py-2 text-sm focus:outline-none focus:border-indigo-500">
+          <select id="nudge-scope" name="nudge_scope" class="w-full bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white rounded px-3 py-2 text-sm focus:outline-none focus:border-accent-500">
             <option value="session" ${d.settings.nudge_scope === "session" ? "selected" : ""}>Per chat session</option>
             <option value="global" ${d.settings.nudge_scope === "global" ? "selected" : ""}>Globally</option>
           </select>
@@ -1424,7 +1466,7 @@ ${
       </div>
       <div>
         <label for="share-name" class="block text-sm text-gray-600 dark:text-gray-400 mb-1">Your name (for sharing)</label>
-        <input id="share-name" type="text" name="share_name" maxlength="80" value="${d.settings.share_name ?? ""}" placeholder="git user.name when empty" autocomplete="off" class="w-full bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white rounded px-3 py-2 text-sm focus:outline-none focus:border-indigo-500" />
+        <input id="share-name" type="text" name="share_name" maxlength="80" value="${d.settings.share_name ?? ""}" placeholder="git user.name when empty" autocomplete="off" class="w-full bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white rounded px-3 py-2 text-sm focus:outline-none focus:border-accent-500" />
         <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">Proposed as the sender when you share a lesson. Empty → your git name.</p>
       </div>
       <fieldset class="border-0 p-0 m-0">
@@ -1433,7 +1475,7 @@ ${
           ${themeRadios.map(
             ([value, label, icon]) => html`<label class="flex-1 cursor-pointer">
             <input type="radio" name="ui_theme" value="${value}" ${d.settings.ui_theme === value ? "checked" : ""} class="sr-only peer" />
-            <span class="flex flex-col items-center justify-center gap-1 px-3 py-2 rounded border border-gray-300 dark:border-gray-700 peer-checked:border-indigo-500 peer-checked:bg-indigo-50 dark:peer-checked:bg-indigo-900/30 peer-checked:text-indigo-700 dark:peer-checked:text-indigo-300 text-gray-500 dark:text-gray-400 text-xs font-medium transition select-none"><span class="text-base leading-none">${icon}</span>${label}</span>
+            <span class="flex flex-col items-center justify-center gap-1 px-3 py-2 rounded border border-gray-300 dark:border-gray-700 peer-checked:border-accent-500 peer-checked:bg-accent-50 dark:peer-checked:bg-accent-900/30 peer-checked:text-accent-700 dark:peer-checked:text-accent-300 text-gray-500 dark:text-gray-400 text-xs font-medium transition select-none"><span class="text-base leading-none">${icon}</span>${label}</span>
           </label>`,
           )}
         </div>
@@ -1445,13 +1487,13 @@ ${
           ${homeRadios.map(
             ([value, label, icon]) => html`<label class="flex-1 cursor-pointer">
             <input type="radio" name="ui_home" value="${value}" ${d.settings.ui_home === value ? "checked" : ""} class="sr-only peer" />
-            <span class="flex flex-col items-center justify-center gap-1 px-3 py-2 rounded border border-gray-300 dark:border-gray-700 peer-checked:border-indigo-500 peer-checked:bg-indigo-50 dark:peer-checked:bg-indigo-900/30 peer-checked:text-indigo-700 dark:peer-checked:text-indigo-300 text-gray-500 dark:text-gray-400 text-xs font-medium transition select-none"><span class="text-base leading-none">${icon}</span>${label}</span>
+            <span class="flex flex-col items-center justify-center gap-1 px-3 py-2 rounded border border-gray-300 dark:border-gray-700 peer-checked:border-accent-500 peer-checked:bg-accent-50 dark:peer-checked:bg-accent-900/30 peer-checked:text-accent-700 dark:peer-checked:text-accent-300 text-gray-500 dark:text-gray-400 text-xs font-medium transition select-none"><span class="text-base leading-none">${icon}</span>${label}</span>
           </label>`,
           )}
         </div>
         <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">Auto opens Lessons once you have one, the knowledge map before.</p>
       </fieldset>
-      <button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded px-4 py-2 text-sm transition">Save settings</button>
+      <button type="submit" class="bg-accent-600 hover:bg-accent-500 text-white font-semibold rounded px-4 py-2 text-sm transition">Save settings</button>
     </form>
   </div>
 
@@ -1469,7 +1511,7 @@ ${
         <form method="post" action="/settings/import" enctype="multipart/form-data" class="mt-auto flex flex-col gap-2">
           <input id="file-restore" type="file" name="file" accept=".zip,.json" class="hidden" onchange="updateLabel('file-restore','label-restore','restore-submit')" />
           <label id="label-restore" for="file-restore" class="cursor-pointer inline-flex items-center justify-center gap-1.5 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 font-medium rounded px-4 py-2 text-sm transition truncate">Choose file…</label>
-          <button id="restore-submit" type="submit" disabled class="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-medium rounded px-4 py-2 text-sm transition">Restore</button>
+          <button id="restore-submit" type="submit" disabled class="bg-accent-600 hover:bg-accent-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-medium rounded px-4 py-2 text-sm transition">Restore</button>
         </form>
       </div>
       <div class="flex flex-col gap-1">
@@ -1483,7 +1525,7 @@ ${
         <form method="post" action="/lessons/import" enctype="multipart/form-data" class="mt-auto flex flex-col gap-2">
           <input id="file-import" type="file" name="file" accept=".json" class="hidden" onchange="updateLabel('file-import','label-import','import-submit')" />
           <label id="label-import" for="file-import" class="cursor-pointer inline-flex items-center justify-center gap-1.5 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 font-medium rounded px-4 py-2 text-sm transition truncate">Choose file…</label>
-          <button id="import-submit" type="submit" disabled class="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-medium rounded px-4 py-2 text-sm transition">Import</button>
+          <button id="import-submit" type="submit" disabled class="bg-accent-600 hover:bg-accent-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-medium rounded px-4 py-2 text-sm transition">Import</button>
         </form>
       </div>
     </div>
@@ -1494,8 +1536,8 @@ ${
       <p class="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">Coaching Notebook</p>
       <div class="flex items-center gap-2">
         <div class="flex rounded border border-gray-200 dark:border-gray-700 overflow-hidden text-xs font-medium">
-          <button type="button" @click="nbMode = 'preview'" :class="nbMode === 'preview' ? 'bg-indigo-600 text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'" class="px-3 py-1.5 transition">Preview</button>
-          <button type="button" @click="nbMode = 'source'" :class="nbMode === 'source' ? 'bg-indigo-600 text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'" class="px-3 py-1.5 transition border-l border-gray-200 dark:border-gray-700">Source</button>
+          <button type="button" @click="nbMode = 'preview'" :class="nbMode === 'preview' ? 'bg-accent-600 text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'" class="px-3 py-1.5 transition">Preview</button>
+          <button type="button" @click="nbMode = 'source'" :class="nbMode === 'source' ? 'bg-accent-600 text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'" class="px-3 py-1.5 transition border-l border-gray-200 dark:border-gray-700">Source</button>
         </div>
         <a href="/settings/notebook/download" class="inline-flex items-center gap-1.5 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 font-medium rounded px-3 py-1.5 text-xs transition">↓ Download</a>
         <a href="vscode://file/${d.notebookPath}" title="Open in VS Code" class="inline-flex items-center gap-1.5 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 font-medium rounded px-3 py-1.5 text-xs transition"><img src="/static/vscode.svg" class="w-4 h-4" alt="VS Code" />Open in VS Code</a>

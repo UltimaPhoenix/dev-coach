@@ -96,7 +96,13 @@ devcoach course <id>      # chain, steps, document path
 ## Writing courses by hand
 
 A course document is plain HTML. If you want to polish one, edit `index.html` in its folder — the
-dashboard reloads it on the next view. Keep it self-contained: inline styles and scripts, no
+dashboard reloads it on the next view. Colours are CSS variables on `:root` (`--bg --panel --text
+--muted --line --code-bg --accent --accent-soft --on-accent --ok --ok-soft --warn --warn-soft
+--log-bg --log-text`), set for light, for `@media (prefers-color-scheme: dark)` and for
+`:root[data-theme="dark"]`: a course **conforms to the dashboard's palette without copying it** —
+the neutrals are the dashboard's, the accent is the course's own. Opened on its own the document
+follows your OS and has its own light/dark switch; inside the dashboard that switch is hidden
+and the document follows the dashboard's theme toggle, with the dashboard's neutrals. Keep it self-contained: inline styles and scripts, no
 external URLs, no forms, no `alert`/`confirm` (the sandbox blocks all of those). Keep the
 one-section-at-a-time script and the `nav.steps` menu (the dashboard hides the menu, it opens the
 file with `data-embedded` set, and appends a tiny script that reports the frame's height — the file

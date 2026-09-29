@@ -811,6 +811,28 @@ describe("web shared-with-me filters", () => {
   });
 });
 
+describe("web theme", () => {
+  it("every page carries the palette tokens, a toggle that shows the current scheme, no indigo", async () => {
+    const page = await (await get("/lessons")).text();
+    // Tailwind's gray and the accent family point at the CSS variables of style.css
+    expect(page).toContain("rgb(var(--dc-' + name + '-' + n + ') / <alpha-value>)");
+    expect(page).toContain("gray: scale('gray'), accent: scale('accent')");
+    expect(page).not.toContain("indigo-");
+    // both glyphs ship; the .dark class picks one, so the icon is right from the first paint
+    expect(page).toContain('<span class="dark:hidden" aria-hidden="true">☀️</span>');
+    expect(page).toContain('<span class="hidden dark:inline" aria-hidden="true">🌙</span>');
+    expect(page).toContain("Dark theme — switch to light");
+    expect(page).toContain("new CustomEvent('dc:theme'");
+    // the toggle's choice survives an explicit setting; only saving Settings clears it
+    expect(page).not.toContain("if (serverTheme !== 'system') localStorage.removeItem");
+    expect(page).toContain("addEventListener('change'");
+    const settings = await (await get("/settings")).text();
+    expect(settings).toContain("localStorage.removeItem('theme-override')");
+    const css = await (await get("/static/style.css")).text();
+    expect(css).toContain("--dc-gray-950: 30 31 34");
+  });
+});
+
 describe("web on a database newer than this build (read-only)", () => {
   it("pages render, /ping carries the notice, a write answers 503 with the message", async () => {
     db.withConnection((c) =>
@@ -940,6 +962,13 @@ describe("web courses", () => {
     expect(docText).toContain("two — ✗"); // multi-byte content survives Content-Length
     // the resize bridge is appended on the way out, never written to the file
     expect(docText).toContain('setAttribute("data-embedded", "1")');
+    // …and it takes the theme from the dashboard, and the neutrals of its palette
+    expect(docText).toContain('"devcoach:theme"');
+    expect(docText).toContain(':root[data-embedded][data-theme="dark"]{--bg:#1e1f22');
+    expect(docText).toContain(":root[data-embedded] .theme-switch{display:none}");
+    const viewer = await (await get("/static/course-viewer.js")).text();
+    expect(viewer).toContain('type: "devcoach:theme"');
+    expect(viewer).toContain('addEventListener("dc:theme", sendTheme)');
     expect(docText.trim().endsWith("</script>")).toBe(true);
     expect(readFileSync(courses.documentPath(course.id), "utf8")).not.toContain("data-embedded");
     expect((await get("/static/course-viewer.js")).status).toBe(200);

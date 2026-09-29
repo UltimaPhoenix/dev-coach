@@ -4,6 +4,23 @@ Notable changes to devcoach. Versions follow [Semantic Versioning](https://semve
 
 ---
 
+## [Unreleased]
+
+### Changed
+- **Dark theme, IDE style**: the dashboard's dark mode uses neutral greys layered like an editor
+  (page, panel, raised, border — the JetBrains New UI ramp) and the **brand teal** as accent in
+  both modes, replacing indigo. Every colour is a token in one place, held to a contrast floor by
+  the test suite.
+- **Courses follow the dashboard**: an embedded course switches with the dashboard's light/dark
+  toggle and takes its neutrals, so it sits on the page without a seam. New course documents
+  conform to the palette without copying it (the accent is the course's own), use tokens only,
+  and carry their own theme switch for when they are opened on their own or as an artifact.
+
+### Fixed
+- **Theme toggle**: the button now shows the current theme, from the first paint; the choice
+  survives navigation when the saved setting is Dark or Light (it was dropped on every page);
+  saving Settings, *System* included, clears it; *System* follows an OS change without a reload.
+
 ## [2.6.1] — 2026-09-28
 
 ### Changed

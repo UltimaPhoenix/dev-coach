@@ -51,7 +51,8 @@ and hands you the URL. No install, no PATH needed.
 ## Pages
 
 The top nav has **Profile** (`/knowledge`) and **Lessons**; top-right, the ⚙️ **Settings** button
-and the sun/moon toggles the light/dark theme. The root URL (`/`, what `devcoach ui` prints) opens **Lessons** once you have at least one
+and the sun/moon button shows the **current** theme and switches it for this browser (the choice
+holds until you save a theme in Settings; with *System* the dashboard follows your OS live). The root URL (`/`, what `devcoach ui` prints) opens **Lessons** once you have at least one
 lesson and the **knowledge map** before that; pick one explicitly under Settings → Home page.
 
 ### Knowledge map (`/knowledge`)
@@ -230,7 +231,7 @@ course* folds away the goal, the seed lesson and the ✓/✗ prerequisite chain)
 a sandboxed frame (`sandbox="allow-scripts allow-forms"` plus a `Content-Security-Policy` that also
 sandboxes it when opened on its own: no network, no form posts, no navigation out — `eval` is
 allowed so editable JS examples can run). The frame grows to the height of the step it shows, so
-the page scrolls, never the frame. The **⋯** menu holds **Delete course…** — rows and folder go,
+the page scrolls, never the frame, and the document follows the dashboard's light/dark toggle. The **⋯** menu holds **Delete course…** — rows and folder go,
 the seed lesson stays. A lesson that seeded a course shows a `🎓 Course · N/M` link in its
 metadata row.
 
