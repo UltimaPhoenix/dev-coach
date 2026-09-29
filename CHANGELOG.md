@@ -4,7 +4,16 @@ Notable changes to devcoach. Versions follow [Semantic Versioning](https://semve
 
 ---
 
-## [Unreleased]
+## [2.6.2] — 2026-09-30
+
+### Added
+- **Course code is syntax-highlighted**: documents carry highlight.js (BSD-3-Clause) inside the
+  file, inlined by devcoach with its licence text, so highlighting works in the dashboard, from
+  disk and in an artifact. 36 languages, colours from palette tokens (`--syn-*`), light and dark.
+  Older courses are highlighted by the dashboard on the way out. A course without code carries
+  nothing, and backups store a placeholder instead of one copy of the library per course.
+- `THIRD_PARTY_NOTICES.md` lists every vendored library and its licence; it ships in the npm
+  package and the Claude Desktop extension.
 
 ### Changed
 - **Dark theme, IDE style**: the dashboard's dark mode uses neutral greys layered like an editor
@@ -15,17 +24,11 @@ Notable changes to devcoach. Versions follow [Semantic Versioning](https://semve
   toggle and takes its neutrals, so it sits on the page without a seam. New course documents
   conform to the palette without copying it (the accent is the course's own), use tokens only,
   and carry their own theme switch for when they are opened on their own or as an artifact.
-
-- **Course code is syntax-highlighted**: documents carry highlight.js (BSD-3-Clause) inside the
-  file, inlined by devcoach with its licence text, so highlighting works in the dashboard, from
-  disk and in an artifact. 36 languages, colours from palette tokens (`--syn-*`), light and dark.
-  Older courses are highlighted by the dashboard on the way out. A course without code carries
-  nothing, and backups store a placeholder instead of one copy of the library per course. New `THIRD_PARTY_NOTICES.md`
-  lists every vendored library and its licence.
 - **The artifact offer says what it does**: publishing a course as a Claude artifact uploads a
   copy to claude.ai — the one case where course content leaves your machine. The coach now says
   so when it asks, names what the document contains from your own work, and asks again before
   every republish. The privacy page and the courses guide no longer claim otherwise.
+- Docs site dependencies: `qs` 6.15.3 and `image-size` 2.0.4 (lockfile only).
 
 ### Fixed
 - **Theme toggle**: the button now shows the current theme, from the first paint; the choice
