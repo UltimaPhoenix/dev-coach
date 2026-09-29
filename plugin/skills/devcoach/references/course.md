@@ -110,6 +110,33 @@ translated into JS just to make it runnable:
    output** (typed or picked, then Reveal), **fill the blank**, or **spot the bug** (3–4
    candidates). No button may pretend to execute Java, Rust or Go.
 
+**Code and highlighting.** Every snippet is a `<pre><code class="language-…">` with the language
+named (`js ts python java kotlin csharp go rust swift sql bash json xml css yaml diff`, 36 in
+all) and `&`, `<`, `>` escaped in its text. The document carries ONE placeholder, before your
+own script:
+
+```html
+<script data-devcoach="highlighter"></script>
+```
+
+devcoach fills it when you register steps, in a document that shows code (a course without
+code never carries the library; leave the placeholder in anyway) — with highlight.js (BSD-3-Clause, the licence text
+travels in the block), the stylesheet that colours it, and the call that highlights every
+`pre code`. The library then lives inside the file, so the course is highlighted opened from
+disk and as an artifact, not only in the dashboard.
+
+- **Never write, paste or load a highlighter yourself**, and never colour code by hand with
+  `<span>`s: write plain escaped text and the language class.
+- Colours are tokens with defaults matched to the palette: `--syn-keyword --syn-string
+  --syn-comment --syn-number --syn-title --syn-type --syn-attr --syn-meta`. Define them in your
+  token blocks only to retune them, each at 4.5:1 or better on `--code-bg`.
+- `class="nohighlight"` on a `<code>` keeps it plain: terminal transcripts, program output. An
+  editable `<textarea>` is never highlighted.
+- Once filled, the file holds the library (about 120 KB on a few very long lines). Change the
+  document with **targeted edits**; do not rewrite it whole and do not quote the block. If a
+  rewrite is unavoidable, write the empty placeholder again: it is refilled on the next
+  `add_course_step` or `update_course_progress`.
+
 **Design — conform to the dashboard, do not copy it.** One measure (~68ch), generous spacing,
 quiet Tufte-like typography, light + dark. Every colour is a **token** on `:root`; nothing is
 hard-coded further down (no stray `#fff` on a button, no grey typed by hand in a rule):
@@ -161,12 +188,15 @@ Skeleton (adapt, keep the ids, the class names and the token names):
   <nav class="steps"><a href="#step-1">1 · Sums</a><a href="#step-2">2 · Powers</a>
     <button class="theme-switch" type="button"></button></nav>
   <main>
-    <section id="step-1"><h2>1 · Sums</h2><p class="goal">…</p> … <div class="check">…<button>Reveal</button></div>
+    <section id="step-1"><h2>1 · Sums</h2><p class="goal">…</p> …
+      <pre><code class="language-js">const total = [1, 2, 3].reduce((a, b) =&gt; a + b, 0);</code></pre>
+      <div class="check">…<button>Reveal</button></div>
       <div class="pager"><a href="#step-1">← Previous</a><a href="#step-2">Next →</a></div>
       <p class="ask">Stuck? Ask in the chat — that's where the course is being taught.</p></section>
     <section id="step-2">…</section>
   </main>
 </div>
+<script data-devcoach="highlighter"></script>
 <script>
   // show one section: on load + hashchange, toggle .current on the section and its nav link, scrollTo(0,0)
   // reveal buttons; the live examples (new Function inside try/catch) or the simulations

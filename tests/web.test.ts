@@ -904,6 +904,40 @@ describe("web courses over a real socket", () => {
   });
 });
 
+describe("web course highlighting", () => {
+  const CODE = '<pre><code class="language-js">const a = 1;</code></pre>';
+  const count = (text: string, needle: string) => text.split(needle).length - 1;
+
+  it("serves one highlighter: the document's own, or the fallback for a document without one", async () => {
+    const course = db.withConnection((c) =>
+      courses.createCourse(c, { title: "Highlight me", topic_id: "js" }),
+    );
+    try {
+      // a document written before the highlighter existed: highlighted on the way out only
+      const legacy = `<!doctype html><section id="step-1">${CODE}</section>`;
+      writeFileSync(courses.documentPath(course.id), legacy);
+      const served = await (await get(`/courses/${course.id}/index.html`)).text();
+      expect(count(served, "hljs.highlightElement")).toBe(1);
+      expect(served).toContain("Copyright (c) 2006, Ivan Sagalaev");
+      expect(readFileSync(courses.documentPath(course.id), "utf8")).toBe(legacy);
+
+      // a document that carries its own block: nothing is added twice
+      writeFileSync(
+        courses.documentPath(course.id),
+        `${legacy}<script data-devcoach="highlighter"></script>`,
+      );
+      db.withConnection((c) =>
+        courses.addStep(c, course.id, { title: "One", kind: "example", anchor: "step-1" }),
+      );
+      const own = await (await get(`/courses/${course.id}/index.html`)).text();
+      expect(count(own, "hljs.highlightElement")).toBe(1);
+      expect(own).toContain('setAttribute("data-embedded", "1")');
+    } finally {
+      db.withConnection((c) => courses.deleteCourse(c, course.id));
+    }
+  });
+});
+
 describe("web courses", () => {
   it("lists, shows the sandboxed document, tracks progress, deletes", async () => {
     const empty = await (await get("/courses")).text();
@@ -971,6 +1005,7 @@ describe("web courses", () => {
     expect(viewer).toContain('addEventListener("dc:theme", sendTheme)');
     expect(docText.trim().endsWith("</script>")).toBe(true);
     expect(readFileSync(courses.documentPath(course.id), "utf8")).not.toContain("data-embedded");
+    expect(docText).not.toContain("hljs"); // no code in this document: no highlighter served
     expect((await get("/static/course-viewer.js")).status).toBe(200);
     expect((await get("/courses/../etc/index.html")).status).toBe(404);
 

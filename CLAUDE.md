@@ -244,7 +244,18 @@ report with `{type:"devcoach:theme"}` so the embedded document follows the dashb
 (the bridge sets `data-theme` and the dashboard's neutral tokens; the document's own
 `.theme-switch` is for standalone/artifact opens and is hidden when embedded). Course colours are
 tokens that **conform to the palette without copying it** (neutrals = dashboard, accent = the
-course's own; `tests/theme.test.ts` checks the skeleton's values). The skill flow
+course's own; `tests/theme.test.ts` checks the skeleton's values). **Code highlighting**
+(`core/highlighter.ts`): the document carries ONE `<script data-devcoach="highlighter"></script>`
+placeholder and `ensureHighlighter` (called by `addStep` / `setStepStatus`) fills it with the
+vendored highlight.js + its BSD-3-Clause licence text + a `--syn-*` token stylesheet — the only
+write devcoach makes to a model-written document, and only where the placeholder asks for it;
+the dashboard appends the same block on the way out to documents that have code and no filled
+block. One copy of the library everywhere it can be one: the vendored file is the dashboard's
+own `highlight.min.js`, a document without `<pre><code>` is never filled, a filled document is
+never filled or served with a second block, and backups store the placeholder
+(`stripHighlighter` on export, `fillHighlighter` on restore — exact inverse, byte for byte). The
+copy inside each course file is the one duplication kept on purpose: it is what makes the
+document self-contained (disk, artifact). Vendored licences live in `THIRD_PARTY_NOTICES.md`. The skill flow
 (`references/course.md`) is user-initiated, never starts inside a cued turn, finds a seed lesson
 from a few words of its title (`get_lessons` `search`, several matches → a pick), explores
 prerequisites one question per message as Yes / Roughly / No choices, asks pick-type checks as

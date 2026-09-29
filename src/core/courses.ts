@@ -1,7 +1,7 @@
 // Courses: the files-and-validation half. Rows live in db.ts; this module owns the directory
 // under ~/.devcoach/courses/<id>/, the one document each course keeps there (index.html), and
 // every check that keeps a model-written path or file from doing harm.
-import { existsSync, lstatSync, mkdirSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join, sep } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
 import {
@@ -21,6 +21,7 @@ import {
   updateCourseStepStatus,
   withTransaction,
 } from "./db";
+import { fillHighlighter } from "./highlighter";
 import type {
   Course,
   CourseStatus,
@@ -65,6 +66,26 @@ export function courseDocument(id: string): string | null {
     return path;
   } catch {
     return null;
+  }
+}
+
+/**
+ * Fills the course document's highlighter placeholder with the vendored highlight.js (see
+ * core/highlighter.ts). This is the one write devcoach makes to a model-written document, and
+ * only where the document asked for it: no placeholder, nothing happens. Called whenever a step
+ * is registered or its status moves, so a document rewritten from scratch gets it back. Never
+ * throws and never pushes a document past the size cap.
+ */
+export function ensureHighlighter(id: string): boolean {
+  try {
+    const path = courseDocument(id);
+    if (path === null) return false;
+    const filled = fillHighlighter(readFileSync(path, "utf8"));
+    if (filled === null || Buffer.byteLength(filled) > MAX_COURSE_DOCUMENT_BYTES) return false;
+    writeFileSync(path, filled);
+    return true;
+  } catch {
+    return false;
   }
 }
 
@@ -169,6 +190,7 @@ export function addStep(db: DatabaseSync, courseId: string, input: NewStep): Cou
     if (after < count) shiftCourseStepsFrom(db, courseId, after + 1);
     insertCourseStep(db, step);
     touchCourse(db, courseId, new Date().toISOString());
+    ensureHighlighter(courseId);
     return step;
   });
 }
@@ -181,6 +203,7 @@ export function setStepStatus(
   status: CourseStepStatus,
 ): CourseWithSteps | null {
   const now = new Date().toISOString();
+  ensureHighlighter(courseId);
   return withTransaction(db, () => {
     const ok = updateCourseStepStatus(
       db,

@@ -1138,7 +1138,10 @@ export function createServer(): McpServer {
   const COURSE_REPLY_CHECK =
     "Write ONE self-contained HTML document at document_path (inline CSS + JS, no external URLs, " +
     'no fetch, no <form>, no alert/confirm/prompt) with one <section id="step-N"> per step, using ' +
-    "your file tools — never paste HTML into the chat. Then register every section with " +
+    'your file tools — never paste HTML into the chat. Code goes in <pre><code class="language-…"> ' +
+    'and the document carries ONE <script data-devcoach="highlighter"></script> placeholder: ' +
+    "devcoach fills it with the highlighter when you register steps (never write one yourself, " +
+    "never re-read the whole file afterwards). Then register every section with " +
     "add_course_step (position order, anchor = the section id). Teach one step per message and " +
     "tell the user the course is on the dashboard under Courses (/devcoach:ui).";
 

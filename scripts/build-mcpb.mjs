@@ -32,6 +32,7 @@ execFileSync("npx", ["tsup", "--config", "tsup.mcpb.config.ts"], { cwd: root, st
 const bundle = join(stage, "dist", "bin.js");
 cpSync(join(root, "assets"), join(stage, "assets"), { recursive: true });
 cpSync(join(root, "LICENSE"), join(stage, "LICENSE")); // AGPL text ships inside the bundle
+cpSync(join(root, "THIRD_PARTY_NOTICES.md"), join(stage, "THIRD_PARTY_NOTICES.md")); // vendored libs
 
 const manifest = JSON.parse(readFileSync(join(root, "mcpb", "manifest.json"), "utf8"));
 manifest.version = version; // keep in sync with package.json
