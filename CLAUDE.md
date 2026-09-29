@@ -24,7 +24,14 @@ local web dashboard. Everything is local — one SQLite file at `~/.devcoach/coa
   dragged in ~90 — express, ajv, jose, …)
 - **`node:sqlite`** (`DatabaseSync`) — zero-dependency embedded SQLite at `~/.devcoach/coaching.db`
 - **Zod** — schema validation + tool `inputSchema`/`outputSchema`
-- **Hono** + `@hono/node-server` — web dashboard (server-rendered `hono/html`, vendored Tailwind/Alpine/HTMX)
+- **Hono** + `@hono/node-server` — web dashboard (server-rendered `hono/html`, vendored Tailwind/Alpine/HTMX).
+  **Palette = tokens**: `assets/static/style.css` defines `--dc-gray-*` / `--dc-accent-*` as RGB
+  triplets (light = Tailwind gray, dark = an IDE ramp `#1e1f22` → `#2b2d30` → `#393b40` →
+  `#43454a`, accent = brand teal) and `layout()` points Tailwind's `gray` + `accent` scales at them
+  — never type a hex or an `indigo-*` class in `views.ts` (`tests/theme.test.ts` fails on both and
+  holds the WCAG contrast floor). Theme: `applyTheme()` is the single writer and fires `dc:theme`;
+  the nav toggle shows the CURRENT scheme and stores a per-browser choice (`theme-override`) that
+  only saving Settings clears; `system` follows the OS live
 - **Commander** — CLI arg parsing (`--help`, friendly errors)
 - **fflate** — ZIP backup/restore
 - **Biome** (lint/format) · **Vitest** (tests; coverage thresholds 92% lines / 95% functions /
@@ -232,7 +239,12 @@ the same file publishable as a Claude artifact — an offer the skill makes once
 The server appends `assets/static/course-frame.js` to every served document (sets `data-embedded`,
 which hides the in-document menu, and `postMessage`s height + current anchor); the page's
 `assets/static/course-viewer.js` grows the frame so the **page** scrolls, keeps the pinned step list
-in sync and turns step clicks into a hash change on the frame (no reload). The skill flow
+in sync, turns step clicks into a hash change on the frame (no reload) and answers every frame
+report with `{type:"devcoach:theme"}` so the embedded document follows the dashboard's toggle
+(the bridge sets `data-theme` and the dashboard's neutral tokens; the document's own
+`.theme-switch` is for standalone/artifact opens and is hidden when embedded). Course colours are
+tokens that **conform to the palette without copying it** (neutrals = dashboard, accent = the
+course's own; `tests/theme.test.ts` checks the skeleton's values). The skill flow
 (`references/course.md`) is user-initiated, never starts inside a cued turn, finds a seed lesson
 from a few words of its title (`get_lessons` `search`, several matches → a pick), explores
 prerequisites one question per message as Yes / Roughly / No choices, asks pick-type checks as

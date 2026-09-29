@@ -1,5 +1,56 @@
 /* devcoach — style overrides with light/dark theme support */
 
+/* ── Palette tokens ─────────────────────────────────────────────────────────
+   The one place colours are decided. Values are space-separated RGB triplets so Tailwind can
+   apply its opacity modifiers: layout() in src/web/views.ts points Tailwind's `gray` and
+   `accent` scales at these variables (`rgb(var(--dc-gray-900) / <alpha-value>)`), which is how
+   every `dark:bg-gray-900` in the views picks the palette up without being rewritten.
+   - Light neutrals: Tailwind's own gray.
+   - Dark neutrals: an IDE ramp (JetBrains New UI dark) — page → panel → raised → border.
+   - Accent: the brand teal of the wordmark and the docs site, one step darker from 500 up so
+     white text on accent-600 and accent-600 text on white both clear 4.5:1.
+   tests/theme.test.ts holds the contrast floor for the pairs the UI relies on. */
+
+:root {
+  --dc-gray-50: 249 250 251;
+  --dc-gray-100: 243 244 246;
+  --dc-gray-200: 229 231 235;
+  --dc-gray-300: 209 213 219;
+  --dc-gray-400: 156 163 175;
+  --dc-gray-500: 107 114 128;
+  --dc-gray-600: 75 85 99;
+  --dc-gray-700: 55 65 81;
+  --dc-gray-800: 31 41 55;
+  --dc-gray-900: 17 24 39;
+  --dc-gray-950: 3 7 18;
+
+  --dc-accent-50: 240 253 250;
+  --dc-accent-100: 204 251 241;
+  --dc-accent-200: 153 246 228;
+  --dc-accent-300: 94 234 212;
+  --dc-accent-400: 45 212 191;
+  --dc-accent-500: 13 148 136;
+  --dc-accent-600: 15 118 110;
+  --dc-accent-700: 17 94 89;
+  --dc-accent-800: 19 78 74;
+  --dc-accent-900: 15 61 58;
+  --dc-accent-950: 4 47 46;
+}
+
+.dark {
+  --dc-gray-50: 245 246 247;
+  --dc-gray-100: 236 238 241;
+  --dc-gray-200: 223 225 229;   /* text */
+  --dc-gray-300: 188 190 196;
+  --dc-gray-400: 157 160 168;   /* muted text */
+  --dc-gray-500: 144 150 160;   /* secondary text */
+  --dc-gray-600: 111 115 122;   /* disabled, faint */
+  --dc-gray-700: 67 69 74;      /* borders */
+  --dc-gray-800: 57 59 64;      /* raised: inputs, hover rows */
+  --dc-gray-900: 43 45 48;      /* panels, nav, cards */
+  --dc-gray-950: 30 31 34;      /* page canvas */
+}
+
 /* ── Theme variables ────────────────────────────────────────────────────── */
 
 :root {
@@ -17,10 +68,10 @@
   --md-pre-bg: #f8fafc;
   --md-pre-border: #e2e8f0;
   --md-blockquote-color: #6b7280;
-  --md-blockquote-border: #6366f1;
+  --md-blockquote-border: rgb(var(--dc-accent-500));
   --md-hr: #e5e7eb;
-  --md-link: #4f46e5;
-  --md-link-hover: #6366f1;
+  --md-link: rgb(var(--dc-accent-600));
+  --md-link-hover: rgb(var(--dc-accent-500));
   --md-table-th-bg: #f9fafb;
   --md-table-th-color: #374151;
   --md-table-border: #e5e7eb;
@@ -34,35 +85,39 @@
 }
 
 .dark {
-  --scrollbar-track: #111827;
-  --scrollbar-thumb: #374151;
-  --scrollbar-thumb-hover: #4b5563;
+  --scrollbar-track: rgb(var(--dc-gray-950));
+  --scrollbar-thumb: rgb(var(--dc-gray-700));
+  --scrollbar-thumb-hover: rgb(var(--dc-gray-600));
 
-  --md-text: #e5e7eb;
-  --md-heading: #f9fafb;
-  --md-heading-h3: #d1d5db;
-  --md-h2-border: #374151;
-  --md-code-bg: #1f2937;
+  --md-text: rgb(var(--dc-gray-200));
+  --md-heading: rgb(var(--dc-gray-100));
+  --md-heading-h3: rgb(var(--dc-gray-300));
+  --md-h2-border: rgb(var(--dc-gray-700));
+  --md-code-bg: rgb(var(--dc-gray-800));
   --md-code-color: #f472b6;
-  --md-code-border: #374151;
-  --md-pre-bg: #282c34;
-  --md-pre-border: #374151;
-  --md-blockquote-color: #9ca3af;
-  --md-blockquote-border: #6366f1;
-  --md-hr: #374151;
-  --md-link: #818cf8;
-  --md-link-hover: #a5b4fc;
-  --md-table-th-bg: #1f2937;
-  --md-table-th-color: #d1d5db;
-  --md-table-border: #374151;
-  --md-table-td-color: #e5e7eb;
-  --md-table-even-bg: #111827;
-  --md-strong: #f3f4f6;
+  --md-code-border: rgb(var(--dc-gray-700));
+  --md-pre-bg: rgb(var(--dc-gray-950));
+  --md-pre-border: rgb(var(--dc-gray-700));
+  --md-blockquote-color: rgb(var(--dc-gray-400));
+  --md-blockquote-border: rgb(var(--dc-accent-400));
+  --md-hr: rgb(var(--dc-gray-700));
+  --md-link: rgb(var(--dc-accent-300));
+  --md-link-hover: rgb(var(--dc-accent-200));
+  --md-table-th-bg: rgb(var(--dc-gray-800));
+  --md-table-th-color: rgb(var(--dc-gray-300));
+  --md-table-border: rgb(var(--dc-gray-700));
+  --md-table-td-color: rgb(var(--dc-gray-200));
+  --md-table-even-bg: rgb(var(--dc-gray-800) / 0.4);
+  --md-strong: rgb(var(--dc-gray-100));
   --md-em: #c4b5fd;
 
-  --check-border: #4b5563;
-  --check-bg: #111827;
+  --check-border: rgb(var(--dc-gray-600));
+  --check-bg: rgb(var(--dc-gray-900));
 }
+
+/* Code blocks: keep the highlighter's token colours, sit them on the editor background. */
+.dark .markdown-body pre code.hljs,
+.dark .hljs { background: var(--md-pre-bg); }
 
 /* ── Scrollbar ──────────────────────────────────────────────────────────── */
 
@@ -184,15 +239,15 @@
   transition: background-color 0.12s, border-color 0.12s;
 }
 .dc-check:checked {
-  background-color: #4f46e5;
-  border-color: #4f46e5;
+  background-color: rgb(var(--dc-accent-600));
+  border-color: rgb(var(--dc-accent-600));
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 10.5l3.5 3.5L15 7'/%3E%3C/svg%3E");
   background-size: 72%;
   background-position: center;
   background-repeat: no-repeat;
 }
 .dc-check:focus-visible {
-  outline: 2px solid #6366f1;
+  outline: 2px solid rgb(var(--dc-accent-500));
   outline-offset: 2px;
 }
 
@@ -220,7 +275,7 @@
 }
 .dc-resize-handle:hover::after,
 .dc-resizing .dc-resize-handle:active::after {
-  background-color: rgba(99, 102, 241, 0.85);
+  background-color: rgb(var(--dc-accent-500) / 0.85);
 }
 .dc-resizing {
   user-select: none;

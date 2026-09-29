@@ -86,9 +86,10 @@ under 900 px the menu becomes a strip above the content. Routing by `location.ha
 (`#step-N`, no hash → step 1): on `hashchange` show that section, scroll to the top. Every
 section ends with *← Previous · Next →* buttons and the line *"Stuck? Ask in the chat — that's
 where the course is being taught."* Mark `:root[data-embedded] nav.steps { display: none }`:
-the dashboard injects `data-embedded`, has its own step list, makes the canvas transparent and
-lifts the `max-width` of `.course`, `section` and `header.intro` to use the width it has — so
-keep those class names.
+the dashboard injects `data-embedded`, has its own step list, makes the canvas transparent,
+lifts the `max-width` of `.course`, `section` and `header.intro` to use the width it has, and
+sets `data-theme` from its own light/dark toggle — so keep those class names and the
+`data-theme` selectors.
 
 **Each section**, in order: **Goal** (one line) → **The idea** (short, one concept, an analogy
 where it helps) → **Worked example** → **Try it** (see the ladder below) → **Check yourself**
@@ -109,35 +110,56 @@ translated into JS just to make it runnable:
    output** (typed or picked, then Reveal), **fill the blank**, or **spot the bug** (3–4
    candidates). No button may pretend to execute Java, Rust or Go.
 
-**Design.** One measure (~68ch), generous spacing, quiet Tufte-like typography; light + dark
-using the dashboard's palette (greys, indigo `#4f46e5` accents, rose for warnings). It must
-also pass as a Claude artifact page: `<title>` is a 2–4 word name (the long title is the
-`<h1>`), colour tokens live on `:root`, dark tokens are set under
-`@media (prefers-color-scheme: dark)` guarded by `:root:not([data-theme="light"])` and again
-under `:root[data-theme="dark"]`, `body` has an explicit background, 16 px side gutters at
-phone width, no horizontal page scroll.
+**Design — conform to the dashboard, do not copy it.** One measure (~68ch), generous spacing,
+quiet Tufte-like typography, light + dark. Every colour is a **token** on `:root`; nothing is
+hard-coded further down (no stray `#fff` on a button, no grey typed by hand in a rule):
 
-Skeleton (adapt, keep the ids and the class names):
+- **Neutrals are the dashboard's** — `--bg --panel --text --muted --line --code-bg`, with the
+  values of the skeleton. They are what makes an embedded course sit on the dashboard's canvas
+  without a seam (embedded, the viewer sets these six itself, so keep the names).
+- **The accent is yours** — the brand teal of the skeleton by default, or ONE accent that suits
+  the subject (Rust's orange, Swift's orange-red, a database blue…), as long as `--accent` reads
+  at 4.5:1 or better on `--panel` in both modes and `--on-accent` reads on `--accent`.
+- `--ok` / `--warn` keep their meaning (right / wrong, safe / dangerous). Colours inside a
+  diagram or an illustration are free.
+
+It must also pass as a Claude artifact page: `<title>` is a 2–4 word name (the long title is
+the `<h1>`), dark tokens are set under `@media (prefers-color-scheme: dark)` guarded by
+`:root:not([data-theme="light"])` and again under `:root[data-theme="dark"]`, `body` has an
+explicit background, 16 px side gutters at phone width, no horizontal page scroll.
+
+**Theme switch.** Opened on its own (the file, the artifact) the document follows the OS until
+the reader uses its switch: a `<button class="theme-switch">` in the step menu that sets
+`data-theme` on the root to `dark` or `light`, shows the **current** scheme, carries an
+`aria-label` saying what a click does, and remembers the choice with `localStorage` inside
+`try/catch` (storage is unavailable in a sandboxed open — the switch must still work for the
+visit). Embedded in the dashboard the switch is hidden and the stored choice is NOT applied:
+the dashboard's own toggle drives `data-theme` there.
+
+Skeleton (adapt, keep the ids, the class names and the token names):
 
 ```html
 <!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Node error events</title>
 <style>
-  :root { --bg:#f8fafc; --panel:#fff; --text:#0f172a; --muted:#64748b; --line:#e2e8f0; --accent:#4f46e5; --accent-soft:#eef2ff; --warn:#e11d48; }
-  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg:#0b1220; --panel:#111a2e; --text:#e2e8f0; --muted:#94a3b8; --line:#1e293b; --accent:#818cf8; --accent-soft:#1e1b4b; --warn:#fb7185; } }
-  :root[data-theme="dark"] { --bg:#0b1220; --panel:#111a2e; --text:#e2e8f0; --muted:#94a3b8; --line:#1e293b; --accent:#818cf8; --accent-soft:#1e1b4b; --warn:#fb7185; }
+  :root { --bg:#f9fafb; --panel:#ffffff; --text:#111827; --muted:#6b7280; --line:#e5e7eb; --code-bg:#f3f4f6; --accent:#0f766e; --accent-soft:#f0fdfa; --on-accent:#ffffff; --ok:#047857; --ok-soft:#d1fae5; --warn:#be123c; --warn-soft:#ffe4e6; --log-bg:#1e1f22; --log-text:#dfe1e5; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg:#1e1f22; --panel:#2b2d30; --text:#dfe1e5; --muted:#9da0a8; --line:#43454a; --code-bg:#1e1f22; --accent:#5eead4; --accent-soft:#134e4a; --on-accent:#0b2b28; --ok:#5fad65; --ok-soft:#1f3a24; --warn:#f97583; --warn-soft:#4a1f26; --log-bg:#18191b; --log-text:#dfe1e5; } }
+  :root[data-theme="dark"] { --bg:#1e1f22; --panel:#2b2d30; --text:#dfe1e5; --muted:#9da0a8; --line:#43454a; --code-bg:#1e1f22; --accent:#5eead4; --accent-soft:#134e4a; --on-accent:#0b2b28; --ok:#5fad65; --ok-soft:#1f3a24; --warn:#f97583; --warn-soft:#4a1f26; --log-bg:#18191b; --log-text:#dfe1e5; }
   body { margin:0; background:var(--bg); color:var(--text); font:16px/1.6 system-ui, sans-serif; }
   .course { display:grid; grid-template-columns:16rem minmax(0,1fr); gap:24px; max-width:1100px; margin:0 auto; padding:24px 16px; }
   nav.steps { position:sticky; top:16px; align-self:start; } nav.steps a { display:block; padding:6px 10px; border-radius:8px; color:var(--muted); text-decoration:none; }
   nav.steps a.current { background:var(--accent-soft); color:var(--accent); }
-  :root[data-embedded] nav.steps { display:none } :root[data-embedded] .course { grid-template-columns:minmax(0,1fr); }
-  section { display:none; max-width:68ch; } section.current { display:block; }
+  .theme-switch { margin-top:12px; background:transparent; color:var(--muted); border:1px solid var(--line); border-radius:8px; padding:4px 10px; cursor:pointer; }
+  :root[data-embedded] nav.steps, :root[data-embedded] .theme-switch { display:none } :root[data-embedded] .course { grid-template-columns:minmax(0,1fr); }
+  section { display:none; max-width:68ch; background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:22px 24px; } section.current { display:block; }
+  button.primary { background:var(--accent); color:var(--on-accent); border:1px solid var(--accent); }
   @media (max-width: 900px) { .course { grid-template-columns:minmax(0,1fr); } nav.steps { position:static; display:flex; flex-wrap:wrap; gap:4px; } }
-  /* .goal, .try, .check, .pager, buttons … */
+  /* .goal, .try, .check, .pager … — tokens only */
 </style></head><body>
 <div class="course">
-  <nav class="steps"><a href="#step-1">1 · Sums</a><a href="#step-2">2 · Powers</a></nav>
+  <nav class="steps"><a href="#step-1">1 · Sums</a><a href="#step-2">2 · Powers</a>
+    <button class="theme-switch" type="button"></button></nav>
   <main>
     <section id="step-1"><h2>1 · Sums</h2><p class="goal">…</p> … <div class="check">…<button>Reveal</button></div>
       <div class="pager"><a href="#step-1">← Previous</a><a href="#step-2">Next →</a></div>
@@ -148,17 +170,55 @@ Skeleton (adapt, keep the ids and the class names):
 <script>
   // show one section: on load + hashchange, toggle .current on the section and its nav link, scrollTo(0,0)
   // reveal buttons; the live examples (new Function inside try/catch) or the simulations
+  // theme switch — standalone only; embedded, the dashboard sets data-theme:
+  (function () {
+    var root = document.documentElement, btn = document.querySelector(".theme-switch"), KEY = "course-theme";
+    var isDark = function () {
+      var t = root.getAttribute("data-theme");
+      return t ? t === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+    };
+    var paint = function () {
+      btn.textContent = isDark() ? "🌙 Dark" : "☀️ Light";
+      btn.setAttribute("aria-label", isDark() ? "Dark theme — switch to light" : "Light theme — switch to dark");
+    };
+    if (window.parent === window) {
+      try { var saved = localStorage.getItem(KEY); if (saved === "dark" || saved === "light") root.setAttribute("data-theme", saved); } catch (e) {}
+    }
+    btn.addEventListener("click", function () {
+      var next = isDark() ? "light" : "dark";
+      root.setAttribute("data-theme", next);
+      try { localStorage.setItem(KEY, next); } catch (e) {}
+      paint();
+    });
+    matchMedia("(prefers-color-scheme: dark)").addEventListener("change", paint);
+    paint();
+  })();
 </script></body></html>
 ```
 
-### 4b. Share as an artifact — an offer, nothing more
+### 4b. Share as an artifact — an offer, with the disclosure
+
+Publishing is the one moment course content **leaves the machine**: the Artifact tool uploads
+a copy of the document to claude.ai, under the user's account. The offer must say so — a
+"private" link describes who can open it, not where the file lives.
 
 After the last `add_course_step`, **if the Artifact tool is available**, offer ONCE, as a
-choice: *"Publish this course as a Claude artifact too? (private until you share the
-link)"* — **Yes** → publish `document_path` as it is (`icon: "course"`, `description` = the
-goal) and reply with the link in one line; **No**, or no Artifact tool → nothing. The local
-file stays the course; the artifact is a copy for sharing, and the user can ask for it again
-any time ("publish the course as an artifact"). Never store the link anywhere.
+choice, in these terms:
+
+> *Publish this course as a Claude artifact too? That **uploads a copy to claude.ai** — it
+> leaves this machine. Only you can open it until you share the link.*
+
+- A course usually carries the user's own work (examples come from `seed_context`: project and
+  repository names, file paths, snippets, the bug that started it). When this one does, name
+  what it contains **in the same question** — *"It mentions lolcoach and the hang you
+  debugged."* — so the yes is an informed one. Never publish without that yes.
+- **Yes** → publish `document_path` as it is (`icon: "course"`, `description` = the goal) and
+  reply with the link in one line. **No**, or no Artifact tool → nothing, and do not ask again.
+- The local file stays the course; the artifact is a copy for sharing. The user can ask for it
+  any time ("publish the course as an artifact") — the same disclosure applies each time, and
+  to every republish after an edit. devcoach stores nothing about the artifact, so it cannot
+  delete it either: if asked to take it down, use the Artifact tool or point the user to their
+  artifacts on claude.ai.
 
 ## 5. Teach — one step per message
 

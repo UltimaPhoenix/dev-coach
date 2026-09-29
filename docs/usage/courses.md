@@ -60,14 +60,20 @@ first: continue it, redo it, or keep both.
    lesson as understood.
 
 Right after writing the document, and only in a client that has the Artifact tool, the coach
-offers once to publish the same file as a private Claude artifact — a copy you can share by link.
-The local file stays the course; nothing about the artifact is stored.
+offers once to publish the same file as a Claude artifact — a copy you can share by link.
+**Saying yes uploads that copy to claude.ai: it is the one case where course content leaves your
+machine.** The link is private until you share it, but the file then lives on Anthropic's
+servers under your account, and a course often quotes your own work (project names, paths,
+snippets from the task that started it) — the coach tells you what this one contains when it
+asks. Say no and nothing is uploaded. The local file stays the course either way; devcoach
+records nothing about the artifact, so you manage or delete it from your artifacts on claude.ai.
 
 While a course is active, the usual lesson cues pause so nothing interrupts the conversation.
 
 ## Where it lives
 
-Everything stays on your machine, next to your lessons:
+Everything stays on your machine, next to your lessons (the only exception is an artifact you
+chose to publish, above):
 
 - the course's index and progress in `~/.devcoach/coaching.db` (tables `courses`, `course_steps`);
 - the document at `~/.devcoach/courses/<course-id>/index.html`, written by the AI with its own
@@ -96,7 +102,13 @@ devcoach course <id>      # chain, steps, document path
 ## Writing courses by hand
 
 A course document is plain HTML. If you want to polish one, edit `index.html` in its folder — the
-dashboard reloads it on the next view. Keep it self-contained: inline styles and scripts, no
+dashboard reloads it on the next view. Colours are CSS variables on `:root` (`--bg --panel --text
+--muted --line --code-bg --accent --accent-soft --on-accent --ok --ok-soft --warn --warn-soft
+--log-bg --log-text`), set for light, for `@media (prefers-color-scheme: dark)` and for
+`:root[data-theme="dark"]`: a course **conforms to the dashboard's palette without copying it** —
+the neutrals are the dashboard's, the accent is the course's own. Opened on its own the document
+follows your OS and has its own light/dark switch; inside the dashboard that switch is hidden
+and the document follows the dashboard's theme toggle, with the dashboard's neutrals. Keep it self-contained: inline styles and scripts, no
 external URLs, no forms, no `alert`/`confirm` (the sandbox blocks all of those). Keep the
 one-section-at-a-time script and the `nav.steps` menu (the dashboard hides the menu, it opens the
 file with `data-embedded` set, and appends a tiny script that reports the frame's height — the file
