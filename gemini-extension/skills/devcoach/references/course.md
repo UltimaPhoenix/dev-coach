@@ -196,14 +196,29 @@ Skeleton (adapt, keep the ids, the class names and the token names):
 </script></body></html>
 ```
 
-### 4b. Share as an artifact — an offer, nothing more
+### 4b. Share as an artifact — an offer, with the disclosure
+
+Publishing is the one moment course content **leaves the machine**: the Artifact tool uploads
+a copy of the document to claude.ai, under the user's account. The offer must say so — a
+"private" link describes who can open it, not where the file lives.
 
 After the last `add_course_step`, **if the Artifact tool is available**, offer ONCE, as a
-choice: *"Publish this course as a Claude artifact too? (private until you share the
-link)"* — **Yes** → publish `document_path` as it is (`icon: "course"`, `description` = the
-goal) and reply with the link in one line; **No**, or no Artifact tool → nothing. The local
-file stays the course; the artifact is a copy for sharing, and the user can ask for it again
-any time ("publish the course as an artifact"). Never store the link anywhere.
+choice, in these terms:
+
+> *Publish this course as a Claude artifact too? That **uploads a copy to claude.ai** — it
+> leaves this machine. Only you can open it until you share the link.*
+
+- A course usually carries the user's own work (examples come from `seed_context`: project and
+  repository names, file paths, snippets, the bug that started it). When this one does, name
+  what it contains **in the same question** — *"It mentions lolcoach and the hang you
+  debugged."* — so the yes is an informed one. Never publish without that yes.
+- **Yes** → publish `document_path` as it is (`icon: "course"`, `description` = the goal) and
+  reply with the link in one line. **No**, or no Artifact tool → nothing, and do not ask again.
+- The local file stays the course; the artifact is a copy for sharing. The user can ask for it
+  any time ("publish the course as an artifact") — the same disclosure applies each time, and
+  to every republish after an edit. devcoach stores nothing about the artifact, so it cannot
+  delete it either: if asked to take it down, use the Artifact tool or point the user to their
+  artifacts on claude.ai.
 
 ## 5. Teach — one step per message
 

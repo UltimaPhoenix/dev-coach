@@ -16,6 +16,11 @@ Notable changes to devcoach. Versions follow [Semantic Versioning](https://semve
   conform to the palette without copying it (the accent is the course's own), use tokens only,
   and carry their own theme switch for when they are opened on their own or as an artifact.
 
+- **The artifact offer says what it does**: publishing a course as a Claude artifact uploads a
+  copy to claude.ai — the one case where course content leaves your machine. The coach now says
+  so when it asks, names what the document contains from your own work, and asks again before
+  every republish. The privacy page and the courses guide no longer claim otherwise.
+
 ### Fixed
 - **Theme toggle**: the button now shows the current theme, from the first paint; the choice
   survives navigation when the saved setting is Dark or Light (it was dropped on every page);

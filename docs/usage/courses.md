@@ -60,14 +60,20 @@ first: continue it, redo it, or keep both.
    lesson as understood.
 
 Right after writing the document, and only in a client that has the Artifact tool, the coach
-offers once to publish the same file as a private Claude artifact — a copy you can share by link.
-The local file stays the course; nothing about the artifact is stored.
+offers once to publish the same file as a Claude artifact — a copy you can share by link.
+**Saying yes uploads that copy to claude.ai: it is the one case where course content leaves your
+machine.** The link is private until you share it, but the file then lives on Anthropic's
+servers under your account, and a course often quotes your own work (project names, paths,
+snippets from the task that started it) — the coach tells you what this one contains when it
+asks. Say no and nothing is uploaded. The local file stays the course either way; devcoach
+records nothing about the artifact, so you manage or delete it from your artifacts on claude.ai.
 
 While a course is active, the usual lesson cues pause so nothing interrupts the conversation.
 
 ## Where it lives
 
-Everything stays on your machine, next to your lessons:
+Everything stays on your machine, next to your lessons (the only exception is an artifact you
+chose to publish, above):
 
 - the course's index and progress in `~/.devcoach/coaching.db` (tables `courses`, `course_steps`);
 - the document at `~/.devcoach/courses/<course-id>/index.html`, written by the AI with its own

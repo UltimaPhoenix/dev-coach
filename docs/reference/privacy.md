@@ -32,8 +32,9 @@ file and store them somewhere you trust. See [Backup, export & import](../usage/
 
 ## Sharing is explicit
 
-[Sharing a lesson](../usage/sharing.md) is the only way a lesson leaves your machine,
-and it only happens when you ask for it:
+Your data leaves your machine in exactly two ways, and only when you ask for it:
+[sharing a lesson](../usage/sharing.md), and publishing a course as a Claude artifact (next
+section). For a lesson:
 
 - **Only the lesson travels by default** — title, summary, body, topic, categories and level. Project,
   branch, commit and task context are included only with an explicit *Include where it happened* /
@@ -45,6 +46,22 @@ and it only happens when you ask for it:
 - **Your name is opt-in** — proposed from `share_name` or git `user.name`, editable, and
   "anonymous" is always available.
 - **Nothing is saved on the receiving side until you click** *Add to my lessons* (or run the import).
+
+## Publishing a course as an artifact
+
+A [course](../usage/courses.md) is a file on your disk. In a client that has the Artifact tool
+(Claude Code, claude.ai) the coach offers, once per course, to publish it as a Claude artifact:
+
+- **It is an upload.** Saying yes sends a copy of the course document to claude.ai, stored on
+  Anthropic's servers under your account. "Private" means only you can open the link until you
+  share it — it does not mean the file stayed local.
+- **Look at what it contains first.** Courses draw their examples from the work that triggered
+  the lesson: project and repository names, file paths, snippets, the bug you were chasing. The
+  coach names what the document mentions when it asks.
+- **Nothing happens without a yes**, and the question is asked again for every republish.
+- **devcoach keeps no record of it** — no link, no flag in the database. The upload is done by
+  your client's Artifact tool, not by devcoach, which still makes no network calls of its own.
+  Manage or delete published artifacts from your artifacts on claude.ai.
 
 ## What devcoach reads
 
