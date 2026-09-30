@@ -4,6 +4,14 @@ Notable changes to devcoach. Versions follow [Semantic Versioning](https://semve
 
 ---
 
+## [Unreleased]
+
+### Changed
+- **Docs show courses**: the screenshot fixture carries two demo courses (a cache stampede read off
+  the origin's load curve; retry backoff and jitter), each with charts the document draws from
+  its own functions, so the Courses list and two course pages appear in the user guide and the
+  README.
+
 ## [2.6.3] — 2026-09-30
 
 ### Changed

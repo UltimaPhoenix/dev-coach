@@ -235,6 +235,23 @@ the page scrolls, never the frame, and the document follows the dashboard's ligh
 the seed lesson stays. A lesson that seeded a course shows a `🎓 Course · N/M` link in its
 metadata row.
 
+<Tabs>
+  <TabItem value="courses" label="Courses" default>
+    <ThemedShot
+      alt="The Courses list"
+      light={require("../screenshots/courses-light.png").default}
+      dark={require("../screenshots/courses-dark.png").default}
+    />
+  </TabItem>
+  <TabItem value="course" label="A course page">
+    <ThemedShot
+      alt="A course page: sticky bar, pinned step list, the document on its current step"
+      light={require("../screenshots/course-cache-stampede-light.png").default}
+      dark={require("../screenshots/course-cache-stampede-dark.png").default}
+    />
+  </TabItem>
+</Tabs>
+
 ---
 
 ### Sharing a lesson
