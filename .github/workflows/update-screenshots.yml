@@ -23,6 +23,9 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
+      # The docs site's share page is captured from the site build (website/build/lesson.html).
+      - run: npm ci --prefix website
+      - run: npm run build --prefix website
       # Playwright is a maintenance-only tool — installed ad hoc so it stays out of package.json.
       - run: npm install --no-save playwright
       - run: npx playwright install --with-deps chromium

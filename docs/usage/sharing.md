@@ -6,6 +6,8 @@ keywords: [devcoach share lesson, share coaching lesson, devcoach import, devcoa
 ---
 
 import ThemedShot from "@site/src/components/ThemedShot";
+import Tabs from "@theme/Tabs";
+import TabItem from "@theme/TabItem";
 
 # Sharing lessons
 
@@ -49,6 +51,23 @@ devcoach share <id> --with-context    # also project / branch / commit / task
 devcoach share <id> --by "Ada"        # sender name (remembered as share_name); --anonymous to drop it
 ```
 
+What **Copy text** and `devcoach share` produce — the card people can read, then the one line
+devcoach reads (shortened here; a real code is one line of about a thousand characters):
+
+```text
+### ─────────── 🎓 devcoach ───────────
+**Docker layer caching — why COPY order decides your build speed** · docker · infrastructure · Junior
+
+Every `RUN`, `COPY`, and `ADD` instruction in a Dockerfile creates a new layer. Docker caches each
+layer by its content hash; if the hash matches what's already on disk, it reuses the cached result…
+
+Shared by Ada with devcoach — paste it to your agent or run: devcoach import
+devcoach:lesson:1:dVZdbhs3EL7KYAskgKBd_RhNEeXJqBugaBsXtougqQsvtaQk2rvkluRKWQQBeoai70Wv1hP0CPmGS…
+```
+
+Paste the whole thing anywhere: chat, an issue, an email. The receiver never has to find the code
+in it — every importer does.
+
 ## From your agent
 
 Ask in plain words — *"share the last lesson"*, *"share the lesson about WAL mode as a link"*, *"share it
@@ -74,11 +93,47 @@ Every way in leads to the same place: the lesson joins your log, attributed to t
 - **Agent** — hand it whatever you were given and say *"import this devcoach lesson"* (plugin:
   `/devcoach:import <code or link>`). Then *"show me the lesson Ada shared"* renders it as a card.
 
-<ThemedShot
-  alt="Shared lesson preview"
-  light={require("../screenshots/lesson-import-preview-light.png").default}
-  dark={require("../screenshots/lesson-import-preview-dark.png").default}
-/>
+<Tabs>
+  <TabItem value="link" label="1 · The link opens" default>
+    <ThemedShot
+      alt="The share link's page on the docs site: the lesson rendered, and Import into my devcoach when a dashboard is running"
+      light={require("../screenshots/lesson-link-page-light.png").default}
+      dark={require("../screenshots/lesson-link-page-dark.png").default}
+    />
+  </TabItem>
+  <TabItem value="preview" label="2 · Preview in the dashboard">
+    <ThemedShot
+      alt="Shared lesson preview in the dashboard, with a single Add to my lessons button"
+      light={require("../screenshots/lesson-import-preview-light.png").default}
+      dark={require("../screenshots/lesson-import-preview-dark.png").default}
+    />
+  </TabItem>
+  <TabItem value="imported" label="3 · Imported">
+    <ThemedShot
+      alt="The lesson page right after the import, with the confirmation banner and the shared-by line"
+      light={require("../screenshots/lesson-imported-light.png").default}
+      dark={require("../screenshots/lesson-imported-dark.png").default}
+    />
+  </TabItem>
+  <TabItem value="import-box" label="Or: paste into ＋ Import">
+    <ThemedShot
+      alt="The Import box on the Lessons page"
+      light={require("../screenshots/lessons-import-light.png").default}
+      dark={require("../screenshots/lessons-import-dark.png").default}
+    />
+  </TabItem>
+</Tabs>
+
+The same import from the terminal, twice — the second time devcoach recognises the share:
+
+```text
+$ devcoach import ~/Downloads/lesson-docker-layer-cache-001.devcoach.md
+✓ Imported "Docker layer caching — why COPY order decides your build speed" (shared by Ada) as lesson-docker-layer-cache-001 — topic docker_layer_caching
+Topic 'docker_layer_caching' is not in your knowledge map — track it with: devcoach knowledge-add docker_layer_caching
+
+$ devcoach import ~/Downloads/lesson-docker-layer-cache-001.devcoach.md
+Already in your log as lesson-docker-layer-cache-001 (shared by Ada)
+```
 
 ## What travels — and what never does
 
@@ -101,6 +156,33 @@ See [Privacy & security](../reference/privacy.md#sharing-is-explicit) for the fu
 - It appears in your log with a **🤝 shared by** line and can be filtered with
   `devcoach lessons --imported` / `--from <name>`, `get_lessons({imported: true})` /
   `({shared_by: "<name>"})`, or the dashboard's **🤝 Shared** filter.
+
+<Tabs>
+  <TabItem value="list" label="In the list" default>
+    <ThemedShot
+      alt="The Lessons page filtered to shared lessons: the sender's name under the topic"
+      light={require("../screenshots/lessons-shared-light.png").default}
+      dark={require("../screenshots/lessons-shared-dark.png").default}
+    />
+  </TabItem>
+  <TabItem value="lesson" label="The lesson">
+    <ThemedShot
+      alt="A shared lesson: the card with a shared-by line, feedback buttons, no local context"
+      light={require("../screenshots/lesson-shared-light.png").default}
+      dark={require("../screenshots/lesson-shared-dark.png").default}
+    />
+  </TabItem>
+</Tabs>
+
+```text
+$ devcoach lessons --imported
+╭───┬────────────┬────────┬─────────────────────────────────────────┬───────┬──────────────┬───────────╮
+│   │ Date       │ Topic  │ Title                                   │ Level │ Categories   │ Shared by │
+├───┼────────────┼────────┼─────────────────────────────────────────┼───────┼──────────────┼───────────┤
+│ · │ 2026-04-20 │ sqlite │ WAL mode: readers never block writers 💡 │  mid  │ sqlite, node │ Ada       │
+╰───┴────────────┴────────┴─────────────────────────────────────────┴───────┴──────────────┴───────────╯
+```
+
 - Its **topic counts as taught**, so the coach will not teach it again, and **✓/✗ feedback works**
   as for your own lessons. If the topic is not in your knowledge map yet, you are offered to track it.
 - It **never counts against your daily limit** or the minimum gap, and never resets the pacing — a

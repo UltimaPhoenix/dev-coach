@@ -11,6 +11,10 @@ Notable changes to devcoach. Versions follow [Semantic Versioning](https://semve
   the origin's load curve; retry backoff and jitter), each with charts the document draws from
   its own functions, so the Courses list and two course pages appear in the user guide and the
   README.
+- **Docs show sharing end to end**: the fixture also carries a lesson shared by a teammate, and the
+  guide shows what the sender gets, the share link's page, the preview, the moment after the
+  import and how a shared lesson looks in the log — plus the terminal output of `share`, `import`
+  and `lessons --imported`.
 
 ## [2.6.3] — 2026-09-30
 
