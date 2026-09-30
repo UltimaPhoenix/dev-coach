@@ -8,9 +8,10 @@
 // Requires Playwright + Chromium (the CI workflow installs them; locally: `npm i -D playwright &&
 // npx playwright install chromium`). Run after `npm run build`.
 import { execFileSync, spawn } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { createServer } from "node:http";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
 import { strFromU8, strToU8, unzipSync, zipSync } from "fflate";
 
@@ -20,13 +21,18 @@ const fixture = join(root, "scripts", "screenshots", "fixture.zip");
 const outDir = join(root, "docs", "screenshots");
 const PORT = 7862;
 const BASE = `http://127.0.0.1:${PORT}`;
+// The docs site's share page (website/src/pages/lesson.tsx), served from the site build when one
+// exists: it is what a receiver sees when they open a share link.
+const SITE_BUILD = join(root, "website", "build");
+const SITE_PORT = 7863;
+const SITE_BASE_PATH = "/dev-coach";
 const VIEWPORT = { width: 1440, height: 900 };
 
 // The committed fixture keeps static timestamps; the Lessons page renders relative dates
 // ("2 months ago"), so we shift them to fixed offsets from *now* at capture time — the
 // screenshots then read the same whenever they are regenerated.
 const DAY = 86_400_000;
-const LESSON_AGES_DAYS = [3, 9, 16, 34, 61]; // newest → oldest, in the fixture's own order
+const LESSON_AGES_DAYS = [3, 5, 9, 16, 34, 61]; // newest → oldest, in the fixture's own order
 // Courses: [created, updated] ages in days — the active one is recent, the completed one older.
 const COURSE_AGES_DAYS = {
   "from-a-cache-miss-to-a-stampede": [3, 1],
@@ -75,9 +81,11 @@ function freshenFixture(zipPath, outDir) {
   return out;
 }
 
-// Lesson-sharing pages: the share popover open on a lesson, the import box open on the list, and
-// the read-only preview a share link lands on (its code is computed from the fixture at capture time).
+// Lesson-sharing pages: the share popover open on a lesson, the import box open on the list, the
+// read-only preview a share link lands on (its code is computed from the fixture at capture time),
+// the moment right after an import, and how a shared lesson looks in the log.
 const SHARE_LESSON_ID = "lesson-docker-layer-cache-001";
+const SHARED_LESSON_ID = "wal-mode-readers"; // the fixture's imported lesson (shared by Ada)
 const PAGES = [
   ["knowledge-map", "/knowledge"],
   ["lessons", "/lessons"],
@@ -89,6 +97,9 @@ const PAGES = [
   ["lesson-git-interactive-rebase", "/lessons/lesson-git-interactive-rebase-001"],
   ["lesson-ci-cd-pipeline-stages", "/lessons/lesson-ci-cd-pipeline-stages-001"],
   ["lesson-redis-cache-stampede", "/lessons/lesson-redis-cache-stampede-001"],
+  ["lessons-shared", "/lessons?imported=1"],
+  ["lesson-shared", `/lessons/${SHARED_LESSON_ID}`],
+  ["lesson-imported", `/lessons/${SHARED_LESSON_ID}?imported=1`],
   // Courses: the list, then two course pages on a step with a chart (`?step=` selects the step)
   ["courses", "/courses"],
   ["course-cache-stampede", "/courses/from-a-cache-miss-to-a-stampede?step=3"],
@@ -115,6 +126,54 @@ async function captureCoursePage(page, out) {
   await page.waitForTimeout(300);
   await page.screenshot({ path: out, fullPage: false });
   await page.setViewportSize(VIEWPORT);
+}
+
+// A static server for the site build under its base path — enough for the share page and its
+// assets (Docusaurus writes `lesson.html` for `/lesson`).
+const MIME = {
+  ".html": "text/html",
+  ".js": "text/javascript",
+  ".css": "text/css",
+  ".png": "image/png",
+  ".svg": "image/svg+xml",
+  ".json": "application/json",
+  ".woff2": "font/woff2",
+  ".ico": "image/x-icon",
+};
+function serveSite(dir, port) {
+  const server = createServer((req, res) => {
+    const url = new URL(req.url, "http://localhost");
+    let path = url.pathname.startsWith(`${SITE_BASE_PATH}/`)
+      ? url.pathname.slice(SITE_BASE_PATH.length)
+      : url.pathname;
+    path = normalize(path).replace(/^(\.\.[/\\])+/, "");
+    const candidates = [join(dir, path), join(dir, `${path}.html`), join(dir, path, "index.html")];
+    const file = candidates.find((f) => f.startsWith(dir) && existsSync(f) && !f.endsWith("/"));
+    if (!file || !extname(file)) {
+      res.writeHead(404).end();
+      return;
+    }
+    res.writeHead(200, { "content-type": MIME[extname(file)] ?? "application/octet-stream" });
+    res.end(readFileSync(file));
+  });
+  server.listen(port, "127.0.0.1");
+  return server;
+}
+
+// The share page decodes the code client-side, then probes the dashboard: wait for the decoded
+// title and for the probe's answer (the stubbed /ping says "up"), and match the site's theme to
+// the capture scheme (Docusaurus keeps its own toggle, seeded from the OS preference).
+async function captureSharePage(page, out, scheme) {
+  await page.waitForSelector("h1", { timeout: 15_000 });
+  await page.evaluate((s) => document.documentElement.setAttribute("data-theme", s), scheme);
+  await page
+    .waitForFunction(
+      () => /Add to my lessons|Import into my devcoach/.test(document.body.innerText),
+      { timeout: 15_000 },
+    )
+    .catch(() => {});
+  await page.waitForTimeout(500);
+  await page.screenshot({ path: out, fullPage: true });
 }
 
 async function waitForServer(url, timeoutMs = 30_000) {
@@ -153,22 +212,47 @@ async function main() {
       ...PAGES,
       ["lesson-import-preview", `/lessons/import?code=${encodeURIComponent(shareCode)}`],
     ];
+    // The share page from the site build: the dashboard probe is answered by a stub (the real
+    // one is CORS-locked to the docs origin), so the page shows its "dashboard running" state.
+    let site = null;
+    if (existsSync(join(SITE_BUILD, "lesson.html"))) {
+      site = serveSite(SITE_BUILD, SITE_PORT);
+      pages.push([
+        "lesson-link-page",
+        `http://127.0.0.1:${SITE_PORT}${SITE_BASE_PATH}/lesson#${shareCode}`,
+      ]);
+    } else {
+      console.warn(
+        "  (no website/build — skipping the share-page capture; run `npm run build --prefix website`)",
+      );
+    }
     const { chromium } = await import("playwright");
     mkdirSync(outDir, { recursive: true });
     const browser = await chromium.launch();
     for (const scheme of ["light", "dark"]) {
       const ctx = await browser.newContext({ viewport: VIEWPORT, colorScheme: scheme });
       const page = await ctx.newPage();
+      await page.route(/\/ping(\?|$)/, (route) =>
+        route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          headers: { "access-control-allow-origin": "*" },
+          body: '{"ok":true}',
+        }),
+      );
       for (const [name, path] of pages) {
-        await page.goto(`${BASE}${path}`, { waitUntil: "networkidle" });
+        const url = path.startsWith("http") ? path : `${BASE}${path}`;
+        await page.goto(url, { waitUntil: "networkidle" });
         const out = join(outDir, `${name}-${scheme}.png`);
         if (path.startsWith("/courses/")) await captureCoursePage(page, out);
+        else if (name === "lesson-link-page") await captureSharePage(page, out, scheme);
         else await page.screenshot({ path: out, fullPage: true });
         console.log(`  saved ${out}`);
       }
       await ctx.close();
     }
     await browser.close();
+    site?.close();
   } finally {
     server.kill("SIGTERM");
   }

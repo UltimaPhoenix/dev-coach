@@ -286,6 +286,27 @@ What travels, how the link works and what an imported lesson does to your pacing
 - The [CLI](./cli.md#sharing-a-lesson) (`devcoach import`, no argument = clipboard) and your
   [agent](./coaching.md#sharing-a-lesson-with-a-teammate) (`import_lesson`) do the same.
 
+A shared lesson sits in the log like your own, with the sender's name under the topic and a
+**🤝 shared by** line on its page; the **🤝 Shared** filter lists them (per sender, too). It carries
+no project, branch or folder unless the sender chose to include them.
+
+<Tabs>
+  <TabItem value="shared-list" label="Shared lessons" default>
+    <ThemedShot
+      alt="The Lessons page filtered to shared lessons"
+      light={require("../screenshots/lessons-shared-light.png").default}
+      dark={require("../screenshots/lessons-shared-dark.png").default}
+    />
+  </TabItem>
+  <TabItem value="shared-lesson" label="A shared lesson">
+    <ThemedShot
+      alt="A shared lesson's page"
+      light={require("../screenshots/lesson-shared-light.png").default}
+      dark={require("../screenshots/lesson-shared-dark.png").default}
+    />
+  </TabItem>
+</Tabs>
+
 <ThemedShot
   alt="Shared lesson preview"
   light={require("../screenshots/lesson-import-preview-light.png").default}

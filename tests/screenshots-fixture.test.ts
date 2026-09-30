@@ -48,15 +48,27 @@ describe("screenshot fixture (scripts/screenshots/fixture.zip)", () => {
     }
   });
 
-  it("keeps the five demo lessons the docs pages link to", () => {
-    const ids = (json("lessons.json") as { id: string }[]).map((l) => l.id).sort();
-    expect(ids).toEqual([
+  it("keeps the five demo lessons the docs pages link to, plus one shared lesson", () => {
+    const lessons = json("lessons.json") as {
+      id: string;
+      imported?: boolean;
+      shared_by?: string | null;
+      folder?: string | null;
+    }[];
+    expect(lessons.map((l) => l.id).sort()).toEqual([
       "lesson-ci-cd-pipeline-stages-001",
       "lesson-docker-layer-cache-001",
       "lesson-git-interactive-rebase-001",
       "lesson-postgresql-explain-analyze-001",
       "lesson-redis-cache-stampede-001",
+      "wal-mode-readers",
     ]);
+    // the imported one: attributed to its sender, and — as a real import — without any context
+    const shared = lessons.find((l) => l.id === "wal-mode-readers");
+    expect(shared?.imported).toBe(true);
+    expect(shared?.shared_by).toBe("Ada");
+    expect(shared?.folder).toBeNull();
+    expect(lessons.filter((l) => l.imported)).toHaveLength(1);
   });
 
   it("keeps the two demo courses the docs pages link to, with their documents", () => {
