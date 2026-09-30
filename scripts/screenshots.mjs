@@ -1,6 +1,9 @@
 // Capture devcoach UI screenshots for the docs (Node + Playwright port of the old take_screenshots.py).
 // Flow: restore a demo DB from the fixture into an isolated HOME → start `devcoach ui` → screenshot
 // each page in light + dark → docs/screenshots/<name>-<scheme>.png → stop the server.
+// The fixture also carries two demo courses (courses.json + courses/<id>/index.html, written to
+// the contract in assets/references/course.md); their highlighter placeholder is filled by the
+// restore, so the zip never holds the library.
 //
 // Requires Playwright + Chromium (the CI workflow installs them; locally: `npm i -D playwright &&
 // npx playwright install chromium`). Run after `npm run build`.
@@ -24,6 +27,13 @@ const VIEWPORT = { width: 1440, height: 900 };
 // screenshots then read the same whenever they are regenerated.
 const DAY = 86_400_000;
 const LESSON_AGES_DAYS = [3, 9, 16, 34, 61]; // newest → oldest, in the fixture's own order
+// Courses: [created, updated] ages in days — the active one is recent, the completed one older.
+const COURSE_AGES_DAYS = {
+  "from-a-cache-miss-to-a-stampede": [3, 1],
+  "retry-with-exponential-backoff-and-jitter": [20, 12],
+};
+const stamp = (now, ageDays) =>
+  new Date(now - ageDays * DAY).toISOString().replace(/\.\d{3}Z$/, "Z");
 
 function freshenFixture(zipPath, outDir) {
   const files = unzipSync(readFileSync(zipPath));
@@ -36,6 +46,21 @@ function freshenFixture(zipPath, outDir) {
       lesson.timestamp = new Date(now - age * DAY).toISOString().replace(/\.\d{3}Z$/, "Z");
     });
   files["lessons.json"] = strToU8(JSON.stringify(lessons, null, 2));
+  if (files["courses.json"]) {
+    const data = JSON.parse(strFromU8(files["courses.json"]));
+    for (const course of data.courses) {
+      const [created, updated] = COURSE_AGES_DAYS[course.id] ?? [3, 1];
+      course.created_at = stamp(now, created);
+      course.updated_at = stamp(now, updated);
+      if (course.completed_at) course.completed_at = course.updated_at;
+      const done = data.steps.filter((s) => s.course_id === course.id && s.done_at);
+      done.forEach((s, i) => {
+        // done steps spread evenly between creation and the last update
+        s.done_at = stamp(now, created - ((created - updated) * (i + 1)) / (done.length + 1));
+      });
+    }
+    files["courses.json"] = strToU8(JSON.stringify(data, null, 2));
+  }
   if (files["learning-state.md"]) {
     const stamp = new Date(now - LESSON_AGES_DAYS[0] * DAY).toISOString().replace(/\.\d{3}Z$/, "Z");
     files["learning-state.md"] = strToU8(
@@ -64,7 +89,33 @@ const PAGES = [
   ["lesson-git-interactive-rebase", "/lessons/lesson-git-interactive-rebase-001"],
   ["lesson-ci-cd-pipeline-stages", "/lessons/lesson-ci-cd-pipeline-stages-001"],
   ["lesson-redis-cache-stampede", "/lessons/lesson-redis-cache-stampede-001"],
+  // Courses: the list, then two course pages on a step with a chart (`?step=` selects the step)
+  ["courses", "/courses"],
+  ["course-cache-stampede", "/courses/from-a-cache-miss-to-a-stampede?step=3"],
+  ["course-backoff-jitter", "/courses/retry-with-exponential-backoff-and-jitter?step=3"],
 ];
+
+// A course page is the document in a sandboxed frame that the viewer sizes from the frame's own
+// height reports (course-viewer.js): `networkidle` fires before the frame has grown, so wait for
+// the viewer to have set a height above its 320 px floor, then let the document settle. The
+// frame is out-of-process (opaque origin), and Chromium's full-page capture paints such frames
+// only within the original viewport — so the viewport is sized to the page and the capture is a
+// plain one (observed: the document cut off ~270 px below the viewport with `fullPage`).
+async function captureCoursePage(page, out) {
+  await page.waitForFunction(
+    () => {
+      const frame = document.getElementById("course-frame");
+      return frame !== null && Number.parseInt(frame.style.height, 10) > 320;
+    },
+    { timeout: 15_000 },
+  );
+  await page.waitForTimeout(500);
+  const height = await page.evaluate(() => document.documentElement.scrollHeight);
+  await page.setViewportSize({ width: VIEWPORT.width, height });
+  await page.waitForTimeout(300);
+  await page.screenshot({ path: out, fullPage: false });
+  await page.setViewportSize(VIEWPORT);
+}
 
 async function waitForServer(url, timeoutMs = 30_000) {
   const deadline = Date.now() + timeoutMs;
@@ -111,7 +162,8 @@ async function main() {
       for (const [name, path] of pages) {
         await page.goto(`${BASE}${path}`, { waitUntil: "networkidle" });
         const out = join(outDir, `${name}-${scheme}.png`);
-        await page.screenshot({ path: out, fullPage: true });
+        if (path.startsWith("/courses/")) await captureCoursePage(page, out);
+        else await page.screenshot({ path: out, fullPage: true });
         console.log(`  saved ${out}`);
       }
       await ctx.close();

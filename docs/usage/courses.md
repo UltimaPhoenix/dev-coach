@@ -5,6 +5,10 @@ sidebar_label: Courses
 
 # Courses
 
+import ThemedShot from "@site/src/components/ThemedShot";
+import Tabs from "@theme/Tabs";
+import TabItem from "@theme/TabItem";
+
 **What it's for:** when a lesson is too much for one session, a course is the way out. Instead of
 another card at the same height, devcoach builds a step-by-step path that starts where you actually
 stand — and it finds that starting point by asking.
@@ -91,6 +95,33 @@ makes the live examples work) but cannot reach the network, submit forms or touc
 dashboard. The frame takes the height of the current step, so you scroll the page, not a box.
 The lesson page links to its course with the current progress. Deleting a course (⋯ → Delete
 course…) removes its rows and its folder; the lesson stays.
+
+<Tabs>
+  <TabItem value="list" label="Courses" default>
+    <ThemedShot
+      alt="The Courses list: an active course at 2/5 with the lesson it grew from, and a completed one"
+      light={require("../screenshots/courses-light.png").default}
+      dark={require("../screenshots/courses-dark.png").default}
+    />
+  </TabItem>
+  <TabItem value="stampede" label="A check step, with a chart">
+    <ThemedShot
+      alt="A course page on a check step: three load curves drawn by the document, the code behind them, and a question"
+      light={require("../screenshots/course-cache-stampede-light.png").default}
+      dark={require("../screenshots/course-cache-stampede-dark.png").default}
+    />
+  </TabItem>
+  <TabItem value="backoff" label="A completed course">
+    <ThemedShot
+      alt="A completed course on its jitter step: three retry schedules plotted over the attempt number"
+      light={require("../screenshots/course-backoff-jitter-light.png").default}
+      dark={require("../screenshots/course-backoff-jitter-dark.png").default}
+    />
+  </TabItem>
+</Tabs>
+
+The two courses in the screenshots are the documentation's own demo: charts and diagrams are
+plain SVG that the document draws from a function, so they follow the theme like everything else.
 
 ## CLI
 

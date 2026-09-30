@@ -371,6 +371,10 @@ Reply `y` (already knew it — confidence goes up), `u` (new and clear) or `n` (
 |:---------------------------------------------------------:|:---:|:---:|
 | ![Knowledge map](docs/screenshots/knowledge-map-dark.png) | ![Lessons](docs/screenshots/lessons-dark.png) | ![Settings](docs/screenshots/settings-dark.png) |
 
+| A course, one step at a time |
+|:---:|
+| ![A course page](docs/screenshots/course-cache-stampede-dark.png) |
+
 ---
 
 ## Context & personalization

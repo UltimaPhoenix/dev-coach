@@ -73,7 +73,8 @@ dev-coach/
 ├── scripts/e2e-claude.mjs  # local-only e2e: real `claude -p` sessions (npm run test:e2e)
 ├── scripts/sync-plugin.mjs # pins plugin/, gemini-extension/, server.json + self-marketplace to package.json; copies the skill + LICENSE
 ├── scripts/marketplace-entry.mjs # the devcoach marketplace entry, derived from plugin.json (+ category/tags); used by update-marketplace.mjs
-├── scripts/screenshots.mjs # Playwright capture of docs/screenshots from scripts/screenshots/fixture.zip
+├── scripts/screenshots.mjs # Playwright capture of docs/screenshots from scripts/screenshots/fixture.zip (5 lessons +
+│                           #   2 demo courses with SVG charts; the zip keeps the highlighter placeholder — filled on restore)
 ├── mcpb/                   # Claude Desktop Extension: manifest.json (v0.4, server.type node) + icon.png/svg
 ├── scripts/build-mcpb.mjs  # self-contained bundle (tsup.mcpb.config.ts, deps inlined) → guards (no bare imports;
 │                           #   CLI + MCP initialize from outside the repo) → validate → pack via @anthropic-ai/mcpb
