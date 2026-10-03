@@ -338,15 +338,10 @@ const KINDS = {
         t1.out.slice(-160).replace(/\s+/g, " "),
       );
       check("nothing is saved before the user chooses", count(sb, "knowledge") === 0);
-      // The sandbox has no Claude Code history, and the cue carries its own short flow (it does
-      // not load the skill): a bare "Automatic" then ends in more questions, because the model
-      // will not build a profile from an empty scan. Say what the skill's flow says for that
-      // case, so the scenario tests the save path rather than that known gap.
-      const t2 = claude(
-        sb,
-        "Automatic. If the history scan is empty, start from devcoach's default topics and save.",
-        { resume: t1.session },
-      );
+      // The sandbox has no Claude Code history — the case of every new machine. The cue does
+      // not load the skill, so what makes a bare "Automatic" end in a saved profile here is
+      // get_onboarding's `next_step` (an empty scan starts from default_topics).
+      const t2 = claude(sb, "Automatic", { resume: t1.session });
       check(
         "complete_onboarding was called",
         t2.toolCalls.some((n) => n.endsWith("complete_onboarding")),

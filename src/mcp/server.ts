@@ -234,6 +234,33 @@ function briefingPayload(): Payload {
   }
 }
 
+/**
+ * What to do with an onboarding payload, said by the payload itself. The Stop hook's cue asks the
+ * model to call `get_onboarding` and does not load the skill, so a rule that lives only in
+ * references/onboarding.md never reaches that path: a real session on a machine with no Claude
+ * Code history showed the model refusing to build a profile from an empty scan and asking the
+ * user again, forever. The rule travels here instead — the hook stays untouched.
+ */
+export function onboardingNextStep(
+  knowledgeReady: boolean,
+  notebookReady: boolean,
+  hasDetectedStack: boolean,
+): string | null {
+  if (knowledgeReady && notebookReady) return null;
+  if (knowledgeReady) {
+    return "The profile exists; only the notebook is missing. Compose it and write it to notebook_path — do not rebuild the topics.";
+  }
+  const automatic = hasDetectedStack
+    ? "Automatic = build the topic map yourself, in one pass, from detected_stack enriched with default_topics."
+    : "No Claude Code history was found on this machine (detected_stack is empty). That does NOT block Automatic: use default_topics exactly as returned as the starting map — it is devcoach's general developer baseline, not a guess of yours — and tell the user it is a starting point that corrects itself as they work. Do not stop, do not ask again, do not switch to Guided unless they ask.";
+  return (
+    "Let the user choose how to set up (lead with Automatic, never pick for them). " +
+    `${automatic} ` +
+    "Then save with complete_onboarding and write the notebook to notebook_path, in the same turn. " +
+    "The devcoach skill's references/onboarding.md has the full flow when the skill is available."
+  );
+}
+
 function onboardingPayload(): Payload {
   try {
     const { status, compat } = db.withConnection((c) => ({
@@ -257,6 +284,11 @@ function onboardingPayload(): Payload {
       default_topics: db.DEFAULT_PROFILE,
       context_ready: git.branch !== null,
       notebook_path: db.LEARNING_STATE_PATH,
+      next_step: onboardingNextStep(
+        knowledgeReady,
+        notebookReady,
+        Object.keys(detected).length > 0,
+      ),
     };
   } catch (err) {
     return { error: String(err) };

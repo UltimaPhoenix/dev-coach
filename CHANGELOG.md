@@ -15,9 +15,10 @@ Notable changes to devcoach. Versions follow [Semantic Versioning](https://semve
   machine; a hook never makes a prompt wait for npm (it installs in the background); npm's output
   is kept in `install.log`; the server exits with the reason instead of code 0; and the hooks
   show one "devcoach is not running: …" notice a day instead of nothing. Works on Windows' npm.
-- **Setup on a machine with no Claude Code history**: the onboarding flow now says what
-  *Automatic* does when the scan finds nothing — it starts from devcoach's general topic map
-  instead of stopping. This applies when the flow is run (`/devcoach:setup`, "set up devcoach").
+- **Onboarding no longer stalls on a new machine.** With no Claude Code history to scan, choosing
+  *Automatic* after devcoach's first offer ended in a loop of questions instead of a profile.
+  `get_onboarding` now says what to do with its own answer (`next_step`): an empty scan starts
+  from devcoach's general topic map, saved in the same turn. The hooks are unchanged.
 
 ### Added
 - **`/devcoach:setup`** (Claude Code plugin): checks the runtime, then the server, then builds

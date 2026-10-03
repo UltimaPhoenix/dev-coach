@@ -194,11 +194,15 @@ named before anything else. `DEVCOACH_RUNTIME_DIR` / `DEVCOACH_RUNTIME_SPEC` rel
 and what gets installed (tests, e2e). `/devcoach:setup` (`plugin/commands/setup.md`) is the
 explicit entry: runtime → server → profile, running the skill's `references/onboarding.md` — there
 is no second onboarding skill, on purpose. **The hooks were deliberately left as they are** (user
-decision, 2026-10-03): `ONBOARD_CUE` still carries its own short flow and does not load the skill.
-Known consequence, seen in a real session: on a machine with no Claude Code history the cue path
-can stall on *Automatic* (the model will not build a profile from an empty scan). The skill's
-`references/onboarding.md` covers that case (an empty scan starts from `default_topics`), so the
-explicit path — `/devcoach:setup`, "set up devcoach" — does not stall.
+decision, 2026-10-03): `ONBOARD_CUE` still carries its own short flow and does not load the skill,
+so a rule that lives only in `references/onboarding.md` never reaches the cue path. A real session
+showed the cost: on a machine with no Claude Code history (every new device) the model would not
+build a profile from an empty scan and asked the user again, forever. The rule therefore travels
+in the data the cue already asks for: `get_onboarding` (and the `devcoach://onboarding` resource)
+returns **`next_step`** (`onboardingNextStep` in `mcp/server.ts`) — what to do with this payload,
+including "an empty scan does not block Automatic: use `default_topics` as returned". Verified in
+real sessions with the unchanged hook (`fresh-cue`, plugin and plain MCP entry). When onboarding
+needs a new rule on the cue path, put it there, not in the hook.
 
 The Claude Code **skill**: `devcoach install` copies `assets/SKILL.md` + `references/` to
 `~/.claude/skills/devcoach/` with a `.devcoach-version` stamp; the welcome screen and `stats` hint
