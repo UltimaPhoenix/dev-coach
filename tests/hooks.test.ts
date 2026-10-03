@@ -58,6 +58,20 @@ describe("hooks in-process (runHook dispatcher + payload-injected entrypoints)",
     const fresh = payload({ session_id: null });
     expect(capture(() => runHook("stop-hook", fresh)).out).toContain("complete_onboarding");
     expect(capture(() => runHook("onboard-hook", fresh)).out).toContain("complete_onboarding");
+    // The cue names tools the session may not have (server not connected): it must give the
+    // model a way out that helps the user, not leave it to improvise.
+    const cue = JSON.parse(capture(() => runHook("stop-hook", fresh)).out).reason as string;
+    // Delegation first: the skill's references/onboarding.md is the flow. A cue that carried
+    // its own short version left the skill unread, and Automatic stalled on an empty history.
+    expect(cue).toContain("Invoke the `devcoach` skill (Skill tool)");
+    expect(cue).toContain("references/onboarding.md");
+    expect(cue).toContain("An empty history scan is not a reason to stop");
+    expect(cue.indexOf("Invoke the `devcoach` skill")).toBeLessThan(
+      cue.indexOf("If the devcoach skill is not available"),
+    );
+    expect(cue).toContain("If no devcoach tool is available");
+    expect(cue).toContain("/devcoach:setup");
+    expect(cue).toContain("never improvise a profile");
     expect(capture(() => runHook("prompt-hook", fresh))).toEqual({ out: "", code: 0 });
     expect(capture(() => runHook("lesson-ready", fresh))).toEqual({ out: "", code: 0 });
     expect(capture(() => runHook("frobnicate", fresh))).toEqual({ out: "", code: 0 });

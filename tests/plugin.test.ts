@@ -88,8 +88,10 @@ describe("claude code plugin packaging", () => {
       ".mcp.json",
       "hooks/hooks.json",
       "scripts/launch.mjs",
+      "scripts/launch.config.json",
       "skills/devcoach/SKILL.md",
       "commands/course.md",
+      "commands/setup.md",
       "package.json",
     ]) {
       expect(archive, path).toContain(path);
@@ -210,6 +212,7 @@ describe("claude code plugin packaging", () => {
     ["share", ["share_lesson", "get_lessons"]],
     ["import", ["import_lesson", "add_topic"]],
     ["course", ["create_course", "add_course_step", "update_course_progress", "get_courses"]],
+    ["setup", ["get_onboarding", "complete_onboarding", "get_profile"]],
   ])("ships the /devcoach:%s command wired to its tools", (name, tools) => {
     const cmd = read("plugin", "commands", `${name}.md`);
     expect(cmd).toMatch(/^---\ndescription: .+/);
@@ -219,6 +222,21 @@ describe("claude code plugin packaging", () => {
       expect(allowed).toContain(`mcp__devcoach__${tool}`);
       expect(cmd.split("---")[2]).toContain(tool);
     }
+  });
+
+  // /devcoach:setup is the explicit way in when coaching never started: it must check the
+  // runtime FIRST (through the launcher, which can diagnose itself when devcoach cannot load),
+  // then the server, and only then run onboarding — from the skill's one flow, not a copy.
+  it("/devcoach:setup checks runtime → server → profile, in that order", () => {
+    const cmd = read("plugin", "commands", "setup.md");
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: literal plugin-root placeholder, not a template
+    expect(cmd).toContain('node "${CLAUDE_PLUGIN_ROOT}/scripts/launch.mjs" doctor');
+    expect(cmd).toMatch(/^allowed-tools: Bash\(node:\*\)/m);
+    const order = ["**Runtime.**", "**Server.**", "**Profile.**"].map((s) => cmd.indexOf(s));
+    expect(order.every((i) => i > 0)).toBe(true);
+    expect([...order].sort((a, b) => a - b)).toEqual(order);
+    expect(cmd).toContain("references/onboarding.md");
+    expect(cmd).toContain("/mcp");
   });
 
   it("ships the merged stop-hook + prompt-hook, each with a timeout", () => {

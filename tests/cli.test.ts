@@ -191,6 +191,13 @@ describe("cli", () => {
     expect(r.out).toContain("onboarding complete");
     expect(r.out).toContain("nudge_every=2");
     expect(r.out).toContain("Verdict");
+    expect(r.out).not.toContain("Runtime:"); // only when a plugin/extension launcher started us
+    process.env.DEVCOACH_LAUNCHER = "devcoach plugin · devcoach 9.9.9 · /tmp/runtime/9.9.9";
+    try {
+      expect((await run(["doctor"])).out).toContain("Runtime: devcoach plugin · devcoach 9.9.9");
+    } finally {
+      delete process.env.DEVCOACH_LAUNCHER;
+    }
 
     writeFileSync(join(process.env.HOME as string, ".claude", "settings.json"), "{bad json");
     expect((await run(["doctor"])).out).toContain("not valid JSON");
