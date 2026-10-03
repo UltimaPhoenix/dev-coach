@@ -133,34 +133,15 @@ function emitBlock(client: HookClient, reason: string, systemMessage?: string): 
 // No DB yet → onboarding has not run. Cue WITHOUT creating coaching.db or any
 // marker file, so an interrupted onboarding leaves nothing behind and re-cues on
 // the next task. The artifacts appear only when complete_onboarding actually runs.
-//
-// Like the lesson cue, this one DELEGATES: the skill's references/onboarding.md is the flow.
-// The cue used to carry its own short version instead, and a real session showed the cost — the
-// model never loaded the skill, and on a machine with no Claude Code history (every new device)
-// it refused to "invent" a profile and re-asked forever, where the skill says to start from the
-// default map. What stays here is what the skill cannot say: a fallback for when the skill is
-// not installed, and one for when the devcoach tools are not in the session at all.
-export function buildOnboardCue(client: HookClient = "claude"): string {
-  return (
-    "devcoach: the user has no coaching profile yet. " +
-    `${SKILL_INVOCATION[client].cue} and follow its Onboarding section ` +
-    "(references/onboarding.md) exactly — it is the single source of truth for the setup " +
-    "flow: ask how they want to set it up (lead with Automatic, never pick for them), then " +
-    "build the profile and save it with the devcoach `complete_onboarding` MCP tool before " +
-    "ending your turn. An empty history scan is not a reason to stop: Automatic then starts " +
-    "from the default topic map.\n\n" +
-    "If the devcoach skill is not available, fall back to: ask them how they want to set it " +
-    "up and STRONGLY recommend Automatic — devcoach scans their full Claude Code history " +
-    "across all their projects (call get_onboarding for the detected stack and per-project " +
-    "evidence; when it is empty, use its default_topics as the starting map). Also offer " +
-    "Guided (a short conversation to map topics and confidence levels) and Import (restore " +
-    "from a backup). After they choose, build the profile and save it by calling " +
-    "`complete_onboarding` (an MCP tool, not a shell command).\n\n" +
-    "If no devcoach tool is available in this session, the devcoach MCP server is not " +
-    "connected: say so in one line (in Claude Code: run /devcoach:setup, or reconnect it from " +
-    "/mcp) and stop — never improvise a profile."
-  );
-}
+const ONBOARD_CUE =
+  "devcoach: the user has no coaching profile yet. Ask them how they want to set it up " +
+  "and STRONGLY recommend Automatic — devcoach scans their full Claude Code history " +
+  "across all their projects (call get_onboarding for the detected stack and " +
+  "per-project evidence) so the profile reflects what they actually build. Also offer " +
+  "Guided (a short conversation to map topics and confidence levels) and Import " +
+  "(restore from a backup), but lead with Automatic; do not pick for them. After they " +
+  "choose, build the profile and save it by calling the devcoach `complete_onboarding` " +
+  "MCP tool (not a shell command) before ending your turn.";
 
 export function cmdOnboardHook(payload: HookPayload = readHookPayload()): void {
   if (shouldSuppressHook(payload)) process.exit(0);
@@ -178,7 +159,7 @@ export function cmdOnboardHook(payload: HookPayload = readHookPayload()): void {
     if (ready) process.exit(0);
   }
   hookDebugLog("onboard-hook", payload.session_id, "onboarding cue");
-  emitBlock("claude", buildOnboardCue("claude"));
+  emitBlock("claude", ONBOARD_CUE);
 }
 
 // The notebook's observations are refreshed only every Nth delivered lesson, not after
@@ -303,7 +284,7 @@ function runStopDecision(
   hookDebugLog(hookName, payload.session_id, decision.note);
   switch (decision.kind) {
     case "onboard":
-      emitBlock(opts.client, buildOnboardCue(opts.client));
+      emitBlock(opts.client, ONBOARD_CUE);
       break;
     case "cue":
       emitBlock(
@@ -339,7 +320,7 @@ export function cmdStopHook(
   if (!existsSync(db.DB_PATH)) {
     if (payload.stop_hook_active || payload.permission_mode === "plan") process.exit(0);
     hookDebugLog(hookName, payload.session_id, "onboarding cue (no DB)");
-    emitBlock(client, buildOnboardCue(client));
+    emitBlock(client, ONBOARD_CUE);
   }
   runStopDecision(hookName, payload, { onboardCue: true, client });
 }

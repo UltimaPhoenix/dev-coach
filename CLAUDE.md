@@ -72,8 +72,8 @@ dev-coach/
 ├── website/src/pages/lesson.tsx  # the share link's landing page (+ src/lib/shareCode.ts: browser decoder)
 ├── scripts/e2e-claude.mjs  # local-only e2e (SPENDS TOKENS): real `claude -p` sessions over a grid of installation methods
 │                           #   (plugin-tree, plugin-market, mcp-entry, homebrew) × session kinds (fresh-cue, fresh-explicit,
-│                           #   lesson, skip, plan-mode, restored, server-down). `npm run test:e2e` = smoke (4 calls);
-│                           #   `-- --all` = 25 scenarios; `-- --list`, `-- --only a:b`; one sandbox per scenario
+│                           #   lesson, skip, plan-mode, restored). `npm run test:e2e` = smoke (4 calls);
+│                           #   `-- --all` = 24 scenarios; `-- --list`, `-- --only a:b`; one sandbox per scenario
 ├── scripts/sync-plugin.mjs # pins plugin/, gemini-extension/, server.json + self-marketplace to package.json; copies the skill,
 │                           #   the LICENSE and the launcher (assets/launcher/launch.mjs → both scripts/launch.mjs)
 ├── scripts/marketplace-entry.mjs # the devcoach marketplace entry, derived from plugin.json (+ category/tags); used by update-marketplace.mjs
@@ -193,12 +193,12 @@ a detached `--install`, and after a failure show ONE `systemMessage` a day (`ins
 named before anything else. `DEVCOACH_RUNTIME_DIR` / `DEVCOACH_RUNTIME_SPEC` relocate the data dir
 and what gets installed (tests, e2e). `/devcoach:setup` (`plugin/commands/setup.md`) is the
 explicit entry: runtime → server → profile, running the skill's `references/onboarding.md` — there
-is no second onboarding skill, on purpose. The onboarding cue (`buildOnboardCue`, per client)
-**delegates to the skill** like the lesson cue: a real session showed that a cue carrying its own
-short flow left `references/onboarding.md` unread, and Automatic then stalled on a machine with no
-Claude Code history (every new device) — the skill now says an empty scan starts from
-`default_topics` and never blocks. The cue keeps two fallbacks: skill not installed, and no
-devcoach tools in the session (say the server is not connected, point at setup, never improvise).
+is no second onboarding skill, on purpose. **The hooks were deliberately left as they are** (user
+decision, 2026-10-03): `ONBOARD_CUE` still carries its own short flow and does not load the skill.
+Known consequence, seen in a real session: on a machine with no Claude Code history the cue path
+can stall on *Automatic* (the model will not build a profile from an empty scan). The skill's
+`references/onboarding.md` covers that case (an empty scan starts from `default_topics`), so the
+explicit path — `/devcoach:setup`, "set up devcoach" — does not stall.
 
 The Claude Code **skill**: `devcoach install` copies `assets/SKILL.md` + `references/` to
 `~/.claude/skills/devcoach/` with a `.devcoach-version` stamp; the welcome screen and `stats` hint
