@@ -70,8 +70,12 @@ dev-coach/
 ├── tests/                  # Vitest (16 files: core, db-extra, coach/git/claude-history, share, mcp, mcpb, web,
 │                           #   cli, setup-wizard, hooks, hooks-spawn, plugin, gemini-extension, mcp-registry, …)
 ├── website/src/pages/lesson.tsx  # the share link's landing page (+ src/lib/shareCode.ts: browser decoder)
-├── scripts/e2e-claude.mjs  # local-only e2e: real `claude -p` sessions (npm run test:e2e)
-├── scripts/sync-plugin.mjs # pins plugin/, gemini-extension/, server.json + self-marketplace to package.json; copies the skill + LICENSE
+├── scripts/e2e-claude.mjs  # local-only e2e (SPENDS TOKENS): real `claude -p` sessions over a grid of installation methods
+│                           #   (plugin-tree, plugin-market, mcp-entry, homebrew) × session kinds (fresh-cue, fresh-explicit,
+│                           #   lesson, skip, plan-mode, restored). `npm run test:e2e` = smoke (4 calls);
+│                           #   `-- --all` = 24 scenarios; `-- --list`, `-- --only a:b`; one sandbox per scenario
+├── scripts/sync-plugin.mjs # pins plugin/, gemini-extension/, server.json + self-marketplace to package.json; copies the skill,
+│                           #   the LICENSE and the launcher (assets/launcher/launch.mjs → both scripts/launch.mjs)
 ├── scripts/marketplace-entry.mjs # the devcoach marketplace entry, derived from plugin.json (+ category/tags); used by update-marketplace.mjs
 ├── scripts/screenshots.mjs # Playwright capture of docs/screenshots from scripts/screenshots/fixture.zip (5 lessons + 1 shared
 │                           #   by "Ada" + 2 demo courses with SVG charts; the zip keeps the highlighter placeholder — filled on
@@ -80,8 +84,9 @@ dev-coach/
 ├── mcpb/                   # Claude Desktop Extension: manifest.json (v0.4, server.type node) + icon.png/svg
 ├── scripts/build-mcpb.mjs  # self-contained bundle (tsup.mcpb.config.ts, deps inlined) → guards (no bare imports;
 │                           #   CLI + MCP initialize from outside the repo) → validate → pack via @anthropic-ai/mcpb
-├── plugin/                 # Claude Code plugin (pinned npm launcher + hooks + /devcoach:ui, /devcoach:share, /devcoach:import commands + skill mirror — skills/ synced, never hand-edited)
-├── gemini-extension/       # Gemini CLI extension (same launcher pattern, AfterAgent/BeforeAgent hooks) — synced
+├── plugin/                 # Claude Code plugin (launcher + hooks + /devcoach:setup, :ui, :share, :import, :course commands + skill
+│                           #   mirror — skills/ and scripts/launch.mjs synced, never hand-edited; scripts/launch.config.json is its own)
+├── gemini-extension/       # Gemini CLI extension (same launcher, AfterAgent/BeforeAgent hooks) — synced
 ├── server.json             # MCP Registry manifest (io.github.UltimaPhoenix/devcoach) — version pinned by sync
 └── docs/  website/  .github/workflows/{ci,docs,update-screenshots,cla}.yml
 ```
@@ -175,6 +180,29 @@ user-invocable slash commands, **not** auto-injected — so coaching is driven b
 - `onboard-hook` / `lesson-ready` remain as the legacy two-entry layout; `devcoach install`
   repairs/normalizes hook entries without `--force` and skips them when the devcoach plugin is
   enabled (double registration would double-count).
+
+**The launcher** (`assets/launcher/launch.mjs`, the single source for the plugin and the Gemini
+extension; `tests/launcher.test.ts` runs it as real child processes against a fake `npm`): installs
+the pinned devcoach once into `<data>/runtime/<version>/` — npm runs in `<version>.tmp-<pid>/` and
+the directory is **renamed** into place, so a runtime exists only when its install finished (an
+interrupted install once looked installed and failed on every later start, and the MCP start raced
+the first prompt's hook in one directory). `mcp` installs synchronously and exits **1 with the
+reason** on failure (exit 0 was a mute "failed to connect"); hooks never wait for npm — they start
+a detached `--install`, and after a failure show ONE `systemMessage` a day (`install-failed.json`,
+`notice.stamp`); any other subcommand (`doctor`) prints the launcher's own diagnosis. Node < 24 is
+named before anything else. `DEVCOACH_RUNTIME_DIR` / `DEVCOACH_RUNTIME_SPEC` relocate the data dir
+and what gets installed (tests, e2e). `/devcoach:setup` (`plugin/commands/setup.md`) is the
+explicit entry: runtime → server → profile, running the skill's `references/onboarding.md` — there
+is no second onboarding skill, on purpose. **The hooks were deliberately left as they are** (user
+decision, 2026-10-03): `ONBOARD_CUE` still carries its own short flow and does not load the skill,
+so a rule that lives only in `references/onboarding.md` never reaches the cue path. A real session
+showed the cost: on a machine with no Claude Code history (every new device) the model would not
+build a profile from an empty scan and asked the user again, forever. The rule therefore travels
+in the data the cue already asks for: `get_onboarding` (and the `devcoach://onboarding` resource)
+returns **`next_step`** (`onboardingNextStep` in `mcp/server.ts`) — what to do with this payload,
+including "an empty scan does not block Automatic: use `default_topics` as returned". Verified in
+real sessions with the unchanged hook (`fresh-cue`, plugin and plain MCP entry). When onboarding
+needs a new rule on the cue path, put it there, not in the hook.
 
 The Claude Code **skill**: `devcoach install` copies `assets/SKILL.md` + `references/` to
 `~/.claude/skills/devcoach/` with a `.devcoach-version` stamp; the welcome screen and `stats` hint

@@ -1,30 +1,25 @@
 #!/usr/bin/env node
-// End-to-end test of the coaching loop against REAL headless Claude Code sessions.
-// Local-only (needs an authenticated `claude` CLI + spends tokens) — NOT run in CI.
+// End-to-end tests against REAL headless Claude Code sessions: every way devcoach gets installed,
+// crossed with the kinds of session a user actually has (first one ever, explicit setup, a lesson,
+// small talk, plan mode, a restored backup).
+// Local-only (needs an authenticated `claude` CLI and SPENDS TOKENS) — never run in CI.
 //
-//   npm run test:e2e            build + run both scenarios
-//   node scripts/e2e-claude.mjs [--keep]
+//   npm run test:e2e                     the smoke set (see SMOKE below)
+//   npm run test:e2e -- --all            the whole grid
+//   npm run test:e2e -- --list           what exists, and how many claude calls each run makes
+//   npm run test:e2e -- --only plugin-tree:fresh-cue,mcp-entry:lesson
+//   E2E_MODEL=haiku npm run test:e2e     a cheaper model (default: the CLI's own default)
+//   … --keep                             keep the sandboxes for inspection
 //
-// Two isolation modes:
-//   • hermetic — when CLAUDE_CODE_OAUTH_TOKEN is set (create one with `claude
-//     setup-token`): everything runs in a throwaway HOME, including Claude's own
-//     config. Fully isolated.
-//   • attached (default) — Claude runs with the user's real config/auth (macOS
-//     Keychain auth does not survive a HOME override), while ALL devcoach state is
-//     isolated via the DEVCOACH_DIR env override, which the hooks and the MCP server
-//     inherit. The user's real ~/.devcoach is never touched; if the user's settings
-//     already wire devcoach hooks, those entries are reused (adding a second set
-//     would double-count interactions).
+// Isolation: every scenario gets its own sandbox — DEVCOACH_DIR (database, notebook),
+// DEVCOACH_CLAUDE_DIR (an empty history for the onboarding scan), DEVCOACH_RUNTIME_DIR (the
+// plugin launcher's install) and a neutral cwd. Claude itself runs with the user's real auth
+// ("attached"; macOS Keychain auth does not survive a HOME override) unless
+// CLAUDE_CODE_OAUTH_TOKEN is set, in which case HOME is sandboxed too ("hermetic"). The user's
+// real ~/.devcoach is never touched. The marketplace devcoach plugins are switched off for the
+// run through --settings, except in the `plugin-market` method, which tests exactly that install.
 import { execFileSync, spawnSync } from "node:child_process";
-import {
-  cpSync,
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { homedir, tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -34,130 +29,219 @@ const { DatabaseSync } = createRequire(import.meta.url)("node:sqlite");
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const bin = join(root, "dist", "bin.js");
-const keep = process.argv.includes("--keep");
+const argv = process.argv.slice(2);
+const flag = (name) => argv.includes(name);
+const option = (name) => (argv.includes(name) ? argv[argv.indexOf(name) + 1] : undefined);
+const keep = flag("--keep");
 const hermetic = Boolean(process.env.CLAUDE_CODE_OAUTH_TOKEN);
+const model = process.env.E2E_MODEL;
 
-const results = [];
-const check = (name, pass, detail = "") => {
-  results.push({ name, pass });
-  console.log(`  ${pass ? "✅ PASS" : "❌ FAIL"}  ${name}${detail ? ` — ${detail}` : ""}`);
-};
 const fatal = (msg) => {
   console.error(`\n✗ ${msg}`);
   process.exit(1);
 };
 
-// ── Preflight ─────────────────────────────────────────────────────────────────
-if (!existsSync(bin))
-  fatal("dist/bin.js not found — run `npm run build` first (or use npm run test:e2e)");
-if (spawnSync("which", ["claude"], { encoding: "utf8" }).status !== 0)
-  fatal("`claude` CLI not found on PATH — install Claude Code first");
+// ── Installation methods ──────────────────────────────────────────────────────
+// Each returns what a `claude -p` call needs: extra args, extra env, the tool-name prefix.
+const MARKET_PLUGINS = [
+  "devcoach@ultimaphoenix",
+  "devcoach@ultimaphoenix-beta",
+  "devcoach@devcoach",
+];
+const pluginsOff = Object.fromEntries(MARKET_PLUGINS.map((p) => [p, false]));
+const hookEntry = (command, timeout) => ({ hooks: [{ type: "command", command, timeout }] });
 
-// ── Sandbox setup ─────────────────────────────────────────────────────────────
-const sandbox = mkdtempSync(join(tmpdir(), "dc-e2e-"));
-const dataDir = join(sandbox, "devcoach"); // devcoach DB/notebook, both modes
-const dbPath = join(dataDir, "coaching.db");
-// DEVCOACH_CLAUDE_DIR points the history scan at an empty sandbox dir so the MCP
-// server spawned by claude never reads the real ~/.claude history in attached mode.
-const env = {
-  ...process.env,
-  DEVCOACH_DIR: dataDir,
-  DEVCOACH_CLAUDE_DIR: join(sandbox, "claude-data"),
-  NO_COLOR: "1",
-};
-const claudeArgs = [];
-console.log(
-  `mode: ${hermetic ? "hermetic (sandbox HOME)" : "attached (real Claude config, sandboxed DEVCOACH_DIR)"}`,
-);
-console.log(`sandbox: ${sandbox}\n`);
+let tarball; // the working tree, packed once, for the plugin launcher to install
+function workingTreeTarball() {
+  if (!tarball) {
+    const dir = mkdtempSync(join(tmpdir(), "dc-e2e-pack-"));
+    const name = execFileSync("npm", ["pack", "--silent", "--pack-destination", dir], {
+      cwd: root,
+      encoding: "utf8",
+    })
+      .trim()
+      .split("\n")
+      .at(-1);
+    tarball = join(dir, name);
+  }
+  return tarball;
+}
 
-const hookEntry = (cmd, timeout) => ({
-  hooks: [{ type: "command", command: `node ${bin} ${cmd}`, timeout }],
-});
-const desiredHooks = {
-  Stop: [hookEntry("stop-hook", 60)],
-  UserPromptSubmit: [hookEntry("prompt-hook", 30)],
-};
-
-if (hermetic) {
-  const home = join(sandbox, "home");
-  mkdirSync(join(home, ".claude"), { recursive: true });
-  env.HOME = home;
-  writeFileSync(join(home, ".claude.json"), JSON.stringify({ hasCompletedOnboarding: true }));
-  writeFileSync(join(home, ".claude", "settings.json"), JSON.stringify({ hooks: desiredHooks }));
-  // The coaching skill, so the cue's Skill-tool invocation path is exercised.
-  const skillDir = join(home, ".claude", "skills", "devcoach");
-  mkdirSync(skillDir, { recursive: true });
-  cpSync(join(root, "assets", "SKILL.md"), join(skillDir, "SKILL.md"));
-  cpSync(join(root, "assets", "references"), join(skillDir, "references"), { recursive: true });
-} else {
-  // Attached: reuse the user's devcoach hooks if present (they inherit DEVCOACH_DIR,
-  // so they still write to the sandbox); otherwise inject ours via --settings.
-  let hasHooks = false;
+function installedMarketPlugin() {
   try {
     const settings = JSON.parse(readFileSync(join(homedir(), ".claude", "settings.json"), "utf8"));
-    hasHooks = Object.values(settings.hooks ?? {}).some((entries) =>
-      (entries ?? []).some((e) =>
-        (e.hooks ?? []).some(
-          (h) => (h.command ?? "").includes("devcoach") || (h.command ?? "").includes("dev-coach"),
-        ),
-      ),
-    );
+    const wanted = option("--channel");
+    const enabled = Object.entries(settings.enabledPlugins ?? {})
+      .filter(([id, on]) => on && MARKET_PLUGINS.includes(id))
+      .map(([id]) => id);
+    if (wanted) return `devcoach@ultimaphoenix${wanted === "beta" ? "-beta" : ""}`;
+    return enabled[0] ?? null;
   } catch {
-    // unreadable settings → treat as no hooks
-  }
-  if (hasHooks) {
-    console.log("using the devcoach hooks already wired in ~/.claude/settings.json");
-    console.log("  note: those hooks run the INSTALLED devcoach — if it is older than this repo,");
-    console.log("  hook-side behaviour (cue text) reflects the installed version.");
-  } else {
-    const extra = join(sandbox, "settings.json");
-    writeFileSync(extra, JSON.stringify({ hooks: desiredHooks }));
-    claudeArgs.push("--settings", extra);
-    console.log("no devcoach hooks in the user settings — injecting them via --settings");
+    return null;
   }
 }
 
-// devcoach profile in the sandboxed DEVCOACH_DIR. Pacing starts far away (99) so the
-// auth preflight turn doesn't trigger coaching; scenarios flip it to 0 afterwards.
-const cli = (...args) => execFileSync("node", [bin, ...args], { env, encoding: "utf8" });
-cli("knowledge-add", "typescript", "--confidence", "4");
-cli("set", "nudge_every", "99");
-cli("set", "min_gap_minutes", "0");
-cli("set", "max_per_day", "99");
-// Seed the notebook too: with it missing, devcoach://onboarding reports
-// notebook_ready:false and the skill runs onboarding INSIDE scenario 1's lesson
-// turn — the scenarios must exercise the normal, fully-onboarded lesson path.
-writeFileSync(
-  join(dataDir, "learning-state.md"),
-  "# devcoach — Coaching Notebook\n\n## Observations\nSeeded by e2e.\n",
-);
+const METHODS = {
+  "plugin-tree": {
+    about:
+      "--plugin-dir plugin/, the launcher installing a tarball of the working tree (real first-run install)",
+    prefix: "mcp__plugin_devcoach_devcoach__",
+    setup(sb) {
+      const settings = join(sb.dir, "settings.json");
+      writeFileSync(settings, JSON.stringify({ enabledPlugins: pluginsOff }));
+      return {
+        // No --strict-mcp-config here: it would drop the plugin's own server too.
+        args: ["--plugin-dir", join(root, "plugin"), "--settings", settings],
+        env: {
+          DEVCOACH_RUNTIME_DIR: join(sb.dir, "runtime"),
+          DEVCOACH_RUNTIME_SPEC: `file:${workingTreeTarball()}`,
+        },
+      };
+    },
+    // The CLI for seeding goes through the same launcher the session uses.
+    cli: () => ["node", [join(root, "plugin", "scripts", "launch.mjs")]],
+  },
+  "plugin-market": {
+    about:
+      "the plugin as installed on this PC from the marketplace (the released artifact; --channel stable|beta)",
+    prefix: "mcp__plugin_devcoach_devcoach__",
+    available: () =>
+      installedMarketPlugin()
+        ? null
+        : "no devcoach marketplace plugin is enabled in ~/.claude/settings.json",
+    setup(sb) {
+      const id = installedMarketPlugin();
+      const settings = join(sb.dir, "settings.json");
+      writeFileSync(settings, JSON.stringify({ enabledPlugins: { ...pluginsOff, [id]: true } }));
+      return { args: ["--settings", settings], env: {}, note: id };
+    },
+    cli: () => ["node", [bin]],
+  },
+  "mcp-entry": {
+    about: "a plain MCP entry + hooks in settings (the shape `devcoach install` writes for npx)",
+    prefix: "mcp__devcoach__",
+    setup(sb) {
+      const mcp = join(sb.dir, "mcp.json");
+      writeFileSync(
+        mcp,
+        JSON.stringify({
+          mcpServers: { devcoach: { command: "node", args: [bin, "mcp"] } },
+        }),
+      );
+      const settings = join(sb.dir, "settings.json");
+      writeFileSync(
+        settings,
+        JSON.stringify({
+          enabledPlugins: pluginsOff,
+          hooks: {
+            Stop: [hookEntry(`node ${bin} stop-hook`, 60)],
+            UserPromptSubmit: [hookEntry(`node ${bin} prompt-hook`, 30)],
+          },
+        }),
+      );
+      return {
+        args: ["--mcp-config", mcp, "--strict-mcp-config", "--settings", settings],
+        env: {},
+      };
+    },
+    cli: () => ["node", [bin]],
+  },
+  homebrew: {
+    about:
+      "the Homebrew-installed `devcoach` binary as server and hooks (skipped when not installed)",
+    prefix: "mcp__devcoach__",
+    available: () =>
+      existsSync("/opt/homebrew/bin/devcoach")
+        ? null
+        : "/opt/homebrew/bin/devcoach is not installed",
+    setup(sb) {
+      const brew = "/opt/homebrew/bin/devcoach";
+      const mcp = join(sb.dir, "mcp.json");
+      writeFileSync(
+        mcp,
+        JSON.stringify({ mcpServers: { devcoach: { command: brew, args: ["mcp"] } } }),
+      );
+      const settings = join(sb.dir, "settings.json");
+      writeFileSync(
+        settings,
+        JSON.stringify({
+          enabledPlugins: pluginsOff,
+          hooks: {
+            Stop: [hookEntry(`${brew} stop-hook`, 60)],
+            UserPromptSubmit: [hookEntry(`${brew} prompt-hook`, 30)],
+          },
+        }),
+      );
+      return {
+        args: ["--mcp-config", mcp, "--strict-mcp-config", "--settings", settings],
+        env: {},
+      };
+    },
+    cli: () => ["/opt/homebrew/bin/devcoach", []],
+  },
+};
 
-const mcpConfig = join(sandbox, "mcp.json");
-writeFileSync(
-  mcpConfig,
-  JSON.stringify({ mcpServers: { devcoach: { command: "node", args: [bin, "mcp"] } } }),
-);
+// ── Sandbox + a claude call ───────────────────────────────────────────────────
+const TOOLS = [
+  "get_onboarding",
+  "complete_onboarding",
+  "preview_deep_scan",
+  "get_briefing",
+  "get_profile",
+  "log_lesson",
+  "skip_lesson",
+  "get_lessons",
+  "submit_feedback",
+  "star_lesson",
+  "update_knowledge",
+  "add_topic",
+  "add_group",
+  "update_settings",
+]; // prettier-ignore
 
-const cwd = mkdtempSync(join(tmpdir(), "dc-e2e-cwd-")); // neutral cwd: no repo CLAUDE.md
+function makeSandbox(methodId, kindId) {
+  const dir = mkdtempSync(join(tmpdir(), `dc-e2e-${methodId}-${kindId}-`));
+  const sb = { dir, data: join(dir, "devcoach"), cwd: join(dir, "cwd") };
+  mkdirSync(sb.cwd, { recursive: true });
+  sb.dbPath = join(sb.data, "coaching.db");
+  sb.notebook = join(sb.data, "learning-state.md");
+  const method = METHODS[methodId];
+  const { args, env, note } = method.setup(sb);
+  sb.note = note;
+  sb.env = {
+    ...process.env,
+    DEVCOACH_DIR: sb.data,
+    DEVCOACH_CLAUDE_DIR: join(dir, "claude-data"),
+    NO_COLOR: "1",
+    ...env,
+  };
+  delete sb.env.FORCE_COLOR; // it overrides NO_COLOR and makes every child Node warn about it
+  if (hermetic) {
+    const home = join(dir, "home");
+    mkdirSync(join(home, ".claude"), { recursive: true });
+    writeFileSync(join(home, ".claude.json"), JSON.stringify({ hasCompletedOnboarding: true }));
+    sb.env.HOME = home;
+  }
+  const allowed = [
+    "Skill",
+    "Read",
+    "Write",
+    "Edit",
+    "Glob",
+    ...TOOLS.map((t) => method.prefix + t),
+  ];
+  sb.args = [...args, "--allowedTools", allowed.join(","), ...(model ? ["--model", model] : [])];
+  sb.cli = (...a) => {
+    const [cmd, pre] = method.cli(sb);
+    return execFileSync(cmd, [...pre, ...a], { env: sb.env, encoding: "utf8" });
+  };
+  sb.calls = 0;
+  return sb;
+}
 
-const ALLOWED = [
-  "Skill",
-  "ListMcpResourcesTool",
-  "ReadMcpResourceTool",
-  "Read",
-  "mcp__devcoach__log_lesson",
-  "mcp__devcoach__skip_lesson",
-  "mcp__devcoach__get_lessons",
-  "mcp__devcoach__submit_feedback",
-  "mcp__devcoach__star_lesson",
-  "mcp__devcoach__update_notebook",
-].join(",");
-
-function claude(prompt) {
-  // stream-json: `claude -p` prints only the FINAL message, but the lesson card is
-  // legitimately printed in the assistant message BEFORE the log_lesson tool call —
-  // collect every assistant text block of the turn instead.
+/** One `claude -p` turn. Returns every assistant text block, the session id and the MCP status. */
+function claude(sb, prompt, { resume, planMode } = {}) {
+  sb.calls += 1;
   const res = spawnSync(
     "claude",
     [
@@ -166,56 +250,272 @@ function claude(prompt) {
       "--output-format",
       "stream-json",
       "--verbose",
-      "--mcp-config",
-      mcpConfig,
-      "--strict-mcp-config",
-      "--allowedTools",
-      ALLOWED,
-      ...claudeArgs,
+      ...(resume ? ["--resume", resume] : []),
+      ...(planMode ? ["--permission-mode", "plan"] : []),
+      ...sb.args,
     ],
-    { env, cwd, encoding: "utf8", timeout: 300_000, maxBuffer: 64 * 1024 * 1024 },
+    { env: sb.env, cwd: sb.cwd, encoding: "utf8", timeout: 420_000, maxBuffer: 64 * 1024 * 1024 },
   );
   if (res.error) fatal(`claude -p failed to spawn: ${res.error.message}`);
+  // stream-json: `-p` prints only the FINAL message, but a lesson card is legitimately printed
+  // BEFORE the log_lesson call — collect every assistant text block of the turn.
   let out = "";
+  let session = null;
+  let servers = [];
+  const toolCalls = [];
   for (const line of (res.stdout ?? "").split("\n")) {
     if (!line.trim()) continue;
     try {
       const evt = JSON.parse(line);
-      if (evt.type === "assistant") {
+      if (evt.type === "system" && evt.subtype === "init") {
+        session = evt.session_id ?? session;
+        servers = evt.mcp_servers ?? servers;
+      } else if (evt.type === "assistant") {
         for (const block of evt.message?.content ?? []) {
           if (block.type === "text" && block.text) out += `${block.text}\n`;
+          if (block.type === "tool_use") toolCalls.push(block.name);
         }
-      } else if (evt.type === "result" && typeof evt.result === "string") {
-        // interleaved-visibility safety net: the result repeats the final text
-        if (!out.includes(evt.result)) out += `${evt.result}\n`;
+      } else if (evt.type === "result") {
+        session = evt.session_id ?? session;
+        if (typeof evt.result === "string" && !out.includes(evt.result)) out += `${evt.result}\n`;
       }
     } catch {
-      out += `${line}\n`; // non-JSON line (e.g. "Not logged in") — keep it visible
+      out += `${line}\n`; // a non-JSON line (e.g. "Not logged in") — keep it visible
     }
   }
-  return { out, err: res.stderr ?? "", status: res.status };
+  return { out, session, servers, toolCalls, status: res.status, err: res.stderr ?? "" };
 }
 
-const lessonCount = () => {
-  const db = new DatabaseSync(dbPath);
+const query = (sb, sql) => {
+  if (!existsSync(sb.dbPath)) return null;
+  const conn = new DatabaseSync(sb.dbPath);
   try {
-    return Number(db.prepare("SELECT COUNT(*) AS n FROM lessons").get().n);
+    return conn.prepare(sql).get() ?? null;
+  } catch {
+    return null;
   } finally {
-    db.close();
+    conn.close();
   }
 };
-const cueState = () => {
-  const db = new DatabaseSync(dbPath);
-  try {
-    return db.prepare("SELECT pending, last_skip_reason FROM cue_state WHERE id = 1").get() ?? {};
-  } finally {
-    db.close();
+const count = (sb, table) => Number(query(sb, `SELECT COUNT(*) AS n FROM ${table}`)?.n ?? 0);
+const notebookText = (sb) => (existsSync(sb.notebook) ? readFileSync(sb.notebook, "utf8") : "");
+const BAND = /### ─+ 🎓 devcoach ─+/g;
+const TECH_PROMPT =
+  "Review this TypeScript function and point out the bug, briefly:\n\n" +
+  "```ts\nfunction sum(xs: number[]): number {\n  let total = 0;\n  for (let i = 0; i <= xs.length; i++) total += xs[i];\n  return total;\n}\n```";
+
+function seedProfile(sb, { notebook = true } = {}) {
+  sb.cli("knowledge-add", "typescript", "--confidence", "4");
+  sb.cli("set", "nudge_every", "0"); // every eligible stop cues
+  sb.cli("set", "min_gap_minutes", "240");
+  sb.cli("set", "max_per_day", "99");
+  if (notebook) {
+    writeFileSync(
+      sb.notebook,
+      "# devcoach — Coaching Notebook\n\n## Observations\nSeeded by e2e.\n",
+    );
   }
+}
+
+// ── Session kinds ─────────────────────────────────────────────────────────────
+// Each: { about, calls (claude turns), run(sb, check) }.
+const KINDS = {
+  "fresh-cue": {
+    about:
+      "no profile → the stop hook cues onboarding → the user picks Automatic → profile + notebook saved",
+    calls: 2,
+    run(sb, check) {
+      const t1 = claude(sb, TECH_PROMPT);
+      const server = t1.servers.find((s) => /devcoach/.test(s.name));
+      check(
+        "the devcoach server is connected in the very first session",
+        server?.status === "connected",
+        JSON.stringify(t1.servers.map((s) => `${s.name}:${s.status}`)),
+      );
+      check(
+        "the first turn ends by offering setup, leading with Automatic",
+        /automatic/i.test(t1.out),
+        t1.out.slice(-160).replace(/\s+/g, " "),
+      );
+      check("nothing is saved before the user chooses", count(sb, "knowledge") === 0);
+      // The sandbox has no Claude Code history — the case of every new machine. The cue does
+      // not load the skill, so what makes a bare "Automatic" end in a saved profile here is
+      // get_onboarding's `next_step` (an empty scan starts from default_topics).
+      const t2 = claude(sb, "Automatic", { resume: t1.session });
+      check(
+        "complete_onboarding was called",
+        t2.toolCalls.some((n) => n.endsWith("complete_onboarding")),
+        t2.toolCalls.join(", "),
+      );
+      check(
+        "the knowledge map has topics",
+        count(sb, "knowledge") > 0,
+        `${count(sb, "knowledge")} topics`,
+      );
+      check(
+        "the notebook was written",
+        notebookText(sb).length > 200,
+        `${notebookText(sb).length} chars`,
+      );
+      check("no lesson was delivered in the onboarding turn", count(sb, "lessons") === 0);
+    },
+  },
+  "fresh-explicit": {
+    about:
+      "no profile → the user asks for setup in words (what /devcoach:setup runs) → saved in one turn",
+    calls: 1,
+    run(sb, check) {
+      const t = claude(
+        sb,
+        "Set up devcoach for me. I choose Automatic mode: do not ask me to pick, I confirm Automatic.",
+      );
+      check(
+        "complete_onboarding was called",
+        t.toolCalls.some((n) => n.endsWith("complete_onboarding")),
+        t.toolCalls.join(", "),
+      );
+      check(
+        "the knowledge map has topics",
+        count(sb, "knowledge") > 0,
+        `${count(sb, "knowledge")} topics`,
+      );
+      check(
+        "the notebook was written",
+        notebookText(sb).length > 200,
+        `${notebookText(sb).length} chars`,
+      );
+      check("no lesson was delivered in the onboarding turn", count(sb, "lessons") === 0);
+    },
+  },
+  lesson: {
+    about: "onboarded, technical task → one visible lesson card, one logged lesson",
+    calls: 1,
+    run(sb, check) {
+      seedProfile(sb);
+      let t = claude(sb, TECH_PROMPT);
+      let bands = (t.out.match(BAND) ?? []).length;
+      if (count(sb, "lessons") !== 1 || bands === 0) {
+        console.log("    (retrying once — model nondeterminism)");
+        t = claude(sb, "Now review the same pattern in a for-of variant and comment briefly.");
+        bands = (t.out.match(BAND) ?? []).length;
+      }
+      check(
+        "exactly one lesson row was logged",
+        count(sb, "lessons") === 1,
+        `got ${count(sb, "lessons")}`,
+      );
+      // log_lesson does not echo the card — a second print is the double-card regression.
+      check("the card is printed exactly once", bands === 1, `bands: ${bands}`);
+      check(
+        "cue resolved (no pending retry)",
+        Number(query(sb, "SELECT pending FROM cue_state WHERE id = 1")?.pending ?? 0) === 0,
+      );
+    },
+  },
+  skip: {
+    about: "onboarded, small talk → skip_lesson, no card, no stray feedback line",
+    calls: 1,
+    run(sb, check) {
+      seedProfile(sb);
+      sb.cli("set", "min_gap_minutes", "0");
+      const t = claude(sb, "Ciao! Come stai oggi? Nessuna domanda tecnica, solo due chiacchiere.");
+      check("no lesson row was logged", count(sb, "lessons") === 0);
+      check("no lesson card in the reply", (t.out.match(BAND) ?? []).length === 0);
+      check("no stray feedback line after the skip", !/Did that land/.test(t.out));
+      const reason = query(
+        sb,
+        "SELECT last_skip_reason FROM cue_state WHERE id = 1",
+      )?.last_skip_reason;
+      check(
+        "the model declined explicitly via skip_lesson",
+        typeof reason === "string" && reason.length > 0,
+        reason ? `reason: "${reason}"` : "no skip recorded",
+      );
+    },
+  },
+  "plan-mode": {
+    about: "no profile, plan mode → no onboarding cue, nothing saved",
+    calls: 1,
+    run(sb, check) {
+      const t = claude(
+        sb,
+        "Plan how you would add a --json flag to a small CLI. Two bullet points.",
+        { planMode: true },
+      );
+      check(
+        "no setup question in a plan-mode turn",
+        !/automatic \(deep\)|how (do|would) you (want|like) to set (it|devcoach) up/i.test(t.out),
+      );
+      check("nothing was saved", count(sb, "knowledge") === 0);
+    },
+  },
+  restored: {
+    about: "knowledge present, notebook missing (a restored backup) → only the notebook step runs",
+    calls: 1,
+    run(sb, check) {
+      seedProfile(sb, { notebook: false });
+      sb.cli("set", "nudge_every", "99");
+      const before = count(sb, "knowledge");
+      claude(
+        sb,
+        "Check my devcoach setup and finish whatever is still missing. Do not ask me anything.",
+      );
+      check(
+        "the notebook was written",
+        notebookText(sb).length > 200,
+        `${notebookText(sb).length} chars`,
+      );
+      check(
+        "the knowledge map was left as it was",
+        count(sb, "knowledge") === before,
+        `${before} → ${count(sb, "knowledge")}`,
+      );
+    },
+  },
 };
 
-// ── Preflight: auth ───────────────────────────────────────────────────────────
+const SMOKE = ["plugin-tree:fresh-cue", "plugin-tree:lesson", "mcp-entry:fresh-explicit"];
+const grid = Object.keys(METHODS).flatMap((m) =>
+  Object.entries(KINDS)
+    .filter(([, k]) => !k.only || k.only.includes(m))
+    .map(([k]) => `${m}:${k}`),
+);
+
+// ── Selection ─────────────────────────────────────────────────────────────────
+const only = option("--only");
+const selected = only ? only.split(",") : flag("--all") ? grid : SMOKE;
+for (const id of selected) if (!grid.includes(id)) fatal(`unknown scenario "${id}" — see --list`);
+const callsOf = (ids) => ids.reduce((n, id) => n + KINDS[id.split(":")[1]].calls, 0);
+
+if (flag("--list")) {
+  console.log("Installation methods:");
+  for (const [id, m] of Object.entries(METHODS)) console.log(`  ${id.padEnd(14)} ${m.about}`);
+  console.log("\nSession kinds:");
+  for (const [id, k] of Object.entries(KINDS))
+    console.log(`  ${id.padEnd(14)} ${k.about} (${k.calls} claude call${k.calls > 1 ? "s" : ""})`);
+  console.log(`\nSmoke (default): ${SMOKE.join(", ")} — ${callsOf(SMOKE)} claude calls`);
+  console.log(`All (--all): ${grid.length} scenarios — ${callsOf(grid)} claude calls`);
+  process.exit(0);
+}
+
+// ── Preflight ─────────────────────────────────────────────────────────────────
+if (!existsSync(bin))
+  fatal("dist/bin.js not found — run `npm run build` first (or use npm run test:e2e)");
+if (spawnSync("which", ["claude"], { encoding: "utf8" }).status !== 0)
+  fatal("`claude` CLI not found on PATH — install Claude Code first");
+
+console.log(
+  `mode: ${hermetic ? "hermetic (sandbox HOME)" : "attached (real Claude auth, sandboxed devcoach state)"}${model ? ` · model ${model}` : ""}`,
+);
+console.log(
+  `${selected.length} scenario${selected.length > 1 ? "s" : ""}, about ${callsOf(selected) + 1} claude calls (plus retries)\n`,
+);
+
 console.log("preflight: checking claude auth…");
-const smoke = claude("Reply with exactly: ok");
+const probe = makeSandbox("mcp-entry", "preflight");
+probe.cli("knowledge-add", "typescript", "--confidence", "4"); // a profile: the auth check must not onboard
+probe.cli("set", "nudge_every", "99");
+const smoke = claude(probe, "Reply with exactly: ok");
 if (smoke.status !== 0 || /not logged in/i.test(smoke.out)) {
   console.error((smoke.err || smoke.out).slice(0, 2000));
   fatal(
@@ -224,63 +524,52 @@ if (smoke.status !== 0 || /not logged in/i.test(smoke.out)) {
       : "claude -p failed with the real config — log in first (`claude login`), or set CLAUDE_CODE_OAUTH_TOKEN for hermetic mode.",
   );
 }
+if (!keep) rmSync(probe.dir, { recursive: true, force: true });
 console.log("preflight ok\n");
-cli("set", "nudge_every", "0"); // now every eligible stop cues
-// A realistic gap isolates the double-print check: without it, the stop right after
-// log_lesson re-cues (pacing disabled + no gap) and the model legitimately prints a
-// second card — the deferred same-turn re-cue, not the double-print bug under test.
-cli("set", "min_gap_minutes", "240");
 
-const BAND = /### ─+ 🎓 devcoach ─+/g;
-
-// ── Scenario 1: technical task → visible lesson card + logged lesson ──────────
-console.log("scenario 1: technical task → lesson card + log_lesson");
-const before = lessonCount();
-let s1 = claude(
-  "Review this TypeScript function and point out the bug, briefly:\n\n" +
-    "```ts\nfunction sum(xs: number[]): number {\n  let total = 0;\n  for (let i = 0; i <= xs.length; i++) total += xs[i];\n  return total;\n}\n```",
-);
-let gained = lessonCount() - before;
-let bands = (s1.out.match(BAND) ?? []).length;
-if (gained !== 1 || bands === 0) {
-  console.log("  (retrying once — model nondeterminism)");
-  s1 = claude("Now review the same pattern in a for-of variant and comment briefly.");
-  gained = lessonCount() - before;
-  bands = (s1.out.match(BAND) ?? []).length;
+// ── Run ───────────────────────────────────────────────────────────────────────
+const results = [];
+for (const id of selected) {
+  const [methodId, kindId] = id.split(":");
+  const method = METHODS[methodId];
+  const kind = KINDS[kindId];
+  const unavailable = method.available?.();
+  if (unavailable) {
+    console.log(`▷ ${id} — skipped: ${unavailable}\n`);
+    results.push({ id, name: "(skipped)", pass: true, skipped: true });
+    continue;
+  }
+  const sb = makeSandbox(methodId, kindId);
+  console.log(`▶ ${id}${sb.note ? ` (${sb.note})` : ""}\n  ${kind.about}`);
+  const check = (name, pass, detail = "") => {
+    results.push({ id, name, pass: Boolean(pass) });
+    console.log(`    ${pass ? "✅" : "❌"} ${name}${detail ? ` — ${detail}` : ""}`);
+  };
+  try {
+    kind.run(sb, check);
+  } catch (err) {
+    check("scenario ran to the end", false, String(err?.message ?? err).slice(0, 300));
+  }
+  console.log(
+    `  ${sb.calls} claude call${sb.calls > 1 ? "s" : ""}${keep ? ` · sandbox ${sb.dir}` : ""}\n`,
+  );
+  if (!keep) rmSync(sb.dir, { recursive: true, force: true });
 }
-check("exactly one lesson row was logged", gained === 1, `got ${gained}`);
-check("the lesson card is visible in the reply", bands >= 1, `bands: ${bands}`);
-// log_lesson does not echo the card — a second print is the double-card
-// regression, not tolerable slack.
-check("the card is printed exactly once", bands === 1, `bands: ${bands}`);
-check("cue resolved (no pending retry)", Number(cueState().pending ?? 0) === 0);
 
-// ── Scenario 2: non-technical prompt → skip_lesson, no card ───────────────────
-console.log("\nscenario 2: non-technical prompt → skip_lesson, no card");
-// The skip path needs a cue to decline — drop the gap again so the lesson logged in
-// scenario 1 doesn't rate-limit this turn's cue.
-cli("set", "min_gap_minutes", "0");
-const before2 = lessonCount();
-const s2 = claude("Ciao! Come stai oggi? Nessuna domanda tecnica, solo due chiacchiere.");
-const bands2 = (s2.out.match(BAND) ?? []).length;
-check("no lesson row was logged", lessonCount() === before2, `delta ${lessonCount() - before2}`);
-check("no lesson card in the reply", bands2 === 0, `bands: ${bands2}`);
-// A declined cue must be fully silent — the feedback prompt belongs only under a
-// delivered card (observed regression: a stray line after skip_lesson).
-check("no stray feedback line after the skip", !/Did that land/.test(s2.out));
-const skipReason = cueState().last_skip_reason;
-check(
-  "the model declined explicitly via skip_lesson",
-  typeof skipReason === "string" && skipReason.length > 0,
-  skipReason ? `reason: "${skipReason}"` : "no skip recorded",
-);
-
-// ── Wrap up ───────────────────────────────────────────────────────────────────
+// ── Report ────────────────────────────────────────────────────────────────────
 const failed = results.filter((r) => !r.pass);
-console.log(`\n${results.length - failed.length}/${results.length} checks passed`);
-if (keep) console.log(`sandbox kept at ${sandbox}`);
-else {
-  rmSync(sandbox, { recursive: true, force: true });
-  rmSync(cwd, { recursive: true, force: true });
+const checks = results.filter((r) => !r.skipped);
+console.log("─".repeat(72));
+for (const id of selected) {
+  const mine = results.filter((r) => r.id === id);
+  const state = mine.some((r) => r.skipped)
+    ? "skipped"
+    : mine.every((r) => r.pass)
+      ? "pass"
+      : "FAIL";
+  console.log(`${state.padEnd(8)} ${id}`);
+  for (const r of mine.filter((x) => !x.pass)) console.log(`           ❌ ${r.name}`);
 }
+console.log(`\n${checks.length - failed.length}/${checks.length} checks passed`);
+if (tarball && !keep) rmSync(dirname(tarball), { recursive: true, force: true });
 process.exit(failed.length ? 1 : 0);

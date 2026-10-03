@@ -21,7 +21,10 @@ background.
 ## Onboarding
 
 The first time your agent connects, devcoach notices your profile isn't set up and walks you through it
-inline — no separate command. You pick one of four options.
+inline, after your first task. You can also start it yourself: **`/devcoach:setup`** in the Claude Code
+plugin (it first checks that devcoach is running — see
+[troubleshooting](../install/claude-code-plugin.md#troubleshooting) if it isn't), or just say *"set up
+devcoach"* in any agent. You pick one of four options.
 
 ### Automatic (strongly recommended)
 

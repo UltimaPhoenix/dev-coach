@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import * as db from "../src/core/db";
 import { ShareInputError } from "../src/core/share";
 import { fetchSharedInput } from "../src/core/share-fetch";
-import { createServer } from "../src/mcp/server";
+import { createServer, onboardingNextStep } from "../src/mcp/server";
 
 vi.mock("../src/core/share-fetch", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../src/core/share-fetch")>();
@@ -62,6 +62,33 @@ describe("mcp server", () => {
       Object.keys(onboardingRes).sort(),
     );
     expect(onboarding.structuredContent.detected_stack).toEqual(onboardingRes.detected_stack);
+    await client.close();
+    await server.close();
+  });
+
+  // The Stop hook's cue has the model call get_onboarding and does not load the skill, so the
+  // payload itself must say what to do — above all on a machine with no Claude Code history,
+  // where a real session ended in a loop of questions instead of a profile.
+  it("get_onboarding says what to do next: empty history never blocks Automatic", async () => {
+    const empty = onboardingNextStep(false, false, false) as string;
+    expect(empty).toContain("does NOT block Automatic");
+    expect(empty).toContain("use default_topics exactly as returned");
+    expect(empty).toContain("Do not stop, do not ask again");
+    expect(empty).toContain("never pick for them");
+    expect(empty).toContain("complete_onboarding");
+    const detected = onboardingNextStep(false, false, true) as string;
+    expect(detected).toContain("from detected_stack enriched with default_topics");
+    expect(detected).not.toContain("No Claude Code history");
+    expect(onboardingNextStep(true, false, true)).toContain("only the notebook is missing");
+    expect(onboardingNextStep(true, true, true)).toBeNull();
+
+    const { client, server } = await connect();
+    // (the suite shares one sandbox: an earlier test may already have onboarded it)
+    const before: any = await client.callTool({ name: "get_onboarding", arguments: {} });
+    expect(before.structuredContent).toHaveProperty("next_step");
+    await client.callTool({ name: "complete_onboarding", arguments: { topics: { python: 4 } } });
+    const after: any = await client.callTool({ name: "get_onboarding", arguments: {} });
+    expect(after.structuredContent.next_step).toBeNull(); // profile + notebook placeholder: done
     await client.close();
     await server.close();
   });

@@ -6,6 +6,26 @@ Notable changes to devcoach. Versions follow [Semantic Versioning](https://semve
 
 ## [Unreleased]
 
+### Fixed
+- **The plugin no longer fails silently** ("`plugin:devcoach:devcoach` failed to connect to MCP
+  server" with no reason). The launcher behind the Claude Code plugin and the Gemini extension
+  was rewritten around the cases that produced it: Node older than 24 is named as such; an
+  install interrupted halfway can no longer look installed (npm runs in a temporary directory
+  that is renamed into place); the server and the first prompt's hook no longer race on a fresh
+  machine; a hook never makes a prompt wait for npm (it installs in the background); npm's output
+  is kept in `install.log`; the server exits with the reason instead of code 0; and the hooks
+  show one "devcoach is not running: …" notice a day instead of nothing. Works on Windows' npm.
+- **Onboarding no longer stalls on a new machine.** With no Claude Code history to scan, choosing
+  *Automatic* after devcoach's first offer ended in a loop of questions instead of a profile.
+  `get_onboarding` now says what to do with its own answer (`next_step`): an empty scan starts
+  from devcoach's general topic map, saved in the same turn. The hooks are unchanged.
+
+### Added
+- **`/devcoach:setup`** (Claude Code plugin): checks the runtime, then the server, then builds
+  your profile — the explicit way in, and the first thing to run when coaching never starts.
+  `/devcoach:setup redo` rebuilds the profile. The plugin guide gained a Troubleshooting section.
+- `devcoach doctor` shows which launcher started it and where its runtime lives.
+
 ### Changed
 - **Docs show courses**: the screenshot fixture carries two demo courses (a cache stampede read off
   the origin's load curve; retry backoff and jitter), each with charts the document draws from

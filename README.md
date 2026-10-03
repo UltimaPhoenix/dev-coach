@@ -486,7 +486,9 @@ Plugin releases up to 1.0.1 shipped a manifest that current Claude Code rejects,
 
 **"MCP server not connecting"**
 
-Run `devcoach install` to re-register the server with Claude Code or Claude Desktop, then restart the agent. If the issue persists, check `~/.claude.json` (Claude Code) and confirm the `devcoach` entry is present and the command is correct.
+*With the Claude Code plugin* (`plugin:devcoach:devcoach failed to connect`): run **`/devcoach:setup`** — its first step prints the reason (Node older than 24, `npm` not on the PATH, no network on the first run) and the fix; then reconnect from `/mcp`. Do **not** run `devcoach install` for a plugin. Details: [plugin troubleshooting](https://ultimaphoenix.github.io/dev-coach/install/claude-code-plugin#troubleshooting).
+
+*Without the plugin* (npm / Homebrew): run `devcoach install` to re-register the server with Claude Code or Claude Desktop, then restart the agent. If the issue persists, check `~/.claude.json` (Claude Code) and confirm the `devcoach` entry is present and the command is correct.
 
 **"Coaching isn't firing / no lessons appear"**
 

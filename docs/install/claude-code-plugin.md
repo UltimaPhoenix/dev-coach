@@ -22,6 +22,15 @@ With the plugin you do **not** need to run `devcoach install` — registering th
 double-count interactions. `devcoach install` detects an enabled plugin and skips the hooks
 automatically, and `devcoach doctor` flags a double registration.
 
+## Before you install
+
+The plugin runs devcoach with **your** Node, so the machine needs:
+
+- **Node.js 24 or newer** on the `PATH` Claude Code uses (`node --version`). devcoach uses Node's
+  built-in SQLite; Node 20 and 22 cannot run it.
+- **npm** next to it (it comes with Node), and a network connection **the first time** — the plugin
+  installs the pinned devcoach version once, then works offline.
+
 ## Install
 
 Add the UltimaPhoenix marketplace once, then install devcoach from it:
@@ -34,6 +43,18 @@ Add the UltimaPhoenix marketplace once, then install devcoach from it:
 The marketplace is pinned to each devcoach release by CI and carries every UltimaPhoenix plugin, so a
 new one is a single `/plugin install` away. The MCP server, hooks and skill activate on install — no
 restart needed.
+
+## Set it up
+
+```bash
+/devcoach:setup
+```
+
+It checks that devcoach can run on this machine, that its server is connected, and then builds your
+coaching profile (you pick how: *Automatic* from your Claude Code history is the recommended one).
+You can also skip it: after your first task devcoach offers the same setup on its own. Run it again
+any time — it tells you what is already in place — and `/devcoach:setup redo` rebuilds the profile
+from scratch.
 
 ### Updating
 
@@ -163,5 +184,50 @@ machine's home directory:
 
 It needs **Node.js ≥ 24** (for Node's embedded `node:sqlite`) and a one-time network connection on first
 use (to install the pinned `devcoach` package into the plugin's data dir); after that it runs offline.
+
+## Troubleshooting
+
+### `plugin:devcoach:devcoach` failed to connect to MCP server
+
+Claude Code could not start devcoach's server. Run **`/devcoach:setup`**: its first step prints the
+reason. Or ask the plugin directly from a terminal:
+
+```bash
+node ~/.claude/plugins/cache/ultimaphoenix/devcoach/*/scripts/launch.mjs doctor
+```
+
+| What it says | Fix |
+|---|---|
+| `Node 22.x is too old` | Install Node 24 or newer (`brew upgrade node`), then restart Claude Code. With a version manager, make sure the **default** version is ≥ 24: Claude Code starts `node` from its own `PATH`, not from your shell's current selection |
+| `` `npm` was not found on the PATH `` | Install Node with npm (`brew install node`), then restart |
+| `could not install devcoach … from npm` | The first run needs the network. The log path is in the message (`install.log` in the plugin's data dir) — a proxy or an offline machine shows there. Restart once you are online |
+| `devcoach … could not start` | The installed copy was damaged; the plugin has already removed it and reinstalls on the next start. Reconnect from `/mcp` |
+
+After fixing it, reconnect without restarting: `/mcp` → `plugin:devcoach:devcoach` → *Reconnect*.
+
+Still stuck? Start over from a clean copy — your lessons and profile live in `~/.devcoach` and are
+not touched:
+
+```bash
+rm -rf ~/.claude/plugins/data/devcoach-ultimaphoenix     # the plugin's installed copy of devcoach
+```
+
+then `/mcp` → *Reconnect*. For the full story of one failed start, run `claude --debug` and read
+`~/.claude/debug/<session-id>.txt`: the server's own error line is in there.
+
+Do **not** run `devcoach install` to fix a plugin: that command wires devcoach *without* the plugin,
+and the two together count every interaction twice.
+
+### A notice says "devcoach is not running"
+
+Same causes as above: the hooks found that devcoach cannot start and said so once (at most one
+notice a day; they never interrupt your work). `/devcoach:setup` shows the reason.
+
+### Coaching never starts
+
+`/devcoach:setup` first. When it reports everything in place, remember the pacing is quiet on
+purpose: with the defaults a lesson is cued after ten interactions in a session, at most two a day.
+`devcoach doctor` (or `npx -y devcoach doctor`) ends with a verdict on why the next stop would or
+would not cue one.
 
 → Next: **[Coaching in your agent](../usage/coaching.md)**.
