@@ -17,7 +17,7 @@ import Head from "@docusaurus/Head";
           name: "What is devcoach?",
           acceptedAnswer: {
             "@type": "Answer",
-            text: "devcoach is a free, local, open-source MCP (Model Context Protocol) server that delivers one short, in-context lesson after each task your AI agent completes. It runs alongside Claude Code, Claude Desktop, Gemini CLI and Codex CLI (both beta), Cursor, and other MCP-compatible tools, and keeps a private knowledge map so lessons are calibrated to what you already know.",
+            text: "devcoach is a free, local, open-source MCP (Model Context Protocol) server that delivers one short, in-context lesson after each task your AI agent completes. It runs alongside Claude Code, Claude Desktop, Gemini CLI and Codex CLI (both beta), Cursor, and other MCP-compatible tools, and keeps a private knowledge map of what you already know, so each lesson teaches something you don't know yet, pitched at your level.",
           },
         },
         {
@@ -57,7 +57,7 @@ import Head from "@docusaurus/Head";
           name: "How is devcoach different from Copilot or Cursor inline explanations?",
           acceptedAnswer: {
             "@type": "Answer",
-            text: "Inline AI explanations answer the immediate question; devcoach teaches the reasoning and the anti-patterns so the knowledge transfers to the next problem. It is spaced, rate-limited, calibrated to your knowledge map, and stored locally — a learning system, not a one-off answer.",
+            text: "Inline AI explanations answer the immediate question; devcoach teaches the reasoning and the anti-patterns so the knowledge transfers to the next problem. It is spaced, rate-limited, aimed at the gaps in your knowledge map, and stored locally — a learning system, not a one-off answer.",
           },
         },
         {
@@ -118,7 +118,8 @@ Short answers to the things people most often ask about devcoach. For the longer
 devcoach is a free, local, open-source MCP (Model Context Protocol) server that delivers one short,
 in-context lesson after each task your AI agent completes. It runs alongside Claude Code, Claude
 Desktop, Gemini CLI and Codex CLI (both beta), Cursor, and other MCP-compatible tools, and keeps a
-private knowledge map so lessons are calibrated to what you already know.
+private knowledge map of what you already know, so each lesson teaches something you don't know yet,
+pitched at your level.
 
 ## Is there a free, local MCP server that teaches you while you code?
 
@@ -150,8 +151,8 @@ coaching data lives in a single SQLite file at `~/.devcoach/coaching.db` on your
 ## How is devcoach different from Copilot or Cursor inline explanations?
 
 Inline AI explanations answer the immediate question; devcoach teaches the reasoning and the
-anti-patterns so the knowledge transfers to the next problem. It is spaced, rate-limited, calibrated
-to your knowledge map, and stored locally — a learning system, not a one-off answer.
+anti-patterns so the knowledge transfers to the next problem. It is spaced, rate-limited, aimed at
+the gaps in your knowledge map, and stored locally — a learning system, not a one-off answer.
 
 ## How much does devcoach cost?
 

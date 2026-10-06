@@ -1,6 +1,6 @@
 # devcoach
 
-> devcoach is a free, local, open-source MCP (Model Context Protocol) server that turns every task your AI agent finishes into one short, in-context lesson — progressive technical coaching for Claude Code, Claude Desktop, Gemini CLI, Codex CLI, Cursor, and other MCP-compatible tools. Everything stays on your machine in a single SQLite file: no accounts, no telemetry, no calls home.
+> devcoach is a free, local, open-source MCP (Model Context Protocol) server that turns the tasks your AI agent finishes into short, in-context lessons on what you don't know yet — progressive technical coaching for Claude Code, Claude Desktop, Gemini CLI, Codex CLI, Cursor, and other MCP-compatible tools. Everything stays on your machine in a single SQLite file: no accounts, no telemetry, no calls home.
 
 Install: `npx -y devcoach install` (registers the MCP server, the coaching hooks and the skill) · MCP config for any client: `{ "mcpServers": { "devcoach": { "type": "stdio", "command": "npx", "args": ["-y", "devcoach", "mcp"] } } }` · MCP Registry name: `io.github.UltimaPhoenix/devcoach`
 

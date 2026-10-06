@@ -1,6 +1,6 @@
 ---
 title: devcoach
-description: Stay sharp while your AI does the work. devcoach is a free, local, open-source MCP server that delivers one short, in-context lesson after every task your AI agent completes — for Claude Code, Claude Desktop, Gemini CLI, Codex CLI, Cursor and other MCP tools.
+description: Stay sharp while your AI does the work. devcoach is a free, local, open-source MCP server that teaches you what you don't know yet — one short, in-context lesson drawn from a task your AI agent just completed — for Claude Code, Claude Desktop, Gemini CLI, Codex CLI, Cursor and other MCP tools.
 keywords: [devcoach, MCP server, AI coding coach, Claude Code, Claude Desktop, Gemini CLI, Codex CLI, Cursor, Model Context Protocol, learn while coding, developer learning]
 hide_table_of_contents: true
 ---
@@ -9,7 +9,7 @@ import ThemedShot from "@site/src/components/ThemedShot";
 
 # Stay sharp while your AI does the work.
 
-You're shipping more than ever and understanding less. devcoach fixes that with one lesson at a time, delivered right after your agent completes a task — in Claude Code, Claude Desktop, Gemini CLI, Codex CLI, Cursor and other MCP tools.
+You're shipping more than ever and understanding less. devcoach fixes that with one lesson at a time on something you don't know yet, delivered right after your agent completes a task — in Claude Code, Claude Desktop, Gemini CLI, Codex CLI, Cursor and other MCP tools.
 
 - **[Install in 30 seconds](./install)** — get started now
 - **[See it in use](./usage/coaching)** — onboarding, your first lesson, the feedback loop
@@ -41,7 +41,7 @@ allSettled when partial success is meaningful and you want to report failures.
 AbortController gives you all-or-nothing with prompt cancellation.
 ### ──────── typescript · mid ────────
 
-Did that land? ✅ know (y) · ❌ don't know (n)
+Did that land? ✅ knew it (y) · 💡 understood (u) · ❌ couldn't follow (n)
 ```
 
 ---
@@ -56,7 +56,7 @@ The first time your agent connects, devcoach scans your **local Claude Code hist
 
 ### Feedback in one keystroke, coaching that stays quiet
 
-Under every lesson card: `Did that land? ✅ know (y) · ❌ don't know (n)`. Reply `y` or `n` to adjust your confidence on that topic — or just keep working: no reply means no change. By default devcoach delivers **at most 2 lessons a day, at least 4 hours apart**, cues one only every ~10 interactions per chat session, and never during plan-mode turns.
+Under every lesson card: `Did that land? ✅ knew it (y) · 💡 understood (u) · ❌ couldn't follow (n)`. Reply `y` when you already knew it (confidence on that topic goes up, so the next lessons there go deeper), `u` when it was new and clear, `n` when it was too dense (it's kept as a seed for a step-by-step course) — or just keep working: no reply means no change. By default devcoach delivers **at most 2 lessons a day, at least 4 hours apart**, cues one only every ~10 interactions per chat session, and never during plan-mode turns.
 
 **[The feedback loop →](./usage/coaching#the-feedback-loop)**
 

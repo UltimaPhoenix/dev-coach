@@ -10,9 +10,9 @@ Pick a method in **[Installation](../install/index.md)** — it takes about 30 s
 :::
 
 This is devcoach's main job: **automatic, in-context coaching** while you work with your AI agent. After
-your agent finishes a technical task, devcoach appends one short lesson about something that task touched —
-calibrated to what you already know. There's nothing to open and no command to run; it happens in the
-background.
+your agent finishes a technical task, devcoach appends one short lesson about something that task touched
+and you don't know yet — what your knowledge map says you already know is skipped, the rest is pitched at
+your level. There's nothing to open and no command to run; it happens in the background.
 
 > The [CLI](./cli.md) and [web dashboard](./web-ui.md) are *secondary* ways to review and manage your
 > data — this page is the core experience. See [How it works](../how-it-works.md) for the decision flow

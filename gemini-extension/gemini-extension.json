@@ -1,7 +1,7 @@
 {
   "name": "devcoach",
   "version": "2.6.3",
-  "description": "Progressive technical coach: auto-delivers personalized lessons as you work, tracks your knowledge map, all local. Bundles the devcoach MCP server + AfterAgent hooks + coaching skill.",
+  "description": "Progressive technical coach: teaches you what you don't know yet as you work, tracks your knowledge map, all local. Bundles the devcoach MCP server + AfterAgent hooks + coaching skill.",
   "mcpServers": {
     "devcoach": {
       "command": "node",

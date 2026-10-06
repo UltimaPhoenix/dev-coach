@@ -2,7 +2,7 @@
   "name": "devcoach",
   "version": "2.6.3",
   "mcpName": "io.github.UltimaPhoenix/devcoach",
-  "description": "Stay sharp while your AI does the work — learn from every task with in-context coaching, all local, all free",
+  "description": "Stay sharp while your AI does the work — learn what you don't know yet from the tasks your agent completes, with in-context coaching, all local, all free",
   "license": "AGPL-3.0-only",
   "keywords": [
     "mcp",

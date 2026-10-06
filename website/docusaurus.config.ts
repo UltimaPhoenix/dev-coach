@@ -12,7 +12,7 @@ const SITE_URL = "https://ultimaphoenix.github.io/dev-coach/";
 const NEXT = process.env.DOCS_NEXT === "1";
 const NEXT_URL = `${SITE_URL}next/`;
 const DESCRIPTION =
-  "devcoach is a free, local, open-source MCP server that turns every task your AI agent finishes into one short, in-context lesson — progressive technical coaching for Claude Code, Claude Desktop, Gemini CLI, Codex CLI, Cursor, and other MCP tools.";
+  "devcoach is a free, local, open-source MCP server that turns the tasks your AI agent finishes into short, in-context lessons on what you don't know yet — progressive technical coaching for Claude Code, Claude Desktop, Gemini CLI, Codex CLI, Cursor, and other MCP tools.";
 
 // Inline plugin (zero-dep): emit /llms-full.txt — the entire docs corpus concatenated into one
 // file for LLM / answer-engine retrieval. It is the companion to the curated static /llms.txt.

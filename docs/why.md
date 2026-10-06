@@ -14,9 +14,9 @@ other side knowing less about your own stack than when you started.
 
 devcoach exists to break that trade-off. Instead of sending you off to "find time" for a course you will
 never take, it treats the work you are *already doing* as the curriculum. After your agent completes a
-real task, devcoach delivers one short, targeted lesson about something that task touched — calibrated to
-what you already know, in the context where it actually matters. It is learning on the job, automated:
-the lesson arrives at the exact moment the concept is concrete, then gets out of your way.
+real task, devcoach delivers one short, targeted lesson about something that task touched and you don't
+know yet — pitched at your level, in the context where it actually matters. It is learning on the job,
+automated: the lesson arrives at the exact moment the concept is concrete, then gets out of your way.
 
 That is the everyday value. But there is a larger reason the project exists, and it gets more important
 with every model release.

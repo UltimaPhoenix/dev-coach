@@ -7,6 +7,10 @@ Notable changes to devcoach. Versions follow [Semantic Versioning](https://semve
 ## [Unreleased]
 
 ### Changed
+- **Docs say what devcoach is for**: the README, the docs site, the npm, plugin, Gemini and `.mcpb`
+  descriptions now say that a lesson teaches something you don't know yet — the knowledge map is
+  there to skip what you already know, not to repeat it. The docs home page shows the three-answer
+  feedback line (`y` · `u` · `n`) instead of the old two-answer one.
 - **Docs show courses**: the screenshot fixture carries two demo courses (a cache stampede read off
   the origin's load curve; retry backoff and jitter), each with charts the document draws from
   its own functions, so the Courses list and two course pages appear in the user guide and the

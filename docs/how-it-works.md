@@ -70,7 +70,7 @@ flowchart TD
     D -->|no| S --> Z2([Silent — pacing re-armed])
     D -->|yes| E --> G --> F
     F --> H([Done — counter reset])
-    F -.->|prompts| U(["You: ✅ / ❌"])
+    F -.->|prompts| U(["You: ✅ / 💡 / ❌"])
 ```
 
 If a cue goes unresolved (no `log_lesson`, no `skip_lesson`), the next cue arrives after

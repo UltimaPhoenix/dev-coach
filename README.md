@@ -16,7 +16,7 @@
 
 **Stay sharp while your AI does the work.**
 
-devcoach connects to Claude Code, Claude Desktop, Gemini CLI *(beta)*, Codex CLI *(beta)*, Cursor, Windsurf, and other MCP-compatible tools. After every task you complete, it delivers a short targeted lesson calibrated to what you already know — no generic tutorials, no repeated topics, nothing to open.
+devcoach connects to Claude Code, Claude Desktop, Gemini CLI *(beta)*, Codex CLI *(beta)*, Cursor, Windsurf, and other MCP-compatible tools. When your agent finishes a task, devcoach teaches you one thing from it **that you don't know yet**: it keeps a map of what you already know precisely so it can skip it, and pitches each lesson at your level — no generic tutorials, no repeated topics, nothing to open.
 
 Everything runs **locally**. No data leaves your machine. One SQLite file at `~/.devcoach/coaching.db`.
 
@@ -26,7 +26,7 @@ Everything runs **locally**. No data leaves your machine. One SQLite file at `~/
 
 ## Why devcoach?
 
-AI agents now write much of our code — which makes it easy to ship more while understanding less. devcoach turns each task your agent finishes into one short, in-context lesson, so you keep learning as you go. The deeper bet: as AI grows more capable, the scarce skill becomes *validating* what it produces — and that ability only survives if you keep practicing it.
+AI agents now write much of our code — which makes it easy to ship more while understanding less. devcoach turns the tasks your agent finishes into short, in-context lessons on what you don't know yet, so you keep learning as you go. The deeper bet: as AI grows more capable, the scarce skill becomes *validating* what it produces — and that ability only survives if you keep practicing it.
 
 → [Why devcoach exists](docs/why.md)
 
@@ -50,7 +50,7 @@ flowchart TD
 
     S --> Y(["Silent — pacing re-armed"])
     F --> H(["Done — counter reset"])
-    F -.->|prompts| U(["You: ✅ / ❌"])
+    F -.->|prompts| U(["You: ✅ / 💡 / ❌"])
 ```
 
 → [Full decision flow: session startup · lesson selection · depth calibration](docs/how-it-works.md)
