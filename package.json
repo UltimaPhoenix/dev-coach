@@ -1,6 +1,6 @@
 {
   "name": "devcoach",
-  "version": "2.6.3",
+  "version": "2.7.0",
   "mcpName": "io.github.UltimaPhoenix/devcoach",
   "description": "Stay sharp while your AI does the work — learn what you don't know yet from the tasks your agent completes, with in-context coaching, all local, all free",
   "license": "AGPL-3.0-only",
