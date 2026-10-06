@@ -1,8 +1,9 @@
 // devcoach CLI entry. The shebang is injected by tsup. Hook subcommands run on EVERY
 // agent stop, so they load the lean hooks chunk (node built-ins + core only); every
 // other subcommand loads the full CLI (Commander/zod/MCP SDK/Hono) via dynamic import,
-// which tsup code-splits into separate chunks.
-export {}; // top-level await needs module context — this file has no static imports
+// which tsup code-splits into separate chunks. The one static import is `core/runtime`
+// (node:fs + node:os + the version): it must load on ANY Node, to say what is wrong.
+import { describeRuntime, describeWhere, nodeProblem } from "./core/runtime";
 
 const cmd = process.argv[2] ?? "";
 const HOOK_CMDS = new Set([
@@ -15,6 +16,21 @@ const HOOK_CMDS = new Set([
   "onboard-hook",
   "lesson-ready",
 ]);
+
+/** `devcoach 2.6.3 (homebrew): ` — so a crash in a host's log says which install it came from. */
+function prefix(): string {
+  const info = describeRuntime();
+  return `devcoach ${info.version} (${describeWhere(info.where)}): `;
+}
+
+// Below Node 24 `node:sqlite` does not exist, and the first import of it dies with a bare
+// stack. Say it instead — except in a hook, which must never break the agent's turn.
+const tooOld = nodeProblem(process.versions.node);
+if (tooOld) {
+  if (HOOK_CMDS.has(cmd)) process.exit(0);
+  console.error(`${tooOld} at ${process.execPath}. Upgrade Node, then restart.`);
+  process.exit(1);
+}
 
 try {
   if (HOOK_CMDS.has(cmd)) {
@@ -31,6 +47,6 @@ try {
     console.error((err as Error).message);
     process.exit(3);
   }
-  console.error(err);
+  console.error(prefix(), err);
   process.exit(1);
 }

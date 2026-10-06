@@ -217,6 +217,123 @@ describe("cli", () => {
     expect(both).toContain("devcoach@ultimaphoenix-beta");
   });
 
+  // Claude Desktop starts devcoach from its own config with its own PATH, which it prints in its
+  // log. The fixture is the real log of a failed start (2026-10-05): six `Failed to spawn process:
+  // No such file or directory`, nothing from devcoach. Doctor must say which of the two causes.
+  // On Linux both paths follow XDG_CONFIG_HOME, which CI runners set: pin it inside the sandbox
+  // HOME for these tests so doctor and install never look at the runner's real config.
+  const desktopPaths = (home: string) => {
+    if (process.platform !== "darwin") process.env.XDG_CONFIG_HOME = join(home, ".config");
+    return process.platform === "darwin"
+      ? {
+          config: join(
+            home,
+            "Library",
+            "Application Support",
+            "Claude",
+            "claude_desktop_config.json",
+          ),
+          log: join(home, "Library", "Logs", "Claude", "mcp-server-devcoach.log"),
+        }
+      : {
+          config: join(home, ".config", "Claude", "claude_desktop_config.json"),
+          log: join(home, ".config", "Claude", "logs", "mcp-server-devcoach.log"),
+        };
+  };
+  const savedXdg = process.env.XDG_CONFIG_HOME;
+  const restoreXdg = () => {
+    if (savedXdg === undefined) delete process.env.XDG_CONFIG_HOME;
+    else process.env.XDG_CONFIG_HOME = savedXdg;
+  };
+
+  it.skipIf(process.platform === "win32")(
+    "doctor checks Claude Desktop's entry on the PATH from Desktop's own log",
+    async () => {
+      cleanClaudeSettings();
+      const home = process.env.HOME as string;
+      const { config, log } = desktopPaths(home);
+      mkdirSync(dirname(config), { recursive: true });
+      mkdirSync(dirname(log), { recursive: true });
+      const hostBin = mkdtempSync(join(tmpdir(), "dc-desktop-path-"));
+      const fixture = readFileSync(
+        join(__dirname, "fixtures", "claude-desktop-mcp-devcoach.log"),
+        "utf8",
+      ).replace(
+        /paths: \[[\s\S]*?\[length\]: \d+/,
+        `paths: [\n      '${hostBin}',\n      [length]: 1`,
+      );
+      writeFileSync(log, fixture);
+      try {
+        writeFileSync(config, JSON.stringify({ mcpServers: {} }));
+        expect((await run(["doctor"])).out).toContain("not registered — add it with");
+
+        // yesterday's case: the bare name is on no directory of Desktop's PATH
+        writeFileSync(
+          config,
+          JSON.stringify({ mcpServers: { devcoach: { command: "devcoach", args: ["mcp"] } } }),
+        );
+        const bare = (await run(["doctor"])).out;
+        expect(bare).toContain("registered: devcoach mcp");
+        expect(bare).toContain("`devcoach` is not found on Claude Desktop's PATH (from its log)");
+        expect(bare).toContain(`log: ${log}`);
+        expect(bare).toContain(
+          "last error in it: Failed to spawn process: No such file or directory",
+        );
+
+        // the other cause: the file exists, its #! interpreter does not
+        const script = join(hostBin, "devcoach");
+        writeFileSync(script, "#!/opt/gone/node\n", { mode: 0o755 });
+        const interp = (await run(["doctor"])).out;
+        expect(interp).toContain(
+          `command resolves to ${script} on Claude Desktop's PATH (from its log)`,
+        );
+        expect(interp).toContain("its interpreter /opt/gone/node does not exist");
+      } finally {
+        rmSync(dirname(config), { recursive: true, force: true });
+        rmSync(dirname(log), { recursive: true, force: true });
+        restoreXdg();
+      }
+    },
+  );
+
+  it.skipIf(process.platform === "win32")(
+    "install writes Claude Desktop an absolute command — npx when devcoach only lives in npx's cache",
+    async () => {
+      const { config } = desktopPaths(process.env.HOME as string);
+      const savedPath = process.env.PATH;
+      try {
+        const real = fakeBin("devcoach", "#!/bin/sh\necho 0.0.0\n");
+        process.env.PATH = real;
+        await run(["install", "--claude-desktop", "--force"]);
+        expect(JSON.parse(readFileSync(config, "utf8")).mcpServers.devcoach).toEqual({
+          command: join(real, "devcoach"),
+          args: ["mcp"],
+        });
+
+        // `npx -y devcoach install` puts npx's cache first on PATH: that path will vanish
+        const npxBin = join(
+          mkdtempSync(join(tmpdir(), "dc-npxcache-")),
+          "_npx",
+          "0123",
+          "node_modules",
+          ".bin",
+        );
+        mkdirSync(npxBin, { recursive: true });
+        writeFileSync(join(npxBin, "devcoach"), "#!/bin/sh\n", { mode: 0o755 });
+        process.env.PATH = npxBin;
+        await run(["install", "--claude-desktop", "--force"]);
+        expect(JSON.parse(readFileSync(config, "utf8")).mcpServers.devcoach).toEqual({
+          command: "npx",
+          args: ["-y", "devcoach", "mcp"],
+        });
+      } finally {
+        process.env.PATH = savedPath;
+        rmSync(dirname(config), { recursive: true, force: true });
+        restoreXdg();
+      }
+    },
+  );
+
   it("DEVCOACH_HOOK_DEBUG=1 logs hook decisions to ~/.devcoach/hook.log", async () => {
     db.withConnection((c) => {
       c.exec("DELETE FROM nudge_state;");

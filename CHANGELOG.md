@@ -6,6 +6,28 @@ Notable changes to devcoach. Versions follow [Semantic Versioning](https://semve
 
 ## [Unreleased]
 
+### Added
+- **devcoach says who it is in the agent's log.** The MCP server writes one line to stderr when it
+  starts — devcoach version, Node version and which manager provides it (Homebrew, nvm, fnm, volta,
+  asdf, mise, n, system), how devcoach was installed (Homebrew, npm, npx, plugin, extension), the
+  data directory and its schema — and one more with the client once connected. Claude Desktop and
+  Claude Code copy it into their MCP logs, which no longer show the version on their own. The home
+  directory is written as `~` / `%USERPROFILE%`.
+- **`devcoach doctor` checks Claude Desktop**, and the command Claude Code starts: that it exists on
+  the PATH that agent uses (for Claude Desktop, read from its own log), that the Node in its first
+  line exists and is ≥ 24, where it lives (a temporary npx path, a Node-version directory under
+  nvm & co.), and which devcoach version it runs; it shows Claude Desktop's last error. This tells
+  apart the two causes of `Failed to spawn process: No such file or directory`.
+
+### Fixed
+- **`devcoach install` writes an absolute command** for Claude Desktop and Claude Code instead of a
+  bare `devcoach`, which the agent resolved on its own, shorter PATH. Run from `npx -y devcoach`, it
+  no longer writes npx's temporary directory. On Windows it finds `devcoach`, `claude`, `gemini`
+  and `codex` on PATH at all (it split PATH on `:` and ignored `.cmd`), and registers
+  `node.exe` + devcoach's script.
+- Under Node < 24 the CLI and the server say which Node they found and exit, instead of a stack
+  trace from `node:sqlite`; hooks stay silent.
+
 ### Changed
 - **Docs say what devcoach is for**: the README, the docs site, the npm, plugin, Gemini and `.mcpb`
   descriptions now say that a lesson teaches something you don't know yet — the knowledge map is
