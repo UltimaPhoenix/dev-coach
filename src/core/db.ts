@@ -207,6 +207,28 @@ function readUserVersion(db: DatabaseSync): number {
   return Number(row?.user_version ?? 0);
 }
 
+/**
+ * The file's schema without touching it: no migration, no creation (a missing file stays
+ * missing — its absence is how the hooks know onboarding has not run). For diagnostics only;
+ * never throws.
+ */
+export function peekSchema(dbPath: string = DB_PATH): {
+  exists: boolean;
+  schema: number | null;
+  upgradedBy: string | null;
+} {
+  if (!existsSync(dbPath)) return { exists: false, schema: null, upgradedBy: null };
+  let db: DatabaseSync | null = null;
+  try {
+    db = new DatabaseSyncImpl(dbPath, { readOnly: true });
+    return { exists: true, schema: readUserVersion(db), upgradedBy: getSchemaMeta(db).upgradedBy };
+  } catch {
+    return { exists: true, schema: null, upgradedBy: null };
+  } finally {
+    db?.close();
+  }
+}
+
 export function getInitializedConnection(dbPath: string = DB_PATH): DatabaseSync {
   let db = getConnection(dbPath);
   const fromVersion = readUserVersion(db);

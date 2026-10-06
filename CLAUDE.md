@@ -52,7 +52,7 @@ dev-coach/
 │   ├── references/         # skill progressive disclosure: onboarding.md, calibration.md, review.md, sharing.md, course.md
 │   └── static/             # vendored web bundle (tailwind.js, alpinejs, htmx, flatpickr, …)
 ├── src/
-│   ├── bin.ts              # #!/usr/bin/env node → runCli()
+│   ├── bin.ts              # #!/usr/bin/env node → runCli(); Node < 24 → one sentence and exit (hooks: silent exit 0)
 │   ├── version.ts  skill.ts
 │   ├── core/               # pure logic, no I/O coupling to mcp/cli/web
 │   │   ├── models.ts       # Zod: Lesson, KnowledgeEntry/Group, Profile, Settings, RateLimitResult
@@ -62,8 +62,10 @@ dev-coach/
 │   │   ├── share.ts  share-fetch.ts   # lesson sharing: payload, code/link/.devcoach.md codecs, parseSharedInput; URL fetch
 │   │   ├── claude-history.ts   # cross-project stack scan of ~/.claude (projects map, manifests, activity, memories)
 │   │   ├── courses.ts      # courses: directory + document validation over the db.ts rows (see Courses below)
+│   │   ├── runtime.ts      # where devcoach runs from: classifyPath (channel × Node manager × OS), describeRuntime, the stderr startup line
 │   ├── mcp/server.ts       # McpServer: 25 tools + 11 resources + devcoach_instructions prompt
 │   ├── cli/commands.ts     # Commander dispatcher (35 subcommands: 27 visible + 8 hidden hooks) + term.ts (colours, tables, OSC 8 link()) + open.ts (browser)
+│   │                       #   install.ts (install/uninstall/doctor) + mcp-command.ts (resolveCommand, chooseServerCommand, checkServerCommand)
 │   └── web/app.ts          # Hono app (33 routes incl. POST /shutdown) + views.ts (hono/html pages); assets/static/share.js
 │                           #   startUi returns the server; SIGINT/SIGTERM/SIGHUP → gracefulShutdown (close, 2 s drain, exit);
 │                           #   the open_ui child is detached, so stop_ui / `ui --stop` POST /shutdown (same-origin guarded)
@@ -184,6 +186,26 @@ entries, skill dirs; user hooks untouched; `--data` wipes `~/.devcoach` after a 
 because Homebrew formulae have no uninstall hook, so the formula's `caveats` tell users to run it before
 `brew uninstall`. `devcoach doctor` diagnoses the whole wiring and explains why the next stop would(n't) cue;
 `DEVCOACH_HOOK_DEBUG=1` traces every hook decision to `~/.devcoach/hook.log`.
+
+**Diagnostics in the hosts' logs** (from a real Claude Desktop log, 2026-10-05: six `Failed to spawn
+process: No such file or directory` and not one line from devcoach, because it never ran — Desktop
+logs only method names since 2026-07, so not even the version was visible on good days):
+- `devcoach mcp` writes ONE line to **stderr** before connecting (`startupLine` in `mcp/server.ts`:
+  version · Node + manager · install channel, Node-version binding · data dir + schema, read with
+  `db.peekSchema`, which never creates or migrates the file) and one with the client after
+  `initialize`. Every host copies stderr into its MCP log. Never stdout. Home shown as `~`.
+- `core/runtime.ts` `classifyPath` is the single table of where devcoach and Node live per OS
+  (Homebrew Cellar incl. Linuxbrew, npm global, nvm / nvm-windows / fnm / volta / asdf / mise / n,
+  `_npx` and `fnm_multishells` = ephemeral, plugin / Gemini / `.mcpb` dirs); paths are normalised
+  (`\` → `/`, lower-case on Windows) so Windows cases are tested from any OS.
+- `cli/mcp-command.ts`: `resolveCommand` = the lookup a spawn does (`;` + PATHEXT on Windows —
+  the old `findOnPath` split on `:` and never found anything there); `chooseServerCommand` = what
+  `install` writes (absolute PATH hit, not its realpath, so `brew upgrade` keeps it; Windows:
+  `node.exe` + `bin.js`; ephemeral or absent → `npx -y devcoach mcp`; version-bound → a note);
+  `checkServerCommand` = doctor's explanation, in the order a spawn fails (file → `#!` interpreter
+  → location → Node version → devcoach version). Doctor's *Claude Desktop* section resolves a bare
+  name on the PATH Desktop printed in its own log (`readHostLog`) and shows its last error.
+  `tests/fixtures/claude-desktop-mcp-devcoach.log` is that real log (user name replaced).
 
 ---
 

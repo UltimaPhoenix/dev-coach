@@ -486,7 +486,7 @@ Plugin releases up to 1.0.1 shipped a manifest that current Claude Code rejects,
 
 **"MCP server not connecting"**
 
-Run `devcoach install` to re-register the server with Claude Code or Claude Desktop, then restart the agent. If the issue persists, check `~/.claude.json` (Claude Code) and confirm the `devcoach` entry is present and the command is correct.
+Run **`devcoach doctor`**: it checks the command each agent starts (Claude Desktop's from `claude_desktop_config.json`, Claude Code's from `~/.claude.json`) — that it exists on the PATH that agent uses, that the Node it names exists and is ≥ 24, and which devcoach version it runs. Then `devcoach install --force` re-registers it with an absolute command, and you restart the agent. In Claude Desktop's log (`~/Library/Logs/Claude/mcp-server-devcoach.log`), `Failed to spawn process: No such file or directory` means devcoach never ran: the command, or the Node behind it, is missing — see [When devcoach does not start](https://ultimaphoenix.github.io/dev-coach/install/claude-desktop#when-devcoach-does-not-start). Every devcoach start writes one line to that log with its version, Node and install location.
 
 **"Coaching isn't firing / no lessons appear"**
 

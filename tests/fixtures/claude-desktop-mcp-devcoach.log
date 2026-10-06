@@ -1,0 +1,37 @@
+2026-10-05T07:28:34.986Z [devcoach] [info] Shutting down server... { metadata: undefined }
+2026-10-05T07:28:34.986Z [devcoach] [info] Client transport closed { metadata: undefined }
+2026-10-05T07:29:45.724Z [devcoach] [info] Initializing server... { metadata: undefined }
+2026-10-05T07:29:45.725Z [devcoach] [info] Era probe verdict: legacy (exec lane pinned — no sibling probe) { metadata: undefined }
+2026-10-05T07:29:47.364Z [devcoach] [info] Using MCP server command: devcoach with path: {
+  metadata: {
+    paths: [
+      '/Users/alex/.nvm/versions/node/v26.5.0/bin',
+      '/usr/local/bin',
+      '/opt/homebrew/bin',
+      '/Users/alex/.local/bin',
+      '/usr/bin',
+      '/bin',
+      '/usr/sbin',
+      '/sbin',
+      [length]: 8
+    ]
+  }
+} %o
+2026-10-05T07:29:47.367Z [devcoach] [info] Server started and connected successfully { metadata: undefined }
+2026-10-05T07:29:47.368Z [devcoach] [info] Message from client: method="initialize" id=0 params { metadata: undefined }
+Failed to spawn process: No such file or directory
+2026-10-05T07:29:47.637Z [devcoach] [info] Server transport closed { metadata: undefined }
+2026-10-05T07:29:47.638Z [devcoach] [info] Server transport closed unexpectedly, this is likely due to the process exiting early. If you are developing this MCP server you can add output to stderr (i.e. `console.error('...')` in JavaScript, `print('...', file=sys.stderr)` in python) and it will appear in this log. { metadata: undefined }
+2026-10-05T07:29:47.638Z [devcoach] [error] Server disconnected. For troubleshooting guidance, please visit our [debugging documentation](https://modelcontextprotocol.io/docs/tools/debugging) { metadata: { context: 'connection', stack: undefined } }
+2026-10-05T07:29:47.638Z [devcoach] [info] Client transport closed { metadata: undefined }
+2026-10-05T07:29:47.638Z [devcoach] [info] Client transport closed { metadata: undefined }
+Failed to spawn process: No such file or directory
+2026-10-05T07:29:48.150Z [devcoach] [error] Couldn't start for Cowork and Code sessions. Error: Connection closed { metadata: { context: 'shared-pool', stack: undefined } }
+Failed to spawn process: No such file or directory
+2026-10-05T07:29:51.488Z [devcoach] [error] Couldn't start for Cowork and Code sessions. Error: Connection closed { metadata: { context: 'shared-pool', stack: undefined } }
+Failed to spawn process: No such file or directory
+2026-10-05T07:30:12.510Z [devcoach] [error] Couldn't start for Cowork and Code sessions. Error: Connection closed { metadata: { context: 'shared-pool', stack: undefined } }
+Failed to spawn process: No such file or directory
+2026-10-05T07:31:04.783Z [devcoach] [error] Couldn't start for Cowork and Code sessions. Error: Connection closed { metadata: { context: 'shared-pool', stack: undefined } }
+Failed to spawn process: No such file or directory
+2026-10-05T07:35:31.373Z [devcoach] [error] Couldn't start for Cowork and Code sessions. Error: Connection closed { metadata: { context: 'shared-pool', stack: undefined } }

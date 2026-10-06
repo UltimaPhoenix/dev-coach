@@ -5,22 +5,24 @@
 // file; what differs per client is only the file path, the event names, and the
 // timeout unit (Claude/Codex: seconds, Gemini: milliseconds).
 import { spawnSync } from "node:child_process";
-import {
-  accessSync,
-  constants,
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs";
+import { existsSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { homedir, platform } from "node:os";
 import { dirname, join } from "node:path";
 import { createInterface } from "node:readline/promises";
 import * as coach from "../core/coach";
 import * as db from "../core/db";
+import { describeRuntime, describeWhere } from "../core/runtime";
 import { readSkill, readSkillReferences } from "../skill";
 import { VERSION } from "../version";
+import {
+  checkServerCommand,
+  chooseServerCommand,
+  claudeDesktopLogPath,
+  type Finding,
+  readHostLog,
+  resolveCommand,
+  type ServerCommand,
+} from "./mcp-command";
 import { c } from "./term";
 
 const log = (s = ""): void => {
@@ -81,35 +83,41 @@ const CODEX_CONFIG_TOML = join(CODEX_DIR, "config.toml");
 // Gemini CLI treats it as a precedence alias of ~/.gemini/skills — one copy serves both.
 const AGENTS_SKILL_DIR = join(homedir(), ".agents", "skills", "devcoach");
 
-function findOnPath(bin: string): string | null {
-  for (const dir of (process.env.PATH ?? "").split(":")) {
-    if (!dir) continue;
-    try {
-      accessSync(join(dir, bin), constants.X_OK);
-      return join(dir, bin);
-    } catch {
-      // not here — keep scanning
-    }
-  }
-  return null;
-}
+// PATH lookups go through resolveCommand: `;`-separated with PATHEXT on Windows.
+const findOnPath = (bin: string): string | null => resolveCommand(bin);
 const onPath = (bin: string): boolean => findOnPath(bin) !== null;
 
-function detectInstallMethod(): { command: string; args: string[] } {
-  if (onPath("devcoach")) return { command: "devcoach", args: ["mcp"] };
-  return { command: "npx", args: ["-y", "devcoach", "mcp"] };
+/** The devcoach entry script running right now, symlinks resolved. */
+function runningEntry(): string {
+  try {
+    return realpathSync(process.argv[1] ?? "");
+  } catch {
+    return process.argv[1] ?? "";
+  }
+}
+
+/** The command a host starts devcoach with — see `chooseServerCommand`. */
+function detectInstallMethod(): ServerCommand {
+  return chooseServerCommand({
+    hit: findOnPath("devcoach"),
+    entry: runningEntry(),
+    execPath: process.execPath,
+    platform: process.platform,
+  });
 }
 
 /**
  * Hook command prefix. Hooks may run with a minimal GUI PATH, so prefer the absolute
  * binary path — except when the PATH hit lives in an ephemeral per-shell dir (fnm
  * multishells), where the bare name outlives the path. `npx -y devcoach` is the last
- * resort: it works everywhere but needs the npx cache (or network) on every stop.
+ * resort: it works everywhere but needs the npx cache (or network) on every stop — and
+ * the only choice when the hit itself is npx's cache (`npx -y devcoach install`).
  */
 function hookPrefix(): string {
   const hit = findOnPath("devcoach");
-  if (!hit) return "npx -y devcoach";
-  return hit.includes("fnm_multishells") ? "devcoach" : hit;
+  if (!hit || hit.includes("/_npx/") || hit.includes("\\_npx\\")) return "npx -y devcoach";
+  if (hit.includes("fnm_multishells")) return "devcoach";
+  return hit.includes(" ") ? `"${hit}"` : hit;
 }
 
 /**
@@ -407,10 +415,12 @@ export function cmdInstall(o: InstallOpts): void {
   const anyExplicit = o.claudeCode || o.claudeDesktop || o.gemini || o.codex;
   const doCode = o.claudeCode || !anyExplicit;
   const doDesktop = o.claudeDesktop || !anyExplicit;
-  const m = detectInstallMethod();
+  const method = detectInstallMethod();
+  const m = { command: method.command, args: method.args };
   let needsRestart = false;
 
   log(c.bold("Setting up devcoach") + c.dim(`  (${m.command} ${m.args.join(" ")})`));
+  if (method.note) log(c.yellow(`  ${method.note}`));
   log();
 
   if (doCode) {
@@ -522,6 +532,67 @@ function checkHookCommands(
   }
 }
 
+/** An `mcpServers.devcoach` value as `{command, args}`, or null when it is not one. */
+function asServerEntry(value: unknown): { command: string; args: string[] } | null {
+  const v = value as { command?: unknown; args?: unknown } | null | undefined;
+  if (!v || typeof v.command !== "string") return null;
+  const args = Array.isArray(v.args)
+    ? v.args.filter((a): a is string => typeof a === "string")
+    : [];
+  return { command: v.command, args };
+}
+
+function report(r: Reporter, findings: Finding[]): void {
+  for (const f of findings) r[f.level](f.text);
+}
+
+/**
+ * Claude Desktop starts devcoach from claude_desktop_config.json with its OWN PATH — which it
+ * prints in its log at every start. When the log shows it, the command is resolved on exactly
+ * that PATH; the log's last error line is shown as well (`Failed to spawn process: …`).
+ */
+function doctorClaudeDesktop(r: Reporter): void {
+  log(c.bold("\nClaude Desktop"));
+  const configPath = claudeDesktopConfigPath();
+  const read = readJsonFile<McpConfig>(configPath);
+  if (!read.ok) {
+    r.bad(`${configPath} is not valid JSON — Claude Desktop cannot read it`);
+    return;
+  }
+  const entry = asServerEntry(read.data.mcpServers?.devcoach);
+  if (!entry) {
+    // Not an error: most setups use devcoach from Claude Code only.
+    log(c.dim(`    not registered — add it with ${c.bold("devcoach install --claude-desktop")}`));
+    return;
+  }
+  r.ok(`registered: ${[entry.command, ...entry.args].join(" ")}`);
+  const logPath = claudeDesktopLogPath();
+  const hostLog = existsSync(logPath)
+    ? readHostLog(tailOf(logPath))
+    : { path: null, lastError: null };
+  report(
+    r,
+    checkServerCommand(entry, {
+      path: hostLog.path ?? undefined,
+      pathSource: hostLog.path ? "Claude Desktop's PATH (from its log)" : "this shell's PATH",
+    }),
+  );
+  if (existsSync(logPath)) {
+    log(`    log: ${logPath}`);
+    if (hostLog.lastError) log(`    last error in it: ${hostLog.lastError}`);
+  }
+}
+
+/** The last 256 KB of a log — enough for the latest starts, cheap on a years-old file. */
+function tailOf(path: string): string {
+  try {
+    const text = readFileSync(path, "utf8");
+    return text.length > 256 * 1024 ? text.slice(-256 * 1024) : text;
+  } catch {
+    return "";
+  }
+}
+
 function doctorGemini(r: Reporter): void {
   log(c.bold("\nGemini CLI wiring (beta)"));
   const read = readJsonFile<HooksFile>(GEMINI_SETTINGS);
@@ -620,9 +691,11 @@ export function cmdDoctor(): void {
   log(`\n${c.bold("devcoach doctor")} ${c.dim(`v${VERSION}`)}\n`);
 
   log(c.bold("Environment"));
+  const runtime = describeRuntime();
   const nodeMajor = Number.parseInt(process.versions.node.split(".")[0] ?? "0", 10);
-  if (nodeMajor >= 24) ok(`Node ${process.versions.node} (≥ 24)`);
+  if (nodeMajor >= 24) ok(`Node ${process.versions.node} via ${runtime.nodeManager} (≥ 24)`);
   else bad(`Node ${process.versions.node} — devcoach needs Node ≥ 24 (embedded node:sqlite)`);
+  ok(`this devcoach: ${describeWhere(runtime.where)} (${runtime.entry})`);
 
   log(c.bold("\nClaude Code wiring"));
   const read = readJsonFile<HooksFile>(CLAUDE_CODE_SETTINGS);
@@ -681,13 +754,18 @@ export function cmdDoctor(): void {
     else warn(`Claude Code skill not installed — run ${c.bold("devcoach install")}`);
 
     const mcpRead = readJsonFile<McpConfig>(join(homedir(), ".claude.json"));
-    if (mcpRead.ok && mcpRead.data.mcpServers?.devcoach) ok("MCP server registered (user scope)");
-    else
+    const codeEntry = mcpRead.ok ? asServerEntry(mcpRead.data.mcpServers?.devcoach) : null;
+    if (codeEntry) {
+      ok("MCP server registered (user scope)");
+      report(r, checkServerCommand(codeEntry, { pathSource: "this shell's PATH" }));
+    } else if (!pluginOn)
       warn(
         "MCP server not found in ~/.claude.json — it may be registered elsewhere " +
           `(check with ${c.bold("claude mcp get devcoach")})`,
       );
   }
+
+  if (existsSync(claudeDesktopConfigPath())) doctorClaudeDesktop(r);
 
   // The beta targets appear only when their config dir exists — a Claude-only setup
   // keeps the exact pre-0.10 doctor output.

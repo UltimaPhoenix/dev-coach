@@ -29,6 +29,7 @@ import {
   UiHomeSchema,
   UiThemeSchema,
 } from "../core/models";
+import { describeRuntime, displayPath, runtimeLine } from "../core/runtime";
 import {
   buildSharePayload,
   encodeShareCode,
@@ -1562,8 +1563,32 @@ export function createServer(): McpServer {
   return server;
 }
 
+/**
+ * The startup line: which devcoach, on which Node, installed how, on which data. Every MCP host
+ * copies a server's stderr into its log, and hosts have stopped logging payloads (Claude Desktop
+ * only writes method names since 2026-07), so without this line a shared log cannot say which
+ * devcoach was running. stderr only — stdout is the protocol.
+ */
+export function startupLine(): string {
+  const schema = db.peekSchema();
+  const data = schema.exists
+    ? `schema ${schema.schema ?? "?"}` +
+      (schema.schema !== null && schema.schema > db.SCHEMA_VERSION
+        ? `, read-only: upgraded by devcoach ${schema.upgradedBy ?? "newer"}`
+        : "")
+    : "no database yet";
+  return runtimeLine("mcp", describeRuntime(), [`data ${displayPath(db.DEVCOACH_DIR)} (${data})`]);
+}
+
 export async function runStdio(): Promise<void> {
+  process.stderr.write(`${startupLine()}\n`);
   const server = createServer();
+  server.server.oninitialized = () => {
+    const client = server.server.getClientVersion();
+    process.stderr.write(
+      `devcoach ${VERSION} mcp · client ${client ? `${client.name} ${client.version}` : "unknown"}\n`,
+    );
+  };
   const transport = new StdioServerTransport();
   await server.connect(transport);
 }
