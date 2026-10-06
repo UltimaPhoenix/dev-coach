@@ -4,7 +4,7 @@ Notable changes to devcoach. Versions follow [Semantic Versioning](https://semve
 
 ---
 
-## [Unreleased]
+## [2.7.0] — 2026-10-06
 
 ### Added
 - **`/devcoach:setup`** (Claude Code plugin): checks the runtime, then the server, then builds
@@ -45,6 +45,8 @@ Notable changes to devcoach. Versions follow [Semantic Versioning](https://semve
   trace from `node:sqlite`; hooks stay silent.
 
 ### Changed
+- Dependencies: MCP TypeScript SDK 2.2.0 (server and the test client), hono 4.13.12,
+  @hono/node-server 2.1.3; tooling: Biome 2.5.15, Vitest 5.0.3, @types/node 26.6.4; docs site: qs.
 - **Docs say what devcoach is for**: the README, the docs site, the npm, plugin, Gemini and `.mcpb`
   descriptions now say that a lesson teaches something you don't know yet — the knowledge map is
   there to skip what you already know, not to repeat it. The docs home page shows the three-answer
