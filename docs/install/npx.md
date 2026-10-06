@@ -17,6 +17,16 @@ Restart your agent afterward. Prefer a global binary? `npm install -g devcoach`,
 (and drop the `npx -y` prefix everywhere). After upgrading devcoach, re-run `devcoach install` to refresh
 the skill — `devcoach stats` reminds you when it's out of date.
 
+Run through `npx`, `install` registers `npx -y devcoach mcp` (npx's own copy is temporary). With a global
+install it registers devcoach's **absolute path**, so an agent with a shorter PATH than your shell
+(Claude Desktop) still finds it; on Windows it registers `node.exe` and devcoach's script.
+
+:::note[nvm, fnm, volta, asdf, mise]
+With a Node version manager, `npm install -g` puts devcoach inside the current Node version's directory
+(`~/.nvm/versions/node/v26.5.0/…`). It goes away with that version: after switching or removing it, run
+`devcoach install --force` again. `install` and `devcoach doctor` both say which Node version it depends on.
+:::
+
 **Canary builds:** every change merged into the `develop` branch is published to npm under the `next`
 tag — `npx -y devcoach@next` (or `npm install -g devcoach@next`) runs the unreleased version, documented at
 [ultimaphoenix.github.io/dev-coach/next](https://ultimaphoenix.github.io/dev-coach/next/). `latest` stays the

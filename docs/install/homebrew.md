@@ -37,7 +37,9 @@ devcoach install
 
 `devcoach install` registers the MCP server, the automatic-coaching hooks (Stop + UserPromptSubmit),
 and the coaching **skill** (`~/.claude/skills/devcoach/`) with Claude Code, plus the MCP server with
-Claude Desktop.
+Claude Desktop. Agents start it as `/opt/homebrew/bin/devcoach mcp` (`/usr/local/bin` on Intel Macs,
+`/home/linuxbrew/.linuxbrew/bin` on Linux): an absolute path that `brew upgrade` keeps valid, and that
+does not depend on the PATH an agent sees. `devcoach doctor` checks it.
 
 `brew tap` registers the third-party repository; `brew trust --tap` marks it trusted so Homebrew loads its
 formulae when `HOMEBREW_REQUIRE_TAP_TRUST` is set. Both are one-time.
