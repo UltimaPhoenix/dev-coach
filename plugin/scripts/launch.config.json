@@ -1,0 +1,6 @@
+{
+  "label": "devcoach plugin",
+  "dataEnv": "CLAUDE_PLUGIN_DATA",
+  "hookNotice": true,
+  "setupHint": "Run /devcoach:setup for details."
+}

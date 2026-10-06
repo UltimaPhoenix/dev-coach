@@ -72,6 +72,15 @@ the user works in daily deserves more topics than a one-off experiment). Do not 
 user to confirm, adjust, or list anything else first — that happens after saving, in
 Step 5.
 
+**An empty scan never blocks Automatic.** A new machine, a first project or a sandbox
+has no history: `detected_stack` is `{}` and `scanned_projects` is 0. The user chose
+Automatic; finish it. Use `default_topics` as the starting map exactly as returned (it
+is a general developer baseline, not an invention of yours), save it, and say so in
+the Step 5 summary — *"I found no Claude Code history on this machine, so I started
+you from devcoach's general map; it corrects itself as you work, and you can adjust
+any topic now."* Do not stop, do not go back to the mode question, do not switch to
+Guided unless the user asks, and do not call `preview_deep_scan` for plain Automatic.
+
 **Automatic (Deep) mode:** run the "Automatic (Deep) procedure" below to get an
 evidence-based `topics`/`groups`/`notebook` result, then skip straight to Step 4 (Deep's
 subagent already decides groups and composes the notebook — don't redo Step 3 for it).
