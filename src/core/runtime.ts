@@ -6,6 +6,7 @@
 // table below is testable for macOS, Linux and Windows from any OS.
 import { realpathSync } from "node:fs";
 import { homedir } from "node:os";
+import { fileURLToPath } from "node:url";
 import { VERSION } from "../version";
 
 /** How this devcoach was installed — read from where its entry script lives. */
@@ -80,7 +81,7 @@ function channelOf(p: string): Channel {
   if (lower.includes("/_npx/")) return "npx";
   if (lower.includes("/cellar/devcoach/")) return "homebrew";
   if (lower.includes("/node_modules/devcoach/")) return "npm-global";
-  if (/\/(src\/bin\.ts|dist\/bin\.js)$/.test(lower)) return "source";
+  if (/\/(src\/core\/runtime\.ts|src\/bin\.ts|dist\/[^/]+\.js)$/.test(lower)) return "source";
   return "unknown";
 }
 
@@ -159,13 +160,14 @@ export interface RuntimeInfo {
   node: string;
   execPath: string;
   nodeManager: NodeManager;
-  /** The devcoach entry script, symlinks resolved. */
+  /** The running devcoach's package directory (or its code file outside a package). */
   entry: string;
   where: PathClass;
 }
 
 export interface RuntimeInputs {
-  argv1?: string;
+  /** The file this code runs from — defaults to this module, symlinks resolved. */
+  codePath?: string;
   execPath?: string;
   nodeVersion?: string;
   platform?: NodeJS.Platform;
@@ -179,17 +181,24 @@ function real(path: string): string {
   }
 }
 
+/**
+ * `process.argv[1]` is NOT where devcoach runs from: the plugin and Gemini launchers import
+ * devcoach's `bin.js` in-process, so argv[1] stays the launcher script. The file this module was
+ * loaded from is always the running devcoach — `<package>/dist/<chunk>.js` once bundled,
+ * `src/core/runtime.ts` from source — and its package directory is what a reader wants to see.
+ */
 export function describeRuntime(inputs: RuntimeInputs = {}): RuntimeInfo {
   const platform = inputs.platform ?? process.platform;
   const execPath = inputs.execPath ?? process.execPath;
-  const entry = inputs.argv1 ?? real(process.argv[1] ?? "");
+  const code = inputs.codePath ?? real(fileURLToPath(import.meta.url));
+  const root = /^(.*)[/\\](?:dist[/\\][^/\\]+\.js|src[/\\]core[/\\]runtime\.ts)$/.exec(code)?.[1];
   return {
     version: VERSION,
     node: inputs.nodeVersion ?? process.versions.node,
     execPath,
     nodeManager: nodeManagerOf(execPath, platform),
-    entry,
-    where: classifyPath(entry, platform),
+    entry: root ?? code,
+    where: classifyPath(code, platform),
   };
 }
 

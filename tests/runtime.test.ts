@@ -248,16 +248,34 @@ describe("the startup line", () => {
 
   it("says which devcoach, on which Node, installed how — and what it depends on", () => {
     const info = describeRuntime({
-      argv1: "/Users/a/.nvm/versions/node/v26.5.0/lib/node_modules/devcoach/dist/bin.js",
+      codePath:
+        "/Users/a/.nvm/versions/node/v26.5.0/lib/node_modules/devcoach/dist/chunk-AB12CD.js",
       execPath: "/Users/a/.nvm/versions/node/v26.5.0/bin/node",
       nodeVersion: "26.5.0",
       platform: "darwin",
     });
     expect(runtimeLine("mcp", info, ["data ~/.devcoach (schema 6)"], "/Users/a", "darwin")).toBe(
       `devcoach ${VERSION} mcp · node 26.5.0 via nvm (~/.nvm/versions/node/v26.5.0/bin/node) · ` +
-        "npm-global, bound to Node v26.5.0 (nvm) (~/.nvm/versions/node/v26.5.0/lib/node_modules/devcoach/dist/bin.js) · " +
+        "npm-global, bound to Node v26.5.0 (nvm) (~/.nvm/versions/node/v26.5.0/lib/node_modules/devcoach) · " +
         "data ~/.devcoach (schema 6)",
     );
+  });
+
+  it("describes the devcoach that runs, not the launcher that imported it (argv[1] is the launcher)", () => {
+    const info = describeRuntime({
+      codePath:
+        "/Users/a/.claude/plugins/data/devcoach-ultimaphoenix/runtime/2.7.0/node_modules/devcoach/dist/chunk-9XY.js",
+      execPath: "/opt/homebrew/Cellar/node/26.10.0_1/bin/node",
+      nodeVersion: "26.10.0",
+      platform: "darwin",
+    });
+    expect(info.where.channel).toBe("claude-plugin");
+    expect(info.entry).toBe(
+      "/Users/a/.claude/plugins/data/devcoach-ultimaphoenix/runtime/2.7.0/node_modules/devcoach",
+    );
+    // by default: this very module — from source here
+    expect(describeRuntime().where.channel).toBe("source");
+    expect(describeRuntime().entry).toBe(root);
   });
 
   it("the server writes it to stderr, and the client once the handshake is done — stdout stays the protocol", async () => {

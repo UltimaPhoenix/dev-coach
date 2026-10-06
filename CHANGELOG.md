@@ -4,6 +4,13 @@ Notable changes to devcoach. Versions follow [Semantic Versioning](https://semve
 
 ---
 
+## [Unreleased]
+
+### Fixed
+- The startup line devcoach writes to the agent's log describes the devcoach that runs: under the
+  Claude Code plugin and the Gemini extension it named the launcher script instead
+  (`unknown (…/scripts/launch.mjs)`).
+
 ## [2.7.0] — 2026-10-06
 
 ### Added
