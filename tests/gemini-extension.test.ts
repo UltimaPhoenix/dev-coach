@@ -52,9 +52,13 @@ describe("gemini cli extension packaging (beta)", () => {
     const pkg = readJson("package.json");
     const pin = readJson("gemini-extension", "package.json");
     expect(pin.dependencies.devcoach).toBe(pkg.version);
-    // The launcher must install OUTSIDE the extension dir (updates replace it).
-    const launcher = read("gemini-extension", "scripts", "launch.mjs");
-    expect(launcher).toContain('join(homedir(), ".devcoach", "gemini-ext")');
+    // The launcher must install OUTSIDE the extension dir (updates replace it): its config
+    // names a directory under the home, and the launcher resolves `dataHome` from there.
+    const config = readJson("gemini-extension", "scripts", "launch.config.json");
+    expect(config.dataHome).toEqual([".devcoach", "gemini-ext"]);
+    expect(read("gemini-extension", "scripts", "launch.mjs")).toContain(
+      "join(homedir(), ...config.dataHome)",
+    );
   });
 
   it("ships the AGPL license text with the extension (synced from LICENSE)", () => {

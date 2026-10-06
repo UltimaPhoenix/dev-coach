@@ -8,6 +8,7 @@
 //   • server.json (MCP Registry) versions ←  package.json version
 //   • .claude-plugin/marketplace.json version ←  package.json version (self-marketplace entry)
 //   • plugin/LICENSE + gemini-extension/LICENSE  ←  LICENSE (AGPL text ships with every install)
+//   • plugin/scripts/launch.mjs + gemini-extension/scripts/launch.mjs  ←  assets/launcher/launch.mjs
 // Idempotent: writing the same content twice is a no-op. Run it in the bump job and before packing.
 //   node scripts/sync-plugin.mjs
 import { copyFileSync, cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -72,6 +73,15 @@ for (const dir of ["plugin", "gemini-extension"]) {
   copyFileSync(join(root, "LICENSE"), join(root, dir, "LICENSE"));
 }
 
+// 8. One launcher for both hosts (assets/launcher/launch.mjs); what differs between them — the
+//    label, the data dir — lives in each scripts/launch.config.json, which is NOT synced.
+for (const dir of ["plugin", "gemini-extension"]) {
+  copyFileSync(
+    join(root, "assets", "launcher", "launch.mjs"),
+    join(root, dir, "scripts", "launch.mjs"),
+  );
+}
+
 console.log(
-  `synced plugin + gemini-extension + server.json + self-marketplace → version ${version}, SKILL.md + LICENSE copied, devcoach pinned`,
+  `synced plugin + gemini-extension + server.json + self-marketplace → version ${version}, SKILL.md + LICENSE + launcher copied, devcoach pinned`,
 );

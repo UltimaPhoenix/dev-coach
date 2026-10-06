@@ -696,6 +696,9 @@ export function cmdDoctor(): void {
   if (nodeMajor >= 24) ok(`Node ${process.versions.node} via ${runtime.nodeManager} (≥ 24)`);
   else bad(`Node ${process.versions.node} — devcoach needs Node ≥ 24 (embedded node:sqlite)`);
   ok(`this devcoach: ${describeWhere(runtime.where)} (${runtime.entry})`);
+  // Set by the plugin / extension launcher (assets/launcher/launch.mjs): which host started this
+  // process and where its pinned runtime lives. Reaching this line at all means it loaded.
+  if (process.env.DEVCOACH_LAUNCHER) ok(`Runtime: ${process.env.DEVCOACH_LAUNCHER}`);
 
   log(c.bold("\nClaude Code wiring"));
   const read = readJsonFile<HooksFile>(CLAUDE_CODE_SETTINGS);
