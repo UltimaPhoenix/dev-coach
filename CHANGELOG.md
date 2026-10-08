@@ -4,7 +4,7 @@ Notable changes to devcoach. Versions follow [Semantic Versioning](https://semve
 
 ---
 
-## [Unreleased]
+## [2.7.1] — 2026-10-08
 
 ### Fixed
 - The startup line devcoach writes to the agent's log describes the devcoach that runs: under the
