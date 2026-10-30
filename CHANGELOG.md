@@ -4,6 +4,15 @@ Notable changes to devcoach. Versions follow [Semantic Versioning](https://semve
 
 ---
 
+## [Unreleased]
+
+### Changed
+- **A shared lesson introduces devcoach to people who don't have it.** The share page names the
+  sender ("Alex shared a devcoach lesson with you"), and when no dashboard answers it opens with a
+  *New to devcoach?* panel: what devcoach does in one sentence, **Install devcoach**, **See how it
+  works**, and a reminder that the link keeps the lesson for later. With a running dashboard the
+  page is unchanged.
+
 ## [2.7.1] — 2026-10-08
 
 ### Fixed
