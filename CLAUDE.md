@@ -347,9 +347,14 @@ Surfaces: CLI `share`/`import` (no arg = clipboard), MCP `share_lesson`/`import_
 flows: pick lesson → transport → privacy → verbatim reply; import outcomes; "show me the lesson X
 shared" = card without `log_lesson`; the ONE unprompted offer, right after `star_lesson`), the plugin
 commands `/devcoach:share` + `/devcoach:import` (`plugin/commands/`), the user guide `docs/usage/sharing.md`, dashboard (`/lessons/:id/share`,
-`POST /lessons/import` with a `Sec-Fetch-Site` guard (the share route too; it persists `share_name`
+`POST /lessons/import`, the share route (also refuses cross-site GETs; it persists `share_name`
 only when the popover posts `persist=1`, set by Alpine on the name input's `change`, not per keystroke),
-read-only `GET /lessons/import?code=`,
+read-only `GET /lessons/import?code=`, **one request guard before every route** (`refusal` in
+`web/app.ts`, `app.use`): Host must be `127.0.0.1`/`localhost`/`[::1]` (DNS rebinding — reads too) and
+any method but GET/HEAD/OPTIONS with a `Sec-Fetch-Site` other than same-origin/none is 403. Never add a
+per-route check for writes: the docs page only ever GETs (`/ping` + its preflight, the import preview link),
+and once Chrome grants it local network access ANY script on that origin can POST to 127.0.0.1;
+`tests/web.test.ts` loops over `app.routes`,
 `/ping` = the app's only CORS route, locked to the docs origin + `Access-Control-Allow-Private-Network`),
 and the docs page `website/src/pages/lesson.tsx` — whose dashboard probe (`website/src/lib/dashboardProbe.ts`,
 `npm test --prefix website`) must stay browser-aware: WebKit blocks https→http://127.0.0.1 subresources as

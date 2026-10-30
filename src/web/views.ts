@@ -385,7 +385,7 @@ export interface LessonsSelected {
 export interface LessonsData {
   /** `?import=1` — open the import popover (after an error, or from a deep link). */
   importOpen: boolean;
-  importError: "invalid" | "cross" | null;
+  importError: "invalid" | null;
   lessons: Lesson[];
   allCategories: string[];
   allProjects: string[];
@@ -659,7 +659,7 @@ export function lessonsPage(d: LessonsData): Html {
       <button type="button" @click="open = !open" title="Import a lesson someone shared" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-accent-400">＋ Import</button>
       <div x-show="open" x-transition:enter="transition ease-out duration-100" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100" class="absolute right-0 top-full mt-1 z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg w-80 p-3 space-y-2.5" style="display:none">
         <p class="text-xs text-gray-500 dark:text-gray-400">Paste the lesson code, the link, a URL or the whole text — or drop a <code>.devcoach.md</code> anywhere on this page.</p>
-        ${d.importError === "invalid" ? html`<p class="text-xs text-rose-600 dark:text-rose-400">That doesn't look like a devcoach lesson — copy the whole text again.</p>` : d.importError === "cross" ? html`<p class="text-xs text-rose-600 dark:text-rose-400">Imports only work from this dashboard — paste the lesson here.</p>` : ""}
+        ${d.importError === "invalid" ? html`<p class="text-xs text-rose-600 dark:text-rose-400">That doesn't look like a devcoach lesson — copy the whole text again.</p>` : ""}
         <textarea name="text" form="import-form" rows="4" placeholder="devcoach:lesson:1:…" autocomplete="off" class="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-accent-500 font-mono" x-ref="importText" x-effect="if (open) $nextTick(() => $refs.importText.focus())"></textarea>
         <div class="flex items-center gap-2">
           <label class="cursor-pointer text-xs text-gray-500 dark:text-gray-400 hover:text-accent-600 dark:hover:text-accent-400 transition">📄 Choose file<input id="import-file" type="file" name="file" form="import-form" accept=".md,.json,.txt" class="hidden" onchange="document.getElementById('import-form').submit()" /></label>

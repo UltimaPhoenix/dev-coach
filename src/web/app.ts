@@ -1,5 +1,6 @@
 // Hono web dashboard — pages rendered by views.ts (faithful Tailwind/Alpine markup).
-// Bound to 127.0.0.1; forms use the POST→303 redirect pattern.
+// Bound to 127.0.0.1; forms use the POST→303 redirect pattern. One guard runs before every route
+// (`refusal`): requests for another host name and writes started by another site never reach one.
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, extname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -89,13 +90,36 @@ const PING_HEADERS = {
 };
 
 /**
- * Same-origin guard for the import POST: the share page and any other site can only *link* to
- * the read-only preview, never submit the form. A missing header (curl, older browsers, tests)
- * is allowed — the dashboard is bound to 127.0.0.1.
+ * True when the browser says another site started the request. `same-site` counts: another server
+ * on 127.0.0.1 is another site here. No header means no browser (curl, the CLI, tests): allowed.
  */
 function isCrossSite(c: { req: { header(name: string): string | undefined } }): boolean {
   const site = c.req.header("sec-fetch-site");
   return site !== undefined && site !== "same-origin" && site !== "none";
+}
+
+/** The names a browser uses to reach the dashboard (it listens on 127.0.0.1 only). */
+const DASHBOARD_HOSTS = new Set(["127.0.0.1", "localhost", "[::1]"]);
+/** The methods that only read; every other one changes something. */
+const READ_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
+
+/**
+ * Why the dashboard turns a request away before any route sees it, or null to let it through.
+ * - Host: a page served under another name that resolves to 127.0.0.1 (DNS rebinding) would be
+ *   same-origin with the dashboard, so it could read and change everything. Refused, reads too.
+ * - Writes: no form or script on another site changes anything — the docs site's share page
+ *   included, which any script on that origin can drive once Chrome has been allowed local network
+ *   access. That page only ever reads: the GET /ping probe (and its OPTIONS preflight) and the link
+ *   to the GET /lessons/import preview, whose "Add to my lessons" is the dashboard's own POST.
+ */
+function refusal(c: Context): string | null {
+  if (!DASHBOARD_HOSTS.has(new URL(c.req.url).hostname)) {
+    return "Forbidden: the devcoach dashboard answers on 127.0.0.1 and localhost only.";
+  }
+  if (!READ_METHODS.has(c.req.method) && isCrossSite(c)) {
+    return "Forbidden: another website cannot change your devcoach dashboard.";
+  }
+  return null;
 }
 
 // `git config user.name` is a subprocess; it does not change while the dashboard runs, so it is
@@ -170,6 +194,12 @@ export function createApp(opts: AppOptions = {}): Hono {
     return c.text("Internal Server Error", 500);
   });
 
+  app.use(async (c, next) => {
+    const refused = refusal(c);
+    if (refused) return c.text(refused, 403);
+    await next();
+  });
+
   app.get("/static/*", (c) => {
     const rel = decodeURIComponent(c.req.path.slice("/static/".length));
     const filePath = join(STATIC_DIR, rel);
@@ -207,9 +237,8 @@ export function createApp(opts: AppOptions = {}): Hono {
 
   // ── Shutdown (`devcoach ui --stop`, the stop_ui tool) ─────────────────────
   // The dashboard started by the MCP open_ui tool is detached from any terminal, so Ctrl-C cannot
-  // reach it; this is its off switch. Same-origin only: a web page elsewhere must not stop it.
+  // reach it; this is its off switch (a web page elsewhere cannot stop it: see `refusal`).
   app.post("/shutdown", (c) => {
-    if (isCrossSite(c)) return c.text("Forbidden", 403);
     setTimeout(() => opts.onShutdown?.(), 50); // answer first, then close
     return c.json({ ok: true });
   });
@@ -317,14 +346,13 @@ export function createApp(opts: AppOptions = {}): Hono {
   app.post("/lessons/import", async (c) => {
     const body = await c.req.parseBody();
     const fromLessons = textField(body, "from") === "lessons";
-    const invalid = (reason: "invalid" | "cross") =>
+    const invalid = () =>
       c.redirect(
         fromLessons
-          ? `/lessons?import=1&error=${reason}`
+          ? "/lessons?import=1&error=invalid"
           : "/settings?imported=0&skipped=0&invalid=1",
         303,
       );
-    if (isCrossSite(c)) return invalid("cross");
     // A browser posts an untouched <input type=file> as a zero-byte File — that is "no file".
     const file = body.file;
     const upload = file instanceof File && file.size > 0 ? await file.text() : null;
@@ -344,13 +372,14 @@ export function createApp(opts: AppOptions = {}): Hono {
         303,
       );
     } catch (err) {
-      if (err instanceof ShareInputError) return invalid("invalid");
+      if (err instanceof ShareInputError) return invalid();
       throw err;
     }
   });
 
   // Deep link from the docs site's share page (and a plain paste form): renders a preview and
-  // NEVER writes — the lesson is stored only by the same-origin POST above.
+  // NEVER writes — the lesson is stored only by the preview's own POST above (another site's POST is
+  // turned away by `refusal`).
   app.get("/lessons/import", (c) => {
     const code = (c.req.query("code") ?? "").trim();
     let preview: SharedLesson | null = null;
@@ -433,7 +462,7 @@ export function createApp(opts: AppOptions = {}): Hono {
       order,
     };
 
-    const importError = q.error === "invalid" || q.error === "cross" ? q.error : null;
+    const importError = q.error === "invalid" ? "invalid" : null;
     return c.html(
       lessonsPage({
         importOpen: q.import === "1",
@@ -473,11 +502,9 @@ export function createApp(opts: AppOptions = {}): Hono {
   });
 
   // One route for both surfaces: the list's Select mode posts many `id` fields, the lesson page's
-  // ⋯ menu posts one. Same-origin only: a page elsewhere must never be able to delete a lesson.
-  // Unknown ids are ignored. Imported lessons go the same way; the same share can be imported
+  // ⋯ menu posts one. Unknown ids are ignored. Imported lessons go the same way; the same share can be imported
   // again afterwards (duplicate detection only looks at rows that still exist).
   app.post("/lessons/delete", async (c) => {
-    if (isCrossSite(c)) return c.text("Forbidden", 403);
     const body = await c.req.parseBody({ all: true });
     const raw = body.id;
     const ids = (Array.isArray(raw) ? raw : [raw]).filter(
@@ -492,7 +519,8 @@ export function createApp(opts: AppOptions = {}): Hono {
   // POST carries name + include_context from the popover form; it remembers the name only when
   // the form says so (`persist=1`, sent on the input's change event — not on every keystroke).
   // The GET variants (fragment, formats, the download link) render with the name they carry but
-  // never persist it. Same-origin only: a page elsewhere must not read a share or rename the sender.
+  // never persist it. Same-origin only, reads included: a page elsewhere must not read a share (its
+  // POST is already refused by `refusal`, which leaves the GETs to this check).
   app.on(["GET", "POST"], "/lessons/:lesson_id/share", async (c: Context) => {
     if (isCrossSite(c)) return c.text("Forbidden", 403);
     let name: string | undefined;
@@ -652,7 +680,6 @@ export function createApp(opts: AppOptions = {}): Hono {
   });
 
   app.post("/courses/:course_id/steps/:position", async (c) => {
-    if (isCrossSite(c)) return c.text("Forbidden", 403);
     const body = await c.req.parseBody();
     const status = textField(body, "status");
     if (!["todo", "done", "skipped"].includes(status)) return c.text("Unknown status", 400);
@@ -671,7 +698,6 @@ export function createApp(opts: AppOptions = {}): Hono {
   });
 
   app.post("/courses/delete", async (c) => {
-    if (isCrossSite(c)) return c.text("Forbidden", 403);
     const body = await c.req.parseBody();
     db.withConnection((conn) => courses.deleteCourse(conn, textField(body, "id")));
     return c.redirect("/courses", 303);

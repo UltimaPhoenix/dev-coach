@@ -4,6 +4,19 @@ Notable changes to devcoach. Versions follow [Semantic Versioning](https://semve
 
 ---
 
+## [Unreleased]
+
+### Security
+- **A web page can no longer change your dashboard.** While `devcoach ui` was running, any website
+  could submit a form to several dashboard actions — save the settings, the coaching notebook,
+  restore a backup, edit the knowledge map and its groups, star or answer a lesson — with no click
+  on the dashboard. A page could, for example, rewrite the notebook your agent reads before every
+  lesson, or change the lesson pacing. Every action that writes now refuses a request another site
+  starts (*403*). The docs site's share page keeps working: it only checks that your dashboard is
+  running and opens the import preview, and the lesson is saved by your click on the dashboard.
+- The dashboard answers only requests addressed to `127.0.0.1` or `localhost`: a page served under
+  another name that resolves to your machine (DNS rebinding) can no longer read or change it.
+
 ## [2.7.1] — 2026-10-08
 
 ### Fixed

@@ -1,8 +1,10 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { request } from "node:http";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import * as courses from "../src/core/courses";
 import * as db from "../src/core/db";
 import { parseLesson } from "../src/core/models";
+import { buildSharePayload, encodeShareCode } from "../src/core/share";
 import { fetchSharedInput } from "../src/core/share-fetch";
 import { createApp, resolveHomePath } from "../src/web/app";
 
@@ -589,11 +591,8 @@ describe("web lesson sharing", () => {
       { from: "lessons", text },
       { "sec-fetch-site": "cross-site" },
     );
-    expect(r.headers.get("location")).toBe("/lessons?import=1&error=cross");
+    expect(r.status).toBe(403);
     expect(db.withConnection((c) => db.getLessonById(c, "sh1"))).toBeNull();
-    expect(await (await get("/lessons?import=1&error=cross")).text()).toContain(
-      "only work from this dashboard",
-    );
     // same-origin browsers and header-less clients pass
     const ok = await postForm(
       "/lessons/import",
@@ -1033,5 +1032,147 @@ describe("web courses", () => {
     expect(del.headers.get("location")).toBe("/courses");
     expect(existsSync(courses.courseDir(course.id))).toBe(false);
     expect((await get(`/courses/${course.id}`)).status).toBe(404);
+  });
+});
+
+describe("web request guard: another site or another host name changes nothing", () => {
+  const DOCS = "https://ultimaphoenix.github.io"; // the share page; any script on it in Chrome
+  const at = (path: string, init: RequestInit = {}, host = "127.0.0.1:7860") =>
+    app.fetch(new Request(`http://${host}${path}`, init));
+  const notebook = () =>
+    existsSync(db.LEARNING_STATE_PATH) ? readFileSync(db.LEARNING_STATE_PATH, "utf8") : "";
+  const writeRoutes = app.routes.filter(
+    (r) => !["ALL", "GET", "HEAD", "OPTIONS"].includes(r.method),
+  );
+
+  it("refuses every write route when another site starts it, the docs share page included", async () => {
+    expect(writeRoutes.map((r) => r.path)).toEqual(
+      expect.arrayContaining(["/settings", "/settings/notebook", "/settings/import", "/shutdown"]),
+    );
+    writeFileSync(db.LEARNING_STATE_PATH, "# My notebook\n");
+    const settings = db.withConnection((c) => db.getSettings(c));
+    for (const route of writeRoutes) {
+      const path = route.path.replace(/:\w+/g, "x");
+      for (const site of ["cross-site", "same-site"]) {
+        const res = await at(path, {
+          method: route.method,
+          headers: {
+            "sec-fetch-site": site,
+            origin: DOCS,
+            "content-type": "application/x-www-form-urlencoded",
+          },
+          body: "content=Written+by+another+site&max_per_day=99&nudge_every=0&topic=pwned",
+        });
+        expect(res.status, `${route.method} ${route.path} from ${site}`).toBe(403);
+      }
+    }
+    expect(notebook()).toBe("# My notebook\n");
+    expect(db.withConnection((c) => db.getSettings(c))).toEqual(settings);
+    expect(db.withConnection((c) => db.getKnowledgeEntries(c)).map((e) => e.topic)).not.toContain(
+      "pwned",
+    );
+  });
+
+  it("lets the share page do what it does: the /ping probe, its preflight, the import preview", async () => {
+    const fromDocs = { "sec-fetch-site": "cross-site", origin: DOCS };
+    const ping = await at("/ping", { headers: fromDocs });
+    expect(ping.status).toBe(200);
+    expect(ping.headers.get("access-control-allow-origin")).toBe(DOCS);
+    const preflight = await at("/ping", {
+      method: "OPTIONS",
+      headers: {
+        ...fromDocs,
+        "access-control-request-method": "GET",
+        "access-control-request-private-network": "true",
+      },
+    });
+    expect(preflight.status).toBe(204);
+
+    const lesson = parseLesson({
+      id: "guard-shared",
+      timestamp: "2026-10-30T10:00:00Z",
+      topic_id: "http",
+      categories: ["security"],
+      title: "Sec-Fetch-Site names who started a request",
+      level: "mid",
+      summary: "Browsers say which site sent a request; a local server can believe them.",
+    });
+    const code = encodeShareCode(
+      buildSharePayload(lesson, { includeContext: false, sharedBy: "Grace" }),
+    );
+    // "＋ Import into my devcoach" is a top-level link from the docs site: a cross-site navigation
+    const preview = await at(`/lessons/import?code=${encodeURIComponent(code)}`, {
+      headers: { "sec-fetch-site": "cross-site", "sec-fetch-mode": "navigate" },
+    });
+    expect(preview.status).toBe(200);
+    expect(await preview.text()).toContain("Add to my lessons");
+    // "Add to my lessons" is the dashboard's own form: same-origin, saved
+    const add = await at("/lessons/import", {
+      method: "POST",
+      headers: {
+        "sec-fetch-site": "same-origin",
+        "content-type": "application/x-www-form-urlencoded",
+      },
+      body: new URLSearchParams({ text: code }),
+    });
+    expect(add.status).toBe(303);
+    expect(add.headers.get("location")).toBe("/lessons/guard-shared?imported=1");
+    db.withConnection((c) => db.deleteLesson(c, "guard-shared"));
+  });
+
+  it("refuses a request addressed to any other host name (DNS rebinding), reads included", async () => {
+    for (const host of ["rebind.example:7860", "attacker.test", "127.0.0.1.nip.io:7860"]) {
+      expect((await at("/settings/export", {}, host)).status, host).toBe(403);
+      expect((await at("/settings/notebook/download", {}, host)).status, host).toBe(403);
+      const write = await at(
+        "/settings/notebook",
+        {
+          method: "POST",
+          headers: {
+            "sec-fetch-site": "same-origin",
+            "content-type": "application/x-www-form-urlencoded",
+          },
+          body: "content=rebound",
+        },
+        host,
+      );
+      expect(write.status, host).toBe(403);
+    }
+    expect(notebook()).not.toContain("rebound");
+    for (const host of [
+      "127.0.0.1:7860",
+      "localhost:7860",
+      "localhost",
+      "[::1]:7860",
+      "LOCALHOST:7860",
+    ]) {
+      expect((await at("/ping", {}, host)).status, host).toBe(200);
+    }
+  });
+
+  it("a real server judges the Host header the browser sent", async () => {
+    const { startUi } = await import("../src/web/app");
+    const server = startUi(0, { handleSignals: false });
+    try {
+      await new Promise<void>((r) => server.once("listening", () => r()));
+      const port = (server.address() as { port: number }).port;
+      const status = (host: string) =>
+        new Promise<number>((resolve, reject) => {
+          const req = request(
+            { host: "127.0.0.1", port, path: "/ping", headers: { host }, agent: false },
+            (res) => {
+              res.resume();
+              resolve(res.statusCode ?? 0);
+            },
+          );
+          req.on("error", reject);
+          req.end();
+        });
+      expect(await status(`rebind.example:${port}`)).toBe(403);
+      expect(await status(`127.0.0.1:${port}`)).toBe(200);
+      expect(await status(`localhost:${port}`)).toBe(200);
+    } finally {
+      await new Promise<void>((r) => server.close(() => r()));
+    }
   });
 });

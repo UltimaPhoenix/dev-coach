@@ -24,6 +24,19 @@ deliberately writes to your local home directory, so it **cannot** run as a remo
 local-only constraint is the whole point. On claude.ai you can still use the
 [skill copy](../install/claude-ai.md), which provides the coaching behaviour without any data storage.
 
+## The dashboard answers only itself
+
+`devcoach ui` listens on `127.0.0.1`, so no other machine can reach it. On your own machine, every
+request passes two checks before any page or action runs:
+
+- **Another website cannot change anything.** Your browser tells the dashboard which site started a
+  request; a form or script on any other site — the docs site's share page included — gets
+  *403 Forbidden* for every action that writes. Reading is unaffected: that is how the share page
+  checks that your dashboard is running and opens the import preview. The lesson is saved only when
+  you click *Add to my lessons* on the dashboard itself.
+- **Only its own address.** A request must be addressed to `127.0.0.1` or `localhost`. A page served
+  under another name that resolves to your machine (DNS rebinding) is refused, reads included.
+
 ## Backups are plain files
 
 `devcoach backup` produces an **unencrypted** zip (settings, knowledge map, lessons, and the notebook).
