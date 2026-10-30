@@ -131,6 +131,36 @@ describe("web app", () => {
     expect(await (await get("/settings?notebook_saved=1")).text()).toContain("Coaching Notebook");
   });
 
+  it("settings stacks its paired fields in a narrow window", async () => {
+    const page = await (await get("/settings")).text();
+    // two rows of paired fields (lessons per day + gap, interactions + scope): one column below sm
+    expect(
+      page.match(/<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">/g)?.length,
+    ).toBeGreaterThanOrEqual(2);
+    expect(page).not.toContain('<div class="grid grid-cols-2 gap-4">');
+  });
+
+  it("the nav wraps on every page instead of widening a narrow window", async () => {
+    for (const path of [
+      "/lessons",
+      "/lessons/w1",
+      "/knowledge",
+      "/settings",
+      "/courses",
+      "/lessons/import",
+    ]) {
+      const page = await (await get(path)).text();
+      const nav = page.match(/<nav class="([^"]+)"/)?.[1].split(" ") ?? [];
+      expect(nav, path).toEqual(
+        expect.arrayContaining(["flex", "flex-wrap", "gap-x-4", "gap-y-2", "px-4", "sm:px-6"]),
+      );
+      // Settings + theme keep ml-auto: once wrapped, their row is right-aligned.
+      expect(page, path).toMatch(
+        /<div class="ml-auto flex items-center[^"]*">\s*<a href="\/settings"/,
+      );
+    }
+  });
+
   it("multipart import (lessons.json + backup.zip)", async () => {
     const fd = new FormData();
     fd.append(
@@ -971,6 +1001,11 @@ describe("web courses", () => {
     expect(list).toContain("From sums to powers");
     expect(list).toContain("0/2");
     expect(list).toContain("Webify"); // seeded-from lesson title
+    // Below sm the table is a list: the header hides, each row wraps, the title is never clamped.
+    expect(list).toContain('<table class="block sm:table');
+    expect(list).toContain('<thead class="hidden sm:table-header-group">');
+    expect(list).toMatch(/<tr class="flex flex-wrap[^"]*sm:table-row/);
+    expect(list).toMatch(/class="[^"]*sm:line-clamp-2">From sums to powers</);
 
     const detail = await (await get(`/courses/${course.id}`)).text();
     expect(detail).toContain(`src="/courses/${course.id}/index.html#step-1"`);

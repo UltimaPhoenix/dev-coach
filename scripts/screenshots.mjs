@@ -27,6 +27,17 @@ const SITE_BUILD = join(root, "website", "build");
 const SITE_PORT = 7863;
 const SITE_BASE_PATH = "/dev-coach";
 const VIEWPORT = { width: 1440, height: 900 };
+// The narrow pass: these pages are also captured in a phone-sized window, as
+// docs/screenshots/<name>-420-<scheme>.png, and each must fit it without a sideways scroll.
+const NARROW = { width: 420, height: 860 };
+const NARROW_PAGES = [
+  "lessons",
+  "lesson-docker-layer-cache",
+  "knowledge-map",
+  "settings",
+  "courses",
+  "lesson-import-preview",
+];
 
 // The committed fixture keeps static timestamps; the Lessons page renders relative dates
 // ("2 months ago"), so we shift them to fixed offsets from *now* at capture time — the
@@ -176,6 +187,17 @@ async function captureSharePage(page, out, scheme) {
   await page.screenshot({ path: out, fullPage: true });
 }
 
+// A page wider than its window scrolls sideways (the nav once made every page 555 px wide at 420).
+async function assertFitsWindow(page, name) {
+  const { scrollWidth, innerWidth } = await page.evaluate(() => ({
+    scrollWidth: document.documentElement.scrollWidth,
+    innerWidth: window.innerWidth,
+  }));
+  if (scrollWidth > innerWidth) {
+    throw new Error(`${name} is ${scrollWidth} px wide in a ${innerWidth} px window`);
+  }
+}
+
 async function waitForServer(url, timeoutMs = 30_000) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
@@ -247,6 +269,14 @@ async function main() {
         if (path.startsWith("/courses/")) await captureCoursePage(page, out);
         else if (name === "lesson-link-page") await captureSharePage(page, out, scheme);
         else await page.screenshot({ path: out, fullPage: true });
+        console.log(`  saved ${out}`);
+      }
+      await page.setViewportSize(NARROW);
+      for (const [name, path] of pages.filter(([name]) => NARROW_PAGES.includes(name))) {
+        await page.goto(`${BASE}${path}`, { waitUntil: "networkidle" });
+        await assertFitsWindow(page, name);
+        const out = join(outDir, `${name}-${NARROW.width}-${scheme}.png`);
+        await page.screenshot({ path: out, fullPage: true });
         console.log(`  saved ${out}`);
       }
       await ctx.close();

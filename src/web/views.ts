@@ -134,7 +134,9 @@ export function layout(o: {
   </script>
 </head>
 <body class="bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-100 min-h-screen font-mono transition-colors duration-200">
-  <nav class="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-6 py-3 flex items-center gap-6">
+  <!-- The nav wraps: below sm, Settings + theme (ml-auto) drop to a second, right-aligned row
+       instead of making every page wider than a narrow window. -->
+  <nav class="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-4 sm:px-6 py-3 flex flex-wrap items-center gap-x-4 sm:gap-x-6 gap-y-2">
     <!-- Brand wordmark, mirrors the docs site (website/src/css/custom.css): "dev" in the
          theme foreground, "coach" in the teal accent (#0d9488 / #5eead4 = teal-600/300). -->
     <a href="/" class="font-extrabold text-lg tracking-tight text-gray-900 dark:text-gray-100 hover:opacity-80 transition"
@@ -1240,27 +1242,29 @@ export function coursesPage(d: CoursesData): Html {
 ${
   d.courses.length
     ? html`<div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm overflow-hidden">
-  <table class="w-full text-sm table-fixed">
-    <colgroup><col style="width:46%" /><col style="width:22%" /><col style="width:14%" /><col style="width:8rem" /></colgroup>
-    <thead>
+  <!-- Below sm the table is a list: each course is a block (title, then progress · status · updated
+       on one line), so nothing is cut or overlaps in a narrow window. From sm up, the table. -->
+  <table class="block sm:table w-full text-sm sm:table-fixed">
+    <colgroup class="hidden sm:table-column-group"><col style="width:46%" /><col style="width:22%" /><col style="width:14%" /><col style="width:8rem" /></colgroup>
+    <thead class="hidden sm:table-header-group">
       <tr class="bg-gray-50 dark:bg-gray-800/60 border-b border-gray-200 dark:border-gray-800 text-left text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">
         <th class="px-4 py-3">Course</th><th class="px-3 py-3">Progress</th><th class="px-3 py-3">Status</th><th class="px-3 py-3">Updated</th>
       </tr>
     </thead>
-    <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+    <tbody class="block sm:table-row-group divide-y divide-gray-100 dark:divide-gray-800">
       ${d.courses.map((c) => {
         const done = c.steps.filter((s) => s.status !== "todo").length;
         const pct = c.steps.length ? Math.round((done / c.steps.length) * 100) : 0;
-        return html`<tr class="hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors cursor-pointer" tabindex="0" role="link" data-href="/courses/${encodeURIComponent(c.id)}" @click="if (!$event.target.closest('a, button')) window.location = $el.dataset.href" @keydown.enter="window.location = $el.dataset.href">
-        <td class="px-4 py-3">
-          <a href="/courses/${encodeURIComponent(c.id)}" class="font-semibold text-gray-800 dark:text-gray-100 hover:text-accent-600 dark:hover:text-accent-400 transition line-clamp-2">${c.title}</a>
-          ${c.lesson_id ? html`<span class="block text-[11px] text-gray-400 dark:text-gray-500 truncate">from <a href="/lessons/${encodeURIComponent(c.lesson_id)}" class="hover:text-accent-500 hover:underline">${c.lesson_title ?? c.lesson_id}</a></span>` : ""}
+        return html`<tr class="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3 sm:table-row sm:p-0 hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors cursor-pointer" tabindex="0" role="link" data-href="/courses/${encodeURIComponent(c.id)}" @click="if (!$event.target.closest('a, button')) window.location = $el.dataset.href" @keydown.enter="window.location = $el.dataset.href">
+        <td class="block w-full sm:table-cell sm:w-auto sm:px-4 sm:py-3">
+          <a href="/courses/${encodeURIComponent(c.id)}" class="font-semibold text-gray-800 dark:text-gray-100 hover:text-accent-600 dark:hover:text-accent-400 transition sm:line-clamp-2">${c.title}</a>
+          ${c.lesson_id ? html`<span class="block text-[11px] text-gray-400 dark:text-gray-500 sm:truncate">from <a href="/lessons/${encodeURIComponent(c.lesson_id)}" class="hover:text-accent-500 hover:underline">${c.lesson_title ?? c.lesson_id}</a></span>` : ""}
         </td>
-        <td class="px-3 py-3">
+        <td class="block flex-1 min-w-[7rem] sm:table-cell sm:px-3 sm:py-3">
           <div class="flex items-center gap-2"><div class="flex-1 h-1.5 rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden"><div class="h-full bg-accent-500" style="width:${pct}%"></div></div><span class="text-xs tabular-nums text-gray-500 dark:text-gray-400 shrink-0">${done}/${c.steps.length}</span></div>
         </td>
-        <td class="px-3 py-3">${statusBadge(c.status)}</td>
-        <td class="px-3 py-3 whitespace-nowrap text-gray-400 dark:text-gray-500 tabular-nums"><span data-ts="${c.updated_at}">${c.updated_at.slice(0, 10)}</span></td>
+        <td class="block sm:table-cell sm:px-3 sm:py-3">${statusBadge(c.status)}</td>
+        <td class="block sm:table-cell sm:px-3 sm:py-3 whitespace-nowrap text-gray-400 dark:text-gray-500 tabular-nums"><span data-ts="${c.updated_at}">${c.updated_at.slice(0, 10)}</span></td>
       </tr>`;
       })}
     </tbody>
@@ -1435,7 +1439,7 @@ ${
   <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-6">
     <p class="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500 mb-5">Coaching</p>
     <form method="post" action="/settings" class="space-y-4" onsubmit="try { localStorage.removeItem('theme-override') } catch (e) {}">
-      <div class="grid grid-cols-2 gap-4">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label for="max-per-day" class="block text-sm text-gray-600 dark:text-gray-400 mb-1">Max lessons per day</label>
           <input id="max-per-day" type="number" name="max_per_day" min="1" max="20" value="${d.settings.max_per_day}" class="w-full bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white rounded px-3 py-2 text-sm focus:outline-none focus:border-accent-500" />
@@ -1449,7 +1453,7 @@ ${
           <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">Minimum gap between lessons.</p>
         </div>
       </div>
-      <div class="grid grid-cols-2 gap-4">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label for="nudge-every" class="block text-sm text-gray-600 dark:text-gray-400 mb-1">Interactions between lessons</label>
           <input id="nudge-every" type="number" name="nudge_every" min="0" max="1000" value="${d.settings.nudge_every}" class="w-full bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white rounded px-3 py-2 text-sm focus:outline-none focus:border-accent-500" />
