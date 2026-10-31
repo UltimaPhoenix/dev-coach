@@ -81,23 +81,38 @@ topics → optional groups → daily limit and minimum gap — that you can run 
 ## Your first lesson
 
 You work on a task as normal. After your agent responds, devcoach appends a lesson card as the final text
-of the reply:
+of the reply. It opens with what you just did, says what the code assumed and what actually happens,
+and ends with one tip — at most 160 words, so it fits on one screen:
 
+````markdown
+### ─────────── 🎓 devcoach ───────────
+**busy_timeout: SQLite has no lock queue** · SQLite · Mid
+
+The `SQLITE_BUSY` you just fixed: the worker and the API server wrote to `app.db` at the
+same instant. The code assumed writers queue; SQLite has no queue — one writer holds the
+file lock, every other writer is refused *at once*, and retrying is the caller's job.
+
+`PRAGMA busy_timeout = 3000` hands that job to SQLite: the connection sleeps and retries
+for up to 3 s. It is per connection, not per file, so it belongs where the connection is
+opened, not in a migration.
+
+```ts
+conn.exec("BEGIN");           // deferred: locks at the first UPDATE
+conn.exec("BEGIN IMMEDIATE"); // locks now — where the timeout waits
 ```
-### ──────── 🎓 devcoach ────────
 
-**Promise.allSettled vs Promise.all** · TypeScript · Mid
+Only the second one waits. Once a connection is inside a transaction SQLite stops calling
+the busy handler for it: a deferred `BEGIN` that has read and then writes is refused the
+upgrade at once. Start write transactions with `BEGIN IMMEDIATE`.
 
-Promise.all rejects the moment any promise rejects, and you lose the results of the ones that
-already succeeded. For independent work, reach for Promise.allSettled… [3–6 short paragraphs]
-
-💡 *Senior tip:* map each task to a `{ ok, value }` / `{ ok, error }` result up front so callers
-never have to branch on `status` strings.
-
-### ──────── typescript · mid ────────
-
+💡 *Senior tip:* 3 s is a ceiling, not a target — open `withTransaction` with
+`BEGIN IMMEDIATE` and keep writes short, so the wait happens where you chose it, and rarely.
+### ─────────── sqlite · mid ───────────
 Did that land? ✅ knew it (y) · 💡 understood (u) · ❌ couldn't follow (n)
-```
+````
+
+The card never names a file path: the file is already on your screen, and the lesson may travel
+if you share it.
 
 ## The feedback loop
 

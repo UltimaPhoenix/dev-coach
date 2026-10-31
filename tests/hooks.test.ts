@@ -12,6 +12,7 @@ import {
   runHook,
 } from "../src/cli/hooks";
 import * as db from "../src/core/db";
+import { CARD_FALLBACK } from "../src/core/prompts";
 
 const payload = (over: Partial<HookPayload> = {}): HookPayload => ({
   stop_hook_active: false,
@@ -125,6 +126,16 @@ describe("hooks in-process (runHook dispatcher + payload-injected entrypoints)",
     expect(reason).toContain("single source of truth");
     expect(reason).not.toContain("output NOTHING else");
     expect(reason).not.toContain("Three hard rules");
+  });
+
+  it("the skill-missing fallback is CARD_FALLBACK itself, for every client", () => {
+    // One copy of the card instructions: the hook carries the constant, never its own text.
+    for (const client of ["claude", "gemini", "codex"] as const) {
+      const reason = JSON.parse(capture(() => cmdStopHook(payload(), client)).out).reason;
+      expect(reason).toContain(`fall back to: ${CARD_FALLBACK}\n`);
+      expect(reason).toContain("skip_lesson");
+      expect(reason).not.toContain("3–6");
+    }
   });
 
   it("gemini hooks emit Gemini's wire shapes (deny decision, BeforeAgent prime, no Skill tool)", () => {

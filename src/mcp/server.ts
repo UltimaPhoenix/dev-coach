@@ -332,17 +332,24 @@ export function createServer(): McpServer {
       inputSchema: z.object({
         id: z.string().describe("Unique lesson id (uuid or random string)"),
         topic_id: z.string().describe("Primary topic id, e.g. 'python'"),
-        categories: z.array(z.string()).describe("Category tags, e.g. ['python','performance']"),
-        title: z.string().describe("Short lesson title"),
+        categories: z
+          .array(z.string())
+          .describe("Category tags, e.g. ['sqlite','concurrency'] — the card shows the first"),
+        title: z
+          .string()
+          .describe("Lesson title: the mechanism, not the topic — at most 55 characters"),
         level: LevelSchema.describe("Difficulty level: junior | mid | senior"),
         summary: z.string().describe("1-3 sentence summary shown in the lesson card"),
         body: z
           .string()
           .min(1)
           .describe(
-            "Clean lesson markdown: the prose + 💡 Senior tip only — NO card bands, NO '>' " +
-              "blockquote, and do not repeat title/category/level (those are their own fields). " +
-              "Required, non-empty.",
+            "The lesson body as clean markdown: 2–4 short paragraphs, at most 160 words " +
+              "including the tip, at every level. The first sentence names what the user just " +
+              "did — never a `path:line` or a directory (the body travels when the lesson is " +
+              "shared). An optional fenced contrast of at most 8 lines; the `💡 *Senior tip:*` " +
+              "line last. NO card bands, NO '>' blockquote, no title/category/level line (those " +
+              "are their own fields), no feedback line. Required, non-empty.",
           ),
         task_context: z.string().nullish().describe("What the user was doing when taught"),
         project: z.string().nullish().describe("Project name (auto-detected from git if omitted)"),

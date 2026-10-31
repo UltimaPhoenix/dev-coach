@@ -5,6 +5,7 @@
 // The receiving side (`parseSharedInput`) accepts any of them — a bare code, the whole copied card,
 // the link, the file text, or a legacy lessons JSON array — so the user never has to know which
 // one they were handed. Pure module: no I/O, no DB.
+import { homedir } from "node:os";
 import { deflateSync, Inflate, strFromU8, strToU8 } from "fflate";
 import { z } from "zod";
 import { VERSION } from "../version";
@@ -59,6 +60,128 @@ export const SharedLessonSchema = z.object({
 });
 export type SharedLesson = z.infer<typeof SharedLessonSchema>;
 
+// ── Local-path scrub ────────────────────────────────────────────────────────
+
+export interface ScrubOptions {
+  /** The lesson's own `folder` (absolute workspace path) or null. */
+  folder: string | null;
+  /** The sender's home directory (`os.homedir()`); injectable for tests. */
+  home: string;
+}
+
+// One or more separators either way (`\\` doubles in a quoted Windows path); a path starts with ONE.
+const SEP = /[\\/]+/.source;
+const ROOT = /[\\/]/.source;
+// A path starts at the beginning of the text or after a character that cannot continue a word,
+// a host or a path segment — `/home/x` inside `https://example.com/home/x` is a URL, not a path.
+// `vscode://file/<path>` is the one URL whose path is a local path.
+const PATH_START = /(?:(?<![\p{L}\p{N}_.%+~-])|(?<=vscode:\/\/file))/u.source;
+// …and ends before another name character: `<folder>-old` and `<folder>.bak` are other folders.
+const PATH_END = /(?![\p{L}\p{N}_-]|\.[\p{L}\p{N}_])/u.source;
+// One user-name segment: no whitespace, quote, separator or punctuation, never ending in a dot
+// (`… in /Users/ada.` keeps its full stop).
+const NAME = /[^\s\\/"'`<>:|?*()[\]{},;]*[^\s\\/"'`<>:|?*()[\]{},;.]/u.source;
+// Rule 3: user homes whatever the local home is — the drive form first, so `C:\Users\x` is
+// consumed whole before the POSIX form could match its `\Users\x` tail.
+const GENERIC_HOMES = [
+  new RegExp(`${PATH_START}[A-Za-z]:${SEP}Users${SEP}${NAME}`, "giu"),
+  new RegExp(`${PATH_START}${ROOT}(?:Users|home)${SEP}${NAME}`, "gu"),
+  new RegExp(`${PATH_START}${ROOT}root${PATH_END}`, "gu"),
+];
+// The path part of a file URL keeps its leading slash, so the URL's host is never rewritten.
+const URL_PATH_PREFIX = /(?:file:\/\/|vscode:\/\/file)$/;
+const URL_PREFIX_MAX = "vscode://file".length;
+
+const escapeRegExp = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/** Every spelling of an absolute path's prefix: separators either way, macOS `/private` aliases. */
+function prefixPatterns(path: string | null): RegExp[] {
+  if (!path || !/^(?:[\\/]|[A-Za-z]:[\\/])/.test(path)) return [];
+  const segments = path.split(/[\\/]+/).filter(Boolean);
+  const drive = /^[A-Za-z]:$/.test(segments[0] ?? "");
+  if (segments.length < (drive ? 2 : 1)) return []; // `/` or `C:\` would match every path
+  const variants = [segments];
+  // macOS: /tmp, /var and /etc live under /private, and either spelling reaches the same file.
+  if (segments[0] === "private" && ["tmp", "var", "etc"].includes(segments[1] ?? "")) {
+    variants.push(segments.slice(1));
+  } else if (["tmp", "var", "etc"].includes(segments[0] ?? "")) {
+    variants.push(["private", ...segments]);
+  }
+  return variants.map((segs) => {
+    const body = segs.map(escapeRegExp).join(SEP);
+    return new RegExp(`${PATH_START}${drive ? "" : ROOT}${body}${PATH_END}`, drive ? "giu" : "gu");
+  });
+}
+
+/** Markdown split into code (fenced blocks, inline code spans) and prose, in order. */
+function splitCode(text: string): { code: boolean; text: string }[] {
+  const parts: { code: boolean; text: string }[] = [];
+  const pushProse = (prose: string) => {
+    let last = 0;
+    for (const m of prose.matchAll(/(?<!`)(`+)(?!`)[\s\S]*?(?<!`)\1(?!`)/g)) {
+      parts.push({ code: false, text: prose.slice(last, m.index) });
+      parts.push({ code: true, text: m[0] });
+      last = m.index + m[0].length;
+    }
+    parts.push({ code: false, text: prose.slice(last) });
+  };
+  const lines = text.split(/(?<=\n)/);
+  let prose = "";
+  let fence: { text: string; close: RegExp } | null = null;
+  for (const line of lines) {
+    if (fence) {
+      fence.text += line;
+      if (fence.close.test(line)) {
+        parts.push({ code: true, text: fence.text });
+        fence = null;
+      }
+      continue;
+    }
+    const open = /^ {0,3}(`{3,}|~{3,})/.exec(line);
+    if (open?.[1]) {
+      pushProse(prose);
+      prose = "";
+      const marker = open[1];
+      fence = { text: line, close: new RegExp(`^ {0,3}${marker[0]}{${marker.length},}\\s*$`) };
+    } else {
+      prose += line;
+    }
+  }
+  if (fence) parts.push({ code: true, text: fence.text });
+  pushProse(prose);
+  return parts.filter((p) => p.text);
+}
+
+/**
+ * Replace local filesystem locations in free text: the lesson's folder → `<project>`, the home
+ * directory → `~`, any other user home (`/Users/<name>`, `/home/<name>`, `/root`,
+ * `C:\Users\<name>`) → `~`. Separators either way, a drive letter in any case. Idempotent, and a
+ * text without paths comes back byte-identical. In markdown prose the token is written
+ * `\<project>` — the CommonMark escape — because a bare `<project>` is an HTML tag there that
+ * renderers drop; inside code it stays `<project>`.
+ */
+export function scrubLocalPaths(text: string, opts: ScrubOptions): string {
+  const project = prefixPatterns(opts.folder);
+  const homes = [...prefixPatterns(opts.home), ...GENERIC_HOMES];
+  return splitCode(text)
+    .map(({ code, text: part }) =>
+      replacePaths(replacePaths(part, project, code ? "<project>" : "\\<project>"), homes, "~"),
+    )
+    .join("");
+}
+
+function replacePaths(text: string, patterns: RegExp[], token: string): string {
+  return patterns.reduce(
+    (acc, re) =>
+      acc.replace(re, (_match: string, offset: number, whole: string) =>
+        URL_PATH_PREFIX.test(whole.slice(Math.max(0, offset - URL_PREFIX_MAX), offset))
+          ? `/${token}`
+          : token,
+      ),
+    text,
+  );
+}
+
 // ── Building ────────────────────────────────────────────────────────────────
 
 export interface BuildShareOptions {
@@ -66,14 +189,22 @@ export interface BuildShareOptions {
   includeContext: boolean;
   sharedBy: string | null;
   now?: Date;
+  /** The sender's home directory, for the path scrub; defaults to `os.homedir()`. */
+  home?: string;
 }
 
-/** Turn a stored lesson into the portable payload. Local paths never leave the machine. */
+/**
+ * Turn a stored lesson into the portable payload. Local paths never leave the machine: `folder`
+ * never travels, and every free-text field that does is scrubbed (`scrubLocalPaths`) — which
+ * also covers lessons written before the "no file path" rule, and a model that ignored it.
+ */
 export function buildSharePayload(lesson: Lesson, opts: BuildShareOptions): SharedLesson {
+  const scrub = (text: string) =>
+    scrubLocalPaths(text, { folder: lesson.folder, home: opts.home ?? homedir() });
   const lessonPart: SharedLesson["lesson"] = {
-    title: lesson.title,
-    summary: lesson.summary,
-    body: lesson.body,
+    title: scrub(lesson.title),
+    summary: scrub(lesson.summary),
+    body: lesson.body == null ? null : scrub(lesson.body),
     topic_id: lesson.topic_id,
     categories: lesson.categories,
     level: lesson.level,
@@ -82,6 +213,7 @@ export function buildSharePayload(lesson: Lesson, opts: BuildShareOptions): Shar
     for (const key of CONTEXT_KEYS) {
       if (lesson[key] != null) lessonPart[key] = lesson[key];
     }
+    if (lessonPart.task_context != null) lessonPart.task_context = scrub(lessonPart.task_context);
     // A repository is shared only when it names a remote host — a `local` platform means the
     // "repository" is a path on the sender's disk.
     if (lesson.repository_platform && REMOTE_PLATFORMS.has(lesson.repository_platform)) {

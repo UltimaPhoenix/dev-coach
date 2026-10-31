@@ -26,7 +26,7 @@ import {
   stripHighlighter,
 } from "../src/core/highlighter";
 import { normalizeTimestamp, parseLesson } from "../src/core/models";
-import { buildPromptForLevel, formatLessonForDisplay } from "../src/core/prompts";
+import { band, buildPromptForLevel, formatLessonForDisplay } from "../src/core/prompts";
 import { buildSharePayload, renderShareText, ShareInputError } from "../src/core/share";
 import { VERSION } from "../src/version";
 
@@ -359,6 +359,13 @@ describe("prompts", () => {
     expect(out).not.toContain("> ");
     // body missing → summary is the card text
     expect(formatLessonForDisplay(lesson({ body: null }))).toContain("lazy");
+    // ONE category on the title line (the rest stay stored); none → no empty slot.
+    expect(out.split("\n")[1]).toBe("**Generators** · python · Mid");
+    expect(formatLessonForDisplay(lesson({ categories: [] })).split("\n")[1]).toBe(
+      "**Generators** · Mid",
+    );
+    expect(out.split("\n")[0]).toBe(band("🎓 devcoach"));
+    expect([...band("🎓 devcoach").slice(4)]).toHaveLength(34);
     expect(buildPromptForLevel("docker", "ctx", 2)).toContain("beginner");
     expect(buildPromptForLevel("docker", "ctx", 5)).toContain("intermediate");
     expect(buildPromptForLevel("docker", "ctx", 8)).toContain("senior-level");

@@ -174,7 +174,8 @@ user-invocable slash commands, **not** auto-injected — so coaching is driven b
   that **invokes the devcoach skill via the Skill tool** and repeats NONE of its rules (a duplicated
   copy once drifted to a flat "output NOTHING else" with no recovery clause — the card got saved but
   never printed; a test locks the cue rule-free). It carries only the notebook-checkpoint count, the
-  5-line fallback for missing skills (the sole place allowed to instruct), and `skip_lesson` as the
+  fallback for missing skills (`CARD_FALLBACK` in `core/prompts.ts`, the sole place allowed to
+  instruct — tests pin it to the skill's bands and feedback line), and `skip_lesson` as the
   explicit no-op. The `systemMessage` toast is neutral ("checking whether a lesson is due…") so a
   silent skip doesn't read as a failed lesson.
 - **`prompt-hook`** (UserPromptSubmit): read-only peek (`explainCue`, never bumps); when this turn's
@@ -338,7 +339,9 @@ code as the LAST line), the **link** (`SHARE_PAGE_URL#code` — must equal the d
 markdown body, no YAML dependency). `parseSharedInput` accepts all of them plus a legacy lessons JSON
 array, finds the code anywhere in a card/link, and re-joins email-wrapped codes. Privacy rules live
 in `buildSharePayload`: `folder` never, `repository` only for github/gitlab/bitbucket, the other
-context keys only with `includeContext`. `resolveSharedBy`: explicit → anonymous → `share_name`
+context keys only with `includeContext`, and title/summary/body/task_context through
+`scrubLocalPaths` (folder → `<project>`, homes → `~`; written `\<project>` in markdown prose, where a
+bare `<project>` is an HTML tag that marked + DOMPurify drop). `resolveSharedBy`: explicit → anonymous → `share_name`
 setting → git `user.name` → null. Storage: `coach.importSharedLesson` keeps the sender's id, suffixes
 `-shared`/`-shared-2`… only on collision with a different lesson, and reports a re-import of the same
 share as `duplicated` (`isSameSharedLesson`: imported + same title/topic/sender — no `LIKE`).

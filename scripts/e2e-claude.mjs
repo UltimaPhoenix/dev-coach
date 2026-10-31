@@ -9,7 +9,7 @@
 //   npm run test:e2e -- --list           what exists, and how many claude calls each run makes
 //   npm run test:e2e -- --only plugin-tree:fresh-cue,mcp-entry:lesson
 //   E2E_MODEL=haiku npm run test:e2e     a cheaper model (default: the CLI's own default)
-//   … --keep                             keep the sandboxes for inspection
+//   … --keep                             keep the sandboxes for inspection (each turn's reply: turn-<n>.md)
 //
 // Isolation: every scenario gets its own sandbox — DEVCOACH_DIR (database, notebook),
 // DEVCOACH_CLAUDE_DIR (an empty history for the onboarding scan), DEVCOACH_RUNTIME_DIR (the
@@ -283,6 +283,8 @@ function claude(sb, prompt, { resume, planMode } = {}) {
       out += `${line}\n`; // a non-JSON line (e.g. "Not logged in") — keep it visible
     }
   }
+  // --keep also keeps what the user saw: the reply text of every turn, next to the sandbox data.
+  if (keep) writeFileSync(join(sb.dir, `turn-${sb.calls}.md`), out);
   return { out, session, servers, toolCalls, status: res.status, err: res.stderr ?? "" };
 }
 
@@ -300,6 +302,37 @@ const query = (sb, sql) => {
 const count = (sb, table) => Number(query(sb, `SELECT COUNT(*) AS n FROM ${table}`)?.n ?? 0);
 const notebookText = (sb) => (existsSync(sb.notebook) ? readFileSync(sb.notebook, "utf8") : "");
 const BAND = /### ─+ 🎓 devcoach ─+/g;
+const ANY_BAND = /^### ─+ .+ ─+\s*$/;
+const EMOJI = /\p{Extended_Pictographic}/u;
+const cells = (s) => [...s].reduce((n, ch) => n + (EMOJI.test(ch) ? 2 : ch === "️" ? 0 : 1), 0);
+
+/**
+ * The card's height as Claude Code lays it out (top band to bottom band): headings print without
+ * `### ` plus a blank row after them, fence markers print nothing, `**` and backticks are stripped,
+ * an emoji takes two cells. An approximation, reported for information — model output varies.
+ */
+function cardRows(out, columns = 80) {
+  const lines = out.split("\n");
+  const top = lines.findIndex((l) => new RegExp(BAND.source).test(l));
+  const bottom = lines.findIndex((l, i) => i > top && ANY_BAND.test(l));
+  if (top === -1 || bottom === -1) return null;
+  let rows = 0;
+  let blank = false;
+  for (const line of lines.slice(top, bottom + 1)) {
+    if (/^\s*```/.test(line)) continue;
+    if (!line.trim()) {
+      if (!blank) rows += 1;
+      blank = true;
+      continue;
+    }
+    const heading = ANY_BAND.test(line);
+    const text = line.replace(/^### /, "").replace(/\*\*|`/g, "");
+    rows += Math.max(1, Math.ceil(cells(text) / columns));
+    if (heading && line !== lines[bottom]) rows += 1; // the blank row Claude Code adds
+    blank = heading;
+  }
+  return { lines: bottom - top + 1, rows };
+}
 const TECH_PROMPT =
   "Review this TypeScript function and point out the bug, briefly:\n\n" +
   "```ts\nfunction sum(xs: number[]): number {\n  let total = 0;\n  for (let i = 0; i <= xs.length; i++) total += xs[i];\n  return total;\n}\n```";
@@ -406,6 +439,9 @@ const KINDS = {
       );
       // log_lesson does not echo the card — a second print is the double-card regression.
       check("the card is printed exactly once", bands === 1, `bands: ${bands}`);
+      const height = cardRows(t.out);
+      if (height)
+        console.log(`    ℹ card: ${height.lines} lines, ~${height.rows} rows at 80 columns`);
       check(
         "cue resolved (no pending retry)",
         Number(query(sb, "SELECT pending FROM cue_state WHERE id = 1")?.pending ?? 0) === 0,

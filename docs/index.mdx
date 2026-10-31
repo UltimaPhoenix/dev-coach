@@ -21,28 +21,32 @@ You're shipping more than ever and understanding less. devcoach fixes that with 
 
 You work on a task with your AI agent as usual. When it finishes, devcoach appends a lesson:
 
-```markdown
-### ──────── 🎓 devcoach ────────
-**Promise.allSettled vs Promise.all — don't let one failure sink the batch** · TypeScript · Mid
+````markdown
+### ─────────── 🎓 devcoach ───────────
+**busy_timeout: SQLite has no lock queue** · SQLite · Mid
 
-Promise.all rejects the moment any promise rejects, and you lose the results of
-the ones that already succeeded. For independent work (fan-out fetches, batch
-writes) that's usually the wrong default.
+The `SQLITE_BUSY` you just fixed: the worker and the API server wrote to `app.db` at the
+same instant. The code assumed writers queue; SQLite has no queue — one writer holds the
+file lock, every other writer is refused *at once*, and retrying is the caller's job.
 
-Promise.allSettled always resolves, giving you a status for every promise:
+`PRAGMA busy_timeout = 3000` hands that job to SQLite: the connection sleeps and retries
+for up to 3 s. It is per connection, not per file, so it belongs where the connection is
+opened, not in a migration.
 
-    const results = await Promise.allSettled(ids.map(fetchUser));
-    const ok = results.filter(r => r.status === "fulfilled").map(r => r.value);
-
-Use Promise.all when the tasks are genuinely all-or-nothing; reach for
-allSettled when partial success is meaningful and you want to report failures.
-
-💡 *Senior tip:* for work that *should* cancel its siblings on failure, a shared
-AbortController gives you all-or-nothing with prompt cancellation.
-### ──────── typescript · mid ────────
-
-Did that land? ✅ knew it (y) · 💡 understood (u) · ❌ couldn't follow (n)
+```ts
+conn.exec("BEGIN");           // deferred: locks at the first UPDATE
+conn.exec("BEGIN IMMEDIATE"); // locks now — where the timeout waits
 ```
+
+Only the second one waits. Once a connection is inside a transaction SQLite stops calling
+the busy handler for it: a deferred `BEGIN` that has read and then writes is refused the
+upgrade at once. Start write transactions with `BEGIN IMMEDIATE`.
+
+💡 *Senior tip:* 3 s is a ceiling, not a target — open `withTransaction` with
+`BEGIN IMMEDIATE` and keep writes short, so the wait happens where you chose it, and rarely.
+### ─────────── sqlite · mid ───────────
+Did that land? ✅ knew it (y) · 💡 understood (u) · ❌ couldn't follow (n)
+````
 
 ---
 

@@ -98,11 +98,11 @@ See [configuration.md](configuration.md) for the SQLite schema. The `Lesson` sha
   "id": "uuid-or-random",
   // timestamp is not an argument — log_lesson always stamps the real current time server-side
   "topic_id": "typescript",
-  "categories": ["typescript", "performance"],
-  "title": "Promise.allSettled vs Promise.all",
+  "categories": ["typescript", "performance"],  // the card shows the first
+  "title": "Promise.allSettled vs Promise.all",   // the mechanism, at most 55 characters
   "level": "mid",                          // junior | mid | senior
   "summary": "…",                          // shown in the lesson card
-  "body": "…",                             // optional full markdown
+  "body": "…",                             // the card body: 2–4 paragraphs, ≤ 160 words, tip last, no file paths
   "task_context": "…",                     // optional
   "project": null, "repository": null, "branch": null,
   "commit_hash": null, "folder": null, "repository_platform": null  // auto-detected from git when omitted

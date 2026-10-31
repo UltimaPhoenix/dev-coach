@@ -40,6 +40,10 @@ section). For a lesson:
   branch, commit and task context are included only with an explicit *Include where it happened* /
   `--with-context` / `include_context`; a **local folder path is never exported**, and a repository
   name only when it points at a remote host (GitHub, GitLab, Bitbucket).
+- **Local paths in the text are replaced** when a lesson is shared: the lesson's project folder by
+  `<project>`, your home directory and any other user's home (`/Users/…`, `/home/…`, `C:\Users\…`)
+  by `~` — in the title, the TL;DR, the body and the task context, for lessons written before this
+  rule too. The share preview shows the replaced text before anything leaves.
 - **The share link is server-less** — the lesson is encoded in the URL fragment, which browsers never
   send to the site; the docs page decodes it locally. devcoach still makes no network calls of its own:
   the only outbound request is `devcoach import <url>` fetching a URL *you* pasted.

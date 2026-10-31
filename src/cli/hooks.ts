@@ -21,6 +21,7 @@ import { join } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
 import * as coach from "../core/coach";
 import * as db from "../core/db";
+import { CARD_FALLBACK } from "../core/prompts";
 
 /**
  * Which agent CLI invoked the hook. Selected by the subcommand the installed config
@@ -215,17 +216,9 @@ export function buildLessonCue(nextLessonNumber: number, client: HookClient = "c
     "source of truth for the entire flow, including the explicit no-op when the completed " +
     "work does not warrant a lesson.\n" +
     `${notebookStep}\n\n` +
-    "If the devcoach skill is not available, fall back to: call get_briefing (one call: " +
-    "profile, taught topics, notebook); pick ONE untaught profile topic at or " +
-    "above the user's confidence band; call log_lesson silently (body = 3–6 short paragraphs " +
-    "tied to the task plus a `💡 *Senior tip:*` line, clean markdown without bands or a " +
-    "title line); THEN write the card as the FINAL message of the turn: plain markdown (no " +
-    "'>' blockquote) between two band headings `### ──────── 🎓 devcoach ────────` and " +
-    "`### ──────── [topic] · [level] ────────`, with `**[Title]** · [Category] · [Level]`, " +
-    "the body you passed, and the tip — saving is not showing; the card in the final " +
-    "message is the only thing the user sees. If instead the work does not warrant a lesson " +
-    "(pure questions, chat, nothing technical), call the devcoach `skip_lesson` tool with a " +
-    "one-line reason.\n\n" +
+    `If the devcoach skill is not available, fall back to: ${CARD_FALLBACK}\n` +
+    "If instead the work does not warrant a lesson (pure questions, chat, nothing technical), " +
+    "call the devcoach `skip_lesson` tool with a one-line reason.\n\n" +
     "The rate-limit check is already done by this hook — skip it. Work in silence: never " +
     "narrate devcoach tool calls or resource reads ('checking your profile…'). Output only " +
     "the lesson card (or nothing). No preamble, no meta-commentary."

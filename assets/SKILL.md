@@ -146,36 +146,58 @@ raise the bar** — a mediocre lesson wastes the rate limit.
 Append the lesson at the bottom of the response as a card: plain markdown between two
 band headings (never `> ` blockquotes — they break on paragraphs and fenced code):
 
+````
+### ─────────── 🎓 devcoach ───────────
+**[Title: the mechanism, not the topic — at most 55 characters]** · [Category] · [Junior|Mid|Senior]
+
+[What the user just did and what it ran into — 1–2 sentences, second person, no file path.
+Then the wrong assumption the code embodied, and the mechanism that replaces it.]
+
+```lang
+[≤ 8 lines, each ≤ 72 characters: a contrast — the line that breaks beside the line that
+works, or a case whose outcome the reader predicts. Never a line already in the user's diff.
+Omit when the prose carries it.]
 ```
-### ──────── 🎓 devcoach ────────
-**[Lesson title]** · [Category] · [Junior|Mid|Senior]
 
-[Body: 3–6 paragraphs. Concise, practical, code example if useful.
-Explain the WHY. Connect it to the task just completed.]
+[Where the rule stops holding — 1–2 sentences, only when you can show it from the code
+above or a documented behaviour. Omit rather than invent.]
 
-💡 *Senior tip:* [One sentence a senior would say to a junior on this topic]
-### ──────── [topic] · [level] ────────
-```
+💡 *Senior tip:* [one sentence — the rule the reader carries to the next codebase; when there
+is one concrete thing to do in this repo, this is it]
+### ─────────── [topic] · [level] ───────────
+````
 
-Bands are `###` headings of box-drawing dashes (`─`, U+2500) around a centered title,
-~34 chars wide, top and bottom matching. Tone: direct, like a senior colleague in a
-code review — never academic, never verbose.
+Bands are `###` headings of box-drawing dashes (`─`, U+2500), 11 a side around a centred
+title — 34 characters after the `### `; top and bottom match. The title line shows ONE
+category (pass every category in `log_lesson`'s `categories`; the card shows the first).
+
+The body is **2–4 paragraphs, at most 160 words including the tip, at every level** — the
+level changes the angle, never the length (junior: the simplest true model; mid: the why and
+one trade-off; senior: the non-obvious rule and where it breaks). No labels, no headings, no
+second closing line: the 💡 tip is always the last line before the band. The first sentence
+names what the user just did — the change, the bug, the choice — never a `path:line` or a
+directory: the file is already on their screen, and the body travels when the lesson is
+shared (a basename as a noun is fine). Omit a paragraph rather than pad it, and never state a
+boundary you cannot show — a wrong edge case costs more than a missing one. Tone: direct,
+like a senior colleague in a code review — never academic, never verbose.
 
 ## Logging and feedback
 
 **Once the lesson is chosen**, call `log_lesson` silently: `id` (a unique kebab-case
 slug of the title), `title`, `topic_id` (the single most characterizing word —
 `sqlite`, `docker`; max 3 words like `ci_cd`), `categories`, `level`, `summary` in
-their own fields; `body` = ONLY the prose + the 💡 tip as CLEAN markdown (no bands, no
-blockquote, no title/`Category · Level` line). Git metadata is auto-detected
+their own fields; `body` = everything between the title line and the closing band — the
+prose, the fence if any, and the 💡 tip — as CLEAN markdown (no bands, no blockquote, no
+title/`Category · Level` line, no feedback line). Git metadata is auto-detected
 server-side — omit it. **When it returns, write the card as the final message of the
-turn**: both bands, the title line, the same prose you passed as `body`, the tip. That
-final message is the only place the user ever sees the lesson.
+turn**: both bands, the title line, the same body you passed, the tip last. That final
+message is the only place the user ever sees the lesson.
 
 `log_lesson` never asks the user anything — it only saves. Feedback is collected as
-text under the card: append the prompt "Did that land? ✅ knew it (y) · 💡 understood
-(u) · ❌ couldn't follow (n)" DIRECTLY BENEATH the card's closing band — it is the only
-line allowed after the card, and it may never appear without the card right above it.
+text under the card: append the line
+"Did that land? ✅ knew it (y) · 💡 understood (u) · ❌ couldn't follow (n)"
+DIRECTLY BENEATH the card's closing band — it is the only line allowed after the card,
+and it may never appear without the card right above it.
 Read the user's next message loosely: `y` / `yes` / "knew it" / ✅ → `know` ·
 `u` / "understood" / "got it" / 💡 → `understood` · `n` / `no` / "lost me" / ❌ →
 `dont_know` · anything else — including no reply at all, the user just moving on —

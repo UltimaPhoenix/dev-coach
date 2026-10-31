@@ -56,7 +56,7 @@ devcoach reads (shortened here; a real code is one line of about a thousand char
 
 ```text
 ### ─────────── 🎓 devcoach ───────────
-**Docker layer caching — why COPY order decides your build speed** · docker · infrastructure · Junior
+**Docker layer caching — why COPY order decides your build speed** · docker · Junior
 
 Every `RUN`, `COPY`, and `ADD` instruction in a Dockerfile creates a new layer. Docker caches each
 layer by its content hash; if the hash matches what's already on disk, it reuses the cached result…
@@ -141,6 +141,9 @@ Already in your log as lesson-docker-layer-cache-001 (shared by Ada)
 - **On request** (*Include where it happened*, `--with-context`, "with context"): project name, branch,
   commit and the task context. A repository name travels only for remote hosts (GitHub, GitLab,
   Bitbucket); a **local folder path never leaves your machine**.
+- **Local paths in the text are replaced** before the lesson is encoded: your project folder becomes
+  `<project>` and a home directory (`/Users/…`, `/home/…`, `C:\Users\…`) becomes `~`, in the title,
+  TL;DR, body and task context. The preview (dashboard popover, `devcoach share`) shows the result.
 - **Your name** is proposed from the `share_name` setting, then your git `user.name`; edit it in the
   popover or share anonymously. The receiver sees *shared by …* with that name and the date.
 - **The link is server-less**: the lesson sits in the URL fragment (after `#`), which browsers never

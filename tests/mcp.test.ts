@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { Client, InMemoryTransport } from "@modelcontextprotocol/client";
 import { describe, expect, it, vi } from "vitest";
 import * as db from "../src/core/db";
+import { band, CARD_FALLBACK, FEEDBACK_LINE } from "../src/core/prompts";
 import { ShareInputError } from "../src/core/share";
 import { fetchSharedInput } from "../src/core/share-fetch";
 import { createServer, onboardingNextStep } from "../src/mcp/server";
@@ -39,6 +40,29 @@ describe("mcp server", () => {
     expect((await client.listResources()).resources).toHaveLength(10);
     expect((await client.listResourceTemplates()).resourceTemplates).toHaveLength(1);
     expect((await client.listPrompts()).prompts[0].name).toBe("devcoach_instructions");
+    await client.close();
+    await server.close();
+  });
+
+  it("the skill's card is the server's card: the band, the budget, the fallback, the body rule", async () => {
+    const { client, server } = await connect();
+    const pr: any = await client.getPrompt({ name: "devcoach_instructions" });
+    const skill: string = pr.messages[0].content.text;
+    expect(skill).toContain("at most 160 words");
+    expect(skill).toContain("never a `path:line`");
+    // Byte equality with the band the server draws for a shared card — the 34-width guard.
+    const bands = skill.split("\n").filter((line) => /^### ─+ .+ ─+$/.test(line));
+    expect(bands[0]).toBe(band("🎓 devcoach"));
+    // The skill-missing fallback writes the same two bands and asks the same question.
+    for (const line of bands.slice(0, 2)) expect(CARD_FALLBACK).toContain(`\`${line}\``);
+    expect(skill).toContain(`"${FEEDBACK_LINE}"`);
+    expect(CARD_FALLBACK.endsWith(FEEDBACK_LINE)).toBe(true);
+    const tools = (await client.listTools()).tools;
+    const props: any = tools.find((t: any) => t.name === "log_lesson")?.inputSchema.properties;
+    expect(props.body.description).toContain("at most 160 words");
+    expect(props.body.description).toContain("names what the user just did");
+    expect(props.body.description).toContain("never a `path:line`");
+    expect(props.categories.description).toContain("the card shows the first");
     await client.close();
     await server.close();
   });

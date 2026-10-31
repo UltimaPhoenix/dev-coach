@@ -333,33 +333,36 @@ That's it. You go back to work. Coaching happens silently in the background.
 
 You work on a task as normal. After your agent responds, devcoach appends a lesson:
 
+````
+You: Two processes write to the same SQLite file and one fails with SQLITE_BUSY — fix it.
+
+Agent: [fixes the connection setup, explains the change]
+
+### ─────────── 🎓 devcoach ───────────
+**busy_timeout: SQLite has no lock queue** · SQLite · Mid
+
+The `SQLITE_BUSY` you just fixed: the worker and the API server wrote to `app.db` at the
+same instant. The code assumed writers queue; SQLite has no queue — one writer holds the
+file lock, every other writer is refused *at once*, and retrying is the caller's job.
+
+`PRAGMA busy_timeout = 3000` hands that job to SQLite: the connection sleeps and retries
+for up to 3 s. It is per connection, not per file, so it belongs where the connection is
+opened, not in a migration.
+
+```ts
+conn.exec("BEGIN");           // deferred: locks at the first UPDATE
+conn.exec("BEGIN IMMEDIATE"); // locks now — where the timeout waits
 ```
-You: Refactor this endpoint to handle concurrent requests properly.
 
-Agent: [refactors the code, explains the changes]
+Only the second one waits. Once a connection is inside a transaction SQLite stops calling
+the busy handler for it: a deferred `BEGIN` that has read and then writes is refused the
+upgrade at once. Start write transactions with `BEGIN IMMEDIATE`.
 
-### ──────── 🎓 devcoach ────────
-**Promise.allSettled vs Promise.all — don't let one failure sink the batch** · TypeScript · Mid
-
-Promise.all rejects the moment any promise rejects, and you lose the results of
-the ones that already succeeded. For independent work (fan-out fetches, batch
-writes) that's usually the wrong default.
-
-Promise.allSettled always resolves, giving you a status for every promise:
-
-    const results = await Promise.allSettled(ids.map(fetchUser));
-    const ok = results.filter(r => r.status === "fulfilled").map(r => r.value);
-
-Use Promise.all when the tasks are genuinely all-or-nothing; reach for
-allSettled when partial success is meaningful and you want to report failures.
-
-💡 *Senior tip:* for coordinated work that *should* cancel siblings on failure,
-an AbortController shared across the requests gives you all-or-nothing with
-prompt cancellation — the structured-concurrency middle ground.
-### ──────── typescript · mid ────────
-
+💡 *Senior tip:* 3 s is a ceiling, not a target — open `withTransaction` with
+`BEGIN IMMEDIATE` and keep writes short, so the wait happens where you chose it, and rarely.
+### ─────────── sqlite · mid ───────────
 Did that land? ✅ knew it (y) · 💡 understood (u) · ❌ couldn't follow (n)
-```
+````
 
 Reply `y` (already knew it — confidence goes up), `u` (new and clear) or `n` (too dense — kept as a seed for a step-by-step course) to shape future lessons — or just move on: no reply means no change.
 

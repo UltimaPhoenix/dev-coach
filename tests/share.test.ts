@@ -1,6 +1,9 @@
 import dns from "node:dns";
+import { mkdtempSync, rmSync } from "node:fs";
 import http from "node:http";
 import type { AddressInfo } from "node:net";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { deflateSync } from "fflate";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { type Lesson, parseLesson } from "../src/core/models";
@@ -20,6 +23,7 @@ import {
   SHARE_CODE_PREFIX,
   SHARE_PAGE_URL,
   ShareInputError,
+  scrubLocalPaths,
   sharedLessonFilename,
   sharedLessonIdCandidates,
   sharedLessonToLesson,
@@ -111,6 +115,121 @@ describe("share payload", () => {
     expect(resolveSharedBy({ ...base })).toBe("Setting Name");
     expect(resolveSharedBy({ setting: "", gitUserName: "Git Name" })).toBe("Git Name");
     expect(resolveSharedBy({ setting: null, gitUserName: null })).toBeNull();
+  });
+});
+
+describe("scrubLocalPaths", () => {
+  const folder = "/Users/someone/dev/dev-coach";
+  const home = "/Users/someone";
+  const scrub = (text: string, over: Partial<{ folder: string | null; home: string }> = {}) =>
+    scrubLocalPaths(text, { folder, home, ...over });
+
+  it("the lesson's folder → <project>, the home → ~, any other user home → ~", () => {
+    expect(scrub(`in \`${folder}/src/a.ts:12\``)).toBe("in `<project>/src/a.ts:12`");
+    expect(scrub(`see \`${home}/other/x\``)).toBe("see `~/other/x`");
+    expect(scrub("`/Users/alice/p/q.ts` `/home/bob/p` `/root/.npmrc`")).toBe(
+      "`~/p/q.ts` `~/p` `~/.npmrc`",
+    );
+    expect(scrub('`C:\\Users\\Eve\\p\\q.ts` `c:/users/eve/p` `"C:\\\\Users\\\\Eve\\\\x"`')).toBe(
+      '`~\\p\\q.ts` `~/p` `"~\\\\x"`',
+    );
+    // Separators either way, a trailing one, a Windows folder in any case.
+    expect(scrub("`C:/Users/Eve/dev/shop/src`", { folder: "C:\\Users\\Eve\\dev\\shop\\" })).toBe(
+      "`<project>/src`",
+    );
+    expect(scrub("`c:\\users\\eve\\dev\\shop`", { folder: "C:\\Users\\Eve\\dev\\shop" })).toBe(
+      "`<project>`",
+    );
+  });
+
+  it("in prose the token is \\<project>: a bare <project> is an HTML tag renderers drop", () => {
+    expect(scrub(`The lock in ${folder}/src/db.ts:42 is held.`)).toBe(
+      "The lock in \\<project>/src/db.ts:42 is held.",
+    );
+    const fenced = `Before.\n\n\`\`\`ts\nopen("${folder}/data.db");\n\`\`\`\n\nAfter ${folder}.`;
+    expect(scrub(fenced)).toBe(
+      'Before.\n\n```ts\nopen("<project>/data.db");\n```\n\nAfter \\<project>.',
+    );
+    // An unclosed fence is code to the end, like every markdown renderer reads it.
+    expect(scrub(`~~~\n${folder}/x`)).toBe("~~~\n<project>/x");
+  });
+
+  it("is idempotent, and leaves a text without paths byte-identical", () => {
+    const text = `a \`${folder}/x\`, b ${folder}/y, c /home/bob/z, d C:\\Users\\Eve\\w`;
+    const once = scrub(text);
+    expect(scrub(once)).toBe(once);
+    const plain = "First paragraph.\n\n```ts\nconst p = './src';\n```\n\n💡 *Senior tip:* ~/x";
+    expect(scrub(plain)).toBe(plain);
+  });
+
+  it("leaves URLs alone, keeps a file URL's host, and other folders are other folders", () => {
+    const urls = "https://github.com/UltimaPhoenix/dev-coach and https://example.com/home/bob/x";
+    expect(scrub(urls)).toBe(urls);
+    expect(scrub("`vscode://file/Users/alice/p/q.ts` `file:///home/bob/x`")).toBe(
+      "`vscode://file/~/p/q.ts` `file:///~/x`",
+    );
+    expect(scrub(`\`${folder}-old/a\` \`${folder}.bak\` \`/rootfs/x\``)).toBe(
+      "`~/dev/dev-coach-old/a` `~/dev/dev-coach.bak` `/rootfs/x`",
+    );
+    expect(scrub("PATH=/usr/bin:/home/bob/bin (see /Users/ada).")).toBe(
+      "PATH=/usr/bin:~/bin (see ~).",
+    );
+  });
+
+  it("a root, relative or missing folder scrubs nothing of its own; macOS /private aliases match", () => {
+    for (const f of ["/", "C:\\", "dev-coach", null]) {
+      expect(scrub("`/srv/app/x`", { folder: f, home: "/" })).toBe("`/srv/app/x`");
+    }
+    const tmp = { folder: "/private/var/folders/x1/T/sb/shop", home: "/nope" };
+    expect(scrub("`/var/folders/x1/T/sb/shop/a` `/private/var/folders/x1/T/sb/shop/b`", tmp)).toBe(
+      "`<project>/a` `<project>/b`",
+    );
+    expect(scrub("`/private/tmp/sb/c`", { folder: "/tmp/sb", home: "/nope" })).toBe(
+      "`<project>/c`",
+    );
+  });
+
+  it("buildSharePayload scrubs title, summary, body — and task_context only when it travels", () => {
+    const leaky = lesson({
+      title: `Busy in ${folder}/src/db.ts`,
+      summary: `Two writers on ${home}/.devcoach/coaching.db.`,
+      body: `In \`${folder}/src/db.ts:42\` the lock is held.\n\n💡 *Senior tip:* keep it short.`,
+      task_context: `fixing ${folder}/src/db.ts`,
+    });
+    const bare = buildSharePayload(leaky, { includeContext: false, sharedBy: null, now, home });
+    expect(bare.lesson.title).toBe("Busy in \\<project>/src/db.ts");
+    expect(bare.lesson.summary).toBe("Two writers on ~/.devcoach/coaching.db.");
+    expect(bare.lesson.body).toBe(
+      "In `<project>/src/db.ts:42` the lock is held.\n\n💡 *Senior tip:* keep it short.",
+    );
+    expect(bare.lesson.task_context).toBeUndefined();
+    const ctx = buildSharePayload(leaky, { includeContext: true, sharedBy: null, now, home });
+    expect(ctx.lesson.task_context).toBe("fixing \\<project>/src/db.ts");
+    expect(JSON.stringify(ctx)).not.toContain("/Users/someone");
+    // Every encoding carries the scrubbed text: the code, the link and the .devcoach.md file.
+    expect(decodeShareCode(encodeShareCode(ctx)).lesson.body).toBe(ctx.lesson.body);
+    expect(parseShareMarkdownFile(renderShareMarkdownFile(ctx)).lesson.body).toBe(ctx.lesson.body);
+    expect(renderShareText(ctx)).not.toContain("/Users/someone");
+  });
+
+  it("a share code built from a body holding the real sandbox path decodes to <project>/…", () => {
+    // A lesson stored before the no-path rule, logged in a real directory of this machine.
+    const sandbox = mkdtempSync(join(tmpdir(), "dc-share-sandbox-"));
+    try {
+      const legacy = lesson({
+        folder: sandbox,
+        body: `The bug was in \`${sandbox}/src/db.ts:42\`.\n\n💡 *Senior tip:* x`,
+      });
+      const decoded = decodeShareCode(
+        encodeShareCode(buildSharePayload(legacy, { includeContext: true, sharedBy: null, now })),
+      );
+      expect(decoded.lesson.body).toBe(
+        "The bug was in `<project>/src/db.ts:42`.\n\n💡 *Senior tip:* x",
+      );
+      expect(JSON.stringify(decoded)).not.toContain(sandbox);
+    } finally {
+      rmSync(sandbox, { recursive: true, force: true });
+    }
   });
 });
 
