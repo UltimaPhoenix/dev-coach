@@ -5,7 +5,7 @@ import { dirname, extname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { type ServerType, serve } from "@hono/node-server";
 import { type Context, Hono } from "hono";
-import { c, link } from "../cli/term";
+import { c, trustedLink } from "../cli/term";
 import * as coach from "../core/coach";
 import * as courses from "../core/courses";
 import * as db from "../core/db";
@@ -850,7 +850,7 @@ export async function explainListenError(
       return {
         existingUrl: url,
         exitCode: 0,
-        message: `${c.yellow("devcoach UI is already running at")} ${c.cyan(link(url))}${version}\n${c.dim(
+        message: `${c.yellow("devcoach UI is already running at")} ${c.cyan(trustedLink(url))}${version}\n${c.dim(
           "Open it there, start another with --port <n>, or stop it with: devcoach ui --stop",
         )}`,
       };
@@ -893,7 +893,7 @@ export function startUi(port: number, opts: StartUiOptions = {}): ServerType {
   const app = createApp({ onShutdown: () => stop("stop requested", false) });
   const server = serve({ fetch: app.fetch, port, hostname: "127.0.0.1" }, (info) => {
     const url = `http://localhost:${info.port}`;
-    console.log(`devcoach UI running at ${c.cyan(link(url))}`);
+    console.log(`devcoach UI running at ${c.cyan(trustedLink(url))}`);
     if (process.stdout.isTTY) console.log(c.dim("Press Ctrl+C to stop"));
     opts.onReady?.(url);
   });

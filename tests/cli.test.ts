@@ -4,9 +4,11 @@ import { dirname, join } from "node:path";
 import { Readable } from "node:stream";
 import { describe, expect, it, vi } from "vitest";
 import { parseHookPayload, runCli } from "../src/cli/commands";
+import { displayWidth } from "../src/cli/term";
 import * as courses from "../src/core/courses";
 import * as db from "../src/core/db";
 import { parseLesson } from "../src/core/models";
+import { buildSharePayload, encodeShareCode } from "../src/core/share";
 import { fetchSharedInput } from "../src/core/share-fetch";
 import { VERSION } from "../src/version";
 
@@ -1116,6 +1118,105 @@ describe("cli share / import", () => {
       process.env.PATH = path;
     }
     expect((await run([])).out).toContain("share / import");
+  });
+});
+
+describe("cli prints someone else's text inert", () => {
+  const ESC = "\x1b";
+  const BEL = "\x07";
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: the test looks for control characters
+  const CONTROL = /[\x00-\x08\x0b-\x1f\x7f-\x9f\u{202a}-\u{202e}\u{2066}-\u{2069}]/u;
+  const hostile = (id: string) =>
+    parseLesson({
+      id,
+      timestamp: "2026-10-30T10:00:00Z",
+      topic_id: `docker${BEL}`,
+      categories: [`dev${ESC}[31mops`],
+      title: `Cache mounts survive rebuilds${ESC}[2J${ESC}[3J${ESC}[H`,
+      level: "mid",
+      summary: `See ${ESC}]8;;file:///etc/passwd${BEL}the BuildKit guide${ESC}]8;;${BEL}.${ESC}]52;c;ZWNobyBwd25lZA==${BEL}`,
+      body: `RUN --mount=type=cache\n\n${ESC}]8;;javascript:alert(1)${ESC}\\docs${ESC}]8;;${ESC}\\`,
+      task_context: `ctx\x9b2J`,
+      imported: true,
+      shared_by: `${ESC}]8;;javascript:alert(1)${BEL}Ada${ESC}]8;;${BEL}`,
+    });
+
+  it("a crafted share imported with `import` never reaches the terminal as escapes", async () => {
+    const payload = buildSharePayload(hostile("hostile-import"), {
+      includeContext: true,
+      sharedBy: hostile("x").shared_by,
+    });
+    const imported = await run(["import", encodeShareCode(payload)]);
+    expect(imported.out).toContain('Imported "Cache mounts survive rebuilds" (shared by Ada)');
+    expect(imported.out).not.toMatch(CONTROL);
+    const outputs = [
+      (await run(["lessons"])).out,
+      (await run(["lesson", "hostile-import"])).out,
+      (await run(["share", "hostile-import", "--anonymous"])).out,
+    ];
+    for (const out of outputs) expect(out).not.toMatch(CONTROL);
+    expect(outputs[1]).toContain("See the BuildKit guide.");
+  });
+
+  it("rows stored before the import-time strip still print inert (lessons, lesson, share, feedback, profile)", async () => {
+    db.withConnection((c) => db.insertLesson(c, hostile("hostile-raw")));
+    const runs = [
+      ["lessons"],
+      ["lessons", "--imported"],
+      ["lesson", "hostile-raw"],
+      ["share", "hostile-raw", "--anonymous"],
+      ["feedback", "hostile-raw", "know"], // creates the (hostile) topic in the knowledge map
+      ["profile"],
+      ["stats"],
+    ];
+    for (const args of runs) {
+      const { out } = await run(args);
+      expect(out, args.join(" ")).not.toMatch(CONTROL);
+    }
+    const shown = (await run(["lesson", "hostile-raw"])).out;
+    expect(shown).toContain("Cache mounts survive rebuilds");
+    expect(shown).toContain("Shared by:   Ada");
+    expect(shown).toContain("See the BuildKit guide.");
+  });
+
+  it("course text prints inert too", async () => {
+    const course = db.withConnection((c) =>
+      courses.createCourse(c, {
+        topic_id: "docker",
+        title: `Cache mounts${ESC}]0;owned${BEL}`,
+        goal: `Know when${ESC}[2J`,
+        prerequisites: [{ concept: `layers${ESC}c`, known: true }],
+      }),
+    );
+    expect((await run(["courses"])).out).not.toMatch(CONTROL);
+    const shown = (await run(["course", course.id])).out;
+    expect(shown).not.toMatch(CONTROL);
+    expect(shown).toContain("Know when");
+  });
+
+  it("the lessons table aligns: wide glyphs (💡, CJK) take two columns", async () => {
+    db.withConnection((c) => {
+      const mk = (o: Record<string, unknown>) =>
+        db.insertLesson(
+          c,
+          parseLesson({
+            timestamp: "2026-10-29T10:00:00Z",
+            topic_id: "sqlite",
+            categories: ["sqlite"],
+            level: "mid",
+            summary: "s",
+            ...o,
+          }),
+        );
+      mk({ id: "wide-1", title: "WAL mode: readers never block writers", feedback: "understood" });
+      mk({ id: "wide-2", title: "漢字のレッスン", feedback: "know", starred: true });
+      mk({ id: "wide-3", title: "Plain title", feedback: "dont_know" });
+    });
+    const out = (await run(["lessons"])).out;
+    expect(out).toContain("💡");
+    const table = out.split("\n").filter((l) => /^[╭│├╰]/.test(l));
+    const widths = new Set(table.map(displayWidth));
+    expect(widths.size, table.join("\n")).toBe(1);
   });
 });
 

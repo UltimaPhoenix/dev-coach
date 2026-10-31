@@ -28,6 +28,7 @@ import {
 import { normalizeTimestamp, parseLesson } from "../src/core/models";
 import { buildPromptForLevel, formatLessonForDisplay } from "../src/core/prompts";
 import { buildSharePayload, renderShareText, ShareInputError } from "../src/core/share";
+import { stripControlCharsDeep } from "../src/core/text";
 import { VERSION } from "../src/version";
 
 function freshDb(): DatabaseSync {
@@ -402,6 +403,34 @@ describe("detect + git", () => {
   });
 });
 
+describe("control-character strip (core/text)", () => {
+  it("stripControlCharsDeep walks plain objects and arrays, and leaves other values alone", () => {
+    const when = new Date(0);
+    const bare = Object.assign(Object.create(null), { name: "a\x1b[2Jb" });
+    expect(
+      stripControlCharsDeep({
+        n: 1,
+        ok: true,
+        none: null,
+        when,
+        bare,
+        list: ["x\x07", { body: "l1\n\x1bcl2" }],
+      }),
+    ).toEqual({
+      n: 1,
+      ok: true,
+      none: null,
+      when,
+      bare: { name: "ab" },
+      list: ["x", { body: "l1\nl2" }],
+    });
+    expect(stripControlCharsDeep({ title: "a\nb", summary: "a\nb" })).toEqual({
+      title: "a b",
+      summary: "a\nb",
+    });
+  });
+});
+
 describe("lesson sharing — storage & pacing", () => {
   let c: DatabaseSync | undefined;
   afterEach(() => c?.close());
@@ -599,6 +628,57 @@ describe("lesson sharing — storage & pacing", () => {
       "popular-shared-4",
       "popular-shared-5",
     ]);
+  });
+
+  it("importSharedLesson strips control characters: someone else's text is stored inert", () => {
+    const ESC = "\x1b";
+    const BEL = "\x07";
+    // biome-ignore lint/suspicious/noControlCharactersInRegex: the test looks for control characters
+    const CONTROL = /[\x00-\x08\x0b-\x1f\x7f-\x9f\u{202a}-\u{202e}\u{2066}-\u{2069}]/u;
+    c = freshDb();
+    const p = payloadFor("evil");
+    p.lesson.title = `Cache mounts${ESC}[2J${ESC}[3J${ESC}[H survive`;
+    p.lesson.summary = `See ${ESC}]8;;file:///etc/passwd${BEL}the guide${ESC}]8;;${BEL}.${ESC}]52;c;ZWNobw==${BEL}`;
+    p.lesson.body = `Line one\x9b2J\n\n${ESC}]8;;javascript:alert(1)${ESC}\\docs${ESC}]8;;${ESC}\\ invoice\u{202e}fdp.exe\x07\tend`;
+    p.lesson.topic_id = `docker${BEL}`;
+    p.lesson.categories = [`dev${ESC}[31mops`];
+    p.lesson.task_context = `ctx${ESC}c\nhere`;
+    p.shared_by = `${ESC}]8;;javascript:alert(1)${BEL}Ada${ESC}]8;;${BEL}`;
+    p.origin.id = `evil${ESC}[2J`;
+    const r = coach.importSharedLesson(c, p);
+    expect(r).toMatchObject({ inserted: 1, topic_tracked: false });
+    const stored = db.getLessonById(c, "evil");
+    expect(stored).toMatchObject({
+      title: "Cache mounts survive",
+      summary: "See the guide.",
+      body: "Line one\n\ndocs invoicefdp.exe\tend",
+      topic_id: "docker",
+      categories: ["devops"],
+      task_context: "ctx here",
+      shared_by: "Ada",
+    });
+    for (const [key, value] of Object.entries(stored ?? {})) {
+      if (typeof value === "string") expect(value, key).not.toMatch(CONTROL);
+    }
+    // the comparison runs on the stripped text: the same hostile share again is a duplicate
+    expect(coach.importSharedLesson(c, p)).toMatchObject({ inserted: 0, duplicated: 1 });
+    // a lesson that is nothing but escapes has no title left: refused, nothing stored
+    const empty = payloadFor("only-escapes");
+    empty.lesson.title = `${ESC}[2J${ESC}[H`;
+    expect(coach.importSharedLesson(c, empty)).toMatchObject({
+      inserted: 0,
+      invalid: 1,
+      lesson: null,
+    });
+    expect(db.getLessonById(c, "only-escapes")).toBeNull();
+    // the legacy JSON-array form `import` also accepts goes through the same strip
+    const legacy = lesson({
+      id: "legacy-evil",
+      title: `T${ESC}[2J`,
+      summary: `s${ESC}]52;c;eA==${BEL}\nok`,
+    });
+    expect(coach.importSharedInput(c, JSON.stringify([legacy])).inserted).toBe(1);
+    expect(db.getLessonById(c, "legacy-evil")).toMatchObject({ title: "T", summary: "s\nok" });
   });
 
   it("importSharedInput takes any encoding, keeps the legacy JSON array path, and rejects junk", () => {

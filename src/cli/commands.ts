@@ -20,6 +20,7 @@ import {
   sharedLessonFilename,
 } from "../core/share";
 import { fetchSharedInput, isHttpUrl } from "../core/share-fetch";
+import { stripControlCharsDeep } from "../core/text";
 import { VERSION } from "../version";
 import { cmdDoctor, cmdInstall, cmdUninstall, skillHint } from "./install";
 import { openInBrowser } from "./open";
@@ -31,6 +32,8 @@ import {
   confidenceColor,
   renderTable,
   rule,
+  sanitizeForTerminal,
+  sanitizeLine,
 } from "./term";
 
 const log = (s = ""): void => {
@@ -62,6 +65,13 @@ const feedbackLabel = (fb: string | null): string =>
         : c.dim("no feedback");
 const FEEDBACK_VALUES = ["know", "understood", "dont_know", "clear"];
 
+/**
+ * A lesson (or course) with every string made inert for the terminal. A shared lesson is someone
+ * else's text, and a row imported before the import-time strip may still carry escape sequences.
+ */
+const printable = <T extends object>(record: T): T => stripControlCharsDeep(record);
+const senderLabel = (sharedBy: string | null): string => sharedBy ?? c.dim("anonymous");
+
 // ── Display commands ─────────────────────────────────────────────────────────
 
 /** Render the knowledge map as a Topic/Group/Confidence/Bar table (shared by `profile` + `setup`). */
@@ -73,8 +83,8 @@ function renderProfileTable(profile: ReturnType<typeof coach.getProfile>, title:
     .map((e) => {
       const color = confidenceColor(e.confidence);
       return [
-        e.topic,
-        topicGroup.get(e.topic) ?? "Other",
+        sanitizeLine(e.topic),
+        sanitizeLine(topicGroup.get(e.topic) ?? "Other"),
         colorize(color, `${e.confidence}/10`),
         colorize(color, confidenceBar(e.confidence)),
       ];
@@ -166,7 +176,7 @@ function cmdLessons(o: LessonsOpts): void {
   if (hasMeta) columns.push({ header: "Project" }, { header: "Branch" }, { header: "Commit" });
   const hasShared = lessons.some((l) => l.imported);
   if (hasShared) columns.push({ header: "Shared by" });
-  const rows = lessons.map((l) => {
+  const rows = lessons.map(printable).map((l) => {
     const row = [
       l.starred ? c.yellow("★") : c.dim("·"),
       l.timestamp.slice(0, 10),
@@ -182,7 +192,7 @@ function cmdLessons(o: LessonsOpts): void {
         l.commit_hash ? c.cyan(l.commit_hash.slice(0, 7)) : "",
       );
     }
-    if (hasShared) row.push(l.imported ? (l.shared_by ?? c.dim("anonymous")) : "");
+    if (hasShared) row.push(l.imported ? senderLabel(l.shared_by) : "");
     return row;
   });
   log(renderTable("Lessons", columns, rows));
@@ -190,11 +200,12 @@ function cmdLessons(o: LessonsOpts): void {
 }
 
 function cmdLesson(id: string): void {
-  const lesson = db.withConnection((conn) => db.getLessonById(conn, id));
-  if (lesson === null) {
+  const stored = db.withConnection((conn) => db.getLessonById(conn, id));
+  if (stored === null) {
     log(c.red(`Lesson '${id}' not found.`));
     process.exit(1);
   }
+  const lesson = printable(stored);
   log(rule(c.bold(lesson.title)));
   log(`${c.dim("ID:")}         ${lesson.id}`);
   log(`${c.dim("Date:")}        ${lesson.timestamp.slice(0, 19).replace("T", " ")}`);
@@ -205,7 +216,7 @@ function cmdLesson(id: string): void {
   log(
     `${c.dim("Star:")}        ${starLabel}   ${c.dim("Feedback:")} ${feedbackLabel(lesson.feedback)}`,
   );
-  if (lesson.imported) log(`${c.dim("Shared by:")}   ${lesson.shared_by ?? c.dim("anonymous")}`);
+  if (lesson.imported) log(`${c.dim("Shared by:")}   ${senderLabel(lesson.shared_by)}`);
   if (lesson.task_context) log(`${c.dim("Context:")}     ${lesson.task_context}`);
   if (lesson.project || lesson.repository || lesson.branch || lesson.commit_hash || lesson.folder) {
     const parts: string[] = [];
@@ -254,7 +265,7 @@ const courseStatusLabel = (status: string): string =>
       : c.cyan(status);
 
 function cmdCourses(): void {
-  const list = db.withConnection((conn) => courses.listCourses(conn));
+  const list = db.withConnection((conn) => courses.listCourses(conn)).map(printable);
   if (list.length === 0) {
     log(c.dim("No courses yet. Start one in your agent: /devcoach:course, or say yes after a ❌."));
     return;
@@ -280,11 +291,12 @@ function cmdCourses(): void {
 }
 
 function cmdCourse(id: string): void {
-  const course = db.withConnection((conn) => courses.getCourse(conn, id));
-  if (course === null) {
+  const stored = db.withConnection((conn) => courses.getCourse(conn, id));
+  if (stored === null) {
     log(c.red(`Course '${id}' not found.`));
     process.exit(1);
   }
+  const course = printable(stored);
   const p = courses.progress(course);
   log(rule(c.bold(course.title)));
   log(`${c.dim("ID:")}        ${course.id}`);
@@ -334,9 +346,9 @@ function cmdFeedback(id: string, feedback: string): void {
     confLabel = "feedback cleared";
   } else if (result.delta !== 0 && result.confidence !== null) {
     const oldConf = result.confidence - result.delta;
-    confLabel = `${c.cyan(result.topic_id)} confidence: ${oldConf} → ${c.bold(String(result.confidence))}`;
+    confLabel = `${c.cyan(sanitizeLine(result.topic_id))} confidence: ${oldConf} → ${c.bold(String(result.confidence))}`;
   } else {
-    confLabel = `${c.cyan(result.topic_id)} confidence unchanged`;
+    confLabel = `${c.cyan(sanitizeLine(result.topic_id))} confidence unchanged`;
   }
   log(`Lesson ${c.cyan(id)} → ${feedbackLabel(feedbackValue)}  (${confLabel})`);
 }
@@ -384,6 +396,7 @@ function cmdStats(): void {
     ),
   );
 
+  const confidenceNote = (confidence: number): string => c.dim(`(${confidence})`);
   const weakest = (stats.weakest_topics ?? []) as { topic: string; confidence: number }[];
   const strongest = (stats.strongest_topics ?? []) as { topic: string; confidence: number }[];
   if (weakest.length || strongest.length) {
@@ -392,8 +405,8 @@ function cmdStats(): void {
       const w = weakest[i];
       const s = strongest[i];
       rows.push([
-        w ? `${c.red(w.topic)} ${c.dim(`(${w.confidence})`)}` : "",
-        s ? `${c.green(s.topic)} ${c.dim(`(${s.confidence})`)}` : "",
+        w ? `${c.red(sanitizeLine(w.topic))} ${confidenceNote(w.confidence)}` : "",
+        s ? `${c.green(sanitizeLine(s.topic))} ${confidenceNote(s.confidence)}` : "",
       ]);
     }
     log(
@@ -586,7 +599,7 @@ function cmdShare(id: string | undefined, o: ShareOpts): void {
   } else if (o.link) {
     log(renderShareLink(payload));
   } else {
-    log(renderShareText(payload));
+    log(sanitizeForTerminal(renderShareText(payload)));
     if (encodeShareCode(payload).length > 16_000) {
       note("Long lesson — prefer --file for a friendlier hand-off.");
     }
@@ -648,11 +661,11 @@ async function cmdImport(source: string | undefined): Promise<void> {
       log(`${c.green("✓")} Lessons: ${parts.join(", ")}`);
       return;
     }
-    const lesson = result.lesson;
-    if (!lesson) {
+    if (!result.lesson) {
       log(c.red("Could not store the lesson."));
       process.exit(1);
     }
+    const lesson = printable(result.lesson);
     const who = lesson.shared_by ? `shared by ${lesson.shared_by}` : "shared anonymously";
     if (result.duplicated) {
       log(`${c.yellow("Already in your log")} as ${c.cyan(lesson.id)} (${who})`);

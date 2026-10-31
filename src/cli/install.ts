@@ -23,7 +23,7 @@ import {
   resolveCommand,
   type ServerCommand,
 } from "./mcp-command";
-import { c } from "./term";
+import { c, sanitizeLine } from "./term";
 
 const log = (s = ""): void => {
   console.log(s);
@@ -815,7 +815,7 @@ export function cmdDoctor(): void {
       );
       const cue = db.getCueState(conn);
       if (cue.pending) warn(`a cue is pending since ${cue.last_cue_at} (retry threshold armed)`);
-      else if (cue.last_skip_reason) log(`    last skip: "${cue.last_skip_reason}"`);
+      else if (cue.last_skip_reason) log(`    last skip: "${sanitizeLine(cue.last_skip_reason)}"`);
       const rate = coach.checkRateLimit(conn);
       if (rate.allowed) ok("rate limit: allowed");
       else warn(`rate limit: ${rate.reason}`);
