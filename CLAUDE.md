@@ -183,6 +183,16 @@ user-invocable slash commands, **not** auto-injected — so coaching is driven b
 - `onboard-hook` / `lesson-ready` remain as the legacy two-entry layout; `devcoach install`
   repairs/normalizes hook entries without `--force` and skips them when the devcoach plugin is
   enabled (double registration would double-count).
+- **Claude Desktop has no hooks** (nor does the `.mcpb`), so the server's `instructions` are its
+  trigger, chosen per client at `initialize` (`serveInstructionsPerClient` in `mcp/server.ts`):
+  `SELF_DRIVEN_CLIENTS = ["claude-ai"]` get the gated trigger (after technical work → `get_briefing`
+  → ONE lesson only when `coaching.lesson_due`, the flow being `CARD_FALLBACK` itself); every other
+  name, and none, gets the 2.7 string byte for byte (test-locked) — the list grows only by a
+  deliberate edit. `coaching` in the briefing: `driver` hooks|self, `client`, `reason`, and
+  `lesson_due` for self only (onboarded ∧ no active course ∧ writable ∧ rate limit; a hook client
+  never sees a `false` that could talk it out of a cued lesson). A self-driven client is paced by
+  the rate limit alone. It calls the SDK's private `_oninitialize`; without it every client falls
+  back to the hook string, and `tests/desktop-trigger.test.ts` + Guard 3 in `build-mcpb.mjs` fail.
 
 **The launcher** (`assets/launcher/launch.mjs`, the single source for the plugin and the Gemini
 extension; `tests/launcher.test.ts` runs it as real child processes against a fake `npm`): installs

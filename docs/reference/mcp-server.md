@@ -34,7 +34,7 @@ local server.
 | `log_lesson` | Save a delivered lesson — a **pure save** that never elicits feedback. Auto-fills git context, stamps the timestamp server-side, resets the pacing counters, and returns the saved lesson plus a `reply_check` self-check reminding the model that tool arguments are invisible to the user and the card must be written as the final text of the turn | write |
 | `skip_lesson` | Decline a lesson cue with a one-line reason; re-arms the pacing counter | write |
 | `preview_deep_scan` | Metadata-only pre-check for Automatic (Deep) onboarding: `months` (1–24, default 3) sets a rolling window; returns `window_months`, `cutoff`, `candidate_count`, `over_soft_limit` (more than 8 candidates — ask the user to narrow the window) and `candidates[]` (`name`, `path`, `last_activity`, `prompt_count`). Reads no conversation text | read-only |
-| `get_briefing` | Everything needed before a lesson in one call: onboarding status, rate limit, taught topics, profile, notebook text and `notebook_path` (same data as `devcoach://briefing`) | read |
+| `get_briefing` | Everything needed before a lesson in one call: onboarding status, rate limit, `coaching` (who triggers lessons in this client — see [Instructions](#instructions)), taught topics, profile, notebook text and `notebook_path` (same data as `devcoach://briefing`) | read |
 | `get_onboarding` | Onboarding status, the stack detected across the full Claude Code history with per-project provenance, default topics, `notebook_path` (same data as `devcoach://onboarding`) | read |
 | `get_profile` | The current knowledge map — topics, confidence, groups (same data as `devcoach://profile`) | read |
 | `update_knowledge` | Adjust a topic's confidence by a delta (clamped 0–10) | write |
@@ -79,6 +79,35 @@ dashboard and targeted queries. `onboarding` carries the onboarding flags plus t
 Read/Write/Edit the notebook file directly instead of round-tripping its full markdown through a
 tool call.
 
+## Instructions
+
+The `instructions` string a client receives at `initialize` depends on the name it reports
+(`clientInfo.name`):
+
+- **Hook-driven clients** — Claude Code, Gemini CLI, Codex CLI, and every name devcoach does not
+  know — receive a short description of the server. Their lessons come from devcoach's hooks
+  (below), which own the pacing.
+- **Self-driven clients** — today only `claude-ai`, the name Claude Desktop reports — run no
+  hooks, so the instructions make the model the trigger: after substantial technical work it calls
+  `get_briefing` silently, and delivers one lesson only when `coaching.lesson_due` is `true`. The
+  lesson flow is the same constant the hook cue falls back to when the skill is missing.
+
+`get_briefing` and `devcoach://briefing` carry the decision as `coaching`:
+
+```jsonc
+"coaching": {
+  "driver": "self",                                  // "self" only for a self-driven client, else "hooks"
+  "client": { "name": "claude-ai", "version": "0.1.0" }, // what the client reported, or null
+  "lesson_due": false,                               // self-driven clients only
+  "reason": "Too soon: last lesson 12m ago, minimum interval is 4h 0m (3h 47m remaining)"
+}
+```
+
+`lesson_due` is `true` only when onboarding is complete, no course is in progress, the database is
+writable and the rate limit (`max_per_day`, `min_gap_minutes`) allows a lesson. A hook-driven
+client gets no `lesson_due` at all. The server cannot count turns for a client without hooks, so a
+self-driven client is paced by the rate limit alone; `nudge_every` does not apply to it.
+
 ## Prompt
 
 `devcoach_instructions` returns the full coaching instructions (`assets/SKILL.md` plus its reference
@@ -86,7 +115,8 @@ files — `onboarding.md`, `calibration.md`, `review.md`, `sharing.md` — inlin
 Desktop) — they are **not** auto-injected into context. In Claude Code, coaching is driven by the
 `stop-hook`/`prompt-hook` pair: the Stop cue invokes the devcoach **skill** deterministically (with a
 compact self-contained fallback when the skill isn't installed), and the model can decline via
-`skip_lesson` when the turn wasn't technical.
+`skip_lesson` when the turn wasn't technical. Claude Desktop has no hooks: there, the
+[instructions](#instructions) are the trigger.
 
 ## Data models
 

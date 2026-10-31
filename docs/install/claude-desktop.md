@@ -26,6 +26,26 @@ Desktop's built-in Node runtime, so no Node install or terminal is required:
 That's it — the `devcoach` tools, resources, and the `devcoach_instructions` prompt are available in
 your next conversation, and the database is created at `~/.devcoach/coaching.db` on first use.
 
+## How lessons start in Claude Desktop
+
+Claude Desktop has no hooks, so devcoach cannot interrupt a conversation the way it does in Claude
+Code. Instead, its server instructions make Claude the trigger: after a technical task (code, a review,
+debugging, configuration, a query), Claude quietly checks devcoach and adds one lesson at the end of
+its reply when one is due. You will see that check as a devcoach tool call; most of the time it finds
+nothing due and Claude says nothing about it.
+
+- **Pacing** is the rate limit alone: at most `max_per_day` lessons (default 2) in 24 hours, at least
+  `min_gap_minutes` (default 240) apart. Change both by asking Claude (*"set devcoach's daily
+  limit to 3"*), in the dashboard's Settings, or with `devcoach set`. `nudge_every` counts hook
+  turns and does not apply here.
+- **"Coach me"** asks for a lesson at any time, whatever the rate limit says.
+- **The first time**, Claude offers to set up your profile after a technical task — once per
+  conversation.
+- While a **course** is in progress, lessons pause, as they do in Claude Code.
+
+The same applies to a devcoach entry in `claude_desktop_config.json` (Homebrew, npm): Claude Desktop
+identifies itself to every MCP server the same way.
+
 :::note[Unverified publisher]
 The bundle is **self-signed**, so Claude Desktop shows it as coming from an *unverified publisher*. A
 verified signature needs a real code-signing certificate, which isn't configured — the label is

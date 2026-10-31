@@ -14,6 +14,14 @@ your agent finishes a technical task, devcoach appends one short lesson about so
 and you don't know yet — what your knowledge map says you already know is skipped, the rest is pitched at
 your level. There's nothing to open and no command to run; it happens in the background.
 
+:::note[Claude Desktop and other MCP-only agents]
+Claude Code, Gemini CLI and Codex CLI start lessons through devcoach's hooks. Claude Desktop has no
+hooks: there, devcoach's server instructions ask the model to check for a lesson after technical work,
+paced by the [rate limit](../reference/configuration.md) alone — at most `max_per_day` lessons, at least
+`min_gap_minutes` apart. Other MCP-only agents get a lesson when you ask for one. In any agent, say
+*"coach me"* for a lesson at any time.
+:::
+
 > The [CLI](./cli.md) and [web dashboard](./web-ui.md) are *secondary* ways to review and manage your
 > data — this page is the core experience. See [How it works](../how-it-works.md) for the decision flow
 > behind lesson selection.

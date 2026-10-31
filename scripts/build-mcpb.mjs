@@ -64,19 +64,36 @@ execFileSync(process.execPath, [join(probe, "dist", "bin.js"), "--help"], {
   env: probeEnv,
   stdio: ["ignore", "ignore", "inherit"],
 });
-const init = spawnSync(process.execPath, [join(probe, "dist", "bin.js"), "mcp"], {
-  cwd: probe,
-  env: probeEnv,
-  input: `${JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "mcpb-smoke", version: "0.0.0" } } })}\n`,
-  encoding: "utf8",
-  timeout: 15000,
-});
+/** One initialize handshake as `clientName`; the result's instructions, or null when it failed. */
+function handshake(clientName) {
+  const init = spawnSync(process.execPath, [join(probe, "dist", "bin.js"), "mcp"], {
+    cwd: probe,
+    env: probeEnv,
+    input: `${JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: clientName, version: "0.0.0" } } })}\n`,
+    encoding: "utf8",
+    timeout: 15000,
+  });
+  const reply = (init.stdout ?? "").split("\n").find((line) => line.includes('"serverInfo"'));
+  if (!reply) {
+    console.error(`mcpb bundle: MCP initialize handshake failed\n${init.stderr || ""}`);
+    process.exit(1);
+  }
+  return JSON.parse(reply).result.instructions ?? "";
+}
+// Guard 3 — the bundle answers Claude Desktop (clientInfo `claude-ai`) with the lesson trigger and
+// any other client without it: the per-client answer relies on the SDK's initialize internals,
+// which the bundle inlines, so it is checked on the bundle itself.
+const TRIGGER = "you are the coaching trigger";
+const desktop = handshake("claude-ai");
+const other = handshake("mcpb-smoke");
 rmSync(probe, { recursive: true, force: true });
-if (!init.stdout?.includes('"serverInfo"')) {
-  console.error(`mcpb bundle: MCP initialize handshake failed\n${init.stderr || ""}`);
+if (!desktop.includes(TRIGGER) || other.includes(TRIGGER)) {
+  console.error("mcpb bundle: the Claude Desktop instructions are not served per client");
   process.exit(1);
 }
-console.log("mcpb bundle: self-contained (no package imports), CLI + MCP handshake OK");
+console.log(
+  "mcpb bundle: self-contained (no package imports), CLI + MCP handshake OK, Desktop trigger served",
+);
 
 // Validate the staged manifest against the official schema before packing (fail fast).
 execFileSync("npx", ["-y", "@anthropic-ai/mcpb", "validate", join(stage, "manifest.json")], {

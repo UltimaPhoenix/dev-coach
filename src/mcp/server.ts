@@ -6,7 +6,14 @@
 import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
-import { McpServer, ResourceTemplate } from "@modelcontextprotocol/server";
+import type { DatabaseSync } from "node:sqlite";
+import {
+  type Implementation,
+  type InitializeRequest,
+  type InitializeResult,
+  McpServer,
+  ResourceTemplate,
+} from "@modelcontextprotocol/server";
 import { StdioServerTransport } from "@modelcontextprotocol/server/stdio";
 import { z } from "zod";
 import { scanClaudeHistory, scanRecentProjectWindow } from "../core/claude-history";
@@ -29,6 +36,7 @@ import {
   UiHomeSchema,
   UiThemeSchema,
 } from "../core/models";
+import { CARD_FALLBACK } from "../core/prompts";
 import { describeRuntime, displayPath, runtimeLine } from "../core/runtime";
 import {
   buildSharePayload,
@@ -182,6 +190,123 @@ function jsonResource(uri: URL, payload: unknown) {
   };
 }
 
+// ── Who triggers a lesson: devcoach's hooks, or the model itself ─────────────
+// Claude Code, Gemini CLI and Codex CLI run devcoach's hooks, and the hooks own the pacing.
+// Claude Desktop has no hooks (the .mcpb manifest has no such concept), and MCP prompts are
+// never auto-injected, so its users got a lesson only when they asked for one. The one text
+// Desktop injects on its own is the server's `instructions`: a self-driven client receives a
+// gated trigger there, and every other client the hook-driven string, unchanged.
+
+/**
+ * Clients that run no devcoach hooks, so the model itself is the lesson trigger, paced by the
+ * rate limit alone. Matched on the `clientInfo.name` sent at initialize: Claude Desktop sends
+ * `claude-ai` (its own MCP log, docs/install/claude-desktop.md). The list grows only by a
+ * deliberate edit, once a client's name is verified; every other name, and a client that sends
+ * none, is hook-driven — so nothing here can add a lesson where hooks pace them.
+ */
+export const SELF_DRIVEN_CLIENTS: readonly string[] = ["claude-ai"];
+
+export type CoachingDriver = "hooks" | "self";
+
+export function coachingDriver(clientName: string | undefined): CoachingDriver {
+  return clientName !== undefined && SELF_DRIVEN_CLIENTS.includes(clientName) ? "self" : "hooks";
+}
+
+/** What a hook-driven (or unknown) client receives: the 2.7 string, byte for byte. */
+const HOOK_DRIVEN_INSTRUCTIONS =
+  "Progressive technical coaching server. " +
+  "Use the devcoach_instructions prompt for full coaching behaviour guidelines. " +
+  "Read coaching state with the get_briefing / get_onboarding / get_profile tools; the " +
+  "devcoach:// resources expose the same data for clients that browse resources. " +
+  "share_lesson hands a lesson to another person (text, link or file); import_lesson stores " +
+  "one they were given.";
+
+/**
+ * What a self-driven client receives. The gate is computed server-side (`coaching.lesson_due`
+ * in get_briefing), and the lesson flow is CARD_FALLBACK itself — the hook cue's fallback —
+ * so the Desktop path and the hook path can never drift apart.
+ */
+const SELF_DRIVEN_INSTRUCTIONS =
+  "Progressive technical coaching server. No devcoach hook runs in this client, so you are " +
+  "the coaching trigger. After you complete substantial technical work (code, review, " +
+  "debugging, configuration, queries, infra — not questions or chat), call get_briefing " +
+  "silently. Deliver ONE lesson only when it returns coaching.lesson_due = true, as follows " +
+  `(the get_briefing you just made is its first step): ${CARD_FALLBACK}\n` +
+  "If onboarding.needs_onboarding is true, call get_onboarding and follow its next_step " +
+  "instead — once per conversation: if the user declines, do not ask again in it. Otherwise " +
+  "say nothing: never mention a skipped lesson, the rate limit or this check. When the user " +
+  'asks for a lesson ("coach me", "teach me something"), deliver one the same way, whatever ' +
+  "lesson_due says. If a devcoach hook cue ever appears in the session, follow it and add no " +
+  "lesson of your own. The devcoach_instructions prompt holds the full coaching flow. " +
+  "share_lesson hands a lesson to another person (text, link or file); import_lesson stores " +
+  "one they were given.";
+
+/** The `instructions` a client receives at initialize, by the name it reports. */
+export function serverInstructions(clientName: string | undefined): string {
+  return coachingDriver(clientName) === "self"
+    ? SELF_DRIVEN_INSTRUCTIONS
+    : HOOK_DRIVEN_INSTRUCTIONS;
+}
+
+type SdkInitialize = (request: InitializeRequest) => Promise<InitializeResult>;
+
+/**
+ * The SDK answers initialize with one constructor string, but the request names the client, so
+ * the answer is re-written here. It runs the SDK's own initialize (`_oninitialize`: version
+ * negotiation, client identity), which is not public API. Without it — a future SDK — the
+ * handler stays the SDK's: every client gets the hook-driven string, so Desktop loses the
+ * trigger and nothing else changes (and the claude-ai test fails on that SDK bump).
+ */
+export function serveInstructionsPerClient(server: McpServer): void {
+  const sdk = server.server as unknown as { _oninitialize?: SdkInitialize };
+  if (typeof sdk._oninitialize !== "function") return;
+  const initialize: SdkInitialize = sdk._oninitialize.bind(server.server);
+  server.server.setRequestHandler("initialize", async (request) => ({
+    ...(await initialize(request)),
+    instructions: serverInstructions(request.params.clientInfo?.name),
+  }));
+}
+
+/**
+ * The briefing's `coaching` field: who triggers lessons in this client and, for a self-driven
+ * one, whether a lesson may follow the work just done. A hook-driven client gets no
+ * `lesson_due` at all — a `false` there could talk a model out of a lesson a hook just cued.
+ */
+function coachingState(
+  c: DatabaseSync,
+  client: Implementation | undefined,
+  onboarded: boolean,
+  rate: { allowed: boolean; reason?: string | null },
+): Payload {
+  const driver = coachingDriver(client?.name);
+  const identity = client ? { name: client.name, version: client.version } : null;
+  const who = client?.name ?? "an unnamed client";
+  if (driver === "hooks") {
+    return {
+      driver,
+      client: identity,
+      reason: `${who} is hook-driven: this field gates nothing — a hook cue, the coaching skill or the user decides`,
+    };
+  }
+  const blocked = db.compatOf(c)
+    ? "read-only database: a lesson could not be saved"
+    : !onboarded
+      ? "onboarding is not complete: call get_onboarding"
+      : db.hasActiveCourse(c)
+        ? "a course is in progress: lessons pause until it is completed or abandoned"
+        : rate.allowed
+          ? null
+          : (rate.reason ?? "rate limit reached");
+  return {
+    driver,
+    client: identity,
+    lesson_due: blocked === null,
+    reason:
+      blocked ??
+      `no devcoach hook runs in ${who}: one lesson may follow substantial technical work, paced by the rate limit alone`,
+  };
+}
+
 // ── State payloads (shared by the get_* tools and the devcoach:// resources) ──
 // The skill reads state through the tools: every client resolves tool names on its own,
 // while a resource read needs the client-specific server name (plugin:devcoach:devcoach
@@ -198,7 +323,7 @@ function profilePayload(): Payload {
   }
 }
 
-function briefingPayload(): Payload {
+function briefingPayload(client: Implementation | undefined): Payload {
   try {
     let notebook = "";
     try {
@@ -210,6 +335,7 @@ function briefingPayload(): Payload {
     const data = db.withConnection((c) => {
       const knowledgeReady = db.isOnboardingComplete(c).knowledge_ready;
       const notebookReady = notebook.length > 0;
+      const onboarded = knowledgeReady && notebookReady;
       const rate = coach.checkRateLimit(c);
       const rateLimit: Record<string, unknown> = {
         allowed: rate.allowed,
@@ -220,9 +346,10 @@ function briefingPayload(): Payload {
         onboarding: {
           knowledge_ready: knowledgeReady,
           notebook_ready: notebookReady,
-          needs_onboarding: !(knowledgeReady && notebookReady),
+          needs_onboarding: !onboarded,
         },
         rate_limit: rateLimit,
+        coaching: coachingState(c, client, onboarded, rate),
         taught_topics: coach.listTaughtTopics(c),
         profile: coach.getProfile(c),
         // Non-null when this devcoach is older than the file: reads work, writes will fail.
@@ -307,16 +434,11 @@ const stateResult = (tool: string, payload: Payload) =>
 export function createServer(): McpServer {
   const server = new McpServer(
     { name: "devcoach", version: VERSION },
-    {
-      instructions:
-        "Progressive technical coaching server. " +
-        "Use the devcoach_instructions prompt for full coaching behaviour guidelines. " +
-        "Read coaching state with the get_briefing / get_onboarding / get_profile tools; the " +
-        "devcoach:// resources expose the same data for clients that browse resources. " +
-        "share_lesson hands a lesson to another person (text, link or file); import_lesson stores " +
-        "one they were given.",
-    },
+    // The constructor string is what a client gets when the per-client answer cannot be given.
+    { instructions: HOOK_DRIVEN_INSTRUCTIONS },
   );
+  serveInstructionsPerClient(server);
+  const client = () => server.server.getClientVersion();
 
   // ── Tools ──────────────────────────────────────────────────────────────────
 
@@ -1004,12 +1126,13 @@ export function createServer(): McpServer {
       title: "Lesson Briefing",
       description:
         "Everything needed before delivering a lesson, in ONE call: onboarding status, rate limit, " +
-        "taught topics, knowledge profile, the coaching notebook text and its notebook_path. Same " +
-        "data as the devcoach://briefing resource — call the tool, it needs no server name.",
+        "coaching (who triggers lessons in this client: devcoach's hooks, or you), taught topics, " +
+        "knowledge profile, the coaching notebook text and its notebook_path. Same data as the " +
+        "devcoach://briefing resource — call the tool, it needs no server name.",
       inputSchema: z.object({}),
       annotations: readOnly("Lesson Briefing"),
     },
-    () => stateResult("get_briefing", briefingPayload()),
+    () => stateResult("get_briefing", briefingPayload(client())),
   );
 
   server.registerTool(
@@ -1533,7 +1656,7 @@ export function createServer(): McpServer {
       "Everything needed before delivering a lesson in ONE read: onboarding status, " +
         "rate limit, taught topics, knowledge profile, and the coaching notebook.",
     ),
-    (uri) => jsonResource(uri, briefingPayload()),
+    (uri) => jsonResource(uri, briefingPayload(client())),
   );
 
   server.registerResource(
