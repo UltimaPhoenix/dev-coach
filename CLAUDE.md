@@ -62,7 +62,8 @@ dev-coach/
 │   │   ├── share.ts  share-fetch.ts   # lesson sharing: payload, code/link/.devcoach.md codecs, parseSharedInput; URL fetch
 │   │   ├── claude-history.ts   # cross-project stack scan of ~/.claude (projects map, manifests, activity, memories)
 │   │   ├── courses.ts      # courses: directory + document validation over the db.ts rows (see Courses below)
-│   │   ├── runtime.ts      # where devcoach runs from: classifyPath (channel × Node manager × OS), describeRuntime, the stderr startup line
+│   │   ├── runtime.ts      # where devcoach runs from: classifyPath (channel × Node manager × OS), describeRuntime, the stderr startup line,
+│   │   │                   #   doctorHint (channel → the diagnostic the dashboard's first-run / empty states show)
 │   ├── mcp/server.ts       # McpServer: 25 tools + 11 resources + devcoach_instructions prompt
 │   ├── cli/commands.ts     # Commander dispatcher (35 subcommands: 27 visible + 8 hidden hooks) + term.ts (colours, tables, OSC 8 link()) + open.ts (browser)
 │   │                       #   install.ts (install/uninstall/doctor) + mcp-command.ts (resolveCommand, chooseServerCommand, checkServerCommand)
