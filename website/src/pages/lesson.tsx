@@ -9,7 +9,7 @@ import Layout from "@theme/Layout";
 import DOMPurify from "dompurify";
 import { marked } from "marked";
 import type { ReactNode } from "react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   decodeShareCode,
   extractShareCodeCandidates,
@@ -20,6 +20,7 @@ import {
   sharedLessonFilename,
 } from "../lib/shareCode";
 import { type DashboardState, probeDashboard } from "../lib/dashboardProbe";
+import { firstCategory, lastTip, needsTldr, SHARED_ANONYMOUSLY, senderName } from "../lib/lessonView";
 import styles from "./lesson.module.css";
 
 const DEFAULT_PORT = 7860;
@@ -170,6 +171,20 @@ export default function LessonPage(): ReactNode {
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }, [lesson]);
 
+  // The body renders once per lesson; the tip (its last 💡 paragraph) then gets the accent rule,
+  // as on the dashboard's lesson page. A callback ref, so a remount (the article unmounts while a
+  // new link is read) marks it again even when the body is the same.
+  const bodyHtml = useMemo(() => (lesson?.lesson.body ? render(lesson.lesson.body) : ""), [lesson]);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: a new body means a new element to mark
+  const markTip = useCallback(
+    (el: HTMLDivElement | null) => {
+      if (el) lastTip(el.querySelectorAll<HTMLParagraphElement>(":scope > p"))?.classList.add(styles.tip);
+    },
+    [bodyHtml],
+  );
+
+  const sender = senderName(lesson?.shared_by);
+  const category = lesson ? firstCategory(lesson.lesson.categories) : null;
   const importUrl = `http://127.0.0.1:${port}/lessons/import?code=${encodeURIComponent(code)}`;
   const tooLongForLink = code.length > MAX_LINK_CODE;
 
@@ -191,35 +206,44 @@ export default function LessonPage(): ReactNode {
             <p className={styles.eyebrow}>Someone shared a devcoach lesson with you</p>
             <div className={styles.layout}>
             <article className={styles.card}>
-              <div className={styles.titleRow}>
-                <h1 className={styles.title}>{lesson.lesson.title}</h1>
-                <span className={`${styles.level} ${styles[lesson.lesson.level] ?? ""}`}>{lesson.lesson.level}</span>
-              </div>
+              <h1 className={styles.title}>{lesson.lesson.title}</h1>
               <div className={styles.meta}>
-                <span>
-                  🏷 <span className={styles.topic}>{lesson.lesson.topic_id}</span>
+                <span className={styles.facts}>
+                  <span className={styles.topic}>{lesson.lesson.topic_id}</span>
+                  <span aria-hidden="true">·</span>
+                  <span>{lesson.lesson.level}</span>
+                  <span aria-hidden="true">·</span>
+                  <time dateTime={lesson.shared_at}>{lesson.shared_at.slice(0, 10)}</time>
                 </span>
-                {lesson.lesson.categories.map((c) => (
-                  <span key={c} className={styles.chip}>
-                    {c}
-                  </span>
-                ))}
                 <span>
-                  🤝 shared by <strong>{lesson.shared_by ?? "anonymous"}</strong> · {lesson.shared_at.slice(0, 10)}
+                  🤝{" "}
+                  {sender ? (
+                    <>
+                      shared by <strong>{sender}</strong>
+                    </>
+                  ) : (
+                    SHARED_ANONYMOUSLY
+                  )}
                 </span>
+                {category && <span className={styles.chip}>{category}</span>}
               </div>
-              <div className={styles.tldr}>
-                <p className={styles.tldrLabel}>TL;DR</p>
-                {/* biome-ignore lint/security/noDangerouslySetInnerHtml: markdown sanitized by DOMPurify */}
-                <div dangerouslySetInnerHTML={{ __html: render(lesson.lesson.summary) }} />
-              </div>
-              {lesson.lesson.body && (
-                // biome-ignore lint/security/noDangerouslySetInnerHtml: markdown sanitized by DOMPurify
-                <div className={`markdown ${styles.body}`} dangerouslySetInnerHTML={{ __html: render(lesson.lesson.body) }} />
+              {needsTldr(lesson.lesson.summary, lesson.lesson.body) && (
+                <div className={styles.tldr}>
+                  <p className={styles.tldrLabel}>TL;DR</p>
+                  {/* biome-ignore lint/security/noDangerouslySetInnerHtml: markdown sanitized by DOMPurify */}
+                  <div dangerouslySetInnerHTML={{ __html: render(lesson.lesson.summary) }} />
+                </div>
               )}
+              {bodyHtml && (
+                // biome-ignore lint/security/noDangerouslySetInnerHtml: markdown sanitized by DOMPurify
+                <div ref={markTip} className={`markdown ${styles.body}`} dangerouslySetInnerHTML={{ __html: bodyHtml }} />
+              )}
+              <div className={styles.closingRule} aria-hidden="true">
+                {lesson.lesson.topic_id} · {lesson.lesson.level}
+              </div>
               {lesson.lesson.task_context && (
                 <div className={styles.context}>
-                  <strong>Context:</strong> {lesson.lesson.task_context}
+                  <span className={styles.contextLabel}>Context:</span> {lesson.lesson.task_context}
                 </div>
               )}
             </article>

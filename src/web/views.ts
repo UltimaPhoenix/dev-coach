@@ -999,7 +999,7 @@ function plainWords(md: string): string {
  * The TL;DR box is for legacy lessons. A v2 body opens with its summary, so the box would say the
  * first paragraph twice; a lesson without a summary has nothing to put in it.
  */
-function needsTldr(l: Lesson): boolean {
+function needsTldr(l: { summary: string; body?: string | null }): boolean {
   const summary = plainWords(l.summary);
   return summary !== "" && !plainWords(l.body ?? "").startsWith(summary);
 }
@@ -1052,7 +1052,7 @@ const LESSON_ANSWER_SCRIPT = raw(`function lessonAnswer() {
   }`);
 
 /** The echo of the chat card's closing band, above the question: `topic · level`, mono and quiet. */
-function closingRule(l: Lesson): Html {
+function closingRule(l: Pick<Lesson, "topic_id" | "level">): Html {
   return html`<div aria-hidden="true" class="flex items-center gap-3 mb-4 font-mono text-xs text-gray-500 dark:text-gray-400"><span class="w-6 border-t border-gray-300 dark:border-gray-700"></span><span>${l.topic_id} · ${l.level}</span><span class="flex-1 border-t border-gray-300 dark:border-gray-700"></span></div>`;
 }
 
@@ -1262,13 +1262,59 @@ ${dangerDialog(
 
 // ── Import (GET /lessons/import) ─────────────────────────────────────────────
 
-const LEVEL_BADGE: Record<string, string> = {
-  junior:
-    "text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/30 border-green-300 dark:border-green-700",
-  mid: "text-yellow-700 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/30 border-yellow-300 dark:border-yellow-700",
-  senior:
-    "text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/30 border-red-300 dark:border-red-700",
-};
+/** The one phrase for the sender (UI plan §3, rule 5): never "shared by anonymous". */
+function sharedByPhrase(name: string | null): Html {
+  return name
+    ? html`shared by <span class="text-gray-700 dark:text-gray-200">${name}</span>`
+    : html`shared anonymously`;
+}
+
+/**
+ * The 💡 tip (the last body paragraph that opens with the light bulb, U+1F4A1) gets the lesson
+ * page's accent rule. A body without one is left as it is.
+ */
+const MARK_TIP_SCRIPT = raw(
+  `Array.from(document.querySelectorAll('#body-content > p')).reverse().find(function (p) { return p.textContent.trim().startsWith('\\u{1F4A1}'); })?.classList.add('dc-tip');`,
+);
+
+/**
+ * The shared lesson laid out as the lesson page will show it once added — the reading column,
+ * `topic · level · date`, the sender — with "Add to my lessons" where the answer control sits.
+ * The date is the day it was shared: the stored lesson does not exist yet.
+ */
+function importPreview(p: SharedLesson, code: string): Html {
+  const l = p.lesson;
+  const label = "text-gray-500 dark:text-gray-400";
+  return html`<h1 class="text-xl font-bold text-gray-900 dark:text-white mb-2">${l.title}</h1>
+  <div class="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm ${label} mb-5">
+    <span class="inline-flex flex-wrap items-baseline gap-x-1.5">
+      <span class="text-accent-600 dark:text-accent-400">${l.topic_id}</span><span aria-hidden="true">·</span>
+      <span>${l.level}</span><span aria-hidden="true">·</span>
+      <time datetime="${p.shared_at}">${p.shared_at.slice(0, 10)}</time>
+    </span>
+    <span>🤝 ${sharedByPhrase(p.shared_by)}</span>
+    ${l.categories.map((cat) => html`<span class="inline-block bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 text-xs rounded px-2 py-0.5 border border-gray-200 dark:border-gray-700">${cat}</span>`)}
+  </div>
+  ${
+    needsTldr(l)
+      ? html`<div class="my-5 pl-4 border-l-4 border-accent-400 dark:border-accent-500 bg-accent-50 dark:bg-accent-950/40 rounded-r-lg py-3 pr-4">
+    <p class="text-xs font-semibold uppercase tracking-wide text-accent-700 dark:text-accent-300 mb-1">TL;DR</p>
+    <div id="summary-content" class="markdown-body text-sm text-accent-900 dark:text-accent-100"></div>
+  </div>`
+      : ""
+  }
+  <div id="body-content" class="markdown-body dc-prose"></div>
+  <section id="lesson-add" aria-label="Add this lesson" class="mt-8">
+    ${closingRule(l)}
+    <form method="post" action="/lessons/import" class="space-y-2.5">
+      <input type="hidden" name="from" value="lessons" />
+      <input type="hidden" name="text" value="${code}" />
+      <button type="submit" class="inline-flex items-center h-9 px-4 rounded-lg text-sm font-semibold bg-accent-600 hover:bg-accent-500 text-white transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500">＋ Add to my lessons</button>
+      <p class="text-xs ${label}">Nothing is saved until you click. It joins your log like your own lessons and never counts against the daily limit.</p>
+    </form>
+  </section>
+  ${l.task_context ? html`<div class="mt-6 pt-4 border-t border-gray-100 dark:border-gray-800 text-sm text-gray-700 dark:text-gray-300"><span class="${label}">Context:</span> ${l.task_context}</div>` : ""}`;
+}
 
 /**
  * The receiving end of a share link (the docs page sends the browser here with `?code=`) and
@@ -1282,49 +1328,25 @@ export function importPage(d: {
   uiTheme: string;
 }): Html {
   const p = d.preview;
+  const label = "text-gray-500 dark:text-gray-400";
   const pasteForm = html`<form id="import-form" method="post" action="/lessons/import" enctype="multipart/form-data" class="space-y-3">
   <input type="hidden" name="from" value="lessons" />
   <textarea name="text" rows="5" placeholder="devcoach:lesson:1:… — or the link, a URL, or the whole card" autocomplete="off" class="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-accent-500 font-mono"></textarea>
   <div class="flex items-center gap-3">
-    <label class="cursor-pointer text-xs text-gray-500 dark:text-gray-400 hover:text-accent-600 dark:hover:text-accent-400 transition">📄 Choose a .devcoach.md file<input id="import-file" type="file" name="file" accept=".md,.json,.txt" class="hidden" onchange="document.getElementById('import-form').submit()" /></label>
+    <label class="cursor-pointer text-xs ${label} hover:text-accent-600 dark:hover:text-accent-400 transition">📄 Choose a .devcoach.md file<input id="import-file" type="file" name="file" accept=".md,.json,.txt" class="hidden" onchange="document.getElementById('import-form').submit()" /></label>
     <button type="submit" class="ml-auto bg-accent-600 hover:bg-accent-500 text-white font-semibold rounded-lg px-4 py-2 text-sm transition">Import</button>
   </div>
-  <p class="text-xs text-gray-400 dark:text-gray-500">You can also drop the file anywhere on this page.</p>
+  <p class="text-xs ${label}">You can also drop the file anywhere on this page.</p>
 </form>`;
 
   const body = html`
-<div class="mb-4"><a href="/lessons" class="text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-white text-sm transition">← Back to lessons</a></div>
-<div class="${p ? "max-w-5xl" : "max-w-3xl"} mx-auto bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-6">
-  <p class="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500 mb-4">${p ? "Someone shared a lesson with you" : "Import a shared lesson"}</p>
+<div class="max-w-3xl mx-auto">
+<div class="mb-4"><a href="/lessons" class="${label} hover:text-gray-900 dark:hover:text-white text-sm transition">← Back to lessons</a></div>
+<div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-6">
+  <p class="text-xs font-semibold uppercase tracking-wide ${label} mb-4">${p ? "Someone shared a lesson with you" : "Import a shared lesson"}</p>
   ${d.error ? html`<div class="mb-4 px-4 py-2 rounded-lg border text-sm bg-rose-50 dark:bg-rose-900/20 border-rose-200 dark:border-rose-700 text-rose-700 dark:text-rose-300">${d.error}</div>` : ""}
-  ${
-    p
-      ? html`<div class="flex flex-wrap items-center gap-3 mb-2">
-    <h1 class="text-xl font-bold text-gray-900 dark:text-white flex-1 min-w-0">${p.lesson.title}</h1>
-    <span class="text-xs font-semibold px-2 py-0.5 rounded-full border ${LEVEL_BADGE[p.lesson.level] ?? ""} shrink-0">${p.lesson.level}</span>
-  </div>
-  <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-500 dark:text-gray-400 mb-5">
-    <span>🏷 <span class="text-cyan-600 dark:text-cyan-400">${p.lesson.topic_id}</span></span>
-    ${p.lesson.categories.map((cat) => html`<span class="inline-block bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 text-xs rounded px-2 py-0.5 border border-gray-200 dark:border-gray-700">${cat}</span>`)}
-    <span>🤝 shared by <span class="text-gray-700 dark:text-gray-200">${p.shared_by ?? "anonymous"}</span> · ${p.shared_at.slice(0, 10)}</span>
-  </div>
-  <div class="my-5 pl-4 border-l-4 border-accent-400 dark:border-accent-500 bg-accent-50 dark:bg-accent-950/40 rounded-r-lg py-3 pr-4">
-    <p class="text-xs font-semibold uppercase tracking-wide text-accent-500 dark:text-accent-400 mb-1">TL;DR</p>
-    <div id="summary-content" class="markdown-body text-sm text-accent-900 dark:text-accent-100"></div>
-  </div>
-  <details class="group" open ${p.lesson.body ? "" : "hidden"}>
-    <summary class="cursor-pointer text-sm text-accent-600 dark:text-accent-400 hover:text-accent-500 select-none">Full lesson</summary>
-    <div id="body-content" class="markdown-body mt-3"></div>
-  </details>
-  ${p.lesson.task_context ? html`<div class="mt-6 pt-4 border-t border-gray-100 dark:border-gray-800 text-sm text-gray-500 dark:text-gray-400"><span class="text-gray-400 dark:text-gray-500">Context:</span> ${p.lesson.task_context}</div>` : ""}
-  <form method="post" action="/lessons/import" class="mt-6 pt-4 border-t border-gray-100 dark:border-gray-800 flex flex-wrap items-center gap-3">
-    <input type="hidden" name="from" value="lessons" />
-    <input type="hidden" name="text" value="${d.code}" />
-    <button type="submit" class="bg-accent-600 hover:bg-accent-500 text-white font-semibold rounded-lg px-4 py-2 text-sm transition">＋ Add to my lessons</button>
-    <p class="text-xs text-gray-400 dark:text-gray-500">Nothing is saved until you click. It joins your log like your own lessons and never counts against the daily limit.</p>
-  </form>`
-      : pasteForm
-  }
+  ${p ? importPreview(p, d.code) : pasteForm}
+</div>
 </div>`;
 
   const head = html`<link id="hljs-theme" rel="stylesheet" href="/static/vendor/hljs-dark.min.css" />`;
@@ -1343,8 +1365,9 @@ export function importPage(d: {
   });
   ${
     p
-      ? raw(`document.getElementById('summary-content').innerHTML = DOMPurify.sanitize(marked.parse(${jsonForScript(p.lesson.summary)}));
-  document.getElementById('body-content').innerHTML = DOMPurify.sanitize(marked.parse(${jsonForScript(p.lesson.body ?? "")}));`)
+      ? html`${needsTldr(p.lesson) ? raw(`document.getElementById('summary-content').innerHTML = DOMPurify.sanitize(marked.parse(${jsonForScript(p.lesson.summary)}));`) : ""}
+  ${raw(`document.getElementById('body-content').innerHTML = DOMPurify.sanitize(marked.parse(${jsonForScript(p.lesson.body ?? "")}));`)}
+  ${MARK_TIP_SCRIPT}`
       : ""
   }
 </script>`;

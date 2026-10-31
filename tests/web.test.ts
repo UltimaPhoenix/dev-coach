@@ -3,6 +3,7 @@ import { beforeAll, describe, expect, it, vi } from "vitest";
 import * as courses from "../src/core/courses";
 import * as db from "../src/core/db";
 import { parseLesson } from "../src/core/models";
+import { encodeShareCode } from "../src/core/share";
 import { fetchSharedInput } from "../src/core/share-fetch";
 import { createApp, resolveHomePath } from "../src/web/app";
 
@@ -709,7 +710,7 @@ describe("web lesson sharing", () => {
     const html = await r.text();
     expect(html).toContain("Someone shared a lesson with you");
     expect(html).toContain("Preview me");
-    expect(html).toContain("shared by <span");
+    expect(html).toContain('🤝 shared by <span class="text-gray-700 dark:text-gray-200">Bo</span>');
     expect(html).toContain("Add to my lessons");
     expect(html).toContain("Nothing is saved until you click");
     expect(db.withConnection((c) => db.getLessonById(c, "sh2"))).toBeNull();
@@ -719,6 +720,122 @@ describe("web lesson sharing", () => {
     const empty = await (await get("/lessons/import")).text();
     expect(empty).toContain("Import a shared lesson");
     expect(empty).toContain('id="import-form"');
+  });
+
+  describe("the import preview follows the lesson page's reading layout", () => {
+    const shared = (o: {
+      shared_by?: string | null;
+      summary?: string;
+      body?: string | null;
+      level?: "junior" | "mid" | "senior";
+      task_context?: string | null;
+    }) =>
+      encodeShareCode({
+        format: "devcoach.lesson",
+        version: 1,
+        lesson: {
+          title: "busy_timeout: SQLite has no lock queue",
+          summary: o.summary ?? "You set `busy_timeout` to 0, so the second writer failed at once.",
+          body:
+            o.body === undefined
+              ? "You set **`busy_timeout`** to 0, so the second writer failed at once.\n\n💡 *Senior tip:* set it where the connection opens."
+              : o.body,
+          topic_id: "sqlite",
+          categories: ["database", "node"],
+          level: o.level ?? "senior",
+          task_context: o.task_context ?? null,
+        },
+        origin: { id: "busy-timeout-no-lock-queue", timestamp: "2026-10-20T09:00:00Z" },
+        shared_by: o.shared_by === undefined ? "Ada" : o.shared_by,
+        shared_at: "2026-10-30T14:05:00Z",
+        app_version: "2.7.1",
+      });
+    const preview = async (code: string) =>
+      (await get(`/lessons/import?code=${encodeURIComponent(code)}`)).text();
+
+    it("the reading column, then the topic · level rule and “Add to my lessons” where the answer control sits, then Context", async () => {
+      const page = await preview(shared({ task_context: "Fixing the hook's concurrent writes" }));
+      const bodyAt = page.indexOf('<div id="body-content" class="markdown-body dc-prose"></div>');
+      const addAt = page.indexOf('<section id="lesson-add"');
+      const ruleAt = page.indexOf("<span>sqlite · senior</span>");
+      const buttonAt = page.indexOf("＋ Add to my lessons");
+      const contextAt = page.indexOf("Context:</span> Fixing the hook&#39;s concurrent writes");
+      expect(bodyAt).toBeGreaterThan(0);
+      expect(addAt).toBeGreaterThan(bodyAt);
+      expect(ruleAt).toBeGreaterThan(addAt);
+      expect(buttonAt).toBeGreaterThan(ruleAt);
+      expect(contextAt).toBeGreaterThan(buttonAt);
+      // The add form is the dashboard's own POST and carries the code; the GET wrote nothing.
+      const form = page.slice(addAt, contextAt);
+      expect(form).toContain('<form method="post" action="/lessons/import"');
+      expect(form).toContain('name="text" value="devcoach:lesson:1:');
+      // The tip gets the lesson page's accent rule; the bodies are sanitised before innerHTML.
+      expect(page).toContain(".classList.add('dc-tip')");
+      expect(page).toMatch(/innerHTML = DOMPurify\.sanitize\(marked\.parse\(/);
+      // One column, as wide as the lesson page.
+      expect(page).toContain('<div class="max-w-3xl mx-auto">');
+      expect(page).not.toContain("max-w-5xl");
+      expect(page).not.toContain("<summary");
+    });
+
+    it("topic · level · date with the level as a plain word — no coloured pill — then the sender", async () => {
+      const page = await preview(shared({ level: "junior" }));
+      expect(page).toContain(
+        '<span class="text-accent-600 dark:text-accent-400">sqlite</span><span aria-hidden="true">·</span>\n      <span>junior</span><span aria-hidden="true">·</span>\n      <time datetime="2026-10-30T14:05:00Z">2026-10-30</time>',
+      );
+      expect(page).not.toMatch(/rounded-full[^"]*">junior</);
+      expect(page).not.toMatch(/text-(green|yellow|red)-\d+/);
+      expect(page).not.toContain("text-cyan-");
+      expect(page).toContain("🤝 shared by <span");
+      expect(page).toContain(">database</span>");
+      expect(page).toContain(">node</span>");
+    });
+
+    it("without a name the sender reads “shared anonymously”, never “shared by anonymous”", async () => {
+      for (const who of [null, ""]) {
+        const page = await preview(shared({ shared_by: who }));
+        expect(page).toContain("🤝 shared anonymously");
+        expect(page).not.toContain("shared by anonymous");
+        expect(page).not.toContain("shared by <span");
+      }
+    });
+
+    it("the TL;DR box only for a legacy body; a v2 body opens with its summary", async () => {
+      const v2 = await preview(shared({}));
+      expect(v2).not.toContain('id="summary-content"');
+      expect(v2).not.toContain("getElementById('summary-content')");
+      const legacy = await preview(
+        shared({
+          summary: "Docker caches each layer.",
+          body: "## Layers\n\nEvery `RUN` is a layer.",
+        }),
+      );
+      expect(legacy).toContain('id="summary-content"');
+      expect(legacy).toContain("getElementById('summary-content')");
+      const noBody = await preview(shared({ summary: "Only a summary.", body: null }));
+      expect(noBody).toContain('id="summary-content"');
+      expect(noBody).toContain('marked.parse(""))');
+    });
+
+    it("“Add to my lessons” stores the previewed lesson and opens it", async () => {
+      const code = shared({ shared_by: "Ada" });
+      const page = await preview(code);
+      const sent = /name="text" value="([^"]+)"/.exec(
+        page.slice(page.indexOf('id="lesson-add"')),
+      )?.[1];
+      expect(sent).toBe(code);
+      const r = await postForm(
+        "/lessons/import",
+        { from: "lessons", text: sent ?? "" },
+        { "sec-fetch-site": "same-origin" },
+      );
+      expect(r.status).toBe(303);
+      expect(r.headers.get("location")).toBe("/lessons/busy-timeout-no-lock-queue?imported=1");
+      const stored = db.withConnection((c) => db.getLessonById(c, "busy-timeout-no-lock-queue"));
+      expect(stored?.shared_by).toBe("Ada");
+      expect(stored?.imported).toBe(true);
+      db.withConnection((c) => db.deleteLesson(c, "busy-timeout-no-lock-queue"));
+    });
   });
 
   it("legacy lessons.json upload from the settings page keeps its flash", async () => {
