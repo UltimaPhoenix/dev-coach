@@ -27,9 +27,11 @@ import {
   isSameSharedLesson,
   parseSharedInput,
   type SharedLesson,
+  SharedLessonSchema,
   sharedLessonIdCandidates,
   sharedLessonToLesson,
 } from "./share";
+import { stripControlCharsDeep } from "./text";
 
 export function checkRateLimit(db: DatabaseSync): RateLimitResult {
   try {
@@ -179,8 +181,22 @@ export interface SharedImportResult {
  * Store a shared lesson as one of our own (flagged `imported`, named after the sender). The
  * sender's id is kept when free; an own lesson with the same slug gets a suffixed id instead of
  * being overwritten; re-importing the same share is a duplicate. Never touches pacing.
+ * The text is someone else's: escape sequences and control characters are stripped before
+ * anything is compared or stored, and a lesson left without a title, topic or id is refused.
  */
-export function importSharedLesson(db: DatabaseSync, payload: SharedLesson): SharedImportResult {
+export function importSharedLesson(db: DatabaseSync, shared: SharedLesson): SharedImportResult {
+  const clean = SharedLessonSchema.safeParse(stripControlCharsDeep(shared));
+  if (!clean.success) {
+    return {
+      kind: "shared",
+      inserted: 0,
+      duplicated: 0,
+      invalid: 1,
+      lesson: null,
+      topic_tracked: false,
+    };
+  }
+  const payload = clean.data;
   const tracked = Object.hasOwn(getAllKnowledge(db), payload.lesson.topic_id);
   for (const id of sharedLessonIdCandidates(payload)) {
     const existing = getLessonById(db, id);
@@ -225,7 +241,7 @@ export function importSharedInput(db: DatabaseSync, text: string): SharedImportR
   if (input.kind === "lessons") {
     return {
       kind: "lessons",
-      ...importLessons(db, input.records),
+      ...importLessons(db, input.records.map(stripControlCharsDeep)),
       lesson: null,
       topic_tracked: null,
     };
