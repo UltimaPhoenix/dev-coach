@@ -179,11 +179,11 @@ See [Privacy & security](../reference/privacy.md#sharing-is-explicit) for the fu
 
 ```text
 $ devcoach lessons --imported
-╭───┬────────────┬────────┬─────────────────────────────────────────┬───────┬──────────────┬───────────╮
-│   │ Date       │ Topic  │ Title                                   │ Level │ Categories   │ Shared by │
-├───┼────────────┼────────┼─────────────────────────────────────────┼───────┼──────────────┼───────────┤
+╭───┬────────────┬────────┬──────────────────────────────────────────┬───────┬──────────────┬───────────╮
+│   │ Date       │ Topic  │ Title                                    │ Level │ Categories   │ Shared by │
+├───┼────────────┼────────┼──────────────────────────────────────────┼───────┼──────────────┼───────────┤
 │ · │ 2026-04-20 │ sqlite │ WAL mode: readers never block writers 💡 │  mid  │ sqlite, node │ Ada       │
-╰───┴────────────┴────────┴─────────────────────────────────────────┴───────┴──────────────┴───────────╯
+╰───┴────────────┴────────┴──────────────────────────────────────────┴───────┴──────────────┴───────────╯
 ```
 
 - Its **topic counts as taught**, so the coach will not teach it again, and **the "Already knew
@@ -192,6 +192,9 @@ $ devcoach lessons --imported
   shared lesson is a gift, not a lesson delivered to you.
 - Importing the same share twice reports *already in your log*; the same lesson from a different
   sender is stored as a separate lesson.
+- Its text is someone else's, so it is stored **inert**: terminal escape sequences and control
+  characters (a screen clear, a hidden link, a clipboard write, a right-to-left override) are removed
+  on import, and the CLI strips them again before it prints any lesson.
 
 ## The `.devcoach.md` format
 

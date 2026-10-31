@@ -63,8 +63,9 @@ dev-coach/
 │   │   ├── claude-history.ts   # cross-project stack scan of ~/.claude (projects map, manifests, activity, memories)
 │   │   ├── courses.ts      # courses: directory + document validation over the db.ts rows (see Courses below)
 │   │   ├── runtime.ts      # where devcoach runs from: classifyPath (channel × Node manager × OS), describeRuntime, the stderr startup line
+│   │   ├── text.ts         # stripControlChars(+Inline/Deep): escape sequences + control chars out of someone else's text
 │   ├── mcp/server.ts       # McpServer: 25 tools + 11 resources + devcoach_instructions prompt
-│   ├── cli/commands.ts     # Commander dispatcher (35 subcommands: 27 visible + 8 hidden hooks) + term.ts (colours, tables, OSC 8 link()) + open.ts (browser)
+│   ├── cli/commands.ts     # Commander dispatcher (35 subcommands: 27 visible + 8 hidden hooks) + term.ts (colours, tables, displayWidth, sanitizeForTerminal, trustedLink, rule) + open.ts (browser)
 │   │                       #   install.ts (install/uninstall/doctor) + mcp-command.ts (resolveCommand, chooseServerCommand, checkServerCommand)
 │   └── web/app.ts          # Hono app (33 routes incl. POST /shutdown) + views.ts (hono/html pages); assets/static/share.js
 │                           #   startUi returns the server; SIGINT/SIGTERM/SIGHUP → gracefulShutdown (close, 2 s drain, exit);
@@ -368,6 +369,8 @@ and the docs page `website/src/pages/lesson.tsx` — whose dashboard probe (`web
 mixed content (bug 171934, open), so Safari/iOS get an "unsupported" state and NO fetch; Chrome 142+ gates
 loopback behind the `local-network-access` permission (queried before/after the fetch to tell a refusal
 from a dead dashboard; `targetAddressSpace: "loopback"` on the request). Hardening (from two ultrareview rounds, keep it):
+imported text is stripped of escape sequences and control characters (`importSharedLesson`, `core/text.ts`) and
+the CLI strips every printed lesson/course string again (`printable`, `sanitizeLine`) — only `trustedLink` emits OSC 8;
 markdown from lessons is always `DOMPurify.sanitize`d before `innerHTML` (dashboard) / rendered
 through `marked` + DOMPurify (docs page); `decodeShareCode` caps the input at `MAX_CODE_CHARS` and
 inflates with a byte budget (`inflateBounded`; the docs decoder streams the same way); `fetchSharedInput`
