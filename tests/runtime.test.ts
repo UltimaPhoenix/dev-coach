@@ -21,6 +21,7 @@ import {
   classifyPath,
   describeRuntime,
   displayPath,
+  doctorHint,
   nodeManagerOf,
   nodeProblem,
   runtimeLine,
@@ -201,6 +202,34 @@ describe("classifyPath — where an install lives", () => {
     ],
   ] as const)("%s %s → %s", (platform, path, channel, manager, boundTo, ephemeral) => {
     expect(classifyPath(path, platform)).toEqual({ channel, manager, boundTo, ephemeral });
+  });
+});
+
+describe("doctorHint — the one diagnostic a page can point at", () => {
+  it.each([
+    ["claude-plugin", "/devcoach:setup", "claude-code"],
+    ["homebrew", "devcoach doctor", "terminal"],
+    ["npm-global", "devcoach doctor", "terminal"],
+    ["npx", "npx -y devcoach doctor", "terminal"],
+    ["claude-desktop-extension", "npx -y devcoach doctor", "terminal"],
+    ["gemini-extension", "npx -y devcoach doctor", "terminal"],
+    ["source", "npx -y devcoach doctor", "terminal"],
+    ["unknown", "npx -y devcoach doctor", "terminal"],
+  ] as const)("%s → %s", (channel, command, where) => {
+    expect(doctorHint(channel)).toEqual({ command, where });
+  });
+
+  it("follows classifyPath: a plugin runtime is the plugin, a Cellar install is Homebrew", () => {
+    const plugin = classifyPath(
+      "/Users/a/.claude/plugins/data/devcoach-ultimaphoenix/runtime/2.7.1/node_modules/devcoach/dist/bin.js",
+      "darwin",
+    );
+    expect(doctorHint(plugin.channel).command).toBe("/devcoach:setup");
+    const brew = classifyPath(
+      "/opt/homebrew/Cellar/devcoach/2.7.1/libexec/lib/node_modules/devcoach/dist/bin.js",
+      "darwin",
+    );
+    expect(doctorHint(brew.channel).command).toBe("devcoach doctor");
   });
 });
 

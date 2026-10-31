@@ -319,10 +319,38 @@ describe("web view branches — exhaustive", () => {
     expect(desc).toContain("Lessons"); // renders with desc sort active
   });
 
-  it("lessons list: empty state with active filter shows clear-all", async () => {
-    const html = await (await get("/lessons?search=zzz-no-such-lesson")).text();
-    expect(html).toContain("No lessons match");
-    expect(html).toContain("Clear all filters");
+  it("lessons list: a filter that matches nothing names it and offers both ways out", async () => {
+    const html = await (await get("/lessons?search=kafka&period=week")).text();
+    const empty = html.slice(html.indexOf('id="lessons-filtered-empty"'));
+    expect(empty).toContain("No lessons match");
+    expect(empty).toContain("🔍 &quot;kafka&quot;</span> in <span");
+    expect(empty).toContain("🕐 Last 7 days");
+    // "Search all time" keeps the search and drops the period; "Clear every filter" drops both.
+    expect(empty).toContain(
+      'href="?period=all&amp;search=kafka&amp;sort=timestamp&amp;order=desc" class="text-accent-700',
+    );
+    expect(empty).toMatch(/>Search all time<\/a> · <a href="\/lessons"[^>]*>Clear every filter</);
+    expect(html).not.toContain("No lessons yet"); // lessons exist: this is not the first run
+    expect(html).not.toContain('id="lessons-empty"');
+
+    // No period, no "Search all time": it would reload the same list.
+    const noTime = await (await get("/lessons?search=zzz-no-such-lesson&level=senior")).text();
+    expect(noTime).toContain("No lessons match");
+    expect(noTime).toMatch(/&quot;zzz-no-such-lesson&quot;<\/span> and <span[^>]*>🔴 senior</);
+    expect(noTime).toContain("Clear every filter");
+    expect(noTime).not.toContain("Search all time");
+
+    // Only a date range: "No lessons in …".
+    const onlyTime = await (await get("/lessons?date_from=2001-01-01&date_to=2001-01-02")).text();
+    expect(onlyTime).toMatch(/No lessons in <span[^>]*>📅 2001-01-01 → 2001-01-02<\/span>\./);
+    expect(onlyTime).toContain(
+      'href="?period=all&amp;sort=timestamp&amp;order=desc" class="text-accent-700',
+    );
+
+    // Three or more: "a, b and c"; a user's search text stays escaped.
+    const many = await (await get("/lessons?search=%3Cb%3Ex&level=senior&starred=1")).text();
+    expect(many).toMatch(/★ Starred<\/span>, <span[^>]*>🔍 &quot;&lt;b&gt;x&quot;<\/span> and /);
+    expect(many).not.toContain("<b>x");
   });
 
   it("profile: low/mid/high confidence tiers + ungrouped Other section", async () => {

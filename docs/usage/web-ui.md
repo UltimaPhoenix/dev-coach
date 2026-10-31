@@ -76,7 +76,17 @@ Changes save immediately as you edit.
 
 **View mode**: topic names are clickable links that filter the lessons page to show only lessons for that topic.
 
-**Stats bar** (top of page): `N lessons total · N / max today · N this week`, then whether a lesson is available now — or why not.
+**Stats bar** (top of page, once there is a lesson): `N lessons total · N / max today · N this week`, then whether a lesson is available now — or why not.
+
+**Before the first lesson** the page says what to do next instead of showing a blank map:
+
+- **Not set up yet** (no topic at all): a *Set up devcoach* block — say *"set up devcoach"* to your
+  agent (with the Claude Code plugin, `/devcoach:setup`), then keep working. It also gives the one
+  command that checks the wiring for the way you installed devcoach: `devcoach doctor` for Homebrew
+  and global npm installs, `/devcoach:setup` under the plugin, `npx -y devcoach doctor` otherwise.
+- **Set up, no lesson yet**: the map, with one line above it — the first lesson arrives after real
+  work in your agent, at most `max_per_day` a day, `min_gap_minutes` apart (both read from
+  Settings) — and a link to what a lesson looks like.
 
 <ThemedShot
   alt="Knowledge map"
@@ -100,8 +110,14 @@ Filterable, sortable table of all delivered lessons.
 - Shared — All lessons / 👤 My own / 🤝 Shared with me / 🤝 from `<name>` (one entry per sender)
 - Free-text search (also matches the sender of a shared lesson)
 
-Active filters show as chips above the table; when nothing matches you get "No lessons match the
-current filters."
+Active filters show as chips above the table. When they hide every lesson, the page names them
+(*No lessons match 🔍 "kafka" in 🕐 Last 7 days.*) and offers **Search all time** (drops the period
+or date range, keeps the rest — shown only when one is set) and **Clear every filter**.
+
+With no lesson at all and no filter, the page explains how lessons arrive instead: an example of a
+lesson (greyed out, so you recognise the shape when the first one comes), the diagnostic command
+for your install with a **Copy** button, and the pacing from Settings. A lesson someone shared with
+you can be added right away with **＋ Import** — it never counts against the daily limit.
 
 **Sort:** click the Date, Topic, Title, Level or Feedback column header. Ascending or descending.
 

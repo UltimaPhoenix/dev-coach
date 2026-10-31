@@ -12,6 +12,7 @@ import * as db from "../core/db";
 import { detectGitUserName } from "../core/git";
 import { hasCode, hasHighlighter, highlighterBlock } from "../core/highlighter";
 import type { KnowledgeEntry, Lesson, UiHome } from "../core/models";
+import { type Channel, describeRuntime, doctorHint } from "../core/runtime";
 import {
   buildSharePayload,
   decodeShareCode,
@@ -157,10 +158,14 @@ function uiTheme(): string {
 export interface AppOptions {
   /** Invoked by POST /shutdown after the response is sent (startUi wires the graceful stop). */
   onShutdown?: () => void;
+  /** How this devcoach was installed (default: the running process) — picks the diagnostic
+   *  command the first-run pages show. */
+  channel?: Channel;
 }
 
 export function createApp(opts: AppOptions = {}): Hono {
   const app = new Hono();
+  const doctor = doctorHint(opts.channel ?? describeRuntime().where.channel);
 
   // A write refused because a newer devcoach upgraded the database: say so, with both versions,
   // instead of a bare 500. Everything else keeps Hono's default behaviour.
@@ -248,7 +253,8 @@ export function createApp(opts: AppOptions = {}): Hono {
         allGroups: profile.groups.map((g) => g.name),
         stats,
         rateLimit,
-        maxPerDay: settings.max_per_day,
+        pacing: { maxPerDay: settings.max_per_day, minGapMinutes: settings.min_gap_minutes },
+        doctor,
         uiTheme: settings.ui_theme,
       }),
     );
@@ -410,7 +416,9 @@ export function createApp(opts: AppOptions = {}): Hono {
         allBranches: db.getDistinctColumn(conn, "branch"),
         allCommits: db.getDistinctColumn(conn, "commit_hash"),
         allSharedBy: db.listSharedBy(conn),
-        theme: db.getSettings(conn).ui_theme,
+        settings: db.getSettings(conn),
+        // Only the no-lesson state asks; an empty knowledge table means onboarding never ran.
+        setUp: total > 0 || Object.keys(db.getAllKnowledge(conn)).length > 0,
       };
     });
 
@@ -450,7 +458,13 @@ export function createApp(opts: AppOptions = {}): Hono {
         perPage: PER_PAGE,
         total: data.total,
         totalPages: data.totalPages,
-        uiTheme: data.theme,
+        uiTheme: data.settings.ui_theme,
+        setUp: data.setUp,
+        pacing: {
+          maxPerDay: data.settings.max_per_day,
+          minGapMinutes: data.settings.min_gap_minutes,
+        },
+        doctor,
       }),
     );
   });

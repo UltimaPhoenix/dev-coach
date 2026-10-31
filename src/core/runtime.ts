@@ -202,6 +202,25 @@ export function describeRuntime(inputs: RuntimeInputs = {}): RuntimeInfo {
   };
 }
 
+/** How a user checks this install's wiring, and where they type it. */
+export interface DoctorHint {
+  command: string;
+  /** A shell, or the Claude Code prompt (the plugin's own command). */
+  where: "terminal" | "claude-code";
+}
+
+/**
+ * The one diagnostic a page can point at for this install: the plugin has `/devcoach:setup`
+ * (runtime → server → profile), Homebrew and npm-global put `devcoach` on the PATH, and every
+ * other channel (npx, the Desktop extension, Gemini, a checkout) has no `devcoach` to call.
+ */
+export function doctorHint(channel: Channel): DoctorHint {
+  if (channel === "claude-plugin") return { command: "/devcoach:setup", where: "claude-code" };
+  if (channel === "homebrew" || channel === "npm-global")
+    return { command: "devcoach doctor", where: "terminal" };
+  return { command: "npx -y devcoach doctor", where: "terminal" };
+}
+
 /** `npm-global, bound to Node v26.5.0 (nvm)` — the install, and what it depends on. */
 export function describeWhere(where: PathClass): string {
   const parts: string[] = [where.channel];
