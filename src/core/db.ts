@@ -735,6 +735,36 @@ export function getLastLessonTimestamp(db: DatabaseSync): string | null {
   return r ? (r.timestamp as string) : null;
 }
 
+// ── The answer queue ─────────────────────────────────────────────────────────
+// Own lessons still waiting for an answer, newest first: yesterday's lesson is the one the user can
+// still answer honestly, and a shared lesson's answer never moves confidence. Pull-only: the
+// dashboard asks (the list's toolbar, the lesson page after an answer); no hook ever does.
+
+const UNANSWERED_OWN = "feedback IS NULL AND imported = 0";
+
+/** How many own lessons wait for an answer (0 on any error). */
+export function countUnanswered(db: DatabaseSync): number {
+  try {
+    return Number(getRow(db, `SELECT COUNT(*) AS n FROM lessons WHERE ${UNANSWERED_OWN}`)?.n ?? 0);
+  } catch {
+    return 0;
+  }
+}
+
+/** The newest own lesson waiting for an answer, other than `excludeId` (null when none, or on any error). */
+export function getNextUnanswered(db: DatabaseSync, excludeId = ""): string | null {
+  try {
+    const r = getRow(
+      db,
+      `SELECT id FROM lessons WHERE ${UNANSWERED_OWN} AND id <> ? ORDER BY timestamp DESC, id DESC LIMIT 1`,
+      excludeId,
+    );
+    return r ? (r.id as string) : null;
+  } catch {
+    return null;
+  }
+}
+
 // ── Knowledge ────────────────────────────────────────────────────────────────
 
 export function getAllKnowledge(db: DatabaseSync): Record<string, number> {

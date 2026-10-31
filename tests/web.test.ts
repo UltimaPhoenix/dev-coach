@@ -1,10 +1,11 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import * as courses from "../src/core/courses";
 import * as db from "../src/core/db";
 import { parseLesson } from "../src/core/models";
 import { fetchSharedInput } from "../src/core/share-fetch";
 import { createApp, resolveHomePath } from "../src/web/app";
+import { bucket } from "../src/web/views";
 
 vi.mock("../src/core/share-fetch", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../src/core/share-fetch")>();
@@ -116,13 +117,15 @@ describe("web app", () => {
     );
     expect(buttons.every((i) => i > question)).toBe(true);
     expect([...buttons].sort((a, b) => a - b)).toEqual(buttons); // in that order
-    // the list's filter menu, chip and cell use the same words
+    // the list's filter menu, chip and row glyph use the same words
     const list = await (await get("/lessons?feedback=understood")).text();
     for (const label of ["✅ Knew it", "✨ New to me", "❌ Lost me", "○ No answer yet"]) {
       expect(list).toContain(label);
     }
     await post("/lessons/v1/feedback", { feedback: "know", next: "/lessons/v1" });
-    expect(await (await get("/lessons?feedback=know")).text()).toContain("✅ knew it</span>");
+    expect(await (await get("/lessons?feedback=know")).text()).toContain(
+      '✅</span><span class="sr-only">knew it</span>',
+    );
     // none of the retired words (the done-when grep keeps them out of the tree; these catch variants)
     for (const old of [
       /Understood/,
@@ -270,10 +273,11 @@ describe("web app", () => {
 
   it("static handler 404s missing files", async () => {
     expect((await get("/static/does-not-exist.css")).status).toBe(404);
-    const js = await get("/static/table-resize.js");
+    const js = await get("/static/share.js");
     expect(js.status).toBe(200);
     expect(js.headers.get("content-type")).toContain("text/javascript");
-    expect(await js.text()).toContain("resetLessonColumns");
+    expect(await js.text()).toContain("copyShare");
+    expect((await get("/static/table-resize.js")).status).toBe(404); // retired with the table
   });
 });
 
@@ -794,17 +798,17 @@ describe("web lesson delete", () => {
     expect(list).toContain('aria-label="More actions"');
     expect(list).toContain("Delete lessons…");
     expect(list).toContain("✕ Cancel");
-    expect(list).toContain("Reset column widths");
+    expect(list).not.toContain("Reset column widths"); // no columns to resize any more
+    expect(list).not.toContain("table-resize.js");
+    expect(list).not.toContain("<table");
     expect(list).not.toContain("☑ Select</button>");
     expect(list).toContain('class="dc-check');
-    expect(list).toContain('data-resizable="lessons"');
-    expect(list).toContain("<colgroup>");
-    expect(list).toContain('<col data-col="title" data-flex data-min="220" />');
-    expect(list).toContain('<col data-col="date" data-min="96"');
-    expect(list).toContain("table-resize.js");
     expect(list).not.toContain(">↗</a>");
-    expect(list).toContain('data-id="del1"');
-    expect(list).toContain('data-title="Doomed &lt;lesson&gt;"');
+    expect(list).toContain('<li data-id="del1" data-title="Doomed &lt;lesson&gt;"');
+    // the row's checkbox is a real one, named after the lesson; the bar selects the page
+    expect(list).toContain('aria-label="Select “Doomed &lt;lesson&gt;”"');
+    expect(list).toContain("All on this page</label>");
+    expect(list).toContain("querySelectorAll('li[data-id]')");
     expect(list).toContain('role="alertdialog"');
     expect(list).not.toContain("confirm(");
     expect(list).toContain('action="/lessons/delete"');
@@ -873,7 +877,8 @@ describe("web shared-with-me filters", () => {
     });
     const all = await (await get("/lessons")).text();
     expect(all).toContain('data-shared-by="Ada &lt;Lovelace&gt;"');
-    expect(all).toContain("🤝 Ada &lt;Lovelace&gt;"); // row badge under the topic
+    // the row's marker: 🤝 and the name, "shared by" for screen readers
+    expect(all).toContain('🤝</span> <span class="sr-only">shared by</span> Ada &lt;Lovelace&gt;');
     expect(all).toContain("🤝 Shared"); // neutral button label
 
     const theirs = await (await get("/lessons?imported=1")).text();
@@ -901,6 +906,129 @@ describe("web shared-with-me filters", () => {
     expect((await get("/lessons?shared_by=Nobody")).status).toBe(200);
     expect(await (await get("/lessons?shared_by=Nobody")).text()).toContain("No lessons match");
     db.withConnection((c) => db.deleteLesson(c, "from-ada"));
+  });
+});
+
+describe("web lessons list: dense rows by day, the answer first", () => {
+  // Local wall-clock times: the day groups follow the dashboard machine's clock, whatever the TZ.
+  const localAgo = (days: number, h: number, m: number) => {
+    const n = new Date();
+    return new Date(n.getFullYear(), n.getMonth(), n.getDate() - days, h, m);
+  };
+  const seed = (id: string, at: Date | string, extra: Record<string, unknown> = {}) =>
+    db.withConnection((c) =>
+      db.insertLesson(
+        c,
+        parseLesson({
+          id,
+          timestamp: typeof at === "string" ? at : at.toISOString(),
+          topic_id: "journal",
+          categories: ["notes", "more"],
+          title: `Daybook ${id}`,
+          level: "mid",
+          summary: "s",
+          ...extra,
+        }),
+      ),
+    );
+  const rows = (page: string) =>
+    new Map([...page.matchAll(/<li data-id="([^"]+)"[\s\S]*?<\/li>/g)].map((m) => [m[1], m[0]]));
+  const yesterday = localAgo(1, 12, 0);
+
+  beforeAll(() => {
+    seed("day-today", localAgo(0, 0, 1));
+    seed("day-yest", yesterday, { feedback: "know" });
+    seed("day-old", "2024-03-05T12:00:00Z", { starred: true });
+  });
+
+  it("rows are <li> with exactly one <a> each, and no form sits inside an <a>", async () => {
+    const page = await (await get("/lessons")).text();
+    expect(page).not.toContain("<tr");
+    const found = rows(page);
+    expect(found.size).toBeGreaterThanOrEqual(3);
+    for (const row of found.values()) expect(row.match(/<a\s/g)).toHaveLength(1);
+    for (const [, inside] of page.matchAll(/<a\s[^>]*>([\s\S]*?)<\/a>/g)) {
+      expect(inside).not.toContain("<form");
+    }
+    // the answer leads the row: the glyph, its state label for screen readers
+    const mine = rows(await (await get("/lessons?search=Daybook")).text());
+    expect(mine.get("day-today")).toContain('○</span><span class="sr-only">no answer yet</span>');
+    expect(mine.get("day-yest")).toContain('✅</span><span class="sr-only">knew it</span>');
+    // one category, as a plain chip (the row has one link: the title)
+    expect(mine.get("day-old")).toContain(">notes</span>");
+    expect(mine.get("day-old")).not.toContain(">more<");
+  });
+
+  it("groups by day under the date sort, flat under any other", async () => {
+    const byDate = await (await get("/lessons?search=Daybook")).text();
+    const heads = ["Today", "Yesterday", "March 2024"].map((h) => byDate.indexOf(`>${h}</h2>`));
+    expect(heads.every((i) => i > 0)).toBe(true);
+    expect([...heads].sort((a, b) => a - b)).toEqual(heads);
+    expect(byDate).toMatch(/>\s*⇅<\/span><span class="sr-only">Sort:<\/span> Newest first/);
+    // under the Today / Yesterday headers the row shows the clock, the date otherwise
+    expect(rows(byDate).get("day-yest")).toContain(">12:00</time>");
+    expect(rows(byDate).get("day-old")).toContain(">Mar 5, 2024</time>");
+    // oldest first keeps the groups, in their order
+    const oldest = await (await get("/lessons?search=Daybook&sort=timestamp&order=asc")).text();
+    expect(oldest.indexOf(">March 2024</h2>")).toBeLessThan(oldest.indexOf(">Today</h2>"));
+
+    const byTitle = await (await get("/lessons?search=Daybook&sort=title&order=asc")).text();
+    for (const h of ["Today", "Yesterday", "March 2024"])
+      expect(byTitle).not.toContain(`>${h}</h2>`);
+    expect(byTitle).toContain("Sort:</span> Title");
+    // no day header to name the day: the date instead of the clock
+    const day = new Intl.DateTimeFormat("en", { month: "short", day: "numeric" });
+    expect(rows(byTitle).get("day-yest")).toContain(`>${day.format(yesterday)}</time>`);
+    expect(await (await get("/lessons?sort=title&order=desc")).text()).toContain(
+      "Sort:</span> Title",
+    );
+  });
+
+  it("★ marks the starred rows only, and a lesson's course shows as 🎓 n/m", async () => {
+    const course = db.withConnection((c) =>
+      courses.createCourse(c, {
+        title: "Daybook course",
+        topic_id: "journal",
+        lesson_id: "day-yest",
+      }),
+    );
+    const found = rows(await (await get("/lessons?search=Daybook")).text());
+    expect(found.get("day-old")).toContain('★</span><span class="sr-only">starred</span>');
+    for (const id of ["day-today", "day-yest"]) {
+      expect(found.get(id)).not.toContain("★");
+      expect(found.get(id)).not.toContain("☆"); // not a toggle any more
+    }
+    expect(found.get("day-yest")).toContain('🎓</span><span class="sr-only">course</span> 0/0');
+    expect(found.get("day-today")).not.toContain("🎓");
+    db.withConnection((c) => db.deleteCourseRows(c, course.id));
+  });
+
+  it("bucket(): Today, Yesterday, This week (from Monday), this month, then by month", () => {
+    const thu = new Date(2026, 9, 29, 12, 0); // Thursday 29 October 2026
+    const at = (y: number, mo: number, d: number, h = 12) => new Date(y, mo, d, h).toISOString();
+    expect(bucket(at(2026, 9, 29, 8), thu)).toBe("Today");
+    expect(bucket(at(2026, 9, 30), thu)).toBe("Today"); // a clock ahead of ours
+    expect(bucket(at(2026, 9, 28, 23), thu)).toBe("Yesterday");
+    expect(bucket(at(2026, 9, 26, 0), thu)).toBe("This week");
+    expect(bucket(at(2026, 9, 25), thu)).toBe("Earlier in October");
+    expect(bucket(at(2026, 8, 30), thu)).toBe("September");
+    expect(bucket(at(2025, 11, 31), thu)).toBe("December 2025");
+    // a week that started last month; a Monday; a Sunday
+    const oct1 = new Date(2026, 9, 1, 9);
+    expect(bucket(at(2026, 8, 30), oct1)).toBe("Yesterday");
+    expect(bucket(at(2026, 8, 28), oct1)).toBe("This week");
+    expect(bucket(at(2026, 8, 27), oct1)).toBe("September");
+    const mon = new Date(2026, 9, 26, 9);
+    expect(bucket(at(2026, 9, 25), mon)).toBe("Yesterday");
+    expect(bucket(at(2026, 9, 24), mon)).toBe("Earlier in October");
+    const sun = new Date(2026, 10, 1, 9);
+    expect(bucket(at(2026, 9, 26), sun)).toBe("This week");
+    expect(bucket(at(2026, 9, 25), sun)).toBe("October");
+    expect(bucket("not a date", thu)).toBe("not a date");
+  });
+
+  afterAll(() => {
+    db.withConnection((c) => db.deleteLessons(c, ["day-today", "day-yest", "day-old"]));
   });
 });
 

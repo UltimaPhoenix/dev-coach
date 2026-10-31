@@ -1,6 +1,6 @@
-/* Shared relative-time formatter used by the lessons list and the lesson page. Every [data-ts]
+/* Shared relative-time formatter used by the lesson page and the courses list. Every [data-ts]
    gets a relative label; when its cell is too narrow for the long form ("17 minutes ago") it
-   switches to the compact one ("17m"), and it is re-evaluated after column drags and resizes. */
+   switches to the compact one ("17m"), and it is re-evaluated after resizes. */
 (function () {
   /* "yesterday" / "today" are only right at day granularity; for weeks the number is always
      spelled out — "last week" for something 13 days old is a lie — and from two months on the
@@ -79,14 +79,11 @@
   }
 
   applyRelativeTimes(document);
-  /* HTMX-swapped fragments (lesson rows, lesson meta) arrive with raw dates. */
+  /* HTMX-swapped fragments (the lesson meta) arrive with raw dates. */
   document.body.addEventListener('htmx:afterSettle', function () {
     applyRelativeTimes(document);
   });
-  /* Column drags / resets (table-resize.js) and window resizes change the available width. */
-  document.addEventListener('dc:columns-resized', function () {
-    applyRelativeTimes(document);
-  });
+  /* A window resize changes the available width. */
   var timer;
   globalThis.addEventListener('resize', function () {
     clearTimeout(timer);

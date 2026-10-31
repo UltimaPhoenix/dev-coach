@@ -2,6 +2,7 @@
 // Bound to 127.0.0.1; forms use the POST→303 redirect pattern.
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, extname, join } from "node:path";
+import type { DatabaseSync } from "node:sqlite";
 import { fileURLToPath } from "node:url";
 import { type ServerType, serve } from "@hono/node-server";
 import { type Context, Hono } from "hono";
@@ -35,6 +36,7 @@ import {
   lessonsPage,
   profilePage,
   readOnlyPage,
+  type SeededCourse,
   type ShareState,
   settingsPage,
   shareFragment,
@@ -150,6 +152,17 @@ function uiTheme(): string {
   } catch {
     return "system";
   }
+}
+
+/** The course each lesson seeded — the most recently updated, as the lesson page shows it — by lesson id. */
+function coursesByLesson(conn: DatabaseSync): Record<string, SeededCourse> {
+  const out: Record<string, SeededCourse> = {};
+  for (const c of courses.listCourses(conn)) {
+    if (c.lesson_id && !out[c.lesson_id]) {
+      out[c.lesson_id] = { id: c.id, title: c.title, status: c.status, ...courses.progress(c) };
+    }
+  }
+  return out;
 }
 
 // ── App ──────────────────────────────────────────────────────────────────────
@@ -404,6 +417,8 @@ export function createApp(opts: AppOptions = {}): Hono {
         total,
         totalPages,
         lessons: db.getLessons(conn, { ...filters, sort, order, page, per_page: PER_PAGE }),
+        courses: coursesByLesson(conn),
+        queue: { count: db.countUnanswered(conn), next: db.getNextUnanswered(conn) },
         allCategories: db.getAllCategories(conn),
         allProjects: db.getDistinctColumn(conn, "project"),
         allRepositories: db.getDistinctColumn(conn, "repository"),
@@ -439,6 +454,8 @@ export function createApp(opts: AppOptions = {}): Hono {
         importOpen: q.import === "1",
         importError,
         lessons: data.lessons,
+        courses: data.courses,
+        queue: data.queue,
         allCategories: data.allCategories,
         allProjects: data.allProjects,
         allRepositories: data.allRepositories,
@@ -563,6 +580,7 @@ export function createApp(opts: AppOptions = {}): Hono {
         confidence,
         settingName: settings.share_name,
         uiTheme: settings.ui_theme,
+        nextUnanswered: lesson.feedback ? db.getNextUnanswered(conn, lesson.id) : null,
       };
     });
     if (!found) return c.html("<h1>Lesson not found</h1>", 404);
@@ -574,6 +592,7 @@ export function createApp(opts: AppOptions = {}): Hono {
         uiTheme: found.uiTheme,
         share: shareState(found.lesson, found.settingName, { open: q.share === "1" }).state,
         imported,
+        nextUnanswered: found.nextUnanswered,
         course: found.course,
         confidence: found.confidence,
         topicCreated: q.answered === "topic-created",

@@ -88,7 +88,7 @@ Changes save immediately as you edit.
 
 ### Lessons (`/lessons`)
 
-Filterable, sortable table of all delivered lessons.
+Every delivered lesson, one dense row each, grouped by day and led by its answer.
 
 **Filters:**
 - Period — All time / Today / Last 7 days / Last 30 days / Last year / Custom range (the date range
@@ -100,44 +100,44 @@ Filterable, sortable table of all delivered lessons.
 - Shared — All lessons / 👤 My own / 🤝 Shared with me / 🤝 from `<name>` (one entry per sender)
 - Free-text search (also matches the sender of a shared lesson)
 
-Active filters show as chips above the table; when nothing matches you get "No lessons match the
+Active filters show as chips above the list; when nothing matches you get "No lessons match the
 current filters."
 
-**Sort:** click the Date, Topic, Title, Level or Feedback column header. Ascending or descending.
+**Sort** (`⇅ Newest first ▾`): Newest first · Oldest first · Title · Topic · Level · Answer. In date
+order the rows fall under day headers — **Today**, **Yesterday**, **This week** (since Monday),
+**Earlier in October**, then one header per month (`September`, `December 2025`); any other order is
+one flat list. A group can go on over the next page.
 
-**Table columns:** ★, Date, Topic, Title, Level, Categories, Feedback, ↗ — the title gets the width
-(categories wrap onto a second line when needed); the feedback cell shows `✅ knew it` / `✨ new to me` / `❌ lost me`
-(or nothing yet); `↗` opens the Share panel right there; a shared lesson shows `🤝 <sender>`
-under its topic.
+**Rows:** the answer glyph first (`✅` knew it · `✨` new to me · `❌` lost me · `○` no answer yet), then
+the full title (it wraps; it is never cut short), then `topic`, the level as a word, the first category,
+`🤝 <sender>` on a lesson someone shared with you, `🎓 2/5` on a lesson that seeded a course, `★` when
+starred, and the time — the clock under Today and Yesterday, the date further back. On a phone the
+metadata goes on a second line under the title: `topic · level · time`.
 
 **Pagination:** 25 per page.
 
 **Actions per row:**
-- `★` — toggle starred
-- `↗` (appears when you hover the row) — share this lesson from a popover right next to the icon, without leaving the list
-- Click a level pill or category chip — filter the table by it
-- Click anywhere else on the row — open the detail page (feedback is recorded there)
+- Click anywhere on the row — open the lesson (the answer is given there, under the 💡 tip; starring
+  too)
+- `↗` (appears when you hover the row, on wide screens) — share this lesson from a popover right next
+  to the icon, without leaving the list
+
+**Unanswered N · answer the newest →** (toolbar) — how many of your own lessons still wait for an
+answer, and a link to the newest of them. It counts your own lessons only (a shared lesson's answer
+never moves confidence), leaves the list whatever other filters you set, and steps aside while an
+answer filter is on; at zero it is gone. The lesson opens in full: answer it (one key: `y`, `n` or
+`l`), then **Next unanswered →** at the end of the answer takes you to the next newest. Nothing
+reminds you of the queue anywhere else — it is there when you come looking.
 
 **⋯ More** (toolbar, right) — the rare actions live behind this button so the toolbar stays calm:
 
-- **Delete lessons…** — deleting is deliberately hidden until you ask for it. The star column turns
-  into checkboxes, clicking a row now ticks it instead of opening it (the header checkbox ticks the
-  whole page), and a bar at the bottom shows *N selected* with **Delete selected**. One
+- **Delete lessons…** — deleting is deliberately hidden until you ask for it. Each row's answer glyph
+  turns into a checkbox, clicking a row now ticks it instead of opening it (**All on this page**, in
+  the bar, ticks the whole page), and a bar at the bottom shows *N selected* with **Delete selected**. One
   confirmation, then the list reloads with the same filters and page. Esc or **✕ Cancel** (toolbar
   or bar) leaves the mode without deleting anything; it is never remembered across reloads. Deleting is permanent; a lesson
   someone shared with you can be deleted too, and the same share is accepted again if you import it
   later.
-- **Reset column widths** — see below.
-
-**Resizable columns** — on desktop widths, drag the boundary between two column headers: the column
-on one side grows exactly as much as its neighbour shrinks, so the table never changes width and no
-column can be pushed out of view. The title column takes whatever its neighbours give or take and never
-drops below a readable width. Widths are remembered in this browser (and dropped if they no longer fit
-the window); double-click a boundary to reset the two columns beside it, or use **⋯ → Reset column
-widths**. When the Date column gets narrow, dates switch to a compact form: `17m`, `today`, `Mon 2` within the
-last week, then `Sep 10`. Lessons
-two months old or older show their date instead of a relative label: `July 3` within the current
-year, `July 3, 2025` for earlier years (compact: `Jul 2025`).
 
 **＋ Import** (toolbar, right) — add a lesson someone shared with you: paste the code, the link, a
 URL, or the whole copied card into the box, pick a `.devcoach.md` file, or simply **drop the file
@@ -183,7 +183,9 @@ where it came from.
   is added at 6/10, and the sentence says so), *new to me* changes nothing, *lost me* points at a
   step-by-step course (ask your agent; in Claude Code `/devcoach:course <topic>`), or at the course it
   already seeded, with its progress. **change** reopens the question with your answer marked: pick
-  another one (it replaces the old answer in one step) or **Clear the answer**.
+  another one (it replaces the old answer in one step) or **Clear the answer**. When another of your
+  own lessons still waits for an answer, the sentence ends with **Next unanswered →**, which opens the
+  newest of them.
 - **Context and provenance** — a `Context:` line with the coding task that triggered the lesson (when
   available), then a row of lowercase labels linking back to where the lesson came from:
   - **project** — the folder name where you were working
@@ -378,9 +380,9 @@ The dashboard is where you actively shape your coaching:
 
 2. **Edit groups and topics** — add topics you care about, delete ones you don't. Your knowledge map is your learning intent statement.
 
-3. **Answer "Already knew it?" on lessons** — ✅ yes, ✨ new to me or ❌ lost me tells devcoach whether that angle was already yours, new and clear, or too dense. A *yes* adds a point of confidence on the topic (and so deeper lessons there); *lost me* keeps the lesson as a seed for a step-by-step course.
+3. **Answer "Already knew it?" on lessons** — ✅ yes, ✨ new to me or ❌ lost me tells devcoach whether that angle was already yours, new and clear, or too dense. A *yes* adds a point of confidence on the topic (and so deeper lessons there); *lost me* keeps the lesson as a seed for a step-by-step course. Lessons you haven't answered yet are one click away: **answer the newest →** on the Lessons page, then **Next unanswered →** after each answer.
 
-4. **Star lessons to revisit** — use the `★` button to mark lessons worth reading again. You can filter by "starred only" on the Lessons page.
+4. **Star lessons to revisit** — use the `☆` toggle on a lesson's page to mark it worth reading again; the list shows `★` on starred rows, and you can filter by "starred only" on the Lessons page.
 
 5. **Jump to context** — click repository, commit, or folder links on lesson details to immediately review the code that triggered the lesson. This helps you understand *why* the lesson was taught and *where* to apply it.
 

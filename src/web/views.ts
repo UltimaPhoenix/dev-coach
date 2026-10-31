@@ -398,6 +398,10 @@ export interface LessonsData {
   importOpen: boolean;
   importError: "invalid" | "cross" | null;
   lessons: Lesson[];
+  /** The course each lesson seeded (the newest), by lesson id: the row's 🎓 n/m. */
+  courses: Record<string, SeededCourse>;
+  /** The answer queue (own lessons only): how many wait for an answer, and the newest of them. */
+  queue: { count: number; next: string | null };
   allCategories: string[];
   allProjects: string[];
   allRepositories: string[];
@@ -420,6 +424,56 @@ const PERIOD_LABELS: Record<string, string> = {
   month: "Last 30 days",
   year: "Last year",
 };
+const MONTH = new Intl.DateTimeFormat("en", { month: "long" });
+const MONTH_DAY = new Intl.DateTimeFormat("en", { month: "short", day: "numeric" });
+const MONTH_DAY_YEAR = new Intl.DateTimeFormat("en", {
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+});
+const pad2 = (n: number): string => String(n).padStart(2, "0");
+const localDay = (d: Date, offset = 0): number =>
+  new Date(d.getFullYear(), d.getMonth(), d.getDate() + offset).getTime();
+
+/**
+ * The list's day group for a lesson, in local time (the dashboard runs on the user's machine):
+ * Today, Yesterday, This week (from Monday), Earlier in <this month>, then one group per month —
+ * with the year once it is not this year's. A later timestamp (clock skew) counts as today.
+ */
+export function bucket(ts: string, now = new Date()): string {
+  const d = new Date(ts);
+  if (Number.isNaN(d.getTime())) return ts.slice(0, 10);
+  const day = localDay(d);
+  if (day >= localDay(now)) return "Today";
+  if (day >= localDay(now, -1)) return "Yesterday";
+  if (day >= localDay(now, -((now.getDay() + 6) % 7))) return "This week";
+  if (d.getFullYear() !== now.getFullYear()) return `${MONTH.format(d)} ${d.getFullYear()}`;
+  return d.getMonth() === now.getMonth() ? `Earlier in ${MONTH.format(d)}` : MONTH.format(d);
+}
+
+/**
+ * The row's time: the clock under the Today and Yesterday headers (they already name the day), the
+ * date otherwise — with the year once it is not this year's.
+ */
+function rowWhen(ts: string, now: Date, grouped: boolean): string {
+  const d = new Date(ts);
+  if (Number.isNaN(d.getTime())) return ts.slice(0, 10);
+  if (grouped && localDay(d) >= localDay(now, -1)) {
+    return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+  }
+  return (d.getFullYear() === now.getFullYear() ? MONTH_DAY : MONTH_DAY_YEAR).format(d);
+}
+
+/** The list's orders: [sort, order, label]. The date order groups the rows by day; the others are flat. */
+const SORTS: [string, string, string][] = [
+  ["timestamp", "desc", "Newest first"],
+  ["timestamp", "asc", "Oldest first"],
+  ["title", "asc", "Title"],
+  ["topic_id", "asc", "Topic"],
+  ["level", "asc", "Level"],
+  ["feedback", "asc", "Answer"],
+];
+
 const sentenceCase = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
 /** The answer filter's entries (menu, chip): the core vocabulary in sentence case, keyed by `?feedback=`. */
 const FEEDBACK_LABELS: Record<string, string> = {
@@ -428,14 +482,6 @@ const FEEDBACK_LABELS: Record<string, string> = {
   ),
   [NO_ANSWER.filter]: `${NO_ANSWER.glyph} ${sentenceCase(NO_ANSWER.label)}`,
 };
-// Colour means the answer (never the level): the list's answer cell. The lesson page says the
-// answer in words, under the tip.
-const ANSWER_TEXT: Record<string, string> = {
-  know: "text-teal-600 dark:text-teal-400",
-  understood: "text-accent-500 dark:text-accent-400",
-  dont_know: "text-rose-500 dark:text-rose-400",
-};
-const answerLabel = (a: FeedbackAnswer): string => `${a.glyph} ${a.label}`;
 const LEVEL_EMOJI: Record<string, string> = { junior: "🟢", mid: "🟡", senior: "🔴" };
 
 function lessonsQs(s: LessonsSelected, overrides: Record<string, string> = {}): string {
@@ -504,27 +550,14 @@ export function lessonsPage(d: LessonsData): Html {
     ["1", "", "🤝 Shared with me"],
     ...d.allSharedBy.map((name): [string, string, string] => ["1", name, `🤝 from ${name}`]),
   ];
-  const levelTextColor: Record<string, string> = {
-    junior: "text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-900/20",
-    mid: "text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20",
-    senior: "text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/20",
-  };
-
   const chip = (label: string, clearUrl: string) =>
     html`<span class="inline-flex items-center gap-1 pl-2.5 pr-1 py-0.5 rounded-full text-xs bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-300 border border-accent-200 dark:border-accent-800">${label}<a href="${clearUrl}" class="ml-0.5 w-4 h-4 flex items-center justify-center rounded-full hover:bg-accent-200 dark:hover:bg-accent-700 transition">×</a></span>`;
 
-  const sortTh = (label: string, col: string, extra = "") => {
-    const active = s.sort === col;
-    const next = active && s.order === "desc" ? "asc" : "desc";
-    return html`<th class="px-3 py-3 whitespace-nowrap relative overflow-hidden text-ellipsis ${extra}">
-      <a href="${lessonsQs(s, { sort: col, order: next })}" class="hover:text-gray-700 dark:hover:text-gray-200 transition group/sort">${label}
-        ${
-          active
-            ? html`<span class="text-accent-400">${s.order === "asc" ? "↑" : "↓"}</span>`
-            : html`<span class="text-gray-200 dark:text-gray-700 group-hover/sort:text-gray-400 dark:group-hover/sort:text-gray-500 transition">↕</span>`
-        }
-      </a></th>`;
-  };
+  const sortLabel =
+    (SORTS.find(([col, order]) => col === s.sort && order === s.order) ??
+      SORTS.find(([col]) => col === s.sort))?.[2] ?? "Newest first";
+  // The queue (ruling 4 of the UI plan): pull-only, own lessons, gone under any answer filter.
+  const queue = d.queue.count > 0 && d.queue.next && !s.feedback ? d.queue.next : null;
 
   const caret = html`<svg class="w-3 h-3 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/></svg>`;
 
@@ -550,7 +583,7 @@ export function lessonsPage(d: LessonsData): Html {
 
   const pageIds = JSON.stringify(d.lessons.map((l) => l.id));
   const body = html`
-<div :class="selectMode && 'dc-selecting'" x-data="{ selectMode: false, selected: [], confirmOpen: false, shareOpen: false, sharePos: { left: 0, top: null, bottom: null }, openShare(btn) { const r = btn.getBoundingClientRect(); const w = 320; const left = Math.max(8, Math.min(r.right - w, innerWidth - w - 8)); const below = innerHeight - r.bottom > 380; this.sharePos = { left, top: below ? r.bottom + 6 : null, bottom: below ? null : innerHeight - r.top + 6 }; this.shareOpen = true }, toggle(id) { const i = this.selected.indexOf(id); if (i < 0) this.selected.push(id); else this.selected.splice(i, 1) }, setAll(ids, on) { this.selected = on ? ids.slice() : [] }, selectedTitles() { const rows = Array.from(document.querySelectorAll('tr[data-id]')); return this.selected.map((id) => { const r = rows.find((x) => x.dataset.id === id); return r ? r.dataset.title : id }) }, leave() { this.selectMode = false; this.selected = []; this.shareOpen = false; this.confirmOpen = false } }" @keydown.escape.window="leave()">
+<div :class="selectMode && 'dc-selecting'" x-data="{ selectMode: false, selected: [], confirmOpen: false, shareOpen: false, sharePos: { left: 0, top: null, bottom: null }, openShare(btn) { const r = btn.getBoundingClientRect(); const w = 320; const left = Math.max(8, Math.min(r.right - w, innerWidth - w - 8)); const below = innerHeight - r.bottom > 380; this.sharePos = { left, top: below ? r.bottom + 6 : null, bottom: below ? null : innerHeight - r.top + 6 }; this.shareOpen = true }, toggle(id) { const i = this.selected.indexOf(id); if (i < 0) this.selected.push(id); else this.selected.splice(i, 1) }, setAll(ids, on) { this.selected = on ? ids.slice() : [] }, selectedTitles() { const rows = Array.from(document.querySelectorAll('li[data-id]')); return this.selected.map((id) => { const r = rows.find((x) => x.dataset.id === id); return r ? r.dataset.title : id }) }, leave() { this.selectMode = false; this.selected = []; this.shareOpen = false; this.confirmOpen = false } }" @keydown.escape.window="leave()">
 <form id="filter-form" method="get" action="/lessons">
   <input type="hidden" name="period" id="h-period" value="${s.period}">
   <input type="hidden" name="date_from" id="h-date-from" value="${s.date_from}">
@@ -639,6 +672,16 @@ export function lessonsPage(d: LessonsData): Html {
       </div>
     </div>
 
+    <div class="relative" x-data="{ open: false }" @click.outside="open = false" @keydown.escape="open = false">
+      <button type="button" @click="open = !open" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-accent-400"><span aria-hidden="true">⇅</span><span class="sr-only">Sort:</span> ${sortLabel}${caret}</button>
+      <div x-show="open" x-transition:enter="transition ease-out duration-100" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100" class="absolute left-0 top-full mt-1 z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg w-44 p-1 overflow-hidden" style="display:none">
+        ${SORTS.map(([col, order, lbl]) => {
+          const active = lbl === sortLabel;
+          return html`<a href="${lessonsQs(s, { sort: col, order })}" class="w-full text-left px-3 py-2 rounded-lg text-sm transition flex items-center justify-between ${active ? "bg-accent-50 dark:bg-accent-900/30 text-accent-700 dark:text-accent-300 font-medium" : "text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"}">${lbl}${active ? html`<span class="text-accent-500 ml-auto">✓</span>` : ""}</a>`;
+        })}
+      </div>
+    </div>
+
     ${
       d.allCategories.length ||
       d.allProjects.length ||
@@ -659,11 +702,12 @@ export function lessonsPage(d: LessonsData): Html {
         : ""
     }
 
+    ${queue ? html`<p class="text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">Unanswered <span class="tabular-nums text-gray-700 dark:text-gray-200">${d.queue.count}</span> · <a href="/lessons/${encodeURIComponent(queue)}" class="text-accent-700 dark:text-accent-300 hover:underline">answer the newest →</a></p>` : ""}
+
     ${anyFilter ? html`<a href="/lessons" class="ml-auto text-xs text-gray-400 hover:text-gray-700 dark:hover:text-white transition">Clear all</a>` : ""}
 
     ${moreMenu(
-      html`<button type="button" @click="selectMode = true; open = false" class="w-full text-left px-3 py-2 rounded-lg text-sm transition flex items-center gap-2 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"><span class="w-4 h-4 inline-flex items-center justify-center shrink-0 text-[13px] leading-none" aria-hidden="true">🗑</span>Delete lessons…</button>
-        <button type="button" @click="window.resetLessonColumns && window.resetLessonColumns(); open = false" class="w-full text-left px-3 py-2 rounded-lg text-sm transition flex items-center gap-2 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"><svg class="w-4 h-4 shrink-0 text-gray-400 dark:text-gray-500" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><rect x="2.5" y="4" width="15" height="12" rx="2"/><path d="M7.5 4v12M12.5 4v12"/></svg>Reset column widths</button>`,
+      html`<button type="button" @click="selectMode = true; open = false" class="w-full text-left px-3 py-2 rounded-lg text-sm transition flex items-center gap-2 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"><span class="w-4 h-4 inline-flex items-center justify-center shrink-0 text-[13px] leading-none" aria-hidden="true">🗑</span>Delete lessons…</button>`,
       anyFilter ? "" : "ml-auto",
       'x-show="!selectMode"',
     )}
@@ -706,59 +750,7 @@ export function lessonsPage(d: LessonsData): Html {
 
 ${
   d.lessons.length
-    ? html`<div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm overflow-hidden">
-  <table class="w-full text-sm table-fixed" data-resizable="lessons">
-    <colgroup>
-      <col data-col="star" style="width:2.75rem" />
-      <col data-col="date" data-min="96" style="width:8rem" />
-      <col data-col="topic" data-min="88" class="hidden sm:table-column" style="width:11rem" />
-      <col data-col="title" data-flex data-min="220" />
-      <col data-col="level" data-min="88" style="width:5.5rem" />
-      <col data-col="categories" data-min="120" class="hidden lg:table-column" style="width:24%" />
-      <col data-col="feedback" data-min="112" class="hidden xl:table-column" style="width:7rem" />
-      <col data-col="share" style="width:2.5rem" />
-    </colgroup>
-    <thead>
-      <tr class="bg-gray-50 dark:bg-gray-800/60 border-b border-gray-200 dark:border-gray-800 text-left text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">
-        <th class="px-3 py-3"><input type="checkbox" tabindex="-1" aria-label="Select all on this page" class="dc-check" x-show="selectMode" style="display:none" :checked="selected.length > 0 && ${pageIds}.every((id) => selected.includes(id))" @change="setAll(${pageIds}, $event.target.checked)" /></th>
-        ${sortTh("Date", "timestamp")}
-        ${sortTh("Topic", "topic_id", "hidden sm:table-cell")}
-        ${sortTh("Title", "title")}
-        ${sortTh("Level", "level")}
-        <th class="px-3 py-3 hidden lg:table-cell relative overflow-hidden text-ellipsis">Categories</th>
-        ${sortTh("Feedback", "feedback", "hidden xl:table-cell")}
-        <th class="px-2 py-3 w-8"><span class="sr-only">Share</span></th>
-      </tr>
-    </thead>
-    <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
-      ${d.lessons.map((lesson) => {
-        const rowId = domId("lesson-row-", lesson.id);
-        const date = lesson.timestamp.slice(0, 10);
-        const tip = lesson.timestamp.slice(0, 16).replace("T", " ");
-        return html`<tr id="${rowId}" data-id="${lesson.id}" data-title="${lesson.title}" data-href="/lessons/${encodeURIComponent(lesson.id)}" class="hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors group cursor-pointer" tabindex="0" role="link" @click="if (selectMode) toggle($el.dataset.id); else if (!$event.target.closest('a, button, input, label')) window.location = $el.dataset.href" @keydown.enter="if (selectMode) toggle($el.dataset.id); else if ($event.target === $el) window.location = $el.dataset.href" @keydown.space.prevent="selectMode && toggle($el.dataset.id)" :class="selected.includes($el.dataset.id) && 'bg-accent-50 dark:bg-accent-900/20'">
-        <td class="px-3 py-3">
-          <form x-show="!selectMode" method="post" action="/lessons/${encodeURIComponent(lesson.id)}/star" hx-post="/lessons/${encodeURIComponent(lesson.id)}/star" hx-target="#${rowId}" hx-select="#${rowId}" hx-swap="outerHTML">
-            <input type="hidden" name="starred" value="${lesson.starred ? "0" : "1"}" />
-            <input type="hidden" name="next" value="/lessons${lessonsQs(s)}" />
-            <button type="submit" title="${lesson.starred ? "Unstar" : "Star"}" class="w-6 text-lg text-center leading-none transition ${lesson.starred ? "text-yellow-400 hover:text-yellow-300" : "text-gray-300 dark:text-gray-600 hover:text-yellow-400"}">${lesson.starred ? "★" : "☆"}</button>
-          </form>
-          <input type="checkbox" tabindex="-1" aria-hidden="true" class="dc-check pointer-events-none" x-show="selectMode" style="display:none" :checked="selected.includes($el.closest('tr').dataset.id)" />
-        </td>
-        <td class="px-3 py-3 whitespace-nowrap tabular-nums relative group/date">
-          <span class="text-gray-400 dark:text-gray-500 cursor-default" data-ts="${lesson.timestamp}">${date}</span>
-          <div class="absolute z-10 bottom-full left-0 mb-1 px-2 py-1 rounded bg-gray-800 dark:bg-gray-700 text-white text-xs whitespace-nowrap pointer-events-none opacity-0 group-hover/date:opacity-100 transition-opacity duration-150">${tip}</div>
-        </td>
-        <td class="px-3 py-3 hidden sm:table-cell"><span class="block truncate text-xs font-mono text-cyan-600 dark:text-cyan-400">${lesson.topic_id}</span>${lesson.imported ? html`<span class="block text-[11px] text-gray-400 dark:text-gray-500 truncate max-w-[10rem]" title="This lesson was shared with you">🤝 ${lesson.shared_by ?? "anonymous"}</span>` : ""}</td>
-        <td class="px-3 py-3"><a href="/lessons/${encodeURIComponent(lesson.id)}" class="font-semibold text-[15px] leading-snug text-gray-800 dark:text-gray-100 hover:text-accent-600 dark:hover:text-accent-400 transition line-clamp-2">${lesson.title}</a></td>
-        <td class="px-3 py-3"><a href="${lessonsQs(s, { level: lesson.level })}" class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${levelTextColor[lesson.level] ?? ""} hover:ring-2 hover:ring-current hover:ring-offset-1 transition-shadow">${lesson.level}</a></td>
-        <td class="px-3 py-3 hidden lg:table-cell"><div class="flex flex-wrap gap-1">${lesson.categories.map((cat) => html`<a href="${lessonsQs(s, { category: cat })}" class="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-accent-100 dark:hover:bg-accent-900/40 hover:text-accent-700 dark:hover:text-accent-300 transition-colors">${cat}</a>`)}</div></td>
-        <td class="px-3 py-3 hidden xl:table-cell">${answerCell(lesson.feedback)}</td>
-        <td class="px-2 py-3 text-center"><button type="button" hx-get="/lessons/${encodeURIComponent(lesson.id)}/share?format=panel" hx-target="#share-modal-body" hx-swap="innerHTML" @click="openShare($el)" title="Share this lesson" aria-label="Share this lesson" class="inline-flex text-gray-400 dark:text-gray-500 hover:text-accent-500 dark:hover:text-accent-400 transition opacity-0 group-hover:opacity-100 focus-visible:opacity-100"><svg class="w-4 h-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 14 14 6M8 6h6v6"/></svg></button></td>
-      </tr>`;
-      })}
-    </tbody>
-  </table>
-</div>
+    ? html`${lessonList(d)}
 ${
   d.totalPages > 1
     ? html`<div class="flex items-center justify-between mt-4">
@@ -794,6 +786,7 @@ ${
 <div x-show="selectMode" style="display:none" x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0 translate-y-2" x-transition:enter-end="opacity-100 translate-y-0" class="fixed inset-x-0 bottom-0 z-50 border-t border-gray-200 dark:border-gray-800 bg-white/95 dark:bg-gray-900/95 backdrop-blur px-4 sm:px-6 py-3">
   <div class="max-w-7xl mx-auto flex items-center gap-3">
     <button type="button" @click="leave()" class="inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium border transition bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-accent-400">Cancel</button>
+    <label class="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-200 cursor-pointer"><input type="checkbox" class="dc-check" :checked="selected.length > 0 && ${pageIds}.every((id) => selected.includes(id))" @change="setAll(${pageIds}, $event.target.checked)" />All on this page</label>
     <div class="ml-auto flex items-center gap-3">
       <p class="text-sm text-gray-700 dark:text-gray-200 tabular-nums"><span x-text="selected.length"></span> selected</p>
       <button type="button" x-show="selected.length" style="display:none" @click="selected = []" class="text-xs text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-200 transition">Clear</button>
@@ -826,8 +819,6 @@ ${dangerDialog(
 </div>`;
 
   const scripts = html`<script src="/static/vendor/flatpickr.min.js"></script>
-<script src="/static/relative-time.js"></script>
-<script src="/static/table-resize.js"></script>
 <script src="/static/share.js"></script>
 <script>
 function periodPicker() {
@@ -891,6 +882,64 @@ function pageNumbers(page: number, totalPages: number): number[] {
   return out;
 }
 
+// From `lg` the list is one grid whose columns every group and row share (subgrid), so topic,
+// level, category, markers, ★ and time line up down the page whatever their width.
+const LIST_COLUMNS = "lg:grid lg:grid-cols-[auto_minmax(0,1fr)_repeat(7,auto)] lg:gap-x-4";
+const SUBGRID = "lg:col-span-full lg:grid lg:grid-cols-subgrid lg:gap-x-4";
+const LIST_SHELL = `bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm p-1.5 ${LIST_COLUMNS}`;
+
+/**
+ * The lessons as dense rows (UI plan §4.3). Under the date order they fall into day groups —
+ * Today, Yesterday, This week, then by month — a group may go on over the next page; any other
+ * order is one flat list.
+ */
+function lessonList(d: LessonsData): Html {
+  const now = new Date();
+  const grouped = d.s.sort === "timestamp";
+  const rows = (lessons: Lesson[]) =>
+    html`<ul role="list" class="${SUBGRID}">${lessons.map((l) => lessonRow(l, d.courses[l.id], now, grouped))}</ul>`;
+  if (!grouped) return html`<div class="${LIST_SHELL}">${rows(d.lessons)}</div>`;
+  const groups: { label: string; lessons: Lesson[] }[] = [];
+  for (const l of d.lessons) {
+    const label = bucket(l.timestamp, now);
+    const last = groups.at(-1);
+    if (last?.label === label) last.lessons.push(l);
+    else groups.push({ label, lessons: [l] });
+  }
+  return html`<div class="${LIST_SHELL}">${groups.map(
+    (g) =>
+      html`<div class="${SUBGRID}"><h2 class="lg:col-span-full px-3 pt-3 pb-1 text-xs font-medium text-gray-500 dark:text-gray-400">${g.label}</h2>${rows(g.lessons)}</div>`,
+  )}</div>`;
+}
+
+/**
+ * One lesson in the list: the answer glyph, the title — the row's only link, its hit area
+ * stretched over the row — then topic, level, the first category, who shared it or its course,
+ * ★ when starred, the time. Below `lg` the metadata wraps under the title (`topic · level · time`);
+ * from `lg` its wrapper is `display: contents`, so each cell takes its column in the list's grid.
+ * Select mode's checkbox stands in for the glyph; it and the share button sit above the link.
+ */
+function lessonRow(l: Lesson, course: SeededCourse | undefined, now: Date, grouped: boolean): Html {
+  const when = rowWhen(l.timestamp, now, grouped);
+  const sep = html`<span aria-hidden="true" class="lg:hidden">·</span>`;
+  const cell = "empty:hidden lg:empty:block";
+  const select = "toggle($el.closest('li').dataset.id)";
+  return html`<li data-id="${l.id}" data-title="${l.title}" class="relative group grid grid-cols-[1.25rem_minmax(0,1fr)] items-baseline gap-x-3 gap-y-1 px-3 py-2.5 rounded-lg ${SUBGRID} hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors" :class="selected.includes($el.dataset.id) && 'bg-accent-50 dark:bg-accent-900/20'">
+  <span x-show="!selectMode">${answerGlyph(l.feedback)}</span>
+  <input type="checkbox" x-show="selectMode" style="display:none" aria-label="Select “${l.title}”" class="dc-check relative z-10 self-center" :checked="selected.includes($el.closest('li').dataset.id)" @change="${select}" />
+  <a href="/lessons/${encodeURIComponent(l.id)}" @click="if (selectMode) { $event.preventDefault(); ${select} }" class="min-w-0 break-words font-semibold text-[15px] leading-snug text-gray-800 dark:text-gray-100 group-hover:text-accent-600 dark:group-hover:text-accent-400 transition-colors focus:outline-none after:absolute after:inset-0 after:rounded-lg focus-visible:after:ring-2 focus-visible:after:ring-accent-500">${l.title}</a>
+  <div class="col-start-2 flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5 text-xs text-gray-500 dark:text-gray-400 lg:contents">
+    <span class="truncate max-w-full lg:max-w-[14rem] text-accent-600 dark:text-accent-400">${l.topic_id}</span>${sep}
+    <span>${l.level}</span>
+    <span class="hidden lg:block lg:max-w-[9rem] truncate">${l.categories[0] ? html`<span class="px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300">${l.categories[0]}</span>` : ""}</span>
+    <span class="${cell} order-last lg:order-none truncate lg:max-w-[10rem]">${l.imported ? html`<span><span aria-hidden="true">🤝</span> ${l.shared_by ? html`<span class="sr-only">shared by</span> ${l.shared_by}` : "shared anonymously"}</span>` : ""}${course ? html`<span class="${l.imported ? "ml-2" : ""}"><span aria-hidden="true">🎓</span><span class="sr-only">course</span> ${course.done}/${course.total}</span>` : ""}</span>
+    <span class="${cell} order-last lg:order-none text-yellow-500 dark:text-yellow-400">${l.starred ? html`<span aria-hidden="true">★</span><span class="sr-only">starred</span>` : ""}</span>
+    ${sep}<time datetime="${l.timestamp}" class="tabular-nums lg:text-right">${when}</time>
+    <button type="button" hx-get="/lessons/${encodeURIComponent(l.id)}/share?format=panel" hx-target="#share-modal-body" hx-swap="innerHTML" @click="openShare($el)" title="Share this lesson" aria-label="Share “${l.title}”" class="hidden lg:inline-flex relative z-10 self-center text-gray-500 dark:text-gray-400 hover:text-accent-600 dark:hover:text-accent-400 transition opacity-0 group-hover:opacity-100 focus-visible:opacity-100"><svg class="w-4 h-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 14 14 6M8 6h6v6"/></svg></button>
+  </div>
+</li>`;
+}
+
 // ── Lesson detail (lesson_detail.html) ───────────────────────────────────────
 
 const REPO_DOMAINS: Record<string, string> = {
@@ -947,14 +996,21 @@ export function sharePanel(lessonId: string, sh: ShareState, heading: string | n
 `;
 }
 
-type SeededCourse = { id: string; title: string; done: number; total: number; status: string };
+export type SeededCourse = {
+  id: string;
+  title: string;
+  done: number;
+  total: number;
+  status: string;
+};
 
-/** The lessons table's answer cell: glyph + state label, coloured as the answer. */
-function answerCell(feedback: string | null): Html | string {
-  const a = feedbackAnswer(feedback);
-  return a
-    ? html`<span class="text-xs ${ANSWER_TEXT[a.value]} font-medium">${answerLabel(a)}</span>`
-    : "";
+/**
+ * The answer where a list row starts: the glyph (○ while unanswered) with its state label for
+ * screen readers. The emoji carry their own colour; ○ is in the metadata colour.
+ */
+function answerGlyph(feedback: string | null): Html {
+  const a = feedbackAnswer(feedback) ?? NO_ANSWER;
+  return html`<span class="inline-block w-5 text-center ${a === NO_ANSWER ? "text-gray-500 dark:text-gray-400" : ""}"><span aria-hidden="true">${a.glyph}</span><span class="sr-only">${a.label}</span></span>`;
 }
 
 /**
@@ -1069,6 +1125,7 @@ function feedbackControl(
   confidence: number | null,
   topicCreated: boolean,
   course: SeededCourse | null,
+  nextUnanswered: string | null,
 ): Html {
   const url = `/lessons/${encodeURIComponent(l.id)}`;
   const answer = feedbackAnswer(l.feedback);
@@ -1097,8 +1154,13 @@ function feedbackControl(
       <div role="group" aria-label="${FEEDBACK_QUESTION}" class="flex flex-wrap gap-2">${buttons}</div>
       <div class="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-xs text-gray-500 dark:text-gray-400"><span>${rule}</span>${keysSwitch}${answer ? form("clear", html`<button type="submit" class="underline hover:text-gray-900 dark:hover:text-gray-100">Clear the answer</button>`) : ""}</div>
     </div>`;
+  // The answer queue (ruling 4 of the UI plan): one key to answer, one click to the next lesson
+  // that waits — newest first, own lessons only.
+  const next = nextUnanswered
+    ? html` <span aria-hidden="true" class="text-gray-500 dark:text-gray-400">·</span> <a href="/lessons/${encodeURIComponent(nextUnanswered)}" class="font-medium text-accent-700 dark:text-accent-300 underline-offset-2 hover:underline">Next unanswered →</a>`
+    : "";
   const sentence = answer
-    ? html`<p class="text-sm leading-6 text-gray-700 dark:text-gray-200">${answeredSentence(answer, l, confidence, topicCreated, course)} <button type="button" ${refocus} @click="editing = !editing" aria-expanded="false" :aria-expanded="editing" aria-controls="fb-answers" class="ml-1 text-gray-500 dark:text-gray-400 underline hover:text-gray-900 dark:hover:text-gray-100" x-text="editing ? 'keep' : 'change'">change</button></p>`
+    ? html`<p class="text-sm leading-6 text-gray-700 dark:text-gray-200">${answeredSentence(answer, l, confidence, topicCreated, course)} <button type="button" ${refocus} @click="editing = !editing" aria-expanded="false" :aria-expanded="editing" aria-controls="fb-answers" class="ml-1 text-gray-500 dark:text-gray-400 underline hover:text-gray-900 dark:hover:text-gray-100" x-text="editing ? 'keep' : 'change'">change</button>${next}</p>`
     : "";
   return html`<section id="lesson-feedback" aria-label="Your answer" aria-live="polite" class="mt-8"
     x-data="lessonAnswer()" @keydown.window="key($event, $el, confirmOpen)" @submit="refocus = true; editing = false">
@@ -1113,6 +1175,8 @@ export function lessonDetailPage(d: {
   share: ShareState;
   /** Flash after POST /lessons/import: freshly stored, or already in the log. */
   imported: "new" | "dup" | null;
+  /** Once answered: the newest other own lesson still waiting for an answer (null = none). */
+  nextUnanswered: string | null;
   /** The course this lesson seeded, if any (newest). */
   course: SeededCourse | null;
   /** The topic's confidence today (null = the topic is not tracked). */
@@ -1198,7 +1262,7 @@ ${
       : ""
   }
   <div id="body-content" class="markdown-body dc-prose"></div>
-  ${feedbackControl(l, d.confidence, d.topicCreated, d.course)}
+  ${feedbackControl(l, d.confidence, d.topicCreated, d.course, d.nextUnanswered)}
   ${l.task_context ? html`<div class="mt-6 pt-4 border-t border-gray-100 dark:border-gray-800 text-sm text-gray-700 dark:text-gray-300"><span class="${label}">Context:</span> ${l.task_context}</div>` : ""}
   ${
     hasMeta
