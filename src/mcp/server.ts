@@ -20,6 +20,7 @@ import {
   CourseStepKindSchema,
   CourseStepStatusSchema,
   confidenceInputSchema,
+  DEFAULT_UI_PORT,
   FeedbackSchema,
   type Lesson,
   LevelSchema,
@@ -855,7 +856,11 @@ export function createServer(): McpServer {
       title: "Open UI",
       description: "Launch the devcoach web dashboard in the background. port must be 1024-65535.",
       inputSchema: z.object({
-        port: z.number().int().default(7860).describe("Port (default 7860)"),
+        port: z
+          .number()
+          .int()
+          .default(DEFAULT_UI_PORT)
+          .describe(`Port (default ${DEFAULT_UI_PORT})`),
       }),
       annotations: {
         title: "Open UI",
@@ -892,7 +897,11 @@ export function createServer(): McpServer {
         "terminal). Graceful: in-flight requests finish first. Reports stopped=false when nothing " +
         "is running there. port must be 1024-65535.",
       inputSchema: z.object({
-        port: z.number().int().default(7860).describe("Port (default 7860)"),
+        port: z
+          .number()
+          .int()
+          .default(DEFAULT_UI_PORT)
+          .describe(`Port (default ${DEFAULT_UI_PORT})`),
       }),
       annotations: {
         title: "Stop UI",

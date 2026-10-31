@@ -6,3 +6,6 @@ import { join } from "node:path";
 
 process.env.HOME = mkdtempSync(join(tmpdir(), "dc-test-"));
 process.env.NO_COLOR = "1";
+// `devcoach lesson` looks for a running dashboard: point it at a closed port, so a dashboard
+// running on this machine (7860) is never pinged nor linked by a test.
+process.env.DEVCOACH_UI_PORT = "9";

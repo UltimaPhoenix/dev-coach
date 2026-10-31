@@ -2,12 +2,21 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { Readable } from "node:stream";
-import { describe, expect, it, vi } from "vitest";
-import { parseHookPayload, runCli } from "../src/cli/commands";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  DASHBOARD_PING_MS,
+  dashboardAnswers,
+  lessonMeasure,
+  pagerCommand,
+  parseHookPayload,
+  runCli,
+  uiPort,
+} from "../src/cli/commands";
 import { displayWidth } from "../src/cli/term";
 import * as courses from "../src/core/courses";
 import * as db from "../src/core/db";
-import { parseLesson } from "../src/core/models";
+import { type Lesson, parseLesson } from "../src/core/models";
+import { formatLessonForDisplay } from "../src/core/prompts";
 import { buildSharePayload, encodeShareCode } from "../src/core/share";
 import { fetchSharedInput } from "../src/core/share-fetch";
 import { VERSION } from "../src/version";
@@ -30,19 +39,53 @@ const cleanClaudeSettings = (): string => {
   return p;
 };
 
-async function run(args: string[]): Promise<{ out: string; code: number | null }> {
+interface RunOptions {
+  /** Pretend stdout is a terminal of this size (the views a person gets). */
+  tty?: { columns: number; rows: number };
+}
+
+/** Swap stdout's terminal properties for one run; returns the undo. */
+function fakeTerminal(tty: RunOptions["tty"]): () => void {
+  if (!tty) return () => {};
+  const keys = ["isTTY", "columns", "rows"] as const;
+  const saved = keys.map((k) => Object.getOwnPropertyDescriptor(process.stdout, k));
+  const values = { isTTY: true, columns: tty.columns, rows: tty.rows };
+  for (const k of keys) {
+    Object.defineProperty(process.stdout, k, { value: values[k], configurable: true });
+  }
+  return () =>
+    keys.forEach((k, i) => {
+      const d = saved[i];
+      if (d) Object.defineProperty(process.stdout, k, d);
+      else delete (process.stdout as unknown as Record<string, unknown>)[k];
+    });
+}
+
+async function run(
+  args: string[],
+  opts: RunOptions = {},
+): Promise<{ out: string; stdout: string; stderr: string; code: number | null }> {
   const lines: string[] = [];
-  const logSpy = vi.spyOn(console, "log").mockImplementation((...a) => lines.push(a.join(" ")));
-  const errSpy = vi.spyOn(console, "error").mockImplementation((...a) => lines.push(a.join(" ")));
+  const stdout: string[] = [];
+  const stderr: string[] = [];
+  const both = (sink: string[]) => (s: string) => {
+    lines.push(s);
+    sink.push(s);
+  };
+  const toOut = both(stdout);
+  const toErr = both(stderr);
+  const logSpy = vi.spyOn(console, "log").mockImplementation((...a) => toOut(a.join(" ")));
+  const errSpy = vi.spyOn(console, "error").mockImplementation((...a) => toErr(a.join(" ")));
   const errWriteSpy = vi.spyOn(process.stderr, "write").mockImplementation((s: any) => {
-    lines.push(String(s));
+    toErr(String(s));
     return true;
   });
   // Commander writes --help / --version to stdout; capture it too.
   const outWriteSpy = vi.spyOn(process.stdout, "write").mockImplementation((s: any) => {
-    lines.push(String(s));
+    toOut(String(s));
     return true;
   });
+  const restoreTerminal = fakeTerminal(opts.tty);
   let code: number | null = null;
   const exitSpy = vi.spyOn(process, "exit").mockImplementation(((c?: number) => {
     code = c ?? 0;
@@ -56,13 +99,14 @@ async function run(args: string[]): Promise<{ out: string; code: number | null }
     if ((e as Error).message !== "__exit__") throw e;
   } finally {
     process.argv = argv;
+    restoreTerminal();
     logSpy.mockRestore();
     errSpy.mockRestore();
     errWriteSpy.mockRestore();
     outWriteSpy.mockRestore();
     exitSpy.mockRestore();
   }
-  return { out: lines.join("\n"), code };
+  return { out: lines.join("\n"), stdout: stdout.join("\n"), stderr: stderr.join("\n"), code };
 }
 
 describe("cli", () => {
@@ -425,7 +469,7 @@ describe("cli", () => {
     expect(list).toContain("1/1");
     expect(list).toContain("completed");
     const show = (await run(["course", course.id])).out;
-    expect(show).toContain("✓ loops");
+    expect(show).toContain("✅ loops");
     expect(show).toContain("1. Loops");
     expect(show).toContain("index.html");
     expect((await run(["course", "missing"])).code).toBe(1);
@@ -897,16 +941,16 @@ describe("cli rich rendering branches", () => {
     });
   }
 
-  it("lessons table renders junior/senior colors, dont_know icon, and meta columns", async () => {
+  it("lessons on a pipe: one row per lesson with its answer word", async () => {
     seed();
     const out = (await run(["lessons"])).out;
-    expect(out).toContain("Jr");
-    expect(out).toContain("Sr");
-    expect(out).toContain("OnlyP"); // project column populated
+    expect(out).toContain("\tjr\tlost\tJr");
+    expect(out).toContain("\tsr\tyes\tSr");
+    expect(out).toContain("\tpo\t-\tPo");
   });
 
-  it("lesson detail renders git metadata, context, starred, and both feedback labels", async () => {
-    const sr = (await run(["lesson", "sr"])).out;
+  it("lesson --short renders git metadata, context, starred, and both feedback labels", async () => {
+    const sr = (await run(["lesson", "sr", "--short"])).out;
     expect(sr).toContain("project=P");
     expect(sr).toContain("branch=");
     expect(sr).toContain("commit=");
@@ -914,15 +958,15 @@ describe("cli rich rendering branches", () => {
     expect(sr).toContain("Context:");
     expect(sr).toContain("★ starred");
     expect(sr).toContain("✅ knew it");
-    const jr = (await run(["lesson", "jr"])).out;
+    const jr = (await run(["lesson", "jr", "--short"])).out;
     expect(jr).toContain("❌ lost me");
-    expect((await run(["lesson", "po"])).out).toContain("○ no answer yet");
+    expect((await run(["lesson", "po", "--short"])).out).toContain("○ no answer yet");
   });
 
   it("leaving yes undoes its +1; new and lost leave confidence alone", async () => {
     db.withConnection((c) => db.upsertKnowledge(c, "python", 5));
     const left = (await run(["feedback", "sr", "lost"])).out;
-    const m = left.match(/confidence: (\d+) → (\d+)/);
+    const m = left.match(/confidence (\d+) → (\d+)/);
     expect(m).not.toBeNull();
     expect(Number(m?.[2])).toBe(Number(m?.[1]) - 1); // leaving `know` undoes its +1
     expect(left).toContain("❌ lost me");
@@ -944,7 +988,8 @@ describe("cli rich rendering branches", () => {
     expect(db.withConnection((c) => db.getAllKnowledge(c)).python).toBe(6);
     // tracked now: clearing gives the point back and says so
     const cleared = (await run(["feedback", "po", "clear"])).out;
-    expect(cleared).toContain("answer cleared · python confidence: 6 → 5");
+    expect(cleared).toContain("○ answer cleared · Po");
+    expect(cleared).toContain("   python · confidence 6 → 5");
   });
 
   it("feedback refuses the stored values: the old word exits 1 and lists the four words", async () => {
@@ -1089,12 +1134,13 @@ describe("cli share / import", () => {
       )?.[0] ?? "";
     db.withConnection((c) => c.exec("DELETE FROM lessons WHERE id = 's3'"));
     const first = await run(["import", code]);
-    expect(first.out).toContain('✓ Imported "Layer cache s3"');
+    expect(first.out).toContain('Imported "Layer cache s3"');
     expect(first.out).toContain("shared anonymously");
     expect(first.out).toContain("not in your knowledge map");
     expect((await run(["import", code])).out).toContain("Already in your log");
     expect((await run(["lessons", "--imported"])).out).toContain("Layer cache s3");
-    expect((await run(["lesson", "s3"])).out).toContain("Shared by:");
+    expect((await run(["lesson", "s3", "--short"])).out).toContain("Shared by:");
+    expect((await run(["lesson", "s3"])).out).toContain("shared anonymously");
     // file
     seed("s4");
     const dir = mkdtempSync(join(tmpdir(), "dc-import-"));
@@ -1112,7 +1158,7 @@ describe("cli share / import", () => {
       .spyOn(process, "stdin", "get")
       .mockReturnValue(Readable.from([stdinText]) as never);
     try {
-      expect((await run(["import", "-"])).out).toContain('✓ Imported "Layer cache s5"');
+      expect((await run(["import", "-"])).out).toContain('Imported "Layer cache s5"');
     } finally {
       stdinSpy.mockRestore();
     }
@@ -1124,7 +1170,7 @@ describe("cli share / import", () => {
       throw new Error("must not fetch a share link");
     });
     try {
-      expect((await run(["import", link])).out).toContain('✓ Imported "Layer cache s6"');
+      expect((await run(["import", link])).out).toContain('Imported "Layer cache s6"');
       expect(fetchSpy).not.toHaveBeenCalled();
       fetchSpy.mockResolvedValueOnce(stdinText);
       expect((await run(["import", "https://example.test/raw"])).out).toContain(
@@ -1203,10 +1249,13 @@ describe("cli prints someone else's text inert", () => {
     const outputs = [
       (await run(["lessons"])).out,
       (await run(["lesson", "hostile-import"])).out,
+      (await run(["lesson", "hostile-import", "--short"])).out,
       (await run(["share", "hostile-import", "--anonymous"])).out,
     ];
     for (const out of outputs) expect(out).not.toMatch(CONTROL);
-    expect(outputs[1]).toContain("See the BuildKit guide.");
+    expect(outputs[1]).toContain("shared by Ada");
+    expect(outputs[1]).toMatch(/^docs$/m); // the body's link text, no hyperlink
+    expect(outputs[2]).toContain("See the BuildKit guide.");
   });
 
   it("rows stored before the import-time strip still print inert (lessons, lesson, share, feedback, profile)", async () => {
@@ -1215,6 +1264,9 @@ describe("cli prints someone else's text inert", () => {
       ["lessons"],
       ["lessons", "--imported"],
       ["lesson", "hostile-raw"],
+      ["lesson", "hostile-raw", "--short"],
+      ["lesson", "hostile-raw", "--md"],
+      ["lesson", "hostile-raw", "--json"],
       ["share", "hostile-raw", "--anonymous"],
       ["feedback", "hostile-raw", "know"], // creates the (hostile) topic in the knowledge map
       ["profile"],
@@ -1224,10 +1276,14 @@ describe("cli prints someone else's text inert", () => {
       const { out } = await run(args);
       expect(out, args.join(" ")).not.toMatch(CONTROL);
     }
-    const shown = (await run(["lesson", "hostile-raw"])).out;
+    const shown = (await run(["lesson", "hostile-raw", "--short"])).out;
     expect(shown).toContain("Cache mounts survive rebuilds");
     expect(shown).toContain("Shared by:   Ada");
     expect(shown).toContain("See the BuildKit guide.");
+    const full = (await run(["lesson", "hostile-raw"])).out;
+    expect(full).toContain("Cache mounts survive rebuilds");
+    expect(full).toContain("docker · mid · ");
+    expect(full).toContain("· shared by Ada");
   });
 
   it("course text prints inert too", async () => {
@@ -1245,7 +1301,7 @@ describe("cli prints someone else's text inert", () => {
     expect(shown).toContain("Know when");
   });
 
-  it("the lessons table aligns: wide glyphs (✨, CJK) take two columns", async () => {
+  it("lessons by day: wide glyphs (✨, CJK) never push a line past the width", async () => {
     db.withConnection((c) => {
       const mk = (o: Record<string, unknown>) =>
         db.insertLesson(
@@ -1263,11 +1319,14 @@ describe("cli prints someone else's text inert", () => {
       mk({ id: "wide-2", title: "漢字のレッスン", feedback: "know", starred: true });
       mk({ id: "wide-3", title: "Plain title", feedback: "dont_know" });
     });
-    const out = (await run(["lessons"])).out;
-    expect(out).toContain("✨");
-    const table = out.split("\n").filter((l) => /^[╭│├╰]/.test(l));
-    const widths = new Set(table.map(displayWidth));
-    expect(widths.size, table.join("\n")).toBe(1);
+    for (const columns of [40, 60, 100]) {
+      const out = (await run(["lessons"], { tty: { columns, rows: 50 } })).stdout;
+      expect(out).toContain("✨ new to me");
+      expect(out).toContain("漢字のレッスン");
+      for (const line of out.split("\n")) {
+        expect(displayWidth(line), line).toBeLessThanOrEqual(columns);
+      }
+    }
   });
 });
 
@@ -1544,5 +1603,650 @@ describe("gracefulShutdown", () => {
     expect(Date.now() - t0).toBeGreaterThanOrEqual(250);
     expect(server.listening).toBe(false);
     await expect(hung).rejects.toThrow(); // the hung response was terminated at the deadline
+  });
+});
+
+// ── 2.8: `lesson` shows the lesson, `lessons` by day, `feedback` in two lines ──
+
+describe("cli lesson: the lesson itself, then id · dashboard · course · knew it?", () => {
+  const ID = "busy-timeout-no-lock-queue";
+  const TITLE = "busy_timeout: SQLite has no lock queue";
+  const BODY = [
+    "The `SQLITE_BUSY` you just fixed: two writers met at the same instant.",
+    "",
+    "```ts",
+    'conn.exec("BEGIN IMMEDIATE"); // locks now',
+    "```",
+    "",
+    "💡 *Senior tip:* keep writes short.",
+  ].join("\n");
+  const seed = (o: Record<string, unknown> = {}) =>
+    db.withConnection((c) =>
+      db.insertLesson(
+        c,
+        parseLesson({
+          id: ID,
+          timestamp: "2026-10-25T10:00:00Z",
+          topic_id: "sqlite",
+          categories: ["SQLite"],
+          title: TITLE,
+          level: "mid",
+          summary: "SQLite has no queue; busy_timeout retries for you.",
+          body: BODY,
+          ...o,
+        }),
+      ),
+    );
+  const clean = () =>
+    db.withConnection((c) =>
+      c.exec("DELETE FROM course_steps; DELETE FROM courses; DELETE FROM lessons;"),
+    );
+  const lines = (s: string): string[] => s.split("\n");
+  beforeEach(clean);
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("the default view: the body, then the id, the dashboard and a knew it? row", async () => {
+    seed();
+    const { stdout, code } = await run(["lesson", ID, "--width", "80"]);
+    expect(code).toBeNull();
+    const out = lines(stdout);
+    expect(out[0]).toBe(`── 🎓 devcoach ${"─".repeat(65)}`);
+    expect(out[1]).toBe(TITLE);
+    expect(out[2]).toBe("sqlite · mid · 2026-10-25"); // no category, the level a plain word
+    expect(stdout).toContain(
+      "The SQLITE_BUSY you just fixed: two writers met at the same instant.",
+    );
+    expect(stdout).toContain(
+      `── ts ${"─".repeat(74)}\n│ conn.exec("BEGIN IMMEDIATE"); // locks now`,
+    );
+    expect(stdout).toContain("💡 Senior tip: keep writes short.");
+    expect(out.slice(-4)).toEqual([
+      "─".repeat(80),
+      `id         ${ID}`,
+      "dashboard  devcoach ui -o",
+      `knew it?   devcoach feedback ${ID} yes|new|lost`,
+    ]);
+    expect(stdout).not.toContain("course ");
+    for (const line of out) expect(displayWidth(line)).toBeLessThanOrEqual(80);
+  });
+
+  it("an answered lesson: the answer joins the meta line, and the knew it? row is gone", async () => {
+    seed({ feedback: "understood", starred: true });
+    const { stdout } = await run(["lesson", ID]);
+    expect(lines(stdout)[2]).toBe("sqlite · mid · 2026-10-25 · ✨ new to me · ★");
+    expect(stdout).not.toContain("knew it?");
+    expect(lines(stdout).at(-1)).toBe("dashboard  devcoach ui -o");
+  });
+
+  it("a shared lesson says who shared it, or that it came anonymously", async () => {
+    seed({ imported: true, shared_by: "Ada" });
+    expect(lines((await run(["lesson", ID])).stdout)[2]).toBe(
+      "sqlite · mid · 2026-10-25 · shared by Ada",
+    );
+    db.withConnection((c) => c.prepare("UPDATE lessons SET shared_by = NULL").run());
+    expect((await run(["lesson", ID])).stdout).toContain("· shared anonymously");
+  });
+
+  it("a lesson with no body shows its summary", async () => {
+    seed({ body: null });
+    expect((await run(["lesson", ID])).stdout).toContain(
+      "\nSQLite has no queue; busy_timeout retries for you.\n",
+    );
+  });
+
+  it("the dashboard row: a link only when /ping answers in time, else `devcoach ui -o`", async () => {
+    seed();
+    const ping = vi.fn(async (_url: string, _init?: RequestInit) =>
+      Response.json({ ok: true, version: VERSION }),
+    );
+    vi.stubGlobal("fetch", ping);
+    expect((await run(["lesson", ID])).stdout).toContain(
+      `dashboard  http://127.0.0.1:9/lessons/${ID}`,
+    );
+    expect(ping.mock.calls[0]?.[0]).toBe("http://127.0.0.1:9/ping");
+    expect(ping.mock.calls[0]?.[1]?.signal).toBeInstanceOf(AbortSignal);
+    for (const down of [
+      async () => {
+        throw new TypeError("fetch failed"); // nothing listens: the stubbed /ping is down
+      },
+      async () => new Response("no", { status: 500 }),
+      async () => Response.json({ ok: false }),
+    ]) {
+      vi.stubGlobal("fetch", vi.fn(down));
+      expect((await run(["lesson", ID])).stdout).toContain("dashboard  devcoach ui -o");
+    }
+  });
+
+  it("the dashboard wait is short, and the port comes from DEVCOACH_UI_PORT", async () => {
+    expect(DASHBOARD_PING_MS).toBe(150);
+    expect(uiPort({ DEVCOACH_UI_PORT: "7877" })).toBe(7877);
+    for (const bad of [undefined, "", "abc", "0", "70000", "78.5"]) {
+      expect(uiPort({ DEVCOACH_UI_PORT: bad })).toBe(7860);
+    }
+    const slow = vi.fn(
+      (_url: string, init?: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener("abort", () => reject(init.signal?.reason));
+        }),
+    );
+    vi.stubGlobal("fetch", slow);
+    const start = performance.now();
+    expect(await dashboardAnswers(9, 20)).toBe(false);
+    expect(performance.now() - start).toBeLessThan(1000);
+  });
+
+  it("a course row when a course grew from the lesson", async () => {
+    seed();
+    const course = db.withConnection((c) =>
+      courses.createCourse(c, {
+        title: "SQLite locking, step by step",
+        topic_id: "sqlite",
+        lesson_id: ID,
+      }),
+    );
+    writeFileSync(
+      courses.documentPath(course.id),
+      '<section id="step-1">a</section><section id="step-2">b</section>',
+    );
+    db.withConnection((c) => {
+      courses.addStep(c, course.id, { title: "Locks", kind: "concept", anchor: "step-1" });
+      courses.addStep(c, course.id, { title: "Busy", kind: "concept", anchor: "step-2" });
+      courses.setStepStatus(c, course.id, 1, "done");
+    });
+    expect((await run(["lesson", ID])).stdout).toContain(
+      "\ncourse     SQLite locking, step by step · 1/2\n",
+    );
+  });
+
+  it("an id from someone else is quoted in the command to copy, and encoded in the link", async () => {
+    seed({ id: "it's a $(trap)", imported: true });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => Response.json({ ok: true })),
+    );
+    const { stdout } = await run(["lesson", "it's a $(trap)"]);
+    expect(stdout).toContain(`knew it?   devcoach feedback 'it'\\''s a $(trap)' yes|new|lost`);
+    expect(stdout).toContain("http://127.0.0.1:9/lessons/it's%20a%20%24(trap)");
+  });
+
+  it("a long id is never cut: not in the footer, the link or the command to copy", async () => {
+    const long = "a-lesson-id-that-is-much-longer-than-forty-columns";
+    seed({ id: long });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => Response.json({ ok: true })),
+    );
+    const out = lines((await run(["lesson", long, "--width", "40"])).stdout);
+    expect(out).toContain(`id         ${long}`);
+    expect(out).toContain(`dashboard  http://127.0.0.1:9/lessons/${long}`);
+    expect(out.slice(-3)).toEqual([
+      "knew it?   devcoach feedback",
+      `           ${long}`,
+      "           yes|new|lost",
+    ]);
+    const listed = (await run(["lessons"], { tty: { columns: 40, rows: 50 } })).stdout;
+    expect(listed.split("\n")).toContain(`    ${long}`);
+  });
+
+  it("--short is the pre-2.8 view, byte for byte", async () => {
+    seed();
+    vi.stubEnv("COLUMNS", "80");
+    try {
+      const { stdout } = await run(["lesson", ID, "--short"]);
+      expect(lines(stdout)).toEqual([
+        `── ${TITLE} ${"─".repeat(80 - TITLE.length - 4)}`,
+        `ID:         ${ID}`,
+        "Date:        2026-10-25 10:00:00",
+        "Topic:       sqlite",
+        "Categories:  SQLite",
+        "Level:       mid",
+        "Star:        ☆ not starred   Feedback: ○ no answer yet",
+        "─".repeat(80),
+        "SQLite has no queue; busy_timeout retries for you.",
+      ]);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it("--md is the chat card, --json the row; the three views exclude each other (exit 2)", async () => {
+    seed();
+    const stored = db.withConnection((c) => db.getLessonById(c, ID)) as Lesson;
+    expect((await run(["lesson", ID, "--md"])).stdout).toBe(formatLessonForDisplay(stored));
+    expect(parseLesson(JSON.parse((await run(["lesson", ID, "--json"])).stdout))).toEqual(stored);
+    for (const pair of [
+      ["--md", "--json"],
+      ["--short", "--json"],
+      ["--short", "--md"],
+    ]) {
+      const r = await run(["lesson", ID, ...pair]);
+      expect(r.code, pair.join(" ")).toBe(2);
+      expect(r.stdout).toBe("");
+    }
+  });
+
+  it("--json writes invisible and C1 characters as escapes, and the data survives", async () => {
+    seed({ title: "flip \u{202e}this\u{202c} \x85 back" });
+    const { stdout } = await run(["lesson", ID, "--json"]);
+    expect(stdout).toContain("flip \\u202ethis\\u202c \\u0085 back");
+    expect(stdout).not.toMatch(/[\x7f-\x9f\u{202a}-\u{202e}]/u);
+    expect(JSON.parse(stdout).title).toBe("flip \u{202e}this\u{202c} \x85 back");
+  });
+
+  it("--last, a unique prefix, an ambiguous one, not found — errors on stderr, stdout empty", async () => {
+    const mk = (id: string, timestamp: string, o: Record<string, unknown> = {}) =>
+      seed({ id, timestamp, title: `T ${id}`, ...o });
+    mk("alpha-one", "2026-10-01T10:00:00Z");
+    mk("alpha-two", "2026-10-02T10:00:00Z");
+    mk("beta-shared", "2026-10-03T10:00:00Z", { imported: true });
+    expect(lines((await run(["lesson", "--last"])).stdout)[1]).toBe("T alpha-two"); // own only
+    expect(lines((await run(["lesson", "beta"])).stdout)[1]).toBe("T beta-shared");
+    const ambiguous = await run(["lesson", "alpha"]);
+    expect(ambiguous.code).toBe(1);
+    expect(ambiguous.stdout).toBe("");
+    expect(ambiguous.stderr).toContain("'alpha' starts more than one lesson id:");
+    expect(ambiguous.stderr).toContain("alpha-one");
+    expect(ambiguous.stderr).toContain("alpha-two");
+    const missing = await run(["lesson", "zzz"]);
+    expect(missing).toMatchObject({ code: 1, stdout: "", stderr: "Lesson 'zzz' not found." });
+    expect((await run(["lesson", "%"])).code).toBe(1); // a prefix, never a LIKE pattern
+    expect((await run(["lesson"])).code).toBe(2);
+    expect((await run(["lesson", "alpha-one", "--last"])).code).toBe(2);
+    db.withConnection((c) => c.exec("DELETE FROM lessons WHERE imported = 0"));
+    expect((await run(["lesson", "--last"])).stderr).toBe("No lessons of your own yet.");
+  });
+
+  it("twelve matches: ten are listed, then …", async () => {
+    for (let i = 10; i < 22; i++) seed({ id: `many-${i}`, timestamp: `2026-10-${i}T10:00:00Z` });
+    const r = await run(["lesson", "many"]);
+    expect(r.stderr.split("\n").filter((l) => l.startsWith("  many-"))).toHaveLength(10);
+    expect(r.stderr.split("\n").at(-1)).toBe("  …");
+  });
+
+  it("--width lays out for that many columns; a width outside 20–1000 is a usage error", async () => {
+    seed({ body: `${"word ".repeat(40)}\n\n\`\`\`\n${"code ".repeat(20)}\n\`\`\`` });
+    for (const width of [20, 40, 120]) {
+      const out = lines((await run(["lesson", ID, "--width", String(width)])).stdout);
+      const body = out.slice(0, out.lastIndexOf("─".repeat(width))); // the footer never cuts an id
+      for (const line of body) expect(displayWidth(line), line).toBeLessThanOrEqual(width);
+      expect(displayWidth(out[0] as string)).toBe(width);
+    }
+    expect((await run(["lesson", ID, "--width", "19"])).code).toBe(2);
+    expect((await run(["lesson", ID, "--width", "wide"])).code).toBe(2);
+  });
+
+  describe("the pager", () => {
+    it("DEVCOACH_PAGER, then PAGER, then less -FRX; empty or cat = none; Windows only when set", () => {
+      expect(pagerCommand({ DEVCOACH_PAGER: "most", PAGER: "more" }, "darwin")).toBe("most");
+      expect(pagerCommand({ PAGER: "more" }, "linux")).toBe("more");
+      expect(pagerCommand({}, "linux")).toBe("less -FRX");
+      expect(pagerCommand({}, "win32")).toBeNull();
+      expect(pagerCommand({ PAGER: "more" }, "win32")).toBe("more");
+      expect(pagerCommand({ PAGER: "cat" }, "darwin")).toBeNull();
+      expect(pagerCommand({ DEVCOACH_PAGER: " ", PAGER: "less" }, "darwin")).toBeNull();
+    });
+
+    it("a view taller than the terminal goes through the pager; --no-pager and a pipe never page", async () => {
+      seed();
+      const dir = mkdtempSync(join(tmpdir(), "dc-pager-"));
+      const paged = join(dir, "paged.txt");
+      vi.stubEnv("DEVCOACH_PAGER", `cat > '${paged}'`);
+      try {
+        const tall = await run(["lesson", ID], { tty: { columns: 80, rows: 5 } });
+        expect(tall.stdout).toBe("");
+        expect(readFileSync(paged, "utf8")).toContain("💡 Senior tip: keep writes short.");
+        rmSync(paged);
+        const fits = await run(["lesson", ID], { tty: { columns: 80, rows: 100 } });
+        expect(fits.stdout).toContain("knew it?");
+        const noPager = await run(["lesson", ID, "--no-pager"], { tty: { columns: 80, rows: 5 } });
+        expect(noPager.stdout).toContain("knew it?");
+        expect((await run(["lesson", ID])).stdout).toContain("knew it?"); // a pipe
+        expect(existsSync(paged)).toBe(false);
+        vi.stubEnv("DEVCOACH_PAGER", "devcoach-no-such-pager-xyz 2>/dev/null");
+        const missing = await run(["lesson", ID], { tty: { columns: 80, rows: 5 } });
+        expect(missing.stdout).toContain("knew it?"); // no pager found → printed as is
+      } finally {
+        vi.unstubAllEnvs();
+      }
+    });
+  });
+});
+
+describe("cli lessons: by day on a terminal, rows on a pipe", () => {
+  // Lesson i was i days ago, at a time of day that already passed today (midnight-safe).
+  const startOfToday = new Date(new Date().setHours(0, 0, 0, 0)).getTime();
+  const dayAgo = (i: number): Date => {
+    const d = new Date(Math.max(Date.now() - 1000, startOfToday));
+    d.setDate(d.getDate() - i);
+    return d;
+  };
+  const date = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const seed = (n: number) =>
+    db.withConnection((c) => {
+      c.exec("DELETE FROM lessons");
+      for (let i = 0; i < n; i++) {
+        db.insertLesson(
+          c,
+          parseLesson({
+            id: `day-lesson-${String(i).padStart(2, "0")}`,
+            timestamp: dayAgo(i).toISOString(),
+            topic_id: i % 2 ? "sqlite" : "docker",
+            categories: [],
+            title: `Lesson number ${i}: a cache that misses`,
+            level: "mid",
+            summary: "s",
+            feedback: (["know", "understood", "dont_know", null] as const)[i % 4],
+            starred: i === 1,
+            imported: i === 2,
+            shared_by: i === 2 ? "Ada" : null,
+          }),
+        );
+      }
+    });
+
+  it("a pipe gets every row, tab-separated: date, id, answer word, title — nothing else", async () => {
+    seed(25);
+    const { stdout, stderr } = await run(["lessons"]);
+    const rows = stdout.split("\n");
+    expect(rows).toHaveLength(25);
+    for (const row of rows) expect(row.split("\t")).toHaveLength(4);
+    expect(rows[0]?.split("\t").slice(1)).toEqual([
+      "day-lesson-00",
+      "yes",
+      "Lesson number 0: a cache that misses",
+    ]);
+    expect(rows.slice(0, 4).map((r) => r.split("\t")[2])).toEqual(["yes", "new", "lost", "-"]);
+    expect(rows[0]?.split("\t")[0]).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(stdout).not.toContain("lessons ·");
+    expect(stderr).toBe("");
+    expect((await run(["lessons", "-n", "3"])).stdout.split("\n")).toHaveLength(3);
+  });
+
+  it("a terminal gets day headers, two lines per lesson, ✅ knew it, and a trailer", async () => {
+    seed(25);
+    const { stdout } = await run(["lessons"], { tty: { columns: 100, rows: 50 } });
+    const out = stdout.split("\n");
+    expect(out).toContain(`Today ${date(dayAgo(0))}`);
+    expect(out).toContain(`Yesterday ${date(dayAgo(1))}`);
+    const older = dayAgo(3);
+    expect(out).toContain(
+      `${older.toLocaleDateString("en-US", { weekday: "short" })} ${date(older)}`,
+    );
+    expect(out).toContain("  Lesson number 0: a cache that misses");
+    expect(out).toContain("    day-lesson-00 · docker · mid · ✅ knew it");
+    expect(out).toContain("★ Lesson number 1: a cache that misses");
+    expect(out).toContain("    day-lesson-01 · sqlite · mid · ✨ new to me");
+    expect(out).toContain("    day-lesson-02 · docker · mid · shared by Ada · ❌ lost me");
+    expect(out).toContain("    day-lesson-03 · sqlite · mid · ○ no answer yet");
+    expect(out.filter((l) => l.startsWith("    day-lesson-"))).toHaveLength(20);
+    expect(out.at(-1)).toBe("20 of 25 lessons · devcoach lesson <id> opens one · -n 25 for all");
+    expect(out.at(-2)).toBe("");
+    const all = (await run(["lessons", "-n", "25"], { tty: { columns: 100, rows: 50 } })).stdout;
+    expect(all.split("\n").at(-1)).toBe("25 lessons · devcoach lesson <id> opens one");
+  });
+
+  it("any order but the date prints flat, the date moving into the second line", async () => {
+    seed(3);
+    const { stdout } = await run(["lessons", "--sort", "title", "--order", "asc"], {
+      tty: { columns: 100, rows: 50 },
+    });
+    expect(stdout).not.toMatch(/^(Today|Yesterday) /m);
+    expect(stdout).toMatch(/^ {4}day-lesson-00 · docker · mid · \d{4}-\d{2}-\d{2} · ✅ knew it$/m);
+  });
+
+  it("--search finds every word; the trailer names it; one lesson is a lesson", async () => {
+    seed(6);
+    db.withConnection((c) =>
+      c.prepare("UPDATE lessons SET title = 'C++ templates' WHERE id = 'day-lesson-04'").run(),
+    );
+    const one = await run(["lessons", "--search", "c++ templates"], {
+      tty: { columns: 80, rows: 50 },
+    });
+    expect(one.stdout).toContain("  C++ templates");
+    expect(one.stdout.split("\n").at(-1)).toBe(
+      '1 lesson matching "c++ templates" · devcoach lesson <id> opens one',
+    );
+    const piped = (await run(["lessons", "--search", "number 5"])).stdout.split("\n");
+    expect(piped).toEqual([expect.stringContaining("\tday-lesson-05\t")]);
+  });
+
+  it("every filter flag narrows the rows", async () => {
+    db.withConnection((c) => {
+      c.exec("DELETE FROM lessons");
+      const mk = (id: string, o: Record<string, unknown>) =>
+        db.insertLesson(
+          c,
+          parseLesson({
+            id,
+            topic_id: "sqlite",
+            categories: ["databases"],
+            title: id,
+            level: "mid",
+            summary: "s",
+            ...o,
+          }),
+        );
+      mk("recent", { timestamp: new Date(Date.now() - 60_000).toISOString() });
+      mk("tagged", {
+        timestamp: "2026-03-10T10:00:00Z",
+        categories: ["networking"],
+        level: "senior",
+        project: "dev-coach",
+        repository: "owner/dev-coach",
+        branch: "feat/cli-view",
+        commit_hash: "abc1234def",
+      });
+      mk("old", { timestamp: "2025-01-05T10:00:00Z", level: "junior" });
+    });
+    const ids = async (...flags: string[]) =>
+      (await run(["lessons", ...flags])).stdout
+        .split("\n")
+        .filter(Boolean)
+        .map((row) => row.split("\t")[1]);
+    expect(await ids("--period", "today")).toEqual(["recent"]);
+    expect(await ids("--category", "networking")).toEqual(["tagged"]);
+    expect(await ids("--project", "coach")).toEqual(["tagged"]);
+    expect(await ids("--repository", "owner/")).toEqual(["tagged"]);
+    expect(await ids("--branch", "cli-view")).toEqual(["tagged"]);
+    expect(await ids("--commit", "abc12")).toEqual(["tagged"]);
+    expect(await ids("--level", "junior")).toEqual(["old"]);
+    expect(await ids("--date-from", "2026-01-01", "--date-to", "2026-06-30")).toEqual(["tagged"]);
+    expect(await ids("--sort", "title", "--order", "asc")).toEqual(["old", "recent", "tagged"]);
+  });
+
+  it("--json prints every matching lesson; nothing matching goes to stderr; -n 0 is a usage error", async () => {
+    seed(4);
+    const parsed = JSON.parse((await run(["lessons", "--json", "--starred"])).stdout);
+    expect(parsed.map((l: Lesson) => parseLesson(l).id)).toEqual(["day-lesson-01"]);
+    const none = await run(["lessons", "--search", "nothing-like-this"], {
+      tty: { columns: 80, rows: 50 },
+    });
+    expect(none).toMatchObject({ stdout: "", stderr: "No lessons found." });
+    expect((await run(["lessons", "-n", "0"])).code).toBe(2);
+  });
+});
+
+describe("cli feedback: what was recorded, then what it changed", () => {
+  const ID = "fb-lesson";
+  const TITLE = "busy_timeout: SQLite has no lock queue";
+  beforeEach(() =>
+    db.withConnection((c) => {
+      c.exec("DELETE FROM course_steps; DELETE FROM courses; DELETE FROM lessons;");
+      db.insertLesson(
+        c,
+        parseLesson({
+          id: ID,
+          timestamp: "2026-10-25T10:00:00Z",
+          topic_id: "sqlite",
+          categories: [],
+          title: TITLE,
+          level: "mid",
+          summary: "s",
+        }),
+      );
+      db.upsertKnowledge(c, "sqlite", 5);
+    }),
+  );
+  const answer = async (word: string) => (await run(["feedback", ID, word])).stdout.split("\n");
+
+  it("yes: confidence 5 → 6, read from the result; again: already recorded", async () => {
+    expect(await answer("yes")).toEqual([`✅ knew it · ${TITLE}`, "   sqlite · confidence 5 → 6"]);
+    expect(await answer("yes")).toEqual([
+      `✅ knew it · ${TITLE}`,
+      "   sqlite · confidence unchanged · already recorded",
+    ]);
+  });
+
+  it("new, lost and clear: the point comes back, the level was right, a course to ask for", async () => {
+    await answer("yes");
+    expect(await answer("new")).toEqual([
+      `✨ new to me · ${TITLE}`,
+      "   sqlite · confidence 6 → 5 · the level was right",
+    ]);
+    expect(await answer("lost")).toEqual([
+      `❌ lost me · ${TITLE}`,
+      "   sqlite · confidence unchanged · ask your agent for a course on it",
+    ]);
+    const course = db.withConnection((c) =>
+      courses.createCourse(c, { title: "Locks", topic_id: "sqlite", lesson_id: ID }),
+    );
+    expect((await answer("lost")).slice(1)).toEqual([
+      "   sqlite · confidence unchanged · already recorded",
+      `   continue the course · 0/0 · devcoach course ${course.id}`,
+    ]);
+    expect(await answer("clear")).toEqual([
+      `○ answer cleared · ${TITLE}`,
+      "   sqlite · confidence unchanged",
+    ]);
+  });
+
+  it("a yes at 10 changes nothing and says so; a yes on an untracked topic creates it", async () => {
+    db.withConnection((c) => db.upsertKnowledge(c, "sqlite", 10));
+    expect((await answer("yes"))[1]).toBe("   sqlite · confidence unchanged");
+    db.withConnection((c) => {
+      db.deleteKnowledge(c, "sqlite");
+      db.setFeedback(c, ID, null);
+    });
+    expect((await answer("yes"))[1]).toBe(
+      "   sqlite wasn't on your knowledge map: it's tracked now, at 6/10.",
+    );
+  });
+
+  it("a long title wraps under the answer; an unknown lesson is an error on stderr", async () => {
+    db.withConnection((c) =>
+      c.prepare("UPDATE lessons SET title = ? WHERE id = ?").run("word ".repeat(30).trim(), ID),
+    );
+    const out = await answer("new");
+    expect(out.length).toBeGreaterThan(2);
+    expect(out[1]?.startsWith("   word")).toBe(true);
+    const missing = await run(["feedback", "nope", "yes"]);
+    expect(missing).toMatchObject({ code: 1, stdout: "", stderr: "Lesson 'nope' not found." });
+  });
+});
+
+describe("cli: one set of answer glyphs", () => {
+  it("no CLI source or output uses the narrow marks ✓ ✦ ✗", async () => {
+    for (const file of ["src/cli/commands.ts", "src/cli/markdown.ts"]) {
+      expect(readFileSync(new URL(`../${file}`, import.meta.url), "utf8"), file).not.toMatch(
+        /[✓✦✗]/u,
+      );
+    }
+    db.withConnection((c) => {
+      c.exec("DELETE FROM course_steps; DELETE FROM courses; DELETE FROM lessons;");
+      for (const [i, feedback] of (["know", "understood", "dont_know", null] as const).entries()) {
+        db.insertLesson(
+          c,
+          parseLesson({
+            id: `glyph-${i}`,
+            timestamp: "2026-10-25T10:00:00Z",
+            topic_id: "sqlite",
+            categories: [],
+            title: `Glyph ${i}`,
+            level: "mid",
+            summary: "s",
+            body: "Text.\n\n💡 *Senior tip:* t.",
+            feedback,
+          }),
+        );
+      }
+      courses.createCourse(c, {
+        title: "Glyph course",
+        topic_id: "sqlite",
+        lesson_id: "glyph-2",
+        prerequisites: [
+          { concept: "known", known: true },
+          { concept: "unknown", known: false },
+        ],
+      });
+    });
+    const file = join(mkdtempSync(join(tmpdir(), "dc-glyph-")), "b.zip");
+    const shared = parseLesson({
+      id: "glyph-shared",
+      timestamp: "2026-10-25T10:00:00Z",
+      topic_id: "sqlite",
+      categories: [],
+      title: "Glyph shared",
+      level: "mid",
+      summary: "s",
+    });
+    const code = encodeShareCode(
+      buildSharePayload(shared, { includeContext: false, sharedBy: "Ada" }),
+    );
+    const runs: [string[], RunOptions?][] = [
+      [["lessons"], { tty: { columns: 100, rows: 50 } }],
+      [["lessons"]],
+      ...[0, 1, 2, 3].flatMap((i): [string[]][] => [
+        [["lesson", `glyph-${i}`]],
+        [["lesson", `glyph-${i}`, "--short"]],
+      ]),
+      ...["yes", "new", "lost", "clear", "bogus"].map((w): [string[]] => [
+        ["feedback", "glyph-3", w],
+      ]),
+      [["courses"]],
+      [["course", "glyph-course"]],
+      [["stats"]],
+      [["backup", file]],
+      [["restore", file]],
+      [["import", code]],
+      [["import", code]],
+    ];
+    for (const [args, opts] of runs) {
+      expect((await run(args, opts)).out, args.join(" ")).not.toMatch(/[✓✦✗]/u);
+    }
+    expect((await run(["course", "glyph-course"])).out).toContain("✅ known");
+    expect((await run(["course", "glyph-course"])).out).toContain("❌ unknown");
+  });
+});
+
+describe("cli stats: the lesson measure", () => {
+  it("avg prose words and the share of your own lessons with an answer", async () => {
+    db.withConnection((c) => {
+      c.exec("DELETE FROM course_steps; DELETE FROM courses; DELETE FROM lessons;");
+      const mk = (id: string, o: Record<string, unknown>) =>
+        db.insertLesson(
+          c,
+          parseLesson({
+            id,
+            timestamp: "2026-10-25T10:00:00Z",
+            topic_id: "sqlite",
+            categories: [],
+            title: id,
+            level: "mid",
+            summary: "one two three four",
+            ...o,
+          }),
+        );
+      mk("m1", {
+        body: "six words of prose right here\n\n```\nnot counted\n```",
+        feedback: "know",
+      });
+      mk("m2", { body: null }); // the summary counts: four words
+      mk("m3", { body: "shared lessons are not yours", imported: true, feedback: "know" });
+    });
+    expect((await run(["stats"])).stdout).toContain(
+      "lessons: avg 5 words · feedback answered 50 %",
+    );
+    expect(lessonMeasure([])).toBeNull();
   });
 });

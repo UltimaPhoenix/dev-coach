@@ -98,6 +98,24 @@ export function stripControlChars(text: string): string {
   return kept.join("");
 }
 
+/**
+ * JSON text with every character `stripControlChars` would drop written as a `\uXXXX` escape:
+ * the same data once parsed, and nothing a terminal acts on while it prints. `JSON.stringify`
+ * already escapes C0 controls; DEL, the C1 controls and the invisible format characters it
+ * leaves raw. Tabs and newlines outside strings are the JSON's own whitespace and stay.
+ */
+export function escapeControlCharsInJson(json: string): string {
+  let out = "";
+  let runStart = 0;
+  for (let i = 0; i < json.length; i++) {
+    const code = json.charCodeAt(i);
+    if (!isStrippedChar(code)) continue;
+    out += `${json.slice(runStart, i)}\\u${code.toString(16).padStart(4, "0")}`;
+    runStart = i + 1;
+  }
+  return out + json.slice(runStart);
+}
+
 /** `stripControlChars` for a one-line slot (a title, a name, a table cell): breaks become one space. */
 export function stripControlCharsInline(text: string): string {
   return stripControlChars(text).replace(/[\t\n]+/g, " ");

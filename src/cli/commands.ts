@@ -1,16 +1,25 @@
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { createInterface } from "node:readline/promises";
+import type { DatabaseSync } from "node:sqlite";
 import { text as readStream } from "node:stream/consumers";
-import { Command } from "commander";
+import { Command, InvalidArgumentError, Option } from "commander";
 import { scanClaudeHistory } from "../core/claude-history";
 import * as coach from "../core/coach";
 import * as courses from "../core/courses";
 import * as db from "../core/db";
 import { detectStack, mergeStacks } from "../core/detect";
 import { detectGitContext, detectGitUserName } from "../core/git";
-import { FEEDBACK_ANSWERS, type FeedbackAnswer, feedbackAnswer, NO_ANSWER } from "../core/models";
-import { topicCreatedNote } from "../core/prompts";
+import {
+  type CourseWithSteps,
+  DEFAULT_UI_PORT,
+  FEEDBACK_ANSWERS,
+  type Feedback,
+  feedbackAnswer,
+  type Lesson,
+  NO_ANSWER,
+} from "../core/models";
+import { formatLessonForDisplay, topicCreatedNote } from "../core/prompts";
 import {
   buildSharePayload,
   encodeShareCode,
@@ -22,9 +31,17 @@ import {
   sharedLessonFilename,
 } from "../core/share";
 import { fetchSharedInput, isHttpUrl } from "../core/share-fetch";
-import { stripControlCharsDeep } from "../core/text";
+import { escapeControlCharsInJson, stripControlCharsDeep } from "../core/text";
 import { VERSION } from "../version";
 import { cmdDoctor, cmdInstall, cmdUninstall, skillHint } from "./install";
+import {
+  layoutWords,
+  type Piece,
+  phraseWords,
+  proseWordCount,
+  renderMarkdown,
+  wrapPieces,
+} from "./markdown";
 import { openInBrowser } from "./open";
 import {
   type Column,
@@ -32,39 +49,39 @@ import {
   colorize,
   confidenceBar,
   confidenceColor,
+  displayWidth,
+  type Format,
+  paintAll,
+  readingWidth,
   renderTable,
   rule,
   sanitizeForTerminal,
   sanitizeLine,
+  trustedLink,
 } from "./term";
 
 const log = (s = ""): void => {
   console.log(s);
 };
-const levelColor = (lvl: string): string =>
-  lvl === "junior"
-    ? c.green(lvl)
-    : lvl === "mid"
-      ? c.yellow(lvl)
-      : lvl === "senior"
-        ? c.red(lvl)
-        : lvl;
+
+/** An error: one red line on stderr (stdout stays clean for a pipe), then exit. */
+function fail(message: string, code = 1): never {
+  console.error(c.red(message));
+  process.exit(code);
+}
+
 // The answers' words, glyphs and labels come from core (FEEDBACK_ANSWERS); colour means the answer.
-const ANSWER_COLOR: Record<string, (s: string) => string> = {
-  know: c.green,
-  understood: c.cyan,
-  dont_know: c.red,
+const ANSWER_FORMAT: Record<Feedback, Format> = {
+  know: "green",
+  understood: "cyan",
+  dont_know: "red",
 };
-const paintAnswer = (a: FeedbackAnswer, s: string): string => (ANSWER_COLOR[a.value] ?? c.dim)(s);
-const feedbackIcon = (fb: string | null): string => {
-  const a = feedbackAnswer(fb);
-  return a ? ` ${paintAnswer(a, a.glyph)}` : "";
-};
-const feedbackLabel = (fb: string | null): string => {
+/** An answer as a phrase in its colour (`✅ knew it`), or the dim unanswered state. */
+const answerPhrase = (fb: Feedback | null): Piece => {
   const a = feedbackAnswer(fb);
   return a
-    ? paintAnswer(a, `${a.glyph} ${a.label}`)
-    : c.dim(`${NO_ANSWER.glyph} ${NO_ANSWER.label}`);
+    ? { text: `${a.glyph} ${a.label}`, formats: [ANSWER_FORMAT[a.value]] }
+    : { text: `${NO_ANSWER.glyph} ${NO_ANSWER.label}`, formats: ["dim"] };
 };
 // What each CLI word records, for the help text and the unknown-word error.
 const ANSWER_MEANING: Record<string, string> = {
@@ -100,6 +117,87 @@ function feedbackFilterValue(word: string): string | undefined {
  */
 const printable = <T extends object>(record: T): T => stripControlCharsDeep(record);
 const senderLabel = (sharedBy: string | null): string => sharedBy ?? c.dim("anonymous");
+const senderPhrase = (sharedBy: string | null): string =>
+  sharedBy ? `shared by ${sharedBy}` : "shared anonymously";
+
+/** Rows as JSON for a script: the stored data, with nothing in it a terminal would act on. */
+const inertJson = (value: unknown): string =>
+  escapeControlCharsInJson(JSON.stringify(value, null, 2));
+
+const SHELL_SAFE_RE = /^[\w./:@%+=,-]+$/;
+/**
+ * `s` as one shell word, for a command the user copies. A shared lesson keeps its sender's id,
+ * so an id is someone else's text: anything beyond plain characters is single-quoted.
+ */
+const shellWord = (s: string): string =>
+  SHELL_SAFE_RE.test(s) ? s : `'${s.replaceAll("'", "'\\''")}'`;
+
+const twoDigits = (n: number): string => String(n).padStart(2, "0");
+/** `YYYY-MM-DD` in the local time zone: the day the user lived the lesson. */
+function localDate(value: string | Date): string {
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return String(value).slice(0, 10);
+  return `${d.getFullYear()}-${twoDigits(d.getMonth() + 1)}-${twoDigits(d.getDate())}`;
+}
+
+const dim = (text: string): Piece => ({ text, formats: ["dim"] });
+const paintPiece = (p: Piece): string => paintAll(p.formats, p.text);
+
+/** The port the dashboard runs on: `DEVCOACH_UI_PORT`, else the default. */
+export function uiPort(env: NodeJS.ProcessEnv = process.env): number {
+  const port = Number(env.DEVCOACH_UI_PORT);
+  return Number.isInteger(port) && port > 0 && port < 65536 ? port : DEFAULT_UI_PORT;
+}
+
+/** How long `lesson` waits for the dashboard: a row is not worth a noticeable pause. */
+export const DASHBOARD_PING_MS = 150;
+
+/** Does a devcoach dashboard answer `/ping` on `port` within `timeoutMs`? Never throws. */
+export async function dashboardAnswers(
+  port: number,
+  timeoutMs = DASHBOARD_PING_MS,
+): Promise<boolean> {
+  try {
+    const res = await fetch(`http://127.0.0.1:${port}/ping`, {
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    if (!res.ok) return false;
+    return ((await res.json()) as { ok?: unknown }).ok === true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The pager for a long view on a terminal: `DEVCOACH_PAGER`, then `PAGER`, then `less -FRX`
+ * (Windows only pages when one is set). Empty or `cat` means no pager.
+ */
+export function pagerCommand(
+  env: NodeJS.ProcessEnv = process.env,
+  platform: NodeJS.Platform = process.platform,
+): string | null {
+  const chosen = (env.DEVCOACH_PAGER ?? env.PAGER)?.trim();
+  if (chosen !== undefined) return chosen === "" || chosen === "cat" ? null : chosen;
+  return platform === "win32" ? null : "less -FRX";
+}
+
+/** `text` on stdout, through the pager when it is taller than the terminal. */
+function printPaged(text: string, usePager: boolean): void {
+  const { isTTY, rows } = process.stdout;
+  const pager = usePager && isTTY ? pagerCommand() : null;
+  if (pager && rows && text.split("\n").length > rows - 1) {
+    const run = spawnSync(pager, {
+      shell: true,
+      input: `${text}\n`,
+      stdio: ["pipe", "inherit", "inherit"],
+    });
+    // 126/127: the shell found no pager to run, so the text is printed instead. Anything else
+    // (quitting `less` before the end included) means the pager showed it.
+    const noShell = (run.error as NodeJS.ErrnoException | undefined)?.code === "ENOENT";
+    if (!noShell && run.status !== 126 && run.status !== 127) return;
+  }
+  log(text);
+}
 
 // ── Display commands ─────────────────────────────────────────────────────────
 
@@ -136,7 +234,7 @@ function renderProfileTable(profile: ReturnType<typeof coach.getProfile>, title:
  * surprise. `compat` is captured inside the command's own connection.
  */
 function readOnlyNotice(compat: db.SchemaCompat | null): void {
-  if (compat) log(c.yellow(`→ ${db.readOnlyMessage(compat)}`));
+  if (compat) console.error(c.yellow(`→ ${db.readOnlyMessage(compat)}`));
 }
 
 function cmdProfile(): void {
@@ -162,8 +260,86 @@ interface LessonsOpts {
   level: string | null;
   dateFrom: string | null;
   dateTo: string | null;
+  search: string | null;
   sort: string;
   order: string;
+  limit: number | null;
+  json: boolean;
+}
+
+/** How many lessons `lessons` shows on a terminal unless `-n` says otherwise. */
+export const DEFAULT_LIST_LIMIT = 20;
+
+const REGEXP_SPECIAL_RE = /[.*+?^${}()|[\]\\]/g;
+
+/** `text` as pieces in `base`, every `--search` word in it bold magenta. */
+function highlighted(text: string, words: readonly string[], base: readonly Format[]): Piece[] {
+  if (!words.length) return [{ text, formats: base }];
+  const re = new RegExp(words.map((w) => w.replace(REGEXP_SPECIAL_RE, "\\$&")).join("|"), "giu");
+  const pieces: Piece[] = [];
+  let last = 0;
+  for (const m of text.matchAll(re)) {
+    if (!m[0]) continue;
+    if (m.index > last) pieces.push({ text: text.slice(last, m.index), formats: base });
+    pieces.push({ text: m[0], formats: ["bold", "magenta"] });
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) pieces.push({ text: text.slice(last), formats: base });
+  return pieces;
+}
+
+/** `Today`, `Yesterday`, else the weekday: the day header of `lessons`. */
+function dayLabel(date: string, now = new Date()): string {
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  if (date === localDate(now)) return "Today";
+  if (date === localDate(yesterday)) return "Yesterday";
+  const [y, m, d] = date.split("-").map(Number);
+  return new Date(y ?? 0, (m ?? 1) - 1, d ?? 1).toLocaleDateString("en-US", { weekday: "short" });
+}
+
+/**
+ * Two light lines per lesson: the title (★ in the gutter when starred), then a dim
+ * `id · topic · level · … · answer` line whose phrases never break. Day headers when the list is
+ * in date order; any other order prints the date in the second line instead.
+ */
+function lessonsByDay(lessons: Lesson[], words: string[], byDay: boolean, width: number): string[] {
+  const out: string[] = [];
+  let day = "";
+  for (const l of lessons) {
+    const date = localDate(l.timestamp);
+    if (byDay && date !== day) {
+      out.push(`${c.bold(dayLabel(date))} ${c.dim(date)}`);
+      day = date;
+    }
+    const gutter = l.starred ? `${c.yellow("★")} ` : "  ";
+    out.push(...wrapPieces(highlighted(l.title, words, []), width, gutter, "  "));
+    const phrases: Piece[][] = [
+      highlighted(l.id, words, ["dim"]),
+      [dim(l.topic_id)],
+      [dim(l.level)],
+    ];
+    if (!byDay) phrases.push([dim(date)]);
+    if (l.imported) phrases.push([dim(senderPhrase(l.shared_by))]);
+    phrases.push([answerPhrase(l.feedback)]);
+    out.push(...layoutWords(phraseWords(phrases), width, "    ", "    ", false));
+  }
+  return out;
+}
+
+/** The dim last lines of `lessons`: how many, how to open one, how to see the rest. */
+function lessonsTrailer(
+  shown: number,
+  total: number,
+  search: string | null,
+  width: number,
+): string[] {
+  const noun = total === 1 ? "lesson" : "lessons";
+  const count = shown < total ? `${shown} of ${total} ${noun}` : `${total} ${noun}`;
+  const parts = [search ? `${count} matching "${sanitizeLine(search)}"` : count];
+  parts.push("devcoach lesson <id> opens one");
+  if (shown < total) parts.push(`-n ${total} for all`);
+  return layoutWords(phraseWords(parts.map((p) => [dim(p)])), width);
 }
 
 function cmdLessons(o: LessonsOpts): void {
@@ -175,86 +351,102 @@ function cmdLessons(o: LessonsOpts): void {
     );
     process.exit(1);
   }
-  let compat: db.SchemaCompat | null = null;
-  const lessons = db.withConnection((conn) => {
-    compat = db.compatOf(conn);
-    return db.getLessons(conn, {
-      period: o.period === "all" ? null : o.period,
-      category: o.category,
-      level: o.level,
-      project: o.project,
-      repository: o.repository,
-      branch: o.branch,
-      commit: o.commit,
-      starred: o.starred ? true : null,
-      imported: o.imported || o.sharedBy ? true : null,
-      shared_by: o.sharedBy,
-      feedback,
-      date_from: o.dateFrom,
-      date_to: o.dateTo,
-      sort: o.sort,
-      order: o.order,
-    });
-  });
+  const filters: db.LessonFilters = {
+    period: o.period === "all" ? null : o.period,
+    category: o.category,
+    level: o.level,
+    project: o.project,
+    repository: o.repository,
+    branch: o.branch,
+    commit: o.commit,
+    starred: o.starred ? true : null,
+    imported: o.imported || o.sharedBy ? true : null,
+    shared_by: o.sharedBy,
+    feedback,
+    search: o.search,
+    date_from: o.dateFrom,
+    date_to: o.dateTo,
+  };
+  // Humans get a screenful (and a trailer that says how to see the rest); scripts get every row.
+  const tty = Boolean(process.stdout.isTTY);
+  const limit = o.limit ?? (tty && !o.json ? DEFAULT_LIST_LIMIT : null);
+  const page = limit === null ? {} : { page: 1, per_page: limit };
+  const { lessons, total, compat } = db.withConnection((conn) => ({
+    lessons: db.getLessons(conn, { ...filters, ...page, sort: o.sort, order: o.order }),
+    total: db.countFilteredLessons(conn, filters),
+    compat: db.compatOf(conn),
+  }));
 
-  if (lessons.length === 0) {
-    log(c.dim("No lessons found."));
-    return;
-  }
-  const hasMeta = lessons.some((l) => l.project || l.branch || l.commit_hash);
-  const columns: Column[] = [
-    { header: "" },
-    { header: "Date" },
-    { header: "Topic" },
-    { header: "Title" },
-    { header: "Level", justify: "center" },
-    { header: "Categories" },
-  ];
-  if (hasMeta) columns.push({ header: "Project" }, { header: "Branch" }, { header: "Commit" });
-  const hasShared = lessons.some((l) => l.imported);
-  if (hasShared) columns.push({ header: "Shared by" });
-  const rows = lessons.map(printable).map((l) => {
-    const row = [
-      l.starred ? c.yellow("★") : c.dim("·"),
-      l.timestamp.slice(0, 10),
-      c.cyan(l.topic_id),
-      l.title + feedbackIcon(l.feedback),
-      levelColor(l.level),
-      l.categories.join(", "),
-    ];
-    if (hasMeta) {
-      row.push(
-        l.project ?? "",
-        l.branch ? c.magenta(l.branch) : "",
-        l.commit_hash ? c.cyan(l.commit_hash.slice(0, 7)) : "",
-      );
+  if (o.json) {
+    log(inertJson(lessons));
+  } else if (lessons.length === 0) {
+    console.error(c.dim("No lessons found."));
+  } else if (!tty) {
+    // The pipe form: one tab-separated row per lesson, no colour, nothing cut.
+    for (const l of lessons.map(printable)) {
+      const answer = feedbackAnswer(l.feedback)?.cli ?? "-";
+      log([localDate(l.timestamp), l.id, answer, l.title].join("\t"));
     }
-    if (hasShared) row.push(l.imported ? senderLabel(l.shared_by) : "");
-    return row;
-  });
-  log(renderTable("Lessons", columns, rows));
+  } else {
+    const words = o.search?.split(/\s+/).filter(Boolean).map(sanitizeLine) ?? [];
+    const width = readingWidth();
+    const rows = lessonsByDay(lessons.map(printable), words, o.sort === "timestamp", width);
+    const trailer = lessonsTrailer(lessons.length, total, o.search, width);
+    log([...rows, "", ...trailer].join("\n"));
+  }
   readOnlyNotice(compat);
 }
 
-function cmdLesson(id: string): void {
-  const stored = db.withConnection((conn) => db.getLessonById(conn, id));
-  if (stored === null) {
-    log(c.red(`Lesson '${id}' not found.`));
-    process.exit(1);
-  }
-  const lesson = printable(stored);
-  log(rule(c.bold(lesson.title)));
-  log(`${c.dim("ID:")}         ${lesson.id}`);
-  log(`${c.dim("Date:")}        ${lesson.timestamp.slice(0, 19).replace("T", " ")}`);
-  log(`${c.dim("Topic:")}       ${lesson.topic_id}`);
-  log(`${c.dim("Categories:")}  ${lesson.categories.join(", ")}`);
-  log(`${c.dim("Level:")}       ${levelColor(lesson.level)}`);
+interface LessonOpts {
+  last?: boolean;
+  short?: boolean;
+  md?: boolean;
+  json?: boolean;
+  width?: number;
+  pager?: boolean;
+}
+
+type LessonLookup =
+  | { kind: "found"; lesson: Lesson; course: CourseWithSteps | undefined }
+  | { kind: "missing" }
+  | { kind: "ambiguous"; candidates: Lesson[] };
+
+/** The course grown from a lesson: the active one first. */
+function courseFor(conn: DatabaseSync, lessonId: string): CourseWithSteps | undefined {
+  const list = courses.listCourses(conn, { lesson_id: lessonId });
+  return list.find((course) => course.status === "active") ?? list[0];
+}
+
+/** An exact id, else a unique prefix of one; `--last` = the newest of your own lessons. */
+function findLesson(id: string | undefined, last: boolean): LessonLookup {
+  return db.withConnection((conn): LessonLookup => {
+    let lesson = last
+      ? (db.getLessons(conn, { imported: false, page: 1, per_page: 1 })[0] ?? null)
+      : db.getLessonById(conn, id as string);
+    if (!lesson && !last && id) {
+      const candidates = db.getLessonsByIdPrefix(conn, id, 11);
+      if (candidates.length > 1) return { kind: "ambiguous", candidates };
+      lesson = candidates[0] ?? null;
+    }
+    return lesson
+      ? { kind: "found", lesson, course: courseFor(conn, lesson.id) }
+      : { kind: "missing" };
+  });
+}
+
+/** The pre-2.8 view, kept as `lesson --short`: the metadata block, then the summary. */
+function shortLessonView(lesson: Lesson): string[] {
+  const out = [rule(c.bold(lesson.title))];
+  out.push(`${c.dim("ID:")}         ${lesson.id}`);
+  out.push(`${c.dim("Date:")}        ${lesson.timestamp.slice(0, 19).replace("T", " ")}`);
+  out.push(`${c.dim("Topic:")}       ${lesson.topic_id}`);
+  out.push(`${c.dim("Categories:")}  ${lesson.categories.join(", ")}`);
+  out.push(`${c.dim("Level:")}       ${lesson.level}`);
   const starLabel = lesson.starred ? c.yellow("★ starred") : c.dim("☆ not starred");
-  log(
-    `${c.dim("Star:")}        ${starLabel}   ${c.dim("Feedback:")} ${feedbackLabel(lesson.feedback)}`,
-  );
-  if (lesson.imported) log(`${c.dim("Shared by:")}   ${senderLabel(lesson.shared_by)}`);
-  if (lesson.task_context) log(`${c.dim("Context:")}     ${lesson.task_context}`);
+  const answer = paintPiece(answerPhrase(lesson.feedback));
+  out.push(`${c.dim("Star:")}        ${starLabel}   ${c.dim("Feedback:")} ${answer}`);
+  if (lesson.imported) out.push(`${c.dim("Shared by:")}   ${senderLabel(lesson.shared_by)}`);
+  if (lesson.task_context) out.push(`${c.dim("Context:")}     ${lesson.task_context}`);
   if (lesson.project || lesson.repository || lesson.branch || lesson.commit_hash || lesson.folder) {
     const parts: string[] = [];
     if (lesson.project) parts.push(`project=${lesson.project}`);
@@ -262,10 +454,130 @@ function cmdLesson(id: string): void {
     if (lesson.branch) parts.push(`branch=${c.magenta(lesson.branch)}`);
     if (lesson.commit_hash) parts.push(`commit=${c.cyan(lesson.commit_hash.slice(0, 7))}`);
     if (lesson.folder) parts.push(`folder=${lesson.folder}`);
-    log(`${c.dim("Git:")}         ${parts.join(" · ")}`);
+    out.push(`${c.dim("Git:")}         ${parts.join(" · ")}`);
   }
-  log(rule());
-  log(lesson.summary);
+  out.push(rule(), lesson.summary);
+  return out;
+}
+
+const FOOTER_LABEL_WIDTH = 11;
+
+/**
+ * A footer row: a dim label in an 11-column gutter, the value wrapped under itself. Nothing in
+ * a footer is ever cut: an id, a link or a command too long for the line runs past it whole.
+ */
+function footerRow(label: string, pieces: Piece[], width: number): string[] {
+  const gutter = c.dim(label.padEnd(FOOTER_LABEL_WIDTH));
+  return wrapPieces(pieces, width, gutter, " ".repeat(FOOTER_LABEL_WIDTH), false);
+}
+
+/**
+ * `devcoach lesson <id>`: the lesson in a left-anchored frame. Header rule, the title, a dim
+ * `topic · level · date [· shared by] [· answer] [· ★]` line, the body, then a footer: the id,
+ * the dashboard (a link only when it answers), the course grown from it, and — until it is
+ * answered — the command that answers "Already knew it?".
+ */
+function lessonView(
+  lesson: Lesson,
+  course: CourseWithSteps | undefined,
+  dashboard: string | null,
+  width: number,
+): string[] {
+  const brand = "🎓 devcoach";
+  const lead = `── ${brand} `;
+  const out = [
+    `${c.dim("── ")}${paintAll(["bold", "cyan"], brand)}${c.dim(` ${"─".repeat(Math.max(2, width - displayWidth(lead)))}`)}`,
+    ...wrapPieces([{ text: lesson.title, formats: ["bold"] }], width),
+  ];
+  const meta: Piece[][] = [
+    [dim(lesson.topic_id)],
+    [dim(lesson.level)],
+    [dim(localDate(lesson.timestamp))],
+  ];
+  if (lesson.imported) meta.push([dim(senderPhrase(lesson.shared_by))]);
+  if (lesson.feedback) meta.push([answerPhrase(lesson.feedback)]);
+  if (lesson.starred) meta.push([{ text: "★", formats: ["yellow"] }]);
+  out.push(...layoutWords(phraseWords(meta), width), "");
+  out.push(...renderMarkdown(lesson.body?.trim() || lesson.summary, width));
+  out.push(c.dim("─".repeat(width)));
+  out.push(...footerRow("id", [{ text: lesson.id, formats: [], nowrap: true }], width));
+  const where = dashboard
+    ? { text: c.underline(trustedLink(dashboard)), formats: [], nowrap: true }
+    : { text: "devcoach ui -o", formats: [] };
+  out.push(...footerRow("dashboard", [where], width));
+  if (course) {
+    const p = courses.progress(course);
+    out.push(
+      ...footerRow(
+        "course",
+        [{ text: `${course.title} · ${p.done}/${p.total}`, formats: [] }],
+        width,
+      ),
+    );
+  }
+  if (!lesson.feedback) {
+    const words = FEEDBACK_ANSWERS.flatMap((a, k): Piece[] => [
+      ...(k ? [dim("|")] : []),
+      { text: a.cli, formats: [ANSWER_FORMAT[a.value]], nowrap: true },
+    ]);
+    out.push(
+      ...footerRow(
+        "knew it?",
+        [
+          { text: "devcoach feedback ", formats: [] },
+          { text: shellWord(lesson.id), formats: [], nowrap: true },
+          { text: " ", formats: [] },
+          ...words.map((w) => ({ ...w, nowrap: true })),
+        ],
+        width,
+      ),
+    );
+  }
+  return out;
+}
+
+async function cmdLesson(id: string | undefined, o: LessonOpts): Promise<void> {
+  if (id !== undefined && o.last) fail("Give a lesson id or --last, not both.", 2);
+  if (!id?.trim() && !o.last) {
+    fail("Give a lesson id (or the start of one), or --last for the most recent one.", 2);
+  }
+  const found = findLesson(id, Boolean(o.last));
+  if (found.kind === "ambiguous") {
+    const list = found.candidates.slice(0, 10).map((l) => {
+      const shown = printable(l);
+      return `  ${shown.id}  ${c.dim(shown.title)}`;
+    });
+    const more = found.candidates.length > 10 ? ["  …"] : [];
+    fail(
+      [`'${sanitizeLine(id ?? "")}' starts more than one lesson id:`, ...list, ...more].join("\n"),
+    );
+  }
+  if (found.kind === "missing") {
+    fail(o.last ? "No lessons of your own yet." : `Lesson '${sanitizeLine(id ?? "")}' not found.`);
+  }
+  if (o.json) {
+    log(inertJson(found.lesson));
+    return;
+  }
+  const lesson = printable(found.lesson);
+  if (o.md) {
+    log(sanitizeForTerminal(formatLessonForDisplay(lesson)));
+    return;
+  }
+  if (o.short) {
+    log(shortLessonView(lesson).join("\n"));
+    return;
+  }
+  const port = uiPort();
+  const url = `http://127.0.0.1:${port}/lessons/${encodeURIComponent(lesson.id)}`;
+  const dashboard = (await dashboardAnswers(port)) ? url : null;
+  const view = lessonView(
+    lesson,
+    found.course && printable(found.course),
+    dashboard,
+    readingWidth(o.width),
+  );
+  printPaged(view.join("\n"), o.pager !== false);
 }
 
 function cmdStar(id: string, starred: boolean): void {
@@ -275,8 +587,7 @@ function cmdStar(id: string, starred: boolean): void {
     return true;
   });
   if (!found) {
-    log(c.red(`Lesson '${id}' not found.`));
-    process.exit(1);
+    fail(`Lesson '${id}' not found.`);
   }
   log(
     starred
@@ -288,8 +599,7 @@ function cmdStar(id: string, starred: boolean): void {
 function cmdDelete(id: string): void {
   const found = db.withConnection((conn) => db.deleteLesson(conn, id));
   if (!found) {
-    log(c.red(`Lesson '${id}' not found.`));
-    process.exit(1);
+    fail(`Lesson '${id}' not found.`);
   }
   log(`Lesson ${c.cyan(id)} deleted.`);
 }
@@ -330,8 +640,7 @@ function cmdCourses(): void {
 function cmdCourse(id: string): void {
   const stored = db.withConnection((conn) => courses.getCourse(conn, id));
   if (stored === null) {
-    log(c.red(`Course '${id}' not found.`));
-    process.exit(1);
+    fail(`Course '${id}' not found.`);
   }
   const course = printable(stored);
   const p = courses.progress(course);
@@ -349,7 +658,7 @@ function cmdCourse(id: string): void {
   if (course.prerequisites.length) {
     log(
       `${c.dim("Chain:")}     ${course.prerequisites
-        .map((q) => (q.known ? c.green(`✓ ${q.concept}`) : c.red(`✗ ${q.concept}`)))
+        .map((q) => (q.known ? c.green(`✅ ${q.concept}`) : c.red(`❌ ${q.concept}`)))
         .join(c.dim(" → "))}`,
     );
   }
@@ -367,33 +676,79 @@ function cmdCourse(id: string): void {
   }
 }
 
+/**
+ * What an answer changed, as the dim second line of `feedback`: the confidence before the call
+ * against the one the recorded result reports (a clamped +1 at 10 changes nothing, and says so).
+ */
+function feedbackConsequence(
+  result: coach.FeedbackResult,
+  before: number | null,
+  value: Feedback | null,
+  course: CourseWithSteps | undefined,
+): Piece[][] {
+  const phrases: Piece[][] = [[dim(sanitizeLine(result.topic_id))]];
+  if (before !== null && result.confidence !== null && before !== result.confidence) {
+    phrases.push([
+      dim(`confidence ${before} → `),
+      { text: String(result.confidence), formats: ["bold"] },
+    ]);
+  } else {
+    phrases.push([dim("confidence unchanged")]);
+  }
+  if (value !== null && result.previous === value) phrases.push([dim("already recorded")]);
+  if (value === "understood") {
+    phrases.push([dim("the level was right")]);
+  } else if (value === "dont_know" && course) {
+    const p = courses.progress(course);
+    phrases.push([
+      dim(`continue the course · ${p.done}/${p.total} · devcoach course ${course.id}`),
+    ]);
+  } else if (value === "dont_know") {
+    phrases.push([dim("ask your agent for a course on it")]);
+  }
+  return phrases;
+}
+
+/**
+ * `devcoach feedback <id> <answer>` in two lines: what was recorded on which lesson, then what it
+ * changed — the confidence move comes from the result, never a literal +1.
+ */
 function cmdFeedback(id: string, word: string): void {
   const answer = FEEDBACK_ANSWERS.find((a) => a.cli === word);
   if (!answer && word !== NO_ANSWER.cli) {
     console.error(
-      `${c.red(`Unknown answer '${word}'.`)} Answer "Already knew it?" with one of:\n` +
+      `${c.red(`Unknown answer '${sanitizeLine(word)}'.`)} Answer "Already knew it?" with one of:\n` +
         answerWordsHelp([NO_ANSWER.cli, "remove the answer"]),
     );
     process.exit(1);
   }
-  const feedbackValue = answer?.value ?? null;
-  const result = db.withConnection((conn) => coach.recordFeedback(conn, id, feedbackValue));
-  if (result === null) {
-    log(c.red(`Lesson '${id}' not found.`));
-    process.exit(1);
-  }
-  const topic = c.cyan(sanitizeLine(result.topic_id));
-  let effect: string;
-  if (result.topic_created && result.confidence !== null) {
-    effect = topicCreatedNote(topic, result.confidence);
-  } else if (result.delta !== 0 && result.confidence !== null) {
-    const oldConf = result.confidence - result.delta;
-    effect = `${topic} confidence: ${oldConf} → ${c.bold(String(result.confidence))}`;
-  } else {
-    effect = `${topic} confidence unchanged`;
-  }
-  if (feedbackValue === null) effect = `answer cleared · ${effect}`;
-  log(`Lesson ${c.cyan(id)} → ${feedbackLabel(feedbackValue)}  (${effect})`);
+  const value = answer?.value ?? null;
+  const outcome = db.withConnection((conn) => {
+    const lesson = db.getLessonById(conn, id);
+    if (lesson === null) return null;
+    const before = db.getAllKnowledge(conn)[lesson.topic_id] ?? null;
+    const result = coach.recordFeedback(conn, id, value);
+    if (result === null) return null;
+    const course = value === "dont_know" ? courseFor(conn, id) : undefined;
+    return { result, before, title: lesson.title, course: course && printable(course) };
+  });
+  if (outcome === null) fail(`Lesson '${sanitizeLine(id)}' not found.`);
+  const { result, before, title, course } = outcome;
+  const width = readingWidth();
+  const recorded: Piece = answer
+    ? answerPhrase(answer.value)
+    : dim(`${NO_ANSWER.glyph} answer cleared`);
+  const line = [recorded, dim(" · "), { text: sanitizeLine(title), formats: [] }];
+  log(wrapPieces(line, width, "", "   ").join("\n"));
+  const changed =
+    result.topic_created && result.confidence !== null
+      ? wrapPieces(
+          [dim(topicCreatedNote(sanitizeLine(result.topic_id), result.confidence))],
+          width,
+          "   ",
+        )
+      : layoutWords(phraseWords(feedbackConsequence(result, before, value, course)), width, "   ");
+  log(changed.join("\n"));
 }
 
 function cmdSettings(): void {
@@ -416,12 +771,25 @@ function cmdSettings(): void {
   );
 }
 
+/**
+ * How long your own lessons are and how many got an answer: `lessons: avg 142 words · feedback
+ * answered 40 %` (prose words, code left out — what the 160-word rule counts). Null without one.
+ */
+export function lessonMeasure(own: readonly Lesson[]): string | null {
+  if (!own.length) return null;
+  const words = own.reduce((n, l) => n + proseWordCount(l.body?.trim() || l.summary), 0);
+  const answered = own.filter((l) => l.feedback !== null).length;
+  const avg = Math.round(words / own.length);
+  return `lessons: avg ${avg} words · feedback answered ${Math.round((100 * answered) / own.length)} %`;
+}
+
 function cmdStats(): void {
-  const { stats, rateLimit, settings, compat } = db.withConnection((conn) => ({
+  const { stats, rateLimit, settings, compat, own } = db.withConnection((conn) => ({
     stats: coach.getStats(conn),
     rateLimit: coach.checkRateLimit(conn),
     settings: db.getSettings(conn),
     compat: db.compatOf(conn),
+    own: db.getLessons(conn, { imported: false }),
   }));
   const num = (k: string): number => Number(stats[k] ?? 0);
   const rlLabel = rateLimit.allowed ? c.green("Available now") : c.yellow(rateLimit.reason ?? "");
@@ -438,6 +806,8 @@ function cmdStats(): void {
       false,
     ),
   );
+  const measure = lessonMeasure(own);
+  if (measure) log(c.dim(measure));
 
   const confidenceNote = (confidence: number): string => c.dim(`(${confidence})`);
   const weakest = (stats.weakest_topics ?? []) as { topic: string; confidence: number }[];
@@ -465,17 +835,14 @@ function cmdStats(): void {
 function cmdSet(key: string, value: string): void {
   const validKeys = ["max_per_day", "min_gap_minutes", "nudge_every", "nudge_scope", "share_name"];
   if (!validKeys.includes(key)) {
-    log(c.red(`Unknown key '${key}'. Valid keys: ${validKeys.join(", ")}`));
-    process.exit(1);
+    fail(`Unknown key '${key}'. Valid keys: ${validKeys.join(", ")}`);
   }
   if (key === "nudge_scope" && value !== "session" && value !== "global") {
-    log(c.red(`Invalid nudge_scope '${value}'. Use: session | global`));
-    process.exit(1);
+    fail(`Invalid nudge_scope '${value}'. Use: session | global`);
   }
   if (key === "share_name") {
     if (value.trim().length > db.SHARE_NAME_MAX) {
-      log(c.red(`share_name must be at most ${db.SHARE_NAME_MAX} characters.`));
-      process.exit(1);
+      fail(`share_name must be at most ${db.SHARE_NAME_MAX} characters.`);
     }
     const name = db.normalizeShareName(value);
     db.withConnection((conn) => db.setSetting(conn, key, name));
@@ -485,8 +852,7 @@ function cmdSet(key: string, value: string): void {
   if (key === "nudge_every") {
     const n = Number.parseInt(value, 10);
     if (!Number.isInteger(n) || n < 0) {
-      log(c.red(`Invalid nudge_every '${value}'. Use a non-negative integer (0 = off).`));
-      process.exit(1);
+      fail(`Invalid nudge_every '${value}'. Use a non-negative integer (0 = off).`);
     }
   }
   db.withConnection((conn) => db.setSetting(conn, key, value));
@@ -496,8 +862,7 @@ function cmdSet(key: string, value: string): void {
 function cmdKnowledgeAdd(topic: string, confidence: number, group: string | null): void {
   const t = topic.trim();
   if (!t) {
-    log(c.red("Topic name must not be empty."));
-    process.exit(1);
+    fail("Topic name must not be empty.");
   }
   db.withConnection((conn) => {
     db.upsertKnowledge(conn, t, confidence);
@@ -519,8 +884,7 @@ function cmdKnowledgeRemove(topic: string): void {
 function cmdGroupAdd(name: string): void {
   const groupName = name.trim();
   if (!groupName || groupName === "Other") {
-    log(c.red("Invalid group name."));
-    process.exit(1);
+    fail("Invalid group name.");
   }
   db.withConnection((conn) => db.addGroup(conn, groupName));
   log(
@@ -546,8 +910,7 @@ function cmdGroupAssign(topic: string, group: string): void {
     return true;
   });
   if (!ok) {
-    log(c.red(`Topic '${topic}' not in knowledge map. Add it first.`));
-    process.exit(1);
+    fail(`Topic '${topic}' not in knowledge map. Add it first.`);
   }
   log(
     group === "Other"
@@ -571,18 +934,18 @@ function cmdBackup(output: string): void {
 
 function cmdRestore(input: string): void {
   if (!existsSync(input)) {
-    log(c.red(`File not found: ${input}`));
-    process.exit(1);
+    fail(`File not found: ${input}`);
   }
   const result = db.withConnection((conn) => db.restoreBackupZip(conn, readFileSync(input)));
-  if (result.settings) log(`${c.green("✓")} Settings restored`);
-  if (result.topics)
-    log(`${c.green("✓")} Knowledge map restored (${c.cyan(String(result.topics))} topics)`);
+  if (result.settings) log(c.green("Settings restored"));
+  if (result.topics) {
+    log(`${c.green("Knowledge map restored")} (${c.cyan(String(result.topics))} topics)`);
+  }
   const parts = [`${c.cyan(String(result.lessons))} imported`];
   if (result.skipped) parts.push(`${c.yellow(String(result.skipped))} duplicates skipped`);
   if (result.invalid) parts.push(`${c.red(String(result.invalid))} rejected (invalid)`);
-  log(`${c.green("✓")} Lessons: ${parts.join(", ")}`);
-  if (result.learning_state) log(`${c.green("✓")} Notebook restored`);
+  log(`${c.green("Lessons:")} ${parts.join(", ")}`);
+  if (result.learning_state) log(c.green("Notebook restored"));
 }
 
 // ── Lesson sharing ───────────────────────────────────────────────────────────
@@ -603,12 +966,10 @@ interface ShareOpts {
 
 function cmdShare(id: string | undefined, o: ShareOpts): void {
   if (o.by !== undefined && o.anonymous) {
-    log(c.red("Use either --by <name> or --anonymous, not both."));
-    process.exit(1);
+    fail("Use either --by <name> or --anonymous, not both.");
   }
   if (!id && !o.last) {
-    log(c.red("Give a lesson id, or --last for the most recent one."));
-    process.exit(2);
+    fail("Give a lesson id, or --last for the most recent one.", 2);
   }
   const found = db.withConnection((conn) => {
     const lesson = o.last
@@ -631,8 +992,7 @@ function cmdShare(id: string | undefined, o: ShareOpts): void {
     return { payload, remembered };
   });
   if (!found) {
-    log(c.red(o.last ? "No lessons to share yet." : `Lesson '${id}' not found.`));
-    process.exit(1);
+    fail(o.last ? "No lessons to share yet." : `Lesson '${id}' not found.`);
   }
   const { payload, remembered } = found;
   if (o.file !== undefined && o.file !== false) {
@@ -701,20 +1061,19 @@ async function cmdImport(source: string | undefined): Promise<void> {
       if (result.duplicated)
         parts.push(`${c.yellow(String(result.duplicated))} duplicates skipped`);
       if (result.invalid) parts.push(`${c.red(String(result.invalid))} rejected (invalid)`);
-      log(`${c.green("✓")} Lessons: ${parts.join(", ")}`);
+      log(`${c.green("Lessons:")} ${parts.join(", ")}`);
       return;
     }
     if (!result.lesson) {
-      log(c.red("Could not store the lesson."));
-      process.exit(1);
+      fail("Could not store the lesson.");
     }
     const lesson = printable(result.lesson);
-    const who = lesson.shared_by ? `shared by ${lesson.shared_by}` : "shared anonymously";
+    const who = senderPhrase(lesson.shared_by);
     if (result.duplicated) {
       log(`${c.yellow("Already in your log")} as ${c.cyan(lesson.id)} (${who})`);
     } else {
       log(
-        `${c.green("✓ Imported")} ${c.bold(`"${lesson.title}"`)} (${who}) as ${c.cyan(lesson.id)} — topic ${c.cyan(lesson.topic_id)}`,
+        `${c.green("Imported")} ${c.bold(`"${lesson.title}"`)} (${who}) as ${c.cyan(lesson.id)} — topic ${c.cyan(lesson.topic_id)}`,
       );
     }
     if (result.topic_tracked === false) {
@@ -724,8 +1083,7 @@ async function cmdImport(source: string | undefined): Promise<void> {
     }
   } catch (err) {
     if (!(err instanceof ShareInputError)) throw err;
-    log(c.red(err.message));
-    process.exit(1);
+    fail(err.message);
   }
 }
 
@@ -754,14 +1112,13 @@ async function cmdSetup(): Promise<void> {
     const backupPath = await ask("Path to existing backup zip (Enter to skip)", "");
     if (backupPath) {
       if (!existsSync(backupPath)) {
-        log(c.red(`File not found: ${backupPath}`));
-        process.exit(1);
+        fail(`File not found: ${backupPath}`);
       }
       const result = db.withConnection((conn) =>
         db.restoreBackupZip(conn, readFileSync(backupPath)),
       );
       log(
-        `${c.green("✓")} Restored: ${result.topics} topics, ${result.lessons} lessons${result.learning_state ? ", notebook" : ""}`,
+        `${c.green("Restored:")} ${result.topics} topics, ${result.lessons} lessons${result.learning_state ? ", notebook" : ""}`,
       );
       log(c.green("Setup complete!"));
       return;
@@ -882,7 +1239,7 @@ export { cmdLessonReady, cmdOnboardHook, cmdPromptHook, cmdStopHook };
 function printWelcome(): void {
   const commands: [string, string][] = [
     ["mcp", "Start the MCP server (stdio) for Claude Code / Claude Desktop"],
-    ["ui [--port N] [--open|--stop]", "Launch the web dashboard  (default port: 7860)"],
+    ["ui [--port N] [--open|--stop]", `Launch the web dashboard  (default port: ${uiPort()})`],
     ["setup", "First-run wizard: import backup or build your knowledge profile"],
     ["install", "Register MCP server + hooks + skill (Claude default; --gemini/--codex beta)"],
     [
@@ -895,7 +1252,7 @@ function printWelcome(): void {
     ["profile", "Show the knowledge map"],
     ["stats", "Coaching statistics and rate-limit status"],
     ["settings / set", "Show / update settings (max_per_day | min_gap_minutes)"],
-    ["lessons / lesson", "List past lessons / show one in detail"],
+    ["lessons / lesson", "Your lessons by day / read one (--short: its summary)"],
     ["courses / course", "List your courses / show one with its steps"],
     ["star / unstar / delete", "Manage a lesson"],
     ["feedback <id> <answer>", "Answer “Already knew it?”: yes / new / lost (or clear)"],
@@ -920,6 +1277,17 @@ function str(v: string | undefined): string | null {
   return v ?? null;
 }
 
+/** A positive integer option (`-n`, `--width`); anything else is a usage error (exit 2). */
+function positiveInt(min: number, max: number) {
+  return (raw: string): number => {
+    const n = Number(raw);
+    if (!Number.isInteger(n) || n < min || n > max) {
+      throw new InvalidArgumentError(`Expected a whole number from ${min} to ${max}.`);
+    }
+    return n;
+  };
+}
+
 interface LessonsCliOpts {
   period?: string;
   category?: string;
@@ -936,6 +1304,9 @@ interface LessonsCliOpts {
   dateTo?: string;
   sort?: string;
   order?: string;
+  search?: string;
+  limit?: number;
+  json?: boolean;
 }
 
 function buildProgram(): Command {
@@ -966,7 +1337,10 @@ function buildProgram(): Command {
 
   program
     .command("lessons")
-    .description("List past lessons")
+    .description(
+      "Your lessons, newest first: grouped by day on a terminal, one tab-separated row per " +
+        "lesson (date, id, answer, title) on a pipe",
+    )
     .option("--period <period>", "today | week | month | year | all", "all")
     .option("--category <category>", "Filter by category tag")
     .option("--project <project>", "Filter by project (fuzzy)")
@@ -980,8 +1354,15 @@ function buildProgram(): Command {
     .option("--level <level>", "junior | mid | senior")
     .option("--date-from <date>", "Show lessons on or after this date (YYYY-MM-DD[THH:MM])")
     .option("--date-to <date>", "Show lessons on or before this date (YYYY-MM-DD[THH:MM])")
+    .option("--search <text>", "Only lessons containing every word (title, topic, text, sender)")
     .option("--sort <column>", "timestamp | level | topic_id | title | feedback", "timestamp")
     .option("--order <order>", "asc | desc", "desc")
+    .option(
+      "-n, --limit <n>",
+      `How many to show (default on a terminal: ${DEFAULT_LIST_LIMIT}; a pipe gets all)`,
+      positiveInt(1, 1_000_000),
+    )
+    .option("--json", "Print the lessons as JSON")
     .action((opts: LessonsCliOpts) =>
       cmdLessons({
         period: opts.period ?? "all",
@@ -997,16 +1378,31 @@ function buildProgram(): Command {
         level: str(opts.level),
         dateFrom: str(opts.dateFrom),
         dateTo: str(opts.dateTo),
+        search: str(opts.search),
         sort: opts.sort ?? "timestamp",
         order: opts.order ?? "desc",
+        limit: opts.limit ?? null,
+        json: Boolean(opts.json),
       }),
     );
 
   program
     .command("lesson")
-    .description("Show a single lesson in detail")
-    .argument("<id>", "Lesson ID")
-    .action((id: string) => cmdLesson(id));
+    .description("Read a lesson: its text, then its id, dashboard link and the answer command")
+    .argument("[id]", "Lesson ID, or the start of one (or use --last)")
+    .option("--last", "The most recent of your own lessons")
+    .addOption(
+      new Option("--short", "The summary view: metadata and summary").conflicts(["md", "json"]),
+    )
+    .addOption(new Option("--md", "The chat card as markdown (to paste)").conflicts("json"))
+    .option("--json", "The lesson as JSON")
+    .option(
+      "--width <n>",
+      "Columns to lay out for (default: the terminal's, up to 100)",
+      positiveInt(20, 1000),
+    )
+    .option("--no-pager", "Never page, even when the lesson is taller than the terminal")
+    .action((id: string | undefined, opts: LessonOpts) => cmdLesson(id, opts));
 
   program
     .command("courses")
@@ -1208,16 +1604,16 @@ function buildProgram(): Command {
     .description(
       "Launch the web dashboard (Ctrl+C stops it gracefully; --stop stops a running one)",
     )
-    .option("--port <port>", "Port", "7860")
+    .option("--port <port>", "Port", String(uiPort()))
     .option("-o, --open", "Open the dashboard in your default browser")
     .option("--stop", "Stop the dashboard running on --port (e.g. one started by your agent)")
     .action(async (opts: { port?: string; open?: boolean; stop?: boolean }) => {
-      const port = Number.parseInt(opts.port ?? "7860", 10) || 7860;
+      const port = Number.parseInt(opts.port ?? "", 10) || uiPort();
       const { startUi, stopUi } = await import("../web/app");
       if (opts.stop) {
         log(
           (await stopUi(port))
-            ? c.green(`✓ devcoach UI on port ${port} stopped`)
+            ? c.green(`devcoach UI on port ${port} stopped`)
             : c.yellow(`No devcoach UI is running on port ${port}`),
         );
         return;

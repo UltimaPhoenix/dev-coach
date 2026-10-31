@@ -704,6 +704,17 @@ export function getLessonById(db: DatabaseSync, lessonId: string): Lesson | null
   return r ? rowToLesson(r) : null;
 }
 
+/** Lessons whose id starts with `prefix`, newest first, at most `limit` (`devcoach lesson <prefix>`). */
+export function getLessonsByIdPrefix(db: DatabaseSync, prefix: string, limit = 10): Lesson[] {
+  return allRows(
+    db,
+    "SELECT * FROM lessons WHERE substr(id, 1, length(?)) = ? ORDER BY timestamp DESC LIMIT ?",
+    prefix,
+    prefix,
+    limit,
+  ).map(rowToLesson);
+}
+
 export function getAllCategories(db: DatabaseSync): string[] {
   const rows = allRows(
     db,

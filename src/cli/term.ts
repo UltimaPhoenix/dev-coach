@@ -30,7 +30,28 @@ export const c = {
   magenta: (s: string) => paint("magenta", s),
   dim: (s: string) => paint("dim", s),
   bold: (s: string) => paint("bold", s),
+  underline: (s: string) => paint("underline", s),
 };
+
+/** A style a run of text can carry; several combine into one escape pair (`paintAll`). */
+export type Format =
+  | "bold"
+  | "dim"
+  | "italic"
+  | "strikethrough"
+  | "underline"
+  | "cyan"
+  | "green"
+  | "magenta"
+  | "red"
+  | "yellow";
+
+/**
+ * `s` with every format in one `styleText` call. Styles never nest: wrapping an already styled
+ * string would let the inner reset (bold and dim share one) end the outer style early.
+ */
+export const paintAll = (formats: readonly Format[], s: string): string =>
+  formats.length && s ? paint([...formats], s) : s;
 
 export function colorize(name: "green" | "yellow" | "red", s: string): string {
   return name === "green" ? c.green(s) : name === "yellow" ? c.yellow(s) : c.red(s);

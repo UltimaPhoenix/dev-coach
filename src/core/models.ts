@@ -182,6 +182,9 @@ export const SettingsSchema = z.object({
 });
 export type Settings = z.infer<typeof SettingsSchema>;
 
+/** The port the web dashboard listens on unless told otherwise (`ui --port`, `open_ui`). */
+export const DEFAULT_UI_PORT = 7860;
+
 export interface RateLimitResult {
   allowed: boolean;
   reason?: string | null;

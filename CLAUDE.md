@@ -66,6 +66,8 @@ dev-coach/
 │   │   ├── text.ts         # stripControlChars(+Inline/Deep): escape sequences + control chars out of someone else's text
 │   ├── mcp/server.ts       # McpServer: 25 tools + 11 resources + devcoach_instructions prompt
 │   ├── cli/commands.ts     # Commander dispatcher (35 subcommands: 27 visible + 8 hidden hooks) + term.ts (colours, tables, displayWidth, sanitizeForTerminal, trustedLink, rule) + open.ts (browser)
+│   │                       #   markdown.ts = the `lesson` renderer (sanitised first; body links print `text (url)`, never OSC 8;
+│   │                       #   code under `↳` cut at a space). `lessons`: by day on a TTY, `date\tid\tanswer\ttitle` on a pipe
 │   │                       #   install.ts (install/uninstall/doctor) + mcp-command.ts (resolveCommand, chooseServerCommand, checkServerCommand)
 │   └── web/app.ts          # Hono app (33 routes incl. POST /shutdown) + views.ts (hono/html pages); assets/static/share.js
 │                           #   startUi returns the server; SIGINT/SIGTERM/SIGHUP → gracefulShutdown (close, 2 s drain, exit);
