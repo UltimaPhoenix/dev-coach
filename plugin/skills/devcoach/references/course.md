@@ -1,6 +1,6 @@
-# Courses — a step-by-step path from what the user knows to what they couldn't follow
+# Courses — a step-by-step path from what the user knows to the lesson that lost them
 
-A course is the answer to ❌ *couldn't follow*: instead of another lesson at the same
+A course is the answer to ❌ *lost me*: instead of another lesson at the same
 height, a path that starts where the user actually stands. It is **user-initiated**
 ("explain this properly", "teach me X step by step", "start a course", `/devcoach:course`,
 or a *yes* to the one offer you make after a ❌) and it runs **in chat**; the dashboard is
@@ -273,6 +273,6 @@ follows the same rule.
 
 When every step is done or skipped the course completes itself. Close with two lines: what
 the user can now do, and where the document lives. If the course grew from a ❌ lesson,
-offer ONCE, as a **Yes / No** choice: *"Want me to mark that lesson as understood now?"* →
-`submit_feedback(lesson_id, "understood")` only on a yes. Offer nothing else — no star, no
+offer ONCE, as a **Yes / No** choice: *"Want me to change that lesson's answer to ✨ new to
+me?"* → `submit_feedback(lesson_id, "understood")` only on a yes. Offer nothing else — no star, no
 share, no new lesson.

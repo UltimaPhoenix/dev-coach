@@ -98,13 +98,18 @@ export interface FeedbackResult {
   delta: number;
   /** The topic's confidence after the call (null when the topic is not tracked). */
   confidence: number | null;
+  /** True when this answer started tracking the topic: a "yes" on an untracked topic. */
+  topic_created: boolean;
 }
 
 /**
  * The one writer for lesson feedback. `know` means "already knew it" and is the only answer
  * that moves the knowledge map (+1 on entering, -1 on leaving); `understood` and `dont_know`
- * record the answer without touching confidence. Idempotent: repeating the stored value is a
- * no-op, and read + write happen in one transaction so a double click cannot count twice.
+ * record the answer without touching confidence. A "yes" on an untracked topic creates it at
+ * 6/10 (the default 5, plus the point); leaving `know` on a topic that is no longer tracked
+ * gives nothing back, so a removed topic is never re-created below the default. Idempotent:
+ * repeating the stored value is a no-op, and read + write happen in one transaction so a
+ * double click cannot count twice.
  */
 export function recordFeedback(
   db: DatabaseSync,
@@ -117,20 +122,16 @@ export function recordFeedback(
       | undefined;
     if (!row) return null;
     const previous = row.feedback ?? null;
-    const known = getAllKnowledge(db);
-    if (previous === next) {
-      return {
-        topic_id: row.topic_id,
-        previous,
-        delta: 0,
-        confidence: known[row.topic_id] ?? null,
-      };
-    }
+    const current = getAllKnowledge(db)[row.topic_id] ?? null;
+    const unchanged = { topic_id: row.topic_id, previous, delta: 0, topic_created: false };
+    if (previous === next) return { ...unchanged, confidence: current };
     setFeedback(db, lessonId, next);
     const delta = (next === "know" ? 1 : 0) - (previous === "know" ? 1 : 0);
-    const confidence =
-      delta !== 0 ? applyKnowledgeDelta(db, row.topic_id, delta) : (known[row.topic_id] ?? null);
-    return { topic_id: row.topic_id, previous, delta, confidence };
+    if (delta === 0 || (delta < 0 && current === null)) {
+      return { ...unchanged, confidence: current };
+    }
+    const confidence = applyKnowledgeDelta(db, row.topic_id, delta);
+    return { ...unchanged, delta, confidence, topic_created: current === null };
   });
 }
 

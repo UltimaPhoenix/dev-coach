@@ -457,7 +457,7 @@ const KINDS = {
       const t = claude(sb, "Ciao! Come stai oggi? Nessuna domanda tecnica, solo due chiacchiere.");
       check("no lesson row was logged", count(sb, "lessons") === 0);
       check("no lesson card in the reply", (t.out.match(BAND) ?? []).length === 0);
-      check("no stray feedback line after the skip", !/Did that land/.test(t.out));
+      check("no stray feedback line after the skip", !/Already knew it/.test(t.out));
       const reason = query(
         sb,
         "SELECT last_skip_reason FROM cue_state WHERE id = 1",

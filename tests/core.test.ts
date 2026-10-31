@@ -25,8 +25,23 @@ import {
   highlighterBlock,
   stripHighlighter,
 } from "../src/core/highlighter";
-import { normalizeTimestamp, parseLesson } from "../src/core/models";
-import { band, buildPromptForLevel, formatLessonForDisplay } from "../src/core/prompts";
+import {
+  FEEDBACK_ANSWERS,
+  FEEDBACK_QUESTION,
+  FeedbackSchema,
+  feedbackAnswer,
+  NO_ANSWER,
+  normalizeTimestamp,
+  parseLesson,
+} from "../src/core/models";
+import {
+  band,
+  buildPromptForLevel,
+  CARD_FALLBACK,
+  feedbackLine,
+  formatLessonForDisplay,
+  topicCreatedNote,
+} from "../src/core/prompts";
 import { buildSharePayload, renderShareText, ShareInputError } from "../src/core/share";
 import { VERSION } from "../src/version";
 
@@ -343,10 +358,75 @@ describe("coach", () => {
     expect(coach.recordFeedback(c, "l1", "dont_know")).toMatchObject({ delta: 0 });
     expect(db.getAllKnowledge(c).python).toBe(6);
     expect(coach.recordFeedback(c, "missing", "know")).toBeNull();
+    expect(coach.recordFeedback(c, "l1", "know")).toMatchObject({ topic_created: false });
     const stats = coach.getStats(c);
     expect(stats.total_lessons).toBe(1);
     expect((stats.weakest_topics as unknown[]).length).toBeGreaterThan(0);
     expect(coach.listTaughtTopics(c)).toEqual(["python"]);
+  });
+});
+
+describe("one feedback vocabulary", () => {
+  it("FEEDBACK_ANSWERS: one row per stored value, in display order, keys y/n/l", () => {
+    expect(FEEDBACK_ANSWERS.map((a) => a.value)).toEqual(FeedbackSchema.options);
+    expect(FEEDBACK_ANSWERS.map((a) => a.key)).toEqual(["y", "n", "l"]);
+    expect(FEEDBACK_ANSWERS.map((a) => a.glyph)).toEqual(["✅", "✨", "❌"]);
+    expect(FEEDBACK_ANSWERS.map((a) => a.word)).toEqual(["yes", "new to me", "lost me"]);
+    expect(FEEDBACK_ANSWERS.map((a) => a.label)).toEqual(["knew it", "new to me", "lost me"]);
+    for (const a of FEEDBACK_ANSWERS) {
+      // one habit: the CLI word is the answer word's first word, the key its first letter
+      expect(a.cli).toBe(a.word.split(" ")[0]);
+      expect(a.key).toBe(a.word[0]);
+    }
+    expect(new Set(FEEDBACK_ANSWERS.map((a) => a.cli)).has(NO_ANSWER.cli)).toBe(false);
+    expect(feedbackAnswer("understood")?.cli).toBe("new");
+    expect(feedbackAnswer(null)).toBeUndefined();
+    expect(feedbackAnswer("bogus")).toBeUndefined();
+  });
+
+  it("feedbackLine() renders the ruled line, and CARD_FALLBACK ends with it", () => {
+    expect(feedbackLine()).toBe("Already knew it? ✅ yes (y) · ✨ new to me (n) · ❌ lost me (l)");
+    expect(feedbackLine().startsWith(FEEDBACK_QUESTION)).toBe(true);
+    expect(CARD_FALLBACK.endsWith(feedbackLine())).toBe(true);
+  });
+
+  it("lock: the line in assets/SKILL.md is feedbackLine(), byte for byte", () => {
+    const skill = readFileSync(join(__dirname, "..", "assets", "SKILL.md"), "utf8");
+    const lines = skill
+      .split("\n")
+      .filter((l) => l.includes(FEEDBACK_QUESTION) && l.includes("✅"));
+    expect(lines).toEqual([`"${feedbackLine()}"`]);
+  });
+
+  it("a yes on an untracked topic creates it at 6/10; clearing it on a removed topic re-creates nothing", () => {
+    const c = freshDb();
+    db.insertLesson(c, lesson({ id: "u1", topic_id: "zig" }));
+    expect(coach.recordFeedback(c, "u1", "know")).toMatchObject({
+      delta: 1,
+      confidence: 6,
+      topic_created: true,
+    });
+    expect(db.getAllKnowledge(c).zig).toBe(6);
+    // tracked now: the same yes again is a no-op, and changing it gives the point back
+    expect(coach.recordFeedback(c, "u1", "know")).toMatchObject({ topic_created: false });
+    expect(coach.recordFeedback(c, "u1", null)).toMatchObject({ delta: -1, confidence: 5 });
+    // the user removes the topic after answering yes: leaving `know` must not re-create it at 4
+    expect(coach.recordFeedback(c, "u1", "know")).toMatchObject({ confidence: 6 });
+    db.deleteKnowledge(c, "zig");
+    expect(coach.recordFeedback(c, "u1", "understood")).toMatchObject({
+      previous: "know",
+      delta: 0,
+      confidence: null,
+      topic_created: false,
+    });
+    expect(db.getAllKnowledge(c).zig).toBeUndefined();
+    // understood / dont_know on an untracked topic record the answer only
+    expect(coach.recordFeedback(c, "u1", "dont_know")).toMatchObject({ confidence: null });
+    expect(db.getLessonById(c, "u1")?.feedback).toBe("dont_know");
+    expect(topicCreatedNote("zig", 6)).toBe(
+      "zig wasn't on your knowledge map: it's tracked now, at 6/10.",
+    );
+    c.close();
   });
 });
 
@@ -448,7 +528,7 @@ describe("lesson sharing — storage & pacing", () => {
     old.close();
     c = db.getInitializedConnection(path);
     expect(db.getLessonById(c, "old")?.feedback).toBe("understood");
-    // a fresh answer on a v4 database is what the user meant: couldn't follow
+    // a fresh answer on a v4 database is what the user meant: lost me
     db.insertLesson(c, lesson({ id: "fresh", feedback: "dont_know" }));
     c.close();
     c = db.getInitializedConnection(path);

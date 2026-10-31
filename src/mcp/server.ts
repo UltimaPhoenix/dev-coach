@@ -29,6 +29,7 @@ import {
   UiHomeSchema,
   UiThemeSchema,
 } from "../core/models";
+import { topicCreatedNote } from "../core/prompts";
 import { describeRuntime, displayPath, runtimeLine } from "../core/runtime";
 import {
   buildSharePayload,
@@ -84,6 +85,19 @@ const lessonOutput = z.object({
 // placed there is never seen (verified via session transcripts).
 const logLessonOutput = lessonOutput.extend({
   reply_check: z.string(),
+});
+
+// submit_feedback's result: what recordFeedback did. `note` exists only when the answer changed
+// the map in a way the user would not expect — a "yes" that started tracking a topic.
+const feedbackOutput = z.object({
+  lesson_id: z.string(),
+  feedback: FeedbackSchema.nullable(),
+  topic_id: z.string(),
+  previous: z.string().nullable(),
+  delta: z.number().int(),
+  confidence: z.number().int().nullable(),
+  topic_created: z.boolean(),
+  note: z.string().optional().describe("One line to tell the user, when present"),
 });
 
 const CARD_REPLY_CHECK =
@@ -406,7 +420,7 @@ export function createServer(): McpServer {
         });
 
         // Deliberately NO elicitation here: the card-last flow means log_lesson runs
-        // BEFORE the card is visible, so an inline "Did that land?" dialog asked about
+        // BEFORE the card is visible, so an inline feedback dialog asked about
         // a lesson the user had not seen yet (observed live in Claude Code) — and the
         // null fallback then printed the text prompt too, asking twice. Feedback is
         // collected under the card as a text line and recorded next turn via
@@ -482,8 +496,8 @@ export function createServer(): McpServer {
           .enum(["know", "understood", "dont_know", "none"])
           .nullish()
           .describe(
-            "Filter by feedback: know (already knew), understood (new, now clear), " +
-              "dont_know (couldn't follow — a course seed), none (no response)",
+            "Filter by the answer: know (yes, already knew it), understood (new to me), " +
+              "dont_know (lost me — a course seed), none (no answer yet)",
           ),
         search: z
           .string()
@@ -588,16 +602,19 @@ export function createServer(): McpServer {
     {
       title: "Submit Feedback",
       description:
-        "Record the user's answer under a lesson card. know = already knew it (confidence +1); " +
-        "understood = new and now clear (no confidence change); dont_know = couldn't follow this " +
+        'Record the user\'s answer to "Already knew it?" under a lesson card — every answer, ' +
+        "all three. know = yes, already knew it (confidence +1; an untracked topic is created " +
+        "at 6/10); understood = new to me (no confidence change); dont_know = lost me this " +
         "session (no confidence change; the lesson becomes a course seed); clear = remove the " +
-        "answer. Idempotent — repeating the stored answer changes nothing.",
+        "answer (leaving know gives the point back). Idempotent — repeating the stored answer " +
+        "changes nothing. A `note` in the result is one line to tell the user.",
       inputSchema: z.object({
         lesson_id: z.string().describe("Lesson id"),
         feedback: z
           .enum(["know", "understood", "dont_know", "clear"])
-          .describe("know | understood | dont_know | clear"),
+          .describe("know (yes) | understood (new to me) | dont_know (lost me) | clear"),
       }),
+      outputSchema: feedbackOutput,
       annotations: {
         title: "Submit Feedback",
         destructiveHint: false,
@@ -611,7 +628,21 @@ export function createServer(): McpServer {
         const result = db.withConnection((c) =>
           coach.recordFeedback(c, args.lesson_id, feedbackValue),
         );
-        return { content: [txt(String(result !== null))] };
+        if (result === null) {
+          return errResult(
+            `submit_feedback: no lesson '${args.lesson_id}' — find its id with get_lessons.`,
+          );
+        }
+        const note =
+          result.topic_created && result.confidence !== null
+            ? { note: topicCreatedNote(result.topic_id, result.confidence) }
+            : {};
+        return structured({
+          lesson_id: args.lesson_id,
+          feedback: feedbackValue,
+          ...result,
+          ...note,
+        });
       } catch (err) {
         return errResult(`submit_feedback failed for '${args.lesson_id}': ${err}`);
       }
@@ -1190,7 +1221,7 @@ export function createServer(): McpServer {
     {
       title: "Create Course",
       description:
-        "Start a step-by-step course, usually from a lesson the user couldn't follow. Pass the " +
+        "Start a step-by-step course, usually from a lesson that lost the user. Pass the " +
         "prerequisite chain you explored ([{concept, known}], top-down). Returns the course row, " +
         "course_dir and document_path — write the document there yourself, then call " +
         "add_course_step for each section.",

@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { Client, InMemoryTransport } from "@modelcontextprotocol/client";
 import { describe, expect, it, vi } from "vitest";
 import * as db from "../src/core/db";
-import { band, CARD_FALLBACK, FEEDBACK_LINE } from "../src/core/prompts";
+import { band, CARD_FALLBACK, feedbackLine } from "../src/core/prompts";
 import { ShareInputError } from "../src/core/share";
 import { fetchSharedInput } from "../src/core/share-fetch";
 import { createServer, onboardingNextStep } from "../src/mcp/server";
@@ -55,8 +55,12 @@ describe("mcp server", () => {
     expect(bands[0]).toBe(band("🎓 devcoach"));
     // The skill-missing fallback writes the same two bands and asks the same question.
     for (const line of bands.slice(0, 2)) expect(CARD_FALLBACK).toContain(`\`${line}\``);
-    expect(skill).toContain(`"${FEEDBACK_LINE}"`);
-    expect(CARD_FALLBACK.endsWith(FEEDBACK_LINE)).toBe(true);
+    expect(skill).toContain(`"${feedbackLine()}"`);
+    expect(skill).toContain("Already knew it? ✅ yes (y) · ✨ new to me (n) · ❌ lost me (l)");
+    expect(skill).toContain("**Every answer is recorded**");
+    expect(skill).toContain("An answer can prefix a request");
+    expect(skill).not.toContain("within/above band");
+    expect(CARD_FALLBACK.endsWith(feedbackLine())).toBe(true);
     const tools = (await client.listTools()).tools;
     const props: any = tools.find((t: any) => t.name === "log_lesson")?.inputSchema.properties;
     expect(props.body.description).toContain("at most 160 words");
@@ -264,31 +268,30 @@ describe("mcp server", () => {
         }),
       ),
     ).toBe("true");
-    expect(
-      text(
-        await client.callTool({
-          name: "submit_feedback",
-          arguments: { lesson_id: "t1", feedback: "know" },
-        }),
-      ),
-    ).toBe("true");
-    // idempotent: same feedback again still true
-    expect(
-      text(
-        await client.callTool({
-          name: "submit_feedback",
-          arguments: { lesson_id: "t1", feedback: "know" },
-        }),
-      ),
-    ).toBe("true");
-    expect(
-      text(
-        await client.callTool({
-          name: "submit_feedback",
-          arguments: { lesson_id: "t1", feedback: "understood" },
-        }),
-      ),
-    ).toBe("true");
+    // Every answer is recorded, and the result says what it did (structuredContent: the only
+    // part Claude Code surfaces to the model). python is tracked at 4 since onboarding.
+    const feedback = async (lesson_id: string, value: string): Promise<any> =>
+      client.callTool({ name: "submit_feedback", arguments: { lesson_id, feedback: value } });
+    const yes = await feedback("t1", "know");
+    expect(yes.structuredContent).toMatchObject({
+      lesson_id: "t1",
+      feedback: "know",
+      previous: null,
+      delta: 1,
+      confidence: 5,
+      topic_created: false,
+    });
+    expect(yes.structuredContent.note).toBeUndefined();
+    // idempotent: the same answer again changes nothing
+    expect((await feedback("t1", "know")).structuredContent).toMatchObject({ delta: 0 });
+    expect((await feedback("t1", "understood")).structuredContent).toMatchObject({
+      previous: "know",
+      delta: -1,
+      confidence: 4,
+    });
+    const missing: any = await feedback("nope", "know");
+    expect(missing.isError).toBe(true);
+    expect(text(missing)).toContain("get_lessons");
     const understood: any = await client.callTool({
       name: "get_lessons",
       arguments: { feedback: "understood" },
@@ -321,9 +324,42 @@ describe("mcp server", () => {
     await server.close();
   });
 
+  it("a yes on an untracked topic creates it at 6/10, and the result says so in one line", async () => {
+    const { client, server } = await connect();
+    await client.callTool({
+      name: "log_lesson",
+      arguments: {
+        id: "zig-comptime",
+        topic_id: "zig",
+        categories: ["zig"],
+        title: "comptime",
+        level: "mid",
+        summary: "s",
+        body: "Body.",
+      },
+    });
+    expect(db.withConnection((c) => db.getAllKnowledge(c)).zig).toBeUndefined();
+    const r: any = await client.callTool({
+      name: "submit_feedback",
+      arguments: { lesson_id: "zig-comptime", feedback: "know" },
+    });
+    expect(r.structuredContent).toMatchObject({ topic_created: true, confidence: 6, delta: 1 });
+    expect(r.structuredContent.note).toBe(
+      "zig wasn't on your knowledge map: it's tracked now, at 6/10.",
+    );
+    expect(db.withConnection((c) => db.getAllKnowledge(c)).zig).toBe(6);
+    const tools = (await client.listTools()).tools;
+    const fb: any = tools.find((t: any) => t.name === "submit_feedback");
+    expect(fb.description).toContain("an untracked topic is created at 6/10");
+    expect(fb.description).toContain("lost me");
+    expect(fb.description).not.toContain("couldn't");
+    await client.close();
+    await server.close();
+  });
+
   it("log_lesson never elicits, even when the client declares the capability", async () => {
     // Regression: in the card-last flow log_lesson runs BEFORE the card is visible,
-    // so an inline "Did that land?" dialog asked about an unseen lesson (observed
+    // so an inline feedback dialog asked about an unseen lesson (observed
     // live in Claude Code). Feedback is the text line under the card + next-turn
     // submit_feedback — the tool itself must stay a pure, silent save.
     const [ct, st] = InMemoryTransport.createLinkedPair();

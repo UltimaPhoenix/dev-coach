@@ -18,14 +18,14 @@ stand — and it finds that starting point by asking.
 Under every lesson card you answer with one letter:
 
 ```
-Did that land? ✅ knew it (y) · 💡 understood (u) · ❌ couldn't follow (n)
+Already knew it? ✅ yes (y) · ✨ new to me (n) · ❌ lost me (l)
 ```
 
-Answer `n` and the coach offers, once: *"Want a step-by-step course on this? 🎓"*. Say yes and it
+Answer `l` (lost me) and the coach offers, once: *"Want a step-by-step course on this? 🎓"*. Say yes and it
 begins right there. You can also start one on any lesson or any concept at all:
 
 ```
-/devcoach:course                       # from the newest lesson you couldn't follow
+/devcoach:course                       # from the newest lesson that lost you
 /devcoach:course node error event      # from the lesson those words describe
 /devcoach:course logarithms            # from a concept, when no lesson matches
 /devcoach:course continue              # pick up the active course
@@ -60,8 +60,8 @@ first: continue it, redo it, or keep both.
    angle, never a silent skip; two misses and the coach offers to split the step in two, right
    there in the document. Say *skip* to skip a step, *later* to pause —
    `/devcoach:course continue` resumes.
-4. **At the end**, if the course grew from a lesson you couldn't follow, it offers once to mark that
-   lesson as understood.
+4. **At the end**, if the course grew from a lesson that lost you, it offers once to change that
+   lesson's answer to ✨ new to me.
 
 Right after writing the document, and only in a client that has the Artifact tool, the coach
 offers once to publish the same file as a Claude artifact — a copy you can share by link.

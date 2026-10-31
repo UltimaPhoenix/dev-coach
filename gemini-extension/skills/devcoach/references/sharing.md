@@ -57,9 +57,11 @@ just starred a lesson                            →  The one offer (below)
 `get_lessons({shared_by: "Ada"})` when a sender is named (exact name; `search` also matches the
 sender), else `get_lessons({imported: true, search: …})` — ask if 2+ match — then render it as a normal card —
 both bands, the title line with `Category · Level`, the body, the 💡 tip — **without**
-`log_lesson` and **without** the "Did that land?" line. It is already in their log, taught by
-someone else; it costs nothing on the rate limit. Record feedback only if they volunteer it
-("I knew this" → `submit_feedback(id, "know")`).
+`log_lesson`. Where the "Already knew it?" line would go, directly beneath the closing band,
+write the sender instead: `🤝 shared by Ada` (`🤝 shared anonymously` when `shared_by` is
+null) — never "from". It is already in their log, taught by someone else; it costs nothing on
+the rate limit. Record an answer only if they volunteer one, read as loosely as under a card
+("knew it" → `submit_feedback(id, "know")`).
 
 ## The one offer
 

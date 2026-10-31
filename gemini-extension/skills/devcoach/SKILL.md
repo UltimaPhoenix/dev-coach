@@ -70,7 +70,7 @@ older than your coaching database (upgraded by devcoach X); update it or use the
 
 When the user wants to be taught something properly — "explain this step by step", "start
 a course on X", "teach me from the basics", "continue the course", `/devcoach:course` — or
-says *yes* to the one offer you make after a ❌ *couldn't follow* — read
+says *yes* to the one offer you make after a ❌ *lost me* — read
 `references/course.md` in this skill's directory and follow it. A course is user-initiated,
 never starts inside a cued turn, explores what the user already knows one question at a
 time, and lives in ONE HTML document you write yourself.
@@ -195,19 +195,26 @@ message is the only place the user ever sees the lesson.
 
 `log_lesson` never asks the user anything — it only saves. Feedback is collected as
 text under the card: append the line
-"Did that land? ✅ knew it (y) · 💡 understood (u) · ❌ couldn't follow (n)"
+"Already knew it? ✅ yes (y) · ✨ new to me (n) · ❌ lost me (l)"
 DIRECTLY BENEATH the card's closing band — it is the only line allowed after the card,
 and it may never appear without the card right above it.
-Read the user's next message loosely: `y` / `yes` / "knew it" / ✅ → `know` ·
-`u` / "understood" / "got it" / 💡 → `understood` · `n` / `no` / "lost me" / ❌ →
-`dont_know` · anything else — including no reply at all, the user just moving on —
-→ no feedback, drop the question silently. The three answers mean: **know** = already
-knew it (the only one that moves confidence, +1) · **understood** = new, and now
-clear — the level was right · **dont_know** = couldn't follow this session — no
-confidence change; the lesson is kept as a seed for a step-by-step course. Call
-`submit_feedback(id, value)` for `understood` and `dont_know` always, and for `know`
-only when confidence is below the lesson's band (within/above band → already
-calibrated, skip the call). Never call `update_knowledge` on top of feedback.
+Read the user's next message loosely: `y` / yes / "knew it" / ✅ → `know` ·
+`n` / no / new / "didn't know" / "got it" / ✨ → `understood` · `l` / lost / "lost me" /
+"no idea" / "could not follow" / ❌ → `dont_know` · anything else — including no reply
+at all, the user just moving on — → no feedback, drop the question silently. Under
+"Already knew it?" a bare *no* means "I didn't know it": `understood`, never
+`dont_know`. The three answers mean: **know** = already knew it (the only one that
+moves confidence: +1 on the topic; an untracked topic is created at 6/10) ·
+**understood** = new to me, and now clear — the level was right · **dont_know** = lost
+me this session — no confidence change; the lesson is kept as a seed for a step-by-step
+course. **Every answer is recorded**: call `submit_feedback(id, value)` for all three —
+the server applies the effect, the same as the dashboard and the CLI do. When its
+result carries a `note` (a *yes* just started tracking the topic), say it in one line.
+Never call `update_knowledge` on top of feedback.
+
+**An answer can prefix a request:** "n — now add the test" records `understood`, then
+does the request. In that turn make no star, course or profile offer — answering must
+never cost the user a turn.
 
 **After a ❌:** offer ONCE, in one line — *"Want a step-by-step course on this? 🎓"* — and
 on a *yes* start it on that message (`references/course.md`). No other follow-up.
@@ -238,7 +245,7 @@ checkpoints, never touch the notebook.
 - "Show me lessons about X" → `get_lessons({category: X})` or `({search: keyword})`
 - "How good am I at X?" / "Show my profile" → `get_profile`
 - "Coaching log" → `get_lessons({period: "all"})`
-- "Lessons to revisit" / "the ones I couldn't follow" → `get_lessons({feedback: "dont_know"})`
+- "Lessons to revisit" / "the ones that lost me" → `get_lessons({feedback: "dont_know"})`
 - "My courses" → `get_courses` · "Continue the course" → `get_courses({status: "active"})`
   then `references/course.md` §5 · "Start a course on X" → `references/course.md`
 - "Share this / the last lesson" / "share the lesson about X" → `get_lessons` then

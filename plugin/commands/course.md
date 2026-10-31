@@ -1,5 +1,5 @@
 ---
-description: Start (or continue) a step-by-step course from a lesson you couldn't follow, or on any concept
+description: Start (or continue) a step-by-step course from a lesson that lost you, or on any concept
 argument-hint: "[last | a few words of the lesson's title | a concept] [continue]"
 allowed-tools: mcp__plugin_devcoach_devcoach__create_course, mcp__devcoach__create_course, mcp__plugin_devcoach_devcoach__add_course_step, mcp__devcoach__add_course_step, mcp__plugin_devcoach_devcoach__update_course_progress, mcp__devcoach__update_course_progress, mcp__plugin_devcoach_devcoach__get_courses, mcp__devcoach__get_courses, mcp__plugin_devcoach_devcoach__get_lessons, mcp__devcoach__get_lessons, mcp__plugin_devcoach_devcoach__get_briefing, mcp__devcoach__get_briefing, mcp__plugin_devcoach_devcoach__submit_feedback, mcp__devcoach__submit_feedback
 ---
@@ -19,5 +19,6 @@ a side step menu, code in the seed's language, no external URLs, no fetch, no fo
 section with `add_course_step`, offer once to publish it as a Claude artifact if the Artifact tool
 exists, and teach one step per message, marking progress with `update_course_progress`; a check
 whose answer is a pick is asked as choices, one whose answer must be typed as text. At the end, if
-the course grew from a lesson, offer once (Yes / No) to mark it understood with `submit_feedback`.
+the course grew from a lesson, offer once (Yes / No) to change its answer to ✨ new to me
+(`submit_feedback` `understood`).
 Do nothing else.

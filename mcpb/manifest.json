@@ -78,7 +78,7 @@
     },
     {
       "name": "submit_feedback",
-      "description": "Record comprehension feedback"
+      "description": "Record the answer under a lesson card"
     },
     {
       "name": "add_topic",

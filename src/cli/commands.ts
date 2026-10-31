@@ -9,6 +9,8 @@ import * as courses from "../core/courses";
 import * as db from "../core/db";
 import { detectStack, mergeStacks } from "../core/detect";
 import { detectGitContext, detectGitUserName } from "../core/git";
+import { FEEDBACK_ANSWERS, type FeedbackAnswer, feedbackAnswer, NO_ANSWER } from "../core/models";
+import { topicCreatedNote } from "../core/prompts";
 import {
   buildSharePayload,
   encodeShareCode,
@@ -44,23 +46,50 @@ const levelColor = (lvl: string): string =>
       : lvl === "senior"
         ? c.red(lvl)
         : lvl;
-const feedbackIcon = (fb: string | null): string =>
-  fb === "know"
-    ? ` ${c.green("✓")}`
-    : fb === "understood"
-      ? ` ${c.cyan("💡")}`
-      : fb === "dont_know"
-        ? ` ${c.red("✗")}`
-        : "";
-const feedbackLabel = (fb: string | null): string =>
-  fb === "know"
-    ? c.green("✓ I knew this")
-    : fb === "understood"
-      ? c.cyan("💡 Understood")
-      : fb === "dont_know"
-        ? c.red("✗ Couldn't follow")
-        : c.dim("no feedback");
-const FEEDBACK_VALUES = ["know", "understood", "dont_know", "clear"];
+// The answers' words, glyphs and labels come from core (FEEDBACK_ANSWERS); colour means the answer.
+const ANSWER_COLOR: Record<string, (s: string) => string> = {
+  know: c.green,
+  understood: c.cyan,
+  dont_know: c.red,
+};
+const paintAnswer = (a: FeedbackAnswer, s: string): string => (ANSWER_COLOR[a.value] ?? c.dim)(s);
+const feedbackIcon = (fb: string | null): string => {
+  const a = feedbackAnswer(fb);
+  return a ? ` ${paintAnswer(a, a.glyph)}` : "";
+};
+const feedbackLabel = (fb: string | null): string => {
+  const a = feedbackAnswer(fb);
+  return a
+    ? paintAnswer(a, `${a.glyph} ${a.label}`)
+    : c.dim(`${NO_ANSWER.glyph} ${NO_ANSWER.label}`);
+};
+// What each CLI word records, for the help text and the unknown-word error.
+const ANSWER_MEANING: Record<string, string> = {
+  know: "already knew it: confidence +1 (an untracked topic is created at 6/10)",
+  understood: "new to me, now clear: recorded, confidence unchanged",
+  dont_know: "lost me: recorded, confidence unchanged; ask your agent for a course on it",
+};
+const answerWords = (last: string): string =>
+  [...FEEDBACK_ANSWERS.map((a) => a.cli), last].join(" | ");
+
+/** The words `feedback` accepts, one per line with what it records (unknown-word error). */
+function answerWordsHelp(last: [string, string]): string {
+  const rows: [string, string][] = [
+    ...FEEDBACK_ANSWERS.map((a): [string, string] => [
+      a.cli,
+      `${a.glyph} ${ANSWER_MEANING[a.value] ?? a.label}`,
+    ]),
+    last,
+  ];
+  const w = Math.max(...rows.map(([word]) => word.length));
+  return rows.map(([word, meaning]) => `  ${word.padEnd(w)}  ${meaning}`).join("\n");
+}
+
+/** A CLI word → the stored value it filters on (`lessons --feedback`); undefined if unknown. */
+function feedbackFilterValue(word: string): string | undefined {
+  if (word === NO_ANSWER.filter) return NO_ANSWER.filter;
+  return FEEDBACK_ANSWERS.find((a) => a.cli === word)?.value;
+}
 
 // ── Display commands ─────────────────────────────────────────────────────────
 
@@ -128,6 +157,14 @@ interface LessonsOpts {
 }
 
 function cmdLessons(o: LessonsOpts): void {
+  const feedback = o.feedback === null ? null : feedbackFilterValue(o.feedback);
+  if (feedback === undefined) {
+    console.error(
+      `${c.red(`Unknown answer '${o.feedback}'.`)} Filter with one of:\n` +
+        answerWordsHelp([NO_ANSWER.filter, `${NO_ANSWER.glyph} ${NO_ANSWER.label}`]),
+    );
+    process.exit(1);
+  }
   let compat: db.SchemaCompat | null = null;
   const lessons = db.withConnection((conn) => {
     compat = db.compatOf(conn);
@@ -142,7 +179,7 @@ function cmdLessons(o: LessonsOpts): void {
       starred: o.starred ? true : null,
       imported: o.imported || o.sharedBy ? true : null,
       shared_by: o.sharedBy,
-      feedback: o.feedback,
+      feedback,
       date_from: o.dateFrom,
       date_to: o.dateTo,
       sort: o.sort,
@@ -318,27 +355,33 @@ function cmdCourse(id: string): void {
   }
 }
 
-function cmdFeedback(id: string, feedback: string): void {
-  if (!FEEDBACK_VALUES.includes(feedback)) {
-    log(c.red(`Invalid feedback '${feedback}'. Use: ${FEEDBACK_VALUES.join(" | ")}`));
+function cmdFeedback(id: string, word: string): void {
+  const answer = FEEDBACK_ANSWERS.find((a) => a.cli === word);
+  if (!answer && word !== NO_ANSWER.cli) {
+    console.error(
+      `${c.red(`Unknown answer '${word}'.`)} Answer "Already knew it?" with one of:\n` +
+        answerWordsHelp([NO_ANSWER.cli, "remove the answer"]),
+    );
     process.exit(1);
   }
-  const feedbackValue = feedback === "clear" ? null : feedback;
+  const feedbackValue = answer?.value ?? null;
   const result = db.withConnection((conn) => coach.recordFeedback(conn, id, feedbackValue));
   if (result === null) {
     log(c.red(`Lesson '${id}' not found.`));
     process.exit(1);
   }
-  let confLabel: string;
-  if (feedbackValue === null) {
-    confLabel = "feedback cleared";
+  const topic = c.cyan(result.topic_id);
+  let effect: string;
+  if (result.topic_created && result.confidence !== null) {
+    effect = topicCreatedNote(topic, result.confidence);
   } else if (result.delta !== 0 && result.confidence !== null) {
     const oldConf = result.confidence - result.delta;
-    confLabel = `${c.cyan(result.topic_id)} confidence: ${oldConf} → ${c.bold(String(result.confidence))}`;
+    effect = `${topic} confidence: ${oldConf} → ${c.bold(String(result.confidence))}`;
   } else {
-    confLabel = `${c.cyan(result.topic_id)} confidence unchanged`;
+    effect = `${topic} confidence unchanged`;
   }
-  log(`Lesson ${c.cyan(id)} → ${feedbackLabel(feedbackValue)}  (${confLabel})`);
+  if (feedbackValue === null) effect = `answer cleared · ${effect}`;
+  log(`Lesson ${c.cyan(id)} → ${feedbackLabel(feedbackValue)}  (${effect})`);
 }
 
 function cmdSettings(): void {
@@ -842,7 +885,7 @@ function printWelcome(): void {
     ["lessons / lesson", "List past lessons / show one in detail"],
     ["courses / course", "List your courses / show one with its steps"],
     ["star / unstar / delete", "Manage a lesson"],
-    ["feedback <id>", "Record know / understood / dont_know feedback"],
+    ["feedback <id> <answer>", "Answer “Already knew it?”: yes / new / lost (or clear)"],
     ["share / import", "Hand a lesson to a teammate / add a shared lesson to your log"],
     ["knowledge-add / -remove", "Add / remove a topic"],
     ["group-add / -remove / -assign", "Manage knowledge groups"],
@@ -920,7 +963,7 @@ function buildProgram(): Command {
     .option("--starred", "Show only starred lessons")
     .option("--imported", "Show only lessons shared with you")
     .option("--from <name>", "Show only lessons shared by this person")
-    .option("--feedback <feedback>", "know | understood | dont_know | none")
+    .option("--feedback <answer>", answerWords(NO_ANSWER.filter))
     .option("--level <level>", "junior | mid | senior")
     .option("--date-from <date>", "Show lessons on or after this date (YYYY-MM-DD[THH:MM])")
     .option("--date-to <date>", "Show lessons on or before this date (YYYY-MM-DD[THH:MM])")
@@ -983,9 +1026,9 @@ function buildProgram(): Command {
 
   program
     .command("feedback")
-    .description("Record your answer under a lesson: know / understood / dont_know")
+    .description("Answer “Already knew it?” under a lesson: yes / new to me / lost me")
     .argument("<id>", "Lesson ID")
-    .argument("<value>", "know | understood | dont_know | clear")
+    .argument("<answer>", answerWords(NO_ANSWER.cli))
     .action((id: string, value: string) => cmdFeedback(id, value));
 
   program

@@ -443,7 +443,7 @@ function migrate(db: DatabaseSync, fromVersion: number, upgradedBefore: boolean)
     }
   }
   // v4 — feedback grew a third answer. Under the old two-answer model "don't know" mostly meant
-  // "new to me", which is now `understood`; `dont_know` is reserved for "couldn't follow" and
+  // "new to me", which is now `understood`; `dont_know` is reserved for "lost me" and
   // seeds courses. One-shot, by ledger: the stamp alone cannot be trusted, an older build
   // re-stamps a newer file with its own number. A file with no ledger row is genuinely pre-v4
   // only when its stamp says so AND no v5+ build has been here (`upgradedBefore`); otherwise

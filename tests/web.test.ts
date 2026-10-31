@@ -92,13 +92,105 @@ describe("web app", () => {
     expect((await get("/lessons/missing")).status).toBe(404);
   });
 
+  it("one vocabulary: the question comes first, then yes · new to me · lost me", async () => {
+    db.withConnection((c) =>
+      db.insertLesson(
+        c,
+        parseLesson({
+          id: "v1",
+          timestamp: "2026-06-17T10:00:00Z",
+          topic_id: "python",
+          categories: ["python"],
+          title: "Vocab",
+          level: "mid",
+          summary: "s",
+        }),
+      ),
+    );
+    const page = await (await get("/lessons/v1")).text();
+    const question = page.indexOf(
+      '<p class="text-sm text-gray-900 dark:text-gray-100">Already knew it?</p>',
+    );
+    expect(question).toBeGreaterThan(0);
+    expect(page).toContain('role="group" aria-label="Already knew it?"');
+    const buttons = ["✅</span> yes", "✨</span> new to me", "❌</span> lost me"].map((b) =>
+      page.indexOf(b),
+    );
+    expect(buttons.every((i) => i > question)).toBe(true);
+    expect([...buttons].sort((a, b) => a - b)).toEqual(buttons); // in that order
+    // the list's filter menu, chip and cell use the same words
+    const list = await (await get("/lessons?feedback=understood")).text();
+    for (const label of ["✅ Knew it", "✨ New to me", "❌ Lost me", "○ No answer yet"]) {
+      expect(list).toContain(label);
+    }
+    await post("/lessons/v1/feedback", { feedback: "know", next: "/lessons/v1" });
+    expect(await (await get("/lessons?feedback=know")).text()).toContain("✅ knew it</span>");
+    // none of the retired words (the done-when grep keeps them out of the tree; these catch variants)
+    for (const old of [
+      /Understood/,
+      /couldn.t follow/i,
+      /I knew th/,
+      /No response/,
+      /💡/,
+      /[✓✗] /,
+    ]) {
+      expect(page + list).not.toMatch(old);
+    }
+  });
+
+  it("a yes on an untracked topic: the page says it is tracked now, at 6/10 — once", async () => {
+    db.withConnection((c) =>
+      db.insertLesson(
+        c,
+        parseLesson({
+          id: "zz",
+          timestamp: "2026-06-17T11:00:00Z",
+          topic_id: "zig",
+          categories: ["zig"],
+          title: "Comptime",
+          level: "mid",
+          summary: "s",
+        }),
+      ),
+    );
+    const yes = await post("/lessons/zz/feedback", { feedback: "know", next: "/lessons/zz" });
+    expect(yes.status).toBe(303);
+    expect(yes.headers.get("location")).toBe("/lessons/zz?answered=topic-created");
+    const flash = await (await get("/lessons/zz?answered=topic-created")).text();
+    expect(flash).toContain(
+      "Already knew it — it counts toward your confidence. zig wasn&#39;t on your knowledge map: it&#39;s tracked now, at 6/10.",
+    );
+    // the flash is one-shot: the plain page shows today's confidence, the same answer again no flash
+    expect(await (await get("/lessons/zz")).text()).toContain(
+      "Already knew it — it counts toward your confidence (zig: 6/10).",
+    );
+    const again = await post("/lessons/zz/feedback", { feedback: "know", next: "/lessons/zz" });
+    expect(again.headers.get("location")).toBe("/lessons/zz");
+    // a flash never rides to another page, and never on an answer that created nothing
+    await post("/lessons/zz/feedback", { feedback: "clear", next: "/lessons/zz" });
+    db.withConnection((c) => db.deleteKnowledge(c, "zig"));
+    const elsewhere = await post("/lessons/zz/feedback", { feedback: "know", next: "/lessons" });
+    expect(elsewhere.headers.get("location")).toBe("/lessons");
+    const tracked = await post("/lessons/w1/feedback", { feedback: "know", next: "/lessons/w1" });
+    expect(tracked.headers.get("location")).toBe("/lessons/w1");
+    // a forged flash on an answer that isn't "yes" changes nothing
+    await post("/lessons/zz/feedback", { feedback: "understood", next: "/lessons/zz" });
+    expect(await (await get("/lessons/zz?answered=topic-created")).text()).not.toContain(
+      "tracked now",
+    );
+  });
+
   it("star + feedback redirect 303", async () => {
     expect((await post("/lessons/w1/star", { starred: "1", next: "/lessons" })).status).toBe(303);
     expect(
       (await post("/lessons/w1/feedback", { feedback: "bogus", next: "/lessons" })).status,
     ).toBe(400);
     expect((await post("/lessons/w1/feedback", { feedback: "understood" })).status).toBe(303);
-    expect(await (await get("/lessons/w1")).text()).toContain("💡 Understood");
+    const answered = await (await get("/lessons/w1")).text();
+    expect(answered).toContain("✨ new to me"); // the meta badge
+    expect(answered).toMatch(
+      /New to me — recorded\. Only “yes” moves confidence \(python: \d+\/10\)\./,
+    );
     expect(
       (await post("/lessons/w1/feedback", { feedback: "know", next: "//evil.com" })).status,
     ).toBe(303);
@@ -211,7 +303,8 @@ describe("web view branches (rich rendering)", () => {
       ),
     );
     const html = await (await get("/lessons/g1")).text();
-    expect(html).toContain("I knew this");
+    expect(html).toContain("✅ knew it");
+    expect(html).toContain("Already knew it — it counts toward your confidence");
     expect(html).toContain("github.com/UltimaPhoenix/dev-coach");
     expect(html).toContain("/commit/abcdef1234567");
     expect(html).toContain("vscode://file//home/x");
@@ -297,7 +390,9 @@ describe("web view branches — exhaustive", () => {
     });
     const gl = await (await get("/lessons/gl")).text();
     expect(gl).toContain("/-/commit/deadbeef1234"); // gitlab commit URL form
-    expect(gl).toContain("Couldn't follow"); // dont_know branch
+    expect(gl).toContain("❌ lost me"); // dont_know branch
+    expect(gl).toContain("Lost me — recorded. Ask your agent for a step-by-step course on it");
+    expect(gl).toContain("/devcoach:course");
     expect(gl).toContain("Context:"); // task_context branch
     const bb = await (await get("/lessons/bb")).text();
     expect(bb).toContain("/commits/cafe123"); // bitbucket commit URL form
@@ -942,6 +1037,9 @@ describe("web courses", () => {
   it("lists, shows the sandboxed document, tracks progress, deletes", async () => {
     const empty = await (await get("/courses")).text();
     expect(empty).toContain("No courses yet");
+    expect(empty).toContain(
+      'answer <span class="font-mono">l</span> (lost me) under a lesson card',
+    );
     expect(empty).toContain('href="/courses"'); // nav entry
     const course = db.withConnection((c) =>
       courses.createCourse(c, {
@@ -1009,8 +1107,13 @@ describe("web courses", () => {
     expect((await get("/static/course-viewer.js")).status).toBe(200);
     expect((await get("/courses/../etc/index.html")).status).toBe(404);
 
-    // the seed lesson links to its course
+    // the seed lesson links to its course, and "lost me" points at it instead of a new one
     expect(await (await get("/lessons/w1")).text()).toContain("🎓 Course · 0/2");
+    await post("/lessons/w1/feedback", { feedback: "dont_know", next: "/lessons/w1" });
+    const lost = await (await get("/lessons/w1")).text();
+    expect(lost).toContain("Lost me — recorded.");
+    expect(lost).toContain("Continue the course · 0/2");
+    expect(lost).not.toContain("Ask your agent");
 
     const bad = await post(`/courses/${course.id}/steps/1`, { status: "bogus" });
     expect(bad.status).toBe(400);

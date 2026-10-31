@@ -108,7 +108,7 @@ upgrade at once. Start write transactions with `BEGIN IMMEDIATE`.
 💡 *Senior tip:* 3 s is a ceiling, not a target — open `withTransaction` with
 `BEGIN IMMEDIATE` and keep writes short, so the wait happens where you chose it, and rarely.
 ### ─────────── sqlite · mid ───────────
-Did that land? ✅ knew it (y) · 💡 understood (u) · ❌ couldn't follow (n)
+Already knew it? ✅ yes (y) · ✨ new to me (n) · ❌ lost me (l)
 ````
 
 The card never names a file path: the file is already on your screen, and the lesson may travel
@@ -116,16 +116,21 @@ if you share it.
 
 ## The feedback loop
 
-Answer on the line under the card — a bare `y`, `u` or `n` is enough — and your reply tunes future
-coaching:
+Answer on the line under the card — a bare `y`, `n` or `l` is enough — and your reply tunes future
+coaching. Every answer is recorded, the same as an answer given on the dashboard or with
+`devcoach feedback`:
 
-- **✅ knew it** (`y`, `yes`) — you already knew this: your confidence on that topic goes up by one,
-  and you'll see fewer, deeper lessons there.
-- **💡 understood** (`u`, `got it`) — it was new and it landed: the coach pitched the right level, so
-  nothing changes.
-- **❌ couldn't follow** (`n`, `no`) — too dense for this session: confidence stays where it is, and
-  the lesson is kept as a seed for a step-by-step course you can start whenever you like.
+- **✅ yes** (`y`, `knew it`) — you already knew this: your confidence on that topic goes up by one,
+  and you'll see fewer, deeper lessons there. A topic that isn't on your knowledge map yet is added
+  at 6/10, and the coach tells you so.
+- **✨ new to me** (`n`, `no`, `got it`) — it was new and it landed: the coach pitched the right
+  level, so nothing changes. Under "Already knew it?", a plain *no* means this one.
+- **❌ lost me** (`l`, `lost`) — too dense for this session: confidence stays where it is, and the
+  lesson is kept as a seed for a step-by-step course you can start whenever you like.
 - **Anything else, or no reply** — no change; the question is dropped silently and you carry on.
+
+An answer can lead a request: `n — now add the test` records *new to me* and gets on with the test,
+with no follow-up question in between.
 
 ## Sharing a lesson with a teammate
 

@@ -3,7 +3,18 @@
 // Tailwind (static/vendor/tailwind.js) and vendored Alpine/HTMX/Flatpickr/marked render them identically.
 import { html, raw } from "hono/html";
 import type { HtmlEscapedString } from "hono/utils/html";
-import type { CourseWithSteps, KnowledgeEntry, Lesson, Settings } from "../core/models";
+import {
+  type CourseWithSteps,
+  FEEDBACK_ANSWERS,
+  FEEDBACK_QUESTION,
+  type FeedbackAnswer,
+  feedbackAnswer,
+  type KnowledgeEntry,
+  type Lesson,
+  NO_ANSWER,
+  type Settings,
+} from "../core/models";
+import { topicCreatedNote } from "../core/prompts";
 import type { SharedLesson } from "../core/share";
 
 type Html = HtmlEscapedString | Promise<HtmlEscapedString>;
@@ -409,12 +420,33 @@ const PERIOD_LABELS: Record<string, string> = {
   month: "Last 30 days",
   year: "Last year",
 };
+const sentenceCase = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
+/** The answer filter's entries (menu, chip): the core vocabulary in sentence case, keyed by `?feedback=`. */
 const FEEDBACK_LABELS: Record<string, string> = {
-  know: "✓ Knew it",
-  understood: "💡 Understood",
-  dont_know: "✗ Couldn't follow",
-  none: "— No response",
+  ...Object.fromEntries(
+    FEEDBACK_ANSWERS.map((a) => [a.value, `${a.glyph} ${sentenceCase(a.label)}`]),
+  ),
+  [NO_ANSWER.filter]: `${NO_ANSWER.glyph} ${sentenceCase(NO_ANSWER.label)}`,
 };
+// Colour means the answer (never the level): text for list cells, pill and hover for the lesson page.
+const ANSWER_TEXT: Record<string, string> = {
+  know: "text-teal-600 dark:text-teal-400",
+  understood: "text-accent-500 dark:text-accent-400",
+  dont_know: "text-rose-500 dark:text-rose-400",
+};
+const ANSWER_PILL: Record<string, string> = {
+  know: "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 border-green-200 dark:border-green-700",
+  understood:
+    "bg-accent-100 dark:bg-accent-900/30 text-accent-700 dark:text-accent-300 border-accent-200 dark:border-accent-700",
+  dont_know:
+    "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 border-red-200 dark:border-red-700",
+};
+const ANSWER_HOVER: Record<string, string> = {
+  know: "hover:bg-green-100 dark:hover:bg-green-800 hover:text-green-700",
+  understood: "hover:bg-accent-100 dark:hover:bg-accent-900 hover:text-accent-700",
+  dont_know: "hover:bg-red-100 dark:hover:bg-red-900 hover:text-red-700",
+};
+const answerLabel = (a: FeedbackAnswer): string => `${a.glyph} ${a.label}`;
 const LEVEL_EMOJI: Record<string, string> = { junior: "🟢", mid: "🟡", senior: "🔴" };
 
 function lessonsQs(s: LessonsSelected, overrides: Record<string, string> = {}): string {
@@ -594,15 +626,7 @@ export function lessonsPage(d: LessonsData): Html {
     <div class="relative" x-data="{ open: false }" @click.outside="open = false" @keydown.escape="open = false">
       <button type="button" @click="open = !open" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition ${s.feedback ? "bg-accent-600 text-white border-accent-600" : "bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-accent-400"}">${feedbackLabel}${caret}</button>
       <div x-show="open" x-transition:enter="transition ease-out duration-100" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100" class="absolute left-0 top-full mt-1 z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg w-44 p-1 overflow-hidden" style="display:none">
-        ${(
-          [
-            ["", "All feedback"],
-            ["know", "✓ Knew it"],
-            ["understood", "💡 Understood"],
-            ["dont_know", "✗ Couldn't follow"],
-            ["none", "— No response"],
-          ] as [string, string][]
-        ).map(
+        ${([["", "All feedback"], ...Object.entries(FEEDBACK_LABELS)] as [string, string][]).map(
           ([val, lbl]) =>
             html`<button type="button" onclick="document.getElementById('h-feedback').value='${val}'; document.getElementById('filter-form').submit()" class="w-full text-left px-3 py-2 rounded-lg text-sm transition flex items-center justify-between ${s.feedback === val ? "bg-accent-50 dark:bg-accent-900/30 text-accent-700 dark:text-accent-300 font-medium" : "text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"}">${lbl}${s.feedback === val ? html`<span class="text-accent-500 ml-auto">✓</span>` : ""}</button>`,
         )}
@@ -739,7 +763,7 @@ ${
         <td class="px-3 py-3"><a href="/lessons/${encodeURIComponent(lesson.id)}" class="font-semibold text-[15px] leading-snug text-gray-800 dark:text-gray-100 hover:text-accent-600 dark:hover:text-accent-400 transition line-clamp-2">${lesson.title}</a></td>
         <td class="px-3 py-3"><a href="${lessonsQs(s, { level: lesson.level })}" class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${levelTextColor[lesson.level] ?? ""} hover:ring-2 hover:ring-current hover:ring-offset-1 transition-shadow">${lesson.level}</a></td>
         <td class="px-3 py-3 hidden lg:table-cell"><div class="flex flex-wrap gap-1">${lesson.categories.map((cat) => html`<a href="${lessonsQs(s, { category: cat })}" class="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-accent-100 dark:hover:bg-accent-900/40 hover:text-accent-700 dark:hover:text-accent-300 transition-colors">${cat}</a>`)}</div></td>
-        <td class="px-3 py-3 hidden xl:table-cell">${lesson.feedback === "know" ? html`<span class="text-xs text-teal-600 dark:text-teal-400 font-medium">✓ Knew it</span>` : lesson.feedback === "understood" ? html`<span class="text-xs text-accent-500 dark:text-accent-400 font-medium">💡 Understood</span>` : lesson.feedback === "dont_know" ? html`<span class="text-xs text-rose-500 dark:text-rose-400 font-medium">✗ Couldn't follow</span>` : ""}</td>
+        <td class="px-3 py-3 hidden xl:table-cell">${answerCell(lesson.feedback)}</td>
         <td class="px-2 py-3 text-center"><button type="button" hx-get="/lessons/${encodeURIComponent(lesson.id)}/share?format=panel" hx-target="#share-modal-body" hx-swap="innerHTML" @click="openShare($el)" title="Share this lesson" aria-label="Share this lesson" class="inline-flex text-gray-400 dark:text-gray-500 hover:text-accent-500 dark:hover:text-accent-400 transition opacity-0 group-hover:opacity-100 focus-visible:opacity-100"><svg class="w-4 h-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 14 14 6M8 6h6v6"/></svg></button></td>
       </tr>`;
       })}
@@ -934,6 +958,45 @@ export function sharePanel(lessonId: string, sh: ShareState, heading: string | n
 `;
 }
 
+type SeededCourse = { id: string; title: string; done: number; total: number; status: string };
+
+/** The lessons table's answer cell: glyph + state label, coloured as the answer. */
+function answerCell(feedback: string | null): Html | string {
+  const a = feedbackAnswer(feedback);
+  return a
+    ? html`<span class="text-xs ${ANSWER_TEXT[a.value]} font-medium">${answerLabel(a)}</span>`
+    : "";
+}
+
+/**
+ * What the stored answer did, in words, where the question was. The confidence is today's
+ * (null = the topic is not tracked), never a reconstructed "before"; `topicCreated` is the
+ * one-shot flash of the answer that started tracking the topic.
+ */
+function answeredSentence(
+  a: FeedbackAnswer,
+  l: Lesson,
+  confidence: number | null,
+  topicCreated: boolean,
+  course: SeededCourse | null,
+): Html {
+  const glyph = html`<span aria-hidden="true">${a.glyph}</span>`;
+  const now = confidence === null ? "" : ` (${l.topic_id}: ${confidence}/10)`;
+  if (a.value === "know") {
+    return topicCreated && confidence !== null
+      ? html`${glyph} Already knew it — it counts toward your confidence. ${topicCreatedNote(l.topic_id, confidence)}`
+      : html`${glyph} Already knew it — it counts toward your confidence${now}.`;
+  }
+  if (a.value === "understood") {
+    const yes = feedbackAnswer("know")?.word;
+    return html`${glyph} ${sentenceCase(a.label)} — recorded. Only “${yes}” moves confidence${now}.`;
+  }
+  const next = course
+    ? html`<a href="/courses/${encodeURIComponent(course.id)}" class="underline text-accent-700 dark:text-accent-300">${course.status === "completed" ? "Review the course" : "Continue the course"} · ${course.done}/${course.total}</a>`
+    : html`Ask your agent for a step-by-step course on it (Claude Code: <code class="text-xs">/devcoach:course ${l.topic_id}</code>).`;
+  return html`${glyph} ${sentenceCase(a.label)} — recorded. ${next}`;
+}
+
 export function lessonDetailPage(d: {
   lesson: Lesson;
   uiTheme: string;
@@ -941,10 +1004,15 @@ export function lessonDetailPage(d: {
   /** Flash after POST /lessons/import: freshly stored, or already in the log. */
   imported: "new" | "dup" | null;
   /** The course this lesson seeded, if any (newest). */
-  course: { id: string; title: string; done: number; total: number; status: string } | null;
+  course: SeededCourse | null;
+  /** The topic's confidence today (null = the topic is not tracked). */
+  confidence: number | null;
+  /** Flash after a "yes" that started tracking the topic (POST feedback → `?answered=topic-created`). */
+  topicCreated: boolean;
 }): Html {
   const l = d.lesson;
   const sh = d.share;
+  const answer = feedbackAnswer(l.feedback);
   const levelClass =
     l.level === "junior"
       ? "text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/30 border-green-300 dark:border-green-700"
@@ -1010,14 +1078,8 @@ ${
     ${d.course ? html`<a href="/courses/${encodeURIComponent(d.course.id)}" title="${d.course.title}" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-accent-50 dark:bg-accent-900/30 text-accent-700 dark:text-accent-300 border border-accent-200 dark:border-accent-700 hover:border-accent-400 transition">🎓 Course · ${d.course.done}/${d.course.total}${d.course.status === "completed" ? " ✓" : ""}</a>` : ""}
     ${l.categories.map((cat) => html`<a href="/lessons?category=${encodeURIComponent(cat)}" class="inline-block bg-gray-100 dark:bg-gray-800 hover:bg-accent-50 dark:hover:bg-accent-900/50 text-gray-600 dark:text-gray-300 text-xs rounded px-2 py-0.5 transition border border-gray-200 dark:border-gray-700 hover:border-accent-400 dark:hover:border-accent-600">${cat}</a>`)}
     ${
-      l.feedback
-        ? html`${
-            l.feedback === "know"
-              ? html`<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-700">✓ I knew this</span>`
-              : l.feedback === "understood"
-                ? html`<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-accent-100 dark:bg-accent-900/30 text-accent-700 dark:text-accent-300 border border-accent-200 dark:border-accent-700">💡 Understood</span>`
-                : html`<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-700">✗ Couldn't follow</span>`
-          }
+      answer
+        ? html`<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${ANSWER_PILL[answer.value]}">${answerLabel(answer)}</span>
         <form method="post" action="/lessons/${encodeURIComponent(l.id)}/feedback" ${raw(feedbackHx)}><input type="hidden" name="feedback" value="clear" /><input type="hidden" name="next" value="/lessons/${encodeURIComponent(l.id)}" /><button type="submit" class="text-xs text-gray-400 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-400 transition">Clear</button></form>`
         : ""
     }
@@ -1040,13 +1102,15 @@ ${
       : ""
   }
   <div id="lesson-feedback">${
-    !l.feedback
-      ? html`<div class="mt-6 pt-4 border-t border-gray-100 dark:border-gray-800 flex flex-wrap gap-2">
-    <form method="post" action="/lessons/${encodeURIComponent(l.id)}/feedback" ${raw(feedbackHx)}><input type="hidden" name="feedback" value="know" /><input type="hidden" name="next" value="/lessons/${encodeURIComponent(l.id)}" /><button type="submit" class="px-3 py-1 rounded text-sm font-medium transition bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-green-100 dark:hover:bg-green-800 hover:text-green-700 dark:hover:text-white">✓ I knew this</button></form>
-    <form method="post" action="/lessons/${encodeURIComponent(l.id)}/feedback" ${raw(feedbackHx)}><input type="hidden" name="feedback" value="understood" /><input type="hidden" name="next" value="/lessons/${encodeURIComponent(l.id)}" /><button type="submit" class="px-3 py-1 rounded text-sm font-medium transition bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-accent-100 dark:hover:bg-accent-900 hover:text-accent-700 dark:hover:text-white">💡 Understood</button></form>
-    <form method="post" action="/lessons/${encodeURIComponent(l.id)}/feedback" ${raw(feedbackHx)}><input type="hidden" name="feedback" value="dont_know" /><input type="hidden" name="next" value="/lessons/${encodeURIComponent(l.id)}" /><button type="submit" class="px-3 py-1 rounded text-sm font-medium transition bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-red-100 dark:hover:bg-red-900 hover:text-red-700 dark:hover:text-white">✗ Couldn't follow</button></form>
+    answer
+      ? html`<p class="mt-6 pt-4 border-t border-gray-100 dark:border-gray-800 text-sm text-gray-700 dark:text-gray-200">${answeredSentence(answer, l, d.confidence, d.topicCreated, d.course)}</p>`
+      : html`<div class="mt-6 pt-4 border-t border-gray-100 dark:border-gray-800 space-y-2">
+    <p class="text-sm text-gray-900 dark:text-gray-100">${FEEDBACK_QUESTION}</p>
+    <div role="group" aria-label="${FEEDBACK_QUESTION}" class="flex flex-wrap gap-2">${FEEDBACK_ANSWERS.map(
+      (a) =>
+        html`<form method="post" action="/lessons/${encodeURIComponent(l.id)}/feedback" ${raw(feedbackHx)}><input type="hidden" name="feedback" value="${a.value}" /><input type="hidden" name="next" value="/lessons/${encodeURIComponent(l.id)}" /><button type="submit" class="px-3 py-1 rounded text-sm font-medium transition bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 ${ANSWER_HOVER[a.value]} dark:hover:text-white"><span aria-hidden="true">${a.glyph}</span> ${a.word}</button></form>`,
+    )}</div>
   </div>`
-      : ""
   }</div>
   <div class="mt-4 pt-4 border-t border-gray-100 dark:border-gray-800 text-xs text-gray-300 dark:text-gray-600">ID: ${l.id}</div>
 </div>
@@ -1232,6 +1296,7 @@ export interface CoursesData {
 }
 
 export function coursesPage(d: CoursesData): Html {
+  const lostMe = feedbackAnswer("dont_know");
   const body = html`
 <div class="flex items-center justify-between mb-6">
   <h1 class="text-2xl font-bold text-accent-600 dark:text-accent-400">Courses</h1>
@@ -1269,7 +1334,7 @@ ${
     : html`<div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-8 text-center">
   <p class="text-3xl mb-3">🎓</p>
   <p class="text-gray-700 dark:text-gray-200 font-medium">No courses yet.</p>
-  <p class="text-sm text-gray-500 dark:text-gray-400 mt-2 max-w-md mx-auto">A course starts in your agent: answer <span class="font-mono">n</span> (couldn't follow) under a lesson card and say yes to the offer, or run <span class="font-mono">/devcoach:course</span> on any lesson or concept. The AI first asks what you already know, then writes the course here.</p>
+  <p class="text-sm text-gray-500 dark:text-gray-400 mt-2 max-w-md mx-auto">A course starts in your agent: answer <span class="font-mono">${lostMe?.key}</span> (${lostMe?.word}) under a lesson card and say yes to the offer, or run <span class="font-mono">/devcoach:course</span> on any lesson or concept. The AI first asks what you already know, then writes the course here.</p>
 </div>`
 }`;
   const scripts = html`<script src="/static/relative-time.js"></script>`;

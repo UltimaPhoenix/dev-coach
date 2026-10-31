@@ -186,8 +186,8 @@ $ devcoach lessons --imported
 ╰───┴────────────┴────────┴─────────────────────────────────────────┴───────┴──────────────┴───────────╯
 ```
 
-- Its **topic counts as taught**, so the coach will not teach it again, and **✓/✗ feedback works**
-  as for your own lessons. If the topic is not in your knowledge map yet, you are offered to track it.
+- Its **topic counts as taught**, so the coach will not teach it again, and **the "Already knew
+  it?" answers work** as for your own lessons. If the topic is not in your knowledge map yet, you are offered to track it.
 - It **never counts against your daily limit** or the minimum gap, and never resets the pacing — a
   shared lesson is a gift, not a lesson delivered to you.
 - Importing the same share twice reports *already in your log*; the same lesson from a different

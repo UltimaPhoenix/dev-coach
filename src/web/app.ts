@@ -468,8 +468,15 @@ export function createApp(opts: AppOptions = {}): Hono {
       return c.text("Unknown feedback value", 400);
     }
     const value = fb === "" || fb === "clear" ? null : fb;
-    db.withConnection((conn) => coach.recordFeedback(conn, c.req.param("lesson_id"), value));
-    return c.redirect(safeRedirect(textField(body, "next") || undefined), 303);
+    const lessonId = c.req.param("lesson_id");
+    const result = db.withConnection((conn) => coach.recordFeedback(conn, lessonId, value));
+    const next = safeRedirect(textField(body, "next") || undefined);
+    // A "yes" that started tracking the topic says so once, on the lesson page it came from.
+    const backToLesson = next === `/lessons/${encodeURIComponent(lessonId)}`;
+    return c.redirect(
+      result?.topic_created && backToLesson ? `${next}?answered=topic-created` : next,
+      303,
+    );
   });
 
   // One route for both surfaces: the list's Select mode posts many `id` fields, the lesson page's
@@ -549,7 +556,14 @@ export function createApp(opts: AppOptions = {}): Hono {
             ...courses.progress(seeded),
           }
         : null;
-      return { lesson, course, settingName: settings.share_name, uiTheme: settings.ui_theme };
+      const confidence = db.getAllKnowledge(conn)[lesson.topic_id] ?? null;
+      return {
+        lesson,
+        course,
+        confidence,
+        settingName: settings.share_name,
+        uiTheme: settings.ui_theme,
+      };
     });
     if (!found) return c.html("<h1>Lesson not found</h1>", 404);
     const q = c.req.query();
@@ -561,6 +575,8 @@ export function createApp(opts: AppOptions = {}): Hono {
         share: shareState(found.lesson, found.settingName, { open: q.share === "1" }).state,
         imported,
         course: found.course,
+        confidence: found.confidence,
+        topicCreated: q.answered === "topic-created",
       }),
     );
   });

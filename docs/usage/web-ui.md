@@ -93,7 +93,7 @@ Filterable, sortable table of all delivered lessons.
 **Filters:**
 - Period — All time / Today / Last 7 days / Last 30 days / Last year / Custom range (the date range
   accepts an optional time: `2026-04-25T14:30`)
-- Feedback — All feedback / ✓ Knew it / 💡 Understood / ✗ Couldn't follow / — No response
+- Feedback — All feedback / ✅ Knew it / ✨ New to me / ❌ Lost me / ○ No answer yet
 - Level — All levels / 🟢 Junior / 🟡 Mid / 🔴 Senior
 - Filters popover — Category / Project / Repository / Branch / Commit
 - Starred only
@@ -106,7 +106,7 @@ current filters."
 **Sort:** click the Date, Topic, Title, Level or Feedback column header. Ascending or descending.
 
 **Table columns:** ★, Date, Topic, Title, Level, Categories, Feedback, ↗ — the title gets the width
-(categories wrap onto a second line when needed); the feedback cell shows `✓ Knew it` / `💡 Understood` / `✗ Couldn't follow`
+(categories wrap onto a second line when needed); the feedback cell shows `✅ knew it` / `✨ new to me` / `❌ lost me`
 (or nothing yet); `↗` opens the Share panel right there; a shared lesson shows `🤝 <sender>`
 under its topic.
 
@@ -178,7 +178,12 @@ Full lesson content laid out in reading order:
   - **commit** — the exact commit (clickable to view on GitHub/GitLab/Bitbucket or as a local hash)
   - **folder** — a VS Code icon link that opens the project folder in VS Code, so you can immediately
     review the code that triggered the lesson
-- **Feedback buttons** — `✓ I knew this` / `💡 Understood` / `✗ Couldn't follow` (hidden once feedback is recorded)
+- **Already knew it?** — `✅ yes` / `✨ new to me` / `❌ lost me`, the same answers as the line under a
+  chat card. Once answered, the question becomes a sentence saying what the answer did: a *yes*
+  counts toward the topic's confidence (shown as it is now, e.g. `sqlite: 6/10`; a topic that wasn't
+  on your map yet is added at 6/10, and the sentence says so), *new to me* changes nothing, *lost me*
+  points at a step-by-step course (or the course it already seeded, with its progress). The answer
+  also shows as a badge next to the date, with **Clear** to take it back.
 - **ID line** — the full lesson ID, for `devcoach lesson <id>` and friends
 
 <Tabs>
@@ -365,7 +370,7 @@ The dashboard is where you actively shape your coaching:
 
 2. **Edit groups and topics** — add topics you care about, delete ones you don't. Your knowledge map is your learning intent statement.
 
-3. **Record feedback on lessons** — when you click ✓ or ✗ on a lesson, you're telling devcoach whether that angle landed. This adjusts both your confidence on that topic and future lesson depth.
+3. **Answer "Already knew it?" on lessons** — ✅ yes, ✨ new to me or ❌ lost me tells devcoach whether that angle was already yours, new and clear, or too dense. A *yes* adds a point of confidence on the topic (and so deeper lessons there); *lost me* keeps the lesson as a seed for a step-by-step course.
 
 4. **Star lessons to revisit** — use the `★` button to mark lessons worth reading again. You can filter by "starred only" on the Lessons page.
 

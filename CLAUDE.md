@@ -104,17 +104,26 @@ dev-coach/
 `update_course_progress`, `get_courses`.
 
 **Feedback** (`submit_feedback`) has three answers: `know` = already knew it (the only one that moves
-confidence: +1 entering, −1 leaving), `understood` = new and clear (no change), `dont_know` = couldn't
-follow this session (no change; the lesson is a course seed). `coach.recordFeedback` is the single
-writer (one transaction, idempotent) for MCP, CLI and the dashboard. Schema v4 rewrote pre-existing
-`dont_know` rows to `understood` once (gated on the stored `user_version`).
+confidence: +1 entering, −1 leaving; an untracked topic is created at 6/10 and `topic_created` says
+so; leaving `know` on a topic no longer tracked changes nothing), `understood` = new to me (no
+change), `dont_know` = lost me this session (no change; the lesson is a course seed). **One
+vocabulary**: `FEEDBACK_ANSWERS` in `core/models.ts` is the table every surface reads (answer word,
+CLI word, key, glyph, state label), and `feedbackLine()` (`core/prompts.ts`) renders the chat line
+`Already knew it? ✅ yes (y) · ✨ new to me (n) · ❌ lost me (l)` — `assets/SKILL.md` carries the same
+bytes (lock test) and `CARD_FALLBACK` ends with it. The CLI takes `yes|new|lost|clear` (no aliases
+for the stored values); the stored values never change. Every chat answer is recorded, `know` too
+(no band rule: the checkpoint calibration corrects drift). `topicCreatedNote` is the one sentence
+for a created topic (CLI line, dashboard sentence via the `?answered=topic-created` flash, MCP
+`note`). `coach.recordFeedback` is the single writer (one transaction, idempotent) for MCP, CLI and
+the dashboard. Schema v4 rewrote pre-existing `dont_know` rows to `understood` once (gated on the
+stored `user_version`).
 
 Every tool registers a `title` + read-only/destructive annotations, a tight Zod `inputSchema` with
 `.describe()` on each param, `outputSchema`/`structuredContent` for model-shaped returns
 (`Lesson`/`Profile`/`Settings`), and returns `{ isError: true, … }` with a recovery hint on failure.
 `log_lesson` is a **pure save** — it never elicits — and resets the pacing counters. Inline
 elicitation was removed: in the card-last flow the tool runs before the card is visible, so the
-"Did that land?" dialog asked about an unseen lesson (observed live in Claude Code, which DOES
+feedback dialog asked about an unseen lesson (observed live in Claude Code, which DOES
 declare the elicitation capability) and the `null` fallback then printed the text prompt too,
 asking twice. Feedback is the text line under the card, recorded next turn via `submit_feedback`. **Ordering is log_lesson-first, card-last**: the skill has the
 model call the tool silently and write the card as the FINAL message of the turn. Card-first was

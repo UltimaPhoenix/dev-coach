@@ -452,9 +452,9 @@ describe("cli", () => {
     expect((await run(["star", "c1"])).out).toContain("starred");
     expect((await run(["unstar", "c1"])).out).toContain("unstarred");
     expect((await run(["star", "missing"])).code).toBe(1);
-    expect((await run(["feedback", "c1", "know"])).out).toContain("confidence");
-    expect((await run(["feedback", "c1", "clear"])).out).toContain("cleared");
-    expect((await run(["feedback", "missing", "know"])).code).toBe(1);
+    expect((await run(["feedback", "c1", "yes"])).out).toContain("confidence");
+    expect((await run(["feedback", "c1", "clear"])).out).toContain("answer cleared");
+    expect((await run(["feedback", "missing", "yes"])).code).toBe(1);
     expect((await run(["feedback", "c1", "bogus"])).code).toBe(1);
     expect((await run(["delete", "c1"])).out).toContain("deleted");
     expect((await run(["delete", "c1"])).code).toBe(1);
@@ -843,7 +843,7 @@ describe("cli on a database newer than this build (read-only)", () => {
       const lessons = await run(["lessons"]);
       expect(lessons.out).toContain("Read me");
       expect(lessons.out).toContain("schema v99");
-      await expect(run(["feedback", "ro1", "know"])).rejects.toThrow(db.SchemaTooNewError);
+      await expect(run(["feedback", "ro1", "yes"])).rejects.toThrow(db.SchemaTooNewError);
       const doctor = await run(["doctor"]);
       expect(doctor.code).toBeNull();
       expect(doctor.out).toContain("READ-ONLY");
@@ -911,18 +911,69 @@ describe("cli rich rendering branches", () => {
     expect(sr).toContain("folder=/f");
     expect(sr).toContain("Context:");
     expect(sr).toContain("★ starred");
-    expect(sr).toContain("I knew this");
+    expect(sr).toContain("✅ knew it");
     const jr = (await run(["lesson", "jr"])).out;
-    expect(jr).toContain("Couldn't follow");
+    expect(jr).toContain("❌ lost me");
+    expect((await run(["lesson", "po"])).out).toContain("○ no answer yet");
   });
 
-  it("leaving know undoes its +1; understood and dont_know leave confidence alone", async () => {
-    const left = (await run(["feedback", "sr", "dont_know"])).out;
+  it("leaving yes undoes its +1; new and lost leave confidence alone", async () => {
+    db.withConnection((c) => db.upsertKnowledge(c, "python", 5));
+    const left = (await run(["feedback", "sr", "lost"])).out;
     const m = left.match(/confidence: (\d+) → (\d+)/);
     expect(m).not.toBeNull();
     expect(Number(m?.[2])).toBe(Number(m?.[1]) - 1); // leaving `know` undoes its +1
-    expect((await run(["feedback", "sr", "understood"])).out).toContain("confidence unchanged");
-    expect((await run(["feedback", "sr", "understood"])).out).toContain("💡 Understood");
+    expect(left).toContain("❌ lost me");
+    const fresh = (await run(["feedback", "sr", "new"])).out;
+    expect(fresh).toContain("confidence unchanged");
+    expect(fresh).toContain("✨ new to me");
+  });
+
+  it("feedback takes the answer words: yes records know, and says when it starts tracking a topic", async () => {
+    db.withConnection((c) => {
+      db.deleteKnowledge(c, "python");
+      db.setFeedback(c, "po", null);
+    });
+    const yes = await run(["feedback", "po", "yes"]);
+    expect(yes.code).toBeNull();
+    expect(yes.out).toContain("✅ knew it");
+    expect(yes.out).toContain("python wasn't on your knowledge map: it's tracked now, at 6/10.");
+    expect(db.withConnection((c) => db.getLessonById(c, "po"))?.feedback).toBe("know");
+    expect(db.withConnection((c) => db.getAllKnowledge(c)).python).toBe(6);
+    // tracked now: clearing gives the point back and says so
+    const cleared = (await run(["feedback", "po", "clear"])).out;
+    expect(cleared).toContain("answer cleared · python confidence: 6 → 5");
+  });
+
+  it("feedback refuses the stored values: the old word exits 1 and lists the four words", async () => {
+    for (const old of ["know", "understood", "dont_know"]) {
+      const r = await run(["feedback", "sr", old]);
+      expect(r.code).toBe(1);
+      expect(r.out).toContain(`Unknown answer '${old}'`);
+      for (const word of ["yes", "new", "lost", "clear"])
+        expect(r.out).toMatch(new RegExp(`^  ${word} `, "m"));
+      expect(r.out).toContain("an untracked topic is created at 6/10");
+    }
+  });
+
+  it("lessons --feedback filters by the answer words", async () => {
+    db.withConnection((c) => {
+      db.setFeedback(c, "jr", "understood");
+      db.setFeedback(c, "sr", "dont_know");
+      db.setFeedback(c, "po", null);
+    });
+    const fresh = (await run(["lessons", "--feedback", "new"])).out;
+    expect(fresh).toContain("Jr");
+    expect(fresh).not.toContain("Sr");
+    const lost = (await run(["lessons", "--feedback", "lost"])).out;
+    expect(lost).toContain("Sr");
+    expect(lost).not.toContain("Jr");
+    const none = (await run(["lessons", "--feedback", "none"])).out;
+    expect(none).toContain("Po");
+    expect(none).not.toContain("Jr");
+    const old = await run(["lessons", "--feedback", "understood"]);
+    expect(old.code).toBe(1);
+    expect(old.out).toMatch(/^ {2}none {2}○ no answer yet$/m);
   });
 
   it("stats shows weakest and strongest topics", async () => {

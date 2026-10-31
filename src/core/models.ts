@@ -10,10 +10,55 @@ export type Level = z.infer<typeof LevelSchema>;
 export const RepositoryPlatformSchema = z.enum(["github", "gitlab", "bitbucket", "local"]);
 export type RepositoryPlatform = z.infer<typeof RepositoryPlatformSchema>;
 
-// know = already knew it (confidence +1) · understood = new and now clear (no change) ·
-// dont_know = couldn't follow this session (no change; the lesson becomes a course seed).
+// The stored answers. They are model-facing (submit_feedback) and never change; every word a
+// person reads or types for them comes from FEEDBACK_ANSWERS below.
 export const FeedbackSchema = z.enum(["know", "understood", "dont_know"]);
 export type Feedback = z.infer<typeof FeedbackSchema>;
+
+/** One answer to "Already knew it?", as every surface names it. */
+export interface FeedbackAnswer {
+  /** What is stored (lessons.feedback) and what submit_feedback takes. */
+  value: Feedback;
+  /** The answer word: the chat line and the dashboard button. */
+  word: string;
+  /** The `devcoach feedback` / `lessons --feedback` argument: the answer word's first word. */
+  cli: string;
+  /** The key typed in chat: the answer word's first letter. */
+  key: string;
+  glyph: string;
+  /** The state label: lists, the meta line, badges. */
+  label: string;
+}
+
+/** The question every answer surface asks first. */
+export const FEEDBACK_QUESTION = "Already knew it?";
+
+/**
+ * The one feedback vocabulary, in display order. `know` is the only answer that moves the
+ * knowledge map: +1 on the topic (an untracked topic is created at 6/10), given back when the
+ * answer changes. `understood` and `dont_know` record the answer only; a `dont_know` lesson is
+ * a course seed.
+ */
+export const FEEDBACK_ANSWERS: readonly FeedbackAnswer[] = [
+  { value: "know", word: "yes", cli: "yes", key: "y", glyph: "✅", label: "knew it" },
+  {
+    value: "understood",
+    word: "new to me",
+    cli: "new",
+    key: "n",
+    glyph: "✨",
+    label: "new to me",
+  },
+  { value: "dont_know", word: "lost me", cli: "lost", key: "l", glyph: "❌", label: "lost me" },
+];
+
+/** The unanswered state, where a list or a filter needs to name it (never in chat). */
+export const NO_ANSWER = { cli: "clear", filter: "none", glyph: "○", label: "no answer yet" };
+
+/** The vocabulary row for a stored value; undefined for null or an unknown value. */
+export function feedbackAnswer(value: string | null | undefined): FeedbackAnswer | undefined {
+  return FEEDBACK_ANSWERS.find((a) => a.value === value);
+}
 
 /** Confidence accepted from tool inputs: clamped range 0-10. */
 export const confidenceInputSchema = z.number().int().min(0).max(10);
@@ -144,7 +189,7 @@ export interface RateLimitResult {
 
 /** Validate/normalize a raw object into a Lesson (applies timestamp normalization + null coercion). */
 // ── Courses ──────────────────────────────────────────────────────────────────
-// A course grows from a lesson (usually one the user couldn't follow) or a free concept: the AI
+// A course grows from a lesson (usually one that lost the user) or a free concept: the AI
 // walks the prerequisite chain, then writes ONE self-contained HTML document with one section per
 // step and teaches it step by step. The DB keeps the link and the progress; the document lives at
 // ~/.devcoach/courses/<id>/index.html.

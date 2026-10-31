@@ -1,5 +1,5 @@
 // Lesson display formatting, the skill-less card instructions, and level-based prompt templates.
-import type { Lesson } from "./models";
+import { FEEDBACK_ANSWERS, FEEDBACK_QUESTION, type Lesson } from "./models";
 
 /** The fields the card needs — a full Lesson or a shared-lesson payload both qualify. */
 export type LessonCard = Pick<
@@ -19,9 +19,23 @@ export function band(title: string): string {
   return `### ${"─".repeat(left)} ${title} ${"─".repeat(pad - left)}`;
 }
 
-/** The line written directly beneath a delivered card's closing band (assets/SKILL.md). */
-export const FEEDBACK_LINE =
-  "Did that land? ✅ knew it (y) · 💡 understood (u) · ❌ couldn't follow (n)";
+/**
+ * The line written directly beneath a delivered card's closing band, generated from the one
+ * vocabulary: `Already knew it? ✅ yes (y) · ✨ new to me (n) · ❌ lost me (l)`. assets/SKILL.md
+ * carries the same bytes (a test locks them).
+ */
+export function feedbackLine(): string {
+  const answers = FEEDBACK_ANSWERS.map((a) => `${a.glyph} ${a.word} (${a.key})`);
+  return `${FEEDBACK_QUESTION} ${answers.join(" · ")}`;
+}
+
+/**
+ * What every surface says when a "yes" started tracking a topic (an untracked topic is created
+ * at 6/10): the CLI line, the dashboard sentence and submit_feedback's `note`.
+ */
+export function topicCreatedNote(topic: string, confidence: number): string {
+  return `${topic} wasn't on your knowledge map: it's tracked now, at ${confidence}/10.`;
+}
 
 // The template's closing band, as assets/SKILL.md writes it: 11 dashes a side, like the top band.
 const TEMPLATE_CLOSING_BAND = `### ${"─".repeat(11)} [topic] · [level] ${"─".repeat(11)}`;
@@ -43,7 +57,7 @@ export const CARD_FALLBACK =
   `headings \`${band("🎓 devcoach")}\` and \`${TEMPLATE_CLOSING_BAND}\`, with ` +
   "`**[Title]** · [Category] · [Level]` (one category), the body you passed, and the tip last " +
   "— saving is not showing; the card in the final message is the only thing the user sees. " +
-  `Directly beneath the closing band, add the line: ${FEEDBACK_LINE}`;
+  `Directly beneath the closing band, add the line: ${feedbackLine()}`;
 
 /**
  * Format a Lesson as the chat card: a titled top band, `**Title** · Category · Level` with the
