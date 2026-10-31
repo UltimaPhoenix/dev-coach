@@ -428,23 +428,12 @@ const FEEDBACK_LABELS: Record<string, string> = {
   ),
   [NO_ANSWER.filter]: `${NO_ANSWER.glyph} ${sentenceCase(NO_ANSWER.label)}`,
 };
-// Colour means the answer (never the level): text for list cells, pill and hover for the lesson page.
+// Colour means the answer (never the level): the list's answer cell. The lesson page says the
+// answer in words, under the tip.
 const ANSWER_TEXT: Record<string, string> = {
   know: "text-teal-600 dark:text-teal-400",
   understood: "text-accent-500 dark:text-accent-400",
   dont_know: "text-rose-500 dark:text-rose-400",
-};
-const ANSWER_PILL: Record<string, string> = {
-  know: "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 border-green-200 dark:border-green-700",
-  understood:
-    "bg-accent-100 dark:bg-accent-900/30 text-accent-700 dark:text-accent-300 border-accent-200 dark:border-accent-700",
-  dont_know:
-    "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 border-red-200 dark:border-red-700",
-};
-const ANSWER_HOVER: Record<string, string> = {
-  know: "hover:bg-green-100 dark:hover:bg-green-800 hover:text-green-700",
-  understood: "hover:bg-accent-100 dark:hover:bg-accent-900 hover:text-accent-700",
-  dont_know: "hover:bg-red-100 dark:hover:bg-red-900 hover:text-red-700",
 };
 const answerLabel = (a: FeedbackAnswer): string => `${a.glyph} ${a.label}`;
 const LEVEL_EMOJI: Record<string, string> = { junior: "🟢", mid: "🟡", senior: "🔴" };
@@ -997,6 +986,127 @@ function answeredSentence(
   return html`${glyph} ${sentenceCase(a.label)} — recorded. ${next}`;
 }
 
+/** Markdown reduced to the words it reads as: no emphasis or code marks, one space, lower case. */
+function plainWords(md: string): string {
+  return md
+    .replace(/[`*_~#>\\]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
+/**
+ * The TL;DR box is for legacy lessons. A v2 body opens with its summary, so the box would say the
+ * first paragraph twice; a lesson without a summary has nothing to put in it.
+ */
+function needsTldr(l: Lesson): boolean {
+  const summary = plainWords(l.summary);
+  return summary !== "" && !plainWords(l.body ?? "").startsWith(summary);
+}
+
+/**
+ * `vscode://file/<path>` for a local folder: the path URI-encoded (spaces, `%`, `#`, `?`), Windows
+ * separators as `/`. The page links the path; it never prints it.
+ */
+function vscodeFileUrl(path: string): string {
+  return `vscode://file/${encodeURI(path.replace(/\\/g, "/")).replace(/[#?]/g, encodeURIComponent)}`;
+}
+
+/** The letters that answer, in display order (y n l): the hint and the off switch name them. */
+const ANSWER_KEYS = FEEDBACK_ANSWERS.map((a) => a.key);
+
+/**
+ * The page's answer keys (ruling 2 of the UI plan): a letter clicks the *visible* button that
+ * carries it, so the keys work only while the question is open (unanswered, or reopened with
+ * "change") — never with a modifier, on auto-repeat, while composing, in a field or under a modal
+ * dialog — and not at all once this browser turned them off (WCAG 2.1.4). The choice is a
+ * per-browser convenience, like the theme toggle's. `dialogOpen` is the delete dialog's state:
+ * it is true from the click on, while the dialog itself is visible only from the next frame.
+ */
+const LESSON_ANSWER_SCRIPT = raw(`function lessonAnswer() {
+    var STORE = 'lesson-keys';
+    var on = true;
+    try { on = localStorage.getItem(STORE) !== 'off'; } catch (e) {}
+    return {
+      editing: false,
+      refocus: false,
+      keys: on,
+      toggleKeys: function () {
+        this.keys = !this.keys;
+        try { if (this.keys) localStorage.removeItem(STORE); else localStorage.setItem(STORE, 'off'); } catch (e) {}
+      },
+      key: function (e, root, dialogOpen) {
+        if (dialogOpen || !this.keys || e.defaultPrevented || e.repeat || e.isComposing || e.keyCode === 229) return;
+        if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
+        var t = e.target;
+        if (t && t.closest && (t.isContentEditable || t.closest('input, textarea, select, [contenteditable]'))) return;
+        var visible = function (el) { return el.getClientRects().length > 0; };
+        if (Array.prototype.some.call(document.querySelectorAll('[aria-modal="true"], dialog[open]'), visible)) return;
+        var k = (e.key || '').toLowerCase();
+        var b = Array.prototype.find.call(root.querySelectorAll('button[data-key]'), function (x) { return x.dataset.key === k; });
+        if (!b || !visible(b)) return;
+        e.preventDefault();
+        b.click();
+      },
+    };
+  }`);
+
+/** The echo of the chat card's closing band, above the question: `topic · level`, mono and quiet. */
+function closingRule(l: Lesson): Html {
+  return html`<div aria-hidden="true" class="flex items-center gap-3 mb-4 font-mono text-xs text-gray-500 dark:text-gray-400"><span class="w-6 border-t border-gray-300 dark:border-gray-700"></span><span>${l.topic_id} · ${l.level}</span><span class="flex-1 border-t border-gray-300 dark:border-gray-700"></span></div>`;
+}
+
+/**
+ * "Already knew it?", right under the 💡 tip. The section persists across answers (Alpine state,
+ * live region); an answer swaps only #lesson-feedback-state. Once answered, the question becomes
+ * the sentence of what the answer did, and "change" reopens it on the page: a new choice is one
+ * write, "Clear the answer" its own. Focus goes to "change" after an answer and to the first
+ * answer after a clear. Only the answered state gives the question block an id: htmx 1.9 settles a
+ * same-id element with the old one's attributes for 20 ms, which would hide a fresh question.
+ */
+function feedbackControl(
+  l: Lesson,
+  confidence: number | null,
+  topicCreated: boolean,
+  course: SeededCourse | null,
+): Html {
+  const url = `/lessons/${encodeURIComponent(l.id)}`;
+  const answer = feedbackAnswer(l.feedback);
+  const yes = feedbackAnswer("know")?.word;
+  const refocus = raw(`x-init="if (refocus) { refocus = false; $el.focus() }"`);
+  const form = (value: string, button: Html) =>
+    html`<form method="post" action="${url}/feedback" hx-post="${url}/feedback" hx-target="#lesson-feedback-state" hx-select="#lesson-feedback-state" hx-swap="outerHTML"><input type="hidden" name="feedback" value="${value}" /><input type="hidden" name="next" value="${url}" />${button}</form>`;
+  const kbd = (k: string, extra = "") =>
+    html`<kbd class="${extra} px-1.5 rounded border border-gray-200 dark:border-gray-700 text-[11px] leading-4 text-gray-500 dark:text-gray-400">${k}</kbd>`;
+  const buttons = FEEDBACK_ANSWERS.map((a, i) => {
+    const current = a.value === l.feedback;
+    return form(
+      a.value,
+      html`<button type="submit" data-key="${a.key}" aria-keyshortcuts="${a.key}" :aria-keyshortcuts="keys ? '${a.key}' : false" aria-pressed="${String(current)}" ${i === 0 && !answer ? refocus : ""} class="inline-flex items-center gap-2 h-9 px-3 rounded-lg border text-sm transition bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-200 hover:border-accent-500 dark:hover:border-accent-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 ${current ? "border-accent-500 dark:border-accent-400 font-semibold" : "border-gray-200 dark:border-gray-700"}"><span aria-hidden="true">${a.glyph}</span>${a.word}<span aria-hidden="true" x-show="keys">${kbd(a.key, "hidden sm:inline-block")}</span></button>`,
+    );
+  });
+  const rule =
+    confidence === null
+      ? html`Only “${yes}” moves confidence; a “${yes}” puts ${l.topic_id} on your knowledge map.`
+      : html`Only “${yes}” moves your ${l.topic_id} confidence (now ${confidence}/10).`;
+  // The off switch (ruling 2) sits next to the hint at every width: the keys stay live below `sm`,
+  // so the way to turn them off has to stay reachable there too.
+  const keysSwitch = html`<span class="inline-flex flex-wrap items-baseline gap-x-1.5"><span x-show="keys" class="inline-flex items-baseline gap-1">Keys ${ANSWER_KEYS.map((k) => kbd(k, "inline-block"))}</span><span x-show="!keys" style="display:none">Keys off</span><span aria-hidden="true">·</span><button type="button" @click="toggleKeys()" class="underline hover:text-gray-900 dark:hover:text-gray-100"><span x-text="keys ? 'turn off' : 'turn on'">turn off</span><span class="sr-only"> the answer keys</span></button></span>`;
+  const question = html`<div ${answer ? raw(`id="fb-answers" x-show="editing" style="display:none"`) : ""} class="space-y-2.5">
+      <p class="text-[15px] text-gray-900 dark:text-gray-100">${FEEDBACK_QUESTION}</p>
+      <div role="group" aria-label="${FEEDBACK_QUESTION}" class="flex flex-wrap gap-2">${buttons}</div>
+      <div class="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-xs text-gray-500 dark:text-gray-400"><span>${rule}</span>${keysSwitch}${answer ? form("clear", html`<button type="submit" class="underline hover:text-gray-900 dark:hover:text-gray-100">Clear the answer</button>`) : ""}</div>
+    </div>`;
+  const sentence = answer
+    ? html`<p class="text-sm leading-6 text-gray-700 dark:text-gray-200">${answeredSentence(answer, l, confidence, topicCreated, course)} <button type="button" ${refocus} @click="editing = !editing" aria-expanded="false" :aria-expanded="editing" aria-controls="fb-answers" class="ml-1 text-gray-500 dark:text-gray-400 underline hover:text-gray-900 dark:hover:text-gray-100" x-text="editing ? 'keep' : 'change'">change</button></p>`
+    : "";
+  return html`<section id="lesson-feedback" aria-label="Your answer" aria-live="polite" class="mt-8"
+    x-data="lessonAnswer()" @keydown.window="key($event, $el, confirmOpen)" @submit="refocus = true; editing = false">
+  ${closingRule(l)}
+  <div id="lesson-feedback-state" class="space-y-3">${sentence}${question}</div>
+</section>`;
+}
+
 export function lessonDetailPage(d: {
   lesson: Lesson;
   uiTheme: string;
@@ -1012,17 +1122,12 @@ export function lessonDetailPage(d: {
 }): Html {
   const l = d.lesson;
   const sh = d.share;
-  const answer = feedbackAnswer(l.feedback);
-  const levelClass =
-    l.level === "junior"
-      ? "text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/30 border-green-300 dark:border-green-700"
-      : l.level === "mid"
-        ? "text-yellow-700 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/30 border-yellow-300 dark:border-yellow-700"
-        : "text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/30 border-red-300 dark:border-red-700";
+  const lessonUrl = `/lessons/${encodeURIComponent(l.id)}`;
+  const showTldr = needsTldr(l);
 
   const isLocal = l.repository_platform === "local";
   let repoUrl: string | null = null;
-  if (isLocal && l.repository) repoUrl = `vscode://file/${l.repository}`;
+  if (isLocal && l.repository) repoUrl = vscodeFileUrl(l.repository);
   else if (l.repository_platform && REPO_DOMAINS[l.repository_platform] && l.repository)
     repoUrl = `https://${REPO_DOMAINS[l.repository_platform]}/${l.repository}`;
   let commitUrl: string | null = null;
@@ -1037,13 +1142,16 @@ export function lessonDetailPage(d: {
   const hasMeta = Boolean(l.project || l.repository || l.branch || l.commit_hash || l.folder);
   const date = l.timestamp.slice(0, 10);
   const tip = l.timestamp.slice(0, 16).replace("T", " ");
-  // One feedback POST re-renders both regions: the badge row (target) and, out of band,
-  // the footer buttons — the markdown body is client-rendered, so a full-page swap would blank it.
-  const feedbackHx = `hx-post="/lessons/${encodeURIComponent(l.id)}/feedback" hx-target="#lesson-meta" hx-select="#lesson-meta" hx-swap="outerHTML" hx-select-oob="#lesson-feedback:outerHTML"`;
+  // Provenance labels and the metadata line: gray-500 / gray-400 (4.5:1 on the card, both themes).
+  const label = "text-gray-500 dark:text-gray-400";
+  const menuItem =
+    "w-full text-left px-3 py-2 rounded-lg text-sm transition flex items-center gap-2 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800";
+  const menuIcon =
+    "w-4 h-4 inline-flex items-center justify-center shrink-0 text-[13px] leading-none";
 
   const body = html`
-<div x-data="{ confirmOpen: false }" @keydown.escape.window="confirmOpen = false">
-<div class="mb-4"><a href="/lessons" class="text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-white text-sm transition">← Back to lessons</a></div>
+<div x-data="{ confirmOpen: false }" @keydown.escape.window="confirmOpen = false" class="max-w-3xl mx-auto">
+<div class="mb-4"><a href="/lessons" class="${label} hover:text-gray-900 dark:hover:text-white text-sm transition">← Back to lessons</a></div>
 ${
   d.imported
     ? html`<div class="mb-4 px-4 py-2 rounded-lg border text-sm bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-700 text-green-700 dark:text-green-300">${d.imported === "new" ? html`✓ Imported “${l.title}”${l.shared_by ? html`, shared by ${l.shared_by}` : ""}. It's in your log now — feedback works as usual and it never counts against your daily limit.` : html`“${l.title}” was already in your log — nothing changed.`}</div>`
@@ -1051,16 +1159,16 @@ ${
 }
 <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-6">
   <div class="flex flex-wrap items-center gap-3 mb-2">
-    <form id="lesson-star" method="post" action="/lessons/${encodeURIComponent(l.id)}/star" hx-post="/lessons/${encodeURIComponent(l.id)}/star" hx-target="#lesson-star" hx-select="#lesson-star" hx-swap="outerHTML">
+    <form id="lesson-star" method="post" action="${lessonUrl}/star" hx-post="${lessonUrl}/star" hx-target="#lesson-star" hx-select="#lesson-star" hx-swap="outerHTML">
       <input type="hidden" name="starred" value="${l.starred ? "0" : "1"}" />
-      <input type="hidden" name="next" value="/lessons/${encodeURIComponent(l.id)}" />
-      <button type="submit" title="${l.starred ? "Unstar" : "Star"}" class="w-6 text-center text-xl leading-none transition ${l.starred ? "text-yellow-400 hover:text-yellow-300" : "text-gray-300 dark:text-gray-600 hover:text-yellow-400"}">${l.starred ? "★" : "☆"}</button>
+      <input type="hidden" name="next" value="${lessonUrl}" />
+      <button type="submit" title="${l.starred ? "Unstar" : "Star"}" aria-label="${l.starred ? "Unstar this lesson" : "Star this lesson"}" class="w-6 text-center text-xl leading-none transition ${l.starred ? "text-yellow-400 hover:text-yellow-300" : "text-gray-500 dark:text-gray-400 hover:text-yellow-500"}">${l.starred ? "★" : "☆"}</button>
     </form>
-    <h1 class="text-xl font-bold text-gray-900 dark:text-white flex-1 min-w-0">${l.title}</h1>
-    <a href="/lessons?level=${l.level}" class="text-xs font-semibold px-2 py-0.5 rounded-full border ${levelClass} shrink-0 hover:ring-2 hover:ring-current hover:ring-offset-1 transition-shadow">${l.level}</a>
+    <h1 class="text-xl font-bold text-gray-900 dark:text-white w-full sm:w-auto sm:flex-1 min-w-0 order-first sm:order-none">${l.title}</h1>
     ${moreMenu(
-      html`<button type="button" @click="confirmOpen = true; open = false" class="w-full text-left px-3 py-2 rounded-lg text-sm transition flex items-center gap-2 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 hover:!bg-rose-50 dark:hover:!bg-rose-900/30 hover:text-rose-700 dark:hover:text-rose-300"><span class="w-4 h-4 inline-flex items-center justify-center shrink-0 text-[13px] leading-none" aria-hidden="true">🗑</span>Delete lesson…</button>`,
-      "shrink-0",
+      html`<button type="button" data-copy="${l.id}" @click="copyText($el.dataset.copy, $el.querySelector('[data-copy-label]'))" class="${menuItem}"><span class="${menuIcon}" aria-hidden="true">📋</span><span data-copy-label aria-live="polite">Copy id</span></button>
+      <button type="button" @click="confirmOpen = true; open = false" class="${menuItem} hover:!bg-rose-50 dark:hover:!bg-rose-900/30 hover:text-rose-700 dark:hover:text-rose-300"><span class="${menuIcon}" aria-hidden="true">🗑</span>Delete lesson…</button>`,
+      "shrink-0 ml-auto",
     )}
     <div class="relative shrink-0" x-data="{ open: ${String(sh.open)} }" @click.outside="open = false" @keydown.escape="open = false">
       <button type="button" @click="open = !open" title="Share this lesson" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-accent-400">↗ Share</button>
@@ -1069,50 +1177,40 @@ ${
       </div>
     </div>
   </div>
-  <div id="lesson-meta" class="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-500 dark:text-gray-400 mb-5">
-    <span class="relative group/date cursor-default">🗓 <span data-ts="${l.timestamp}">${date}</span>
-      <span class="absolute z-10 bottom-full left-0 mb-1 px-2 py-1 rounded bg-gray-800 dark:bg-gray-700 text-white text-xs whitespace-nowrap pointer-events-none opacity-0 group-hover/date:opacity-100 transition-opacity duration-150">${tip}</span>
+  <div id="lesson-meta" class="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm ${label} mb-5">
+    <span class="inline-flex flex-wrap items-baseline gap-x-1.5">
+      <span class="text-accent-600 dark:text-accent-400">${l.topic_id}</span><span aria-hidden="true">·</span>
+      <a href="/lessons?level=${l.level}" title="Every ${l.level} lesson" class="hover:text-gray-900 dark:hover:text-gray-100 hover:underline">${l.level}</a><span aria-hidden="true">·</span>
+      <span class="relative group/date cursor-default"><span data-ts="${l.timestamp}">${date}</span>
+        <span class="absolute z-10 bottom-full left-0 mb-1 px-2 py-1 rounded bg-gray-800 dark:bg-gray-700 text-white text-xs whitespace-nowrap pointer-events-none opacity-0 group-hover/date:opacity-100 transition-opacity duration-150">${tip}</span>
+      </span>
     </span>
-    <span>🏷 <span class="text-cyan-600 dark:text-cyan-400">${l.topic_id}</span></span>
-    ${l.imported ? html`<span title="This lesson was shared with you">🤝 shared by <span class="text-gray-700 dark:text-gray-200">${l.shared_by ?? "anonymous"}</span></span>` : ""}
+    ${l.imported ? html`<span title="This lesson was shared with you">🤝 ${l.shared_by ? html`shared by <span class="text-gray-700 dark:text-gray-200">${l.shared_by}</span>` : "shared anonymously"}</span>` : ""}
     ${d.course ? html`<a href="/courses/${encodeURIComponent(d.course.id)}" title="${d.course.title}" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-accent-50 dark:bg-accent-900/30 text-accent-700 dark:text-accent-300 border border-accent-200 dark:border-accent-700 hover:border-accent-400 transition">🎓 Course · ${d.course.done}/${d.course.total}${d.course.status === "completed" ? " ✓" : ""}</a>` : ""}
     ${l.categories.map((cat) => html`<a href="/lessons?category=${encodeURIComponent(cat)}" class="inline-block bg-gray-100 dark:bg-gray-800 hover:bg-accent-50 dark:hover:bg-accent-900/50 text-gray-600 dark:text-gray-300 text-xs rounded px-2 py-0.5 transition border border-gray-200 dark:border-gray-700 hover:border-accent-400 dark:hover:border-accent-600">${cat}</a>`)}
-    ${
-      answer
-        ? html`<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${ANSWER_PILL[answer.value]}">${answerLabel(answer)}</span>
-        <form method="post" action="/lessons/${encodeURIComponent(l.id)}/feedback" ${raw(feedbackHx)}><input type="hidden" name="feedback" value="clear" /><input type="hidden" name="next" value="/lessons/${encodeURIComponent(l.id)}" /><button type="submit" class="text-xs text-gray-400 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-400 transition">Clear</button></form>`
-        : ""
-    }
   </div>
-  <div class="my-5 pl-4 border-l-4 border-accent-400 dark:border-accent-500 bg-accent-50 dark:bg-accent-950/40 rounded-r-lg py-3 pr-4">
-    <p class="text-xs font-semibold uppercase tracking-wide text-accent-500 dark:text-accent-400 mb-1">TL;DR</p>
+  ${
+    showTldr
+      ? html`<div class="my-5 pl-4 border-l-4 border-accent-400 dark:border-accent-500 bg-accent-50 dark:bg-accent-950/40 rounded-r-lg py-3 pr-4">
+    <p class="text-xs font-semibold uppercase tracking-wide text-accent-700 dark:text-accent-300 mb-1">TL;DR</p>
     <div id="summary-content" class="markdown-body text-sm text-accent-900 dark:text-accent-100"></div>
-  </div>
-  <div id="body-content" class="markdown-body"></div>
-  ${l.task_context ? html`<div class="mt-6 pt-4 border-t border-gray-100 dark:border-gray-800 text-sm text-gray-500 dark:text-gray-400"><span class="text-gray-400 dark:text-gray-500">Context:</span> ${l.task_context}</div>` : ""}
+  </div>`
+      : ""
+  }
+  <div id="body-content" class="markdown-body dc-prose"></div>
+  ${feedbackControl(l, d.confidence, d.topicCreated, d.course)}
+  ${l.task_context ? html`<div class="mt-6 pt-4 border-t border-gray-100 dark:border-gray-800 text-sm text-gray-700 dark:text-gray-300"><span class="${label}">Context:</span> ${l.task_context}</div>` : ""}
   ${
     hasMeta
-      ? html`<div class="mt-4 pt-4 border-t border-gray-100 dark:border-gray-800"><div class="flex flex-wrap gap-x-5 gap-y-1.5 text-xs text-gray-400 dark:text-gray-500 font-mono">
-    ${l.project ? html`<span><span class="text-gray-400 dark:text-gray-600">project</span> ${repoUrl ? html`<a href="${repoUrl}" ${!isLocal ? raw('target="_blank" rel="noopener"') : ""} class="text-gray-600 dark:text-gray-300 hover:text-accent-600 dark:hover:text-accent-400 transition">${l.project}</a>` : html`<span class="text-gray-600 dark:text-gray-300">${l.project}</span>`}</span>` : ""}
-    ${l.repository ? html`<span class="inline-flex items-center gap-1"><span class="text-gray-400 dark:text-gray-600">repo</span>${l.repository_platform && REPO_DOMAINS[l.repository_platform] ? html`<img src="/static/vendor/icons/${l.repository_platform}.svg" class="w-3 h-3 dark:invert opacity-60 shrink-0" alt="" />` : ""}${repoUrl ? html`<a href="${repoUrl}" ${!isLocal ? raw('target="_blank" rel="noopener"') : ""} class="text-gray-600 dark:text-gray-300 hover:text-accent-600 dark:hover:text-accent-400 transition">${l.repository}</a>` : html`<span class="text-gray-600 dark:text-gray-300">${l.repository}</span>`}</span>` : ""}
-    ${l.branch ? html`<span><span class="text-gray-400 dark:text-gray-600">branch</span> <span class="text-accent-600 dark:text-accent-400">${l.branch}</span></span>` : ""}
-    ${l.commit_hash ? html`<span><span class="text-gray-400 dark:text-gray-600">commit</span> ${commitUrl ? html`<a href="${commitUrl}" target="_blank" rel="noopener" class="text-cyan-600 dark:text-cyan-400 hover:text-accent-600 dark:hover:text-accent-400 transition">${l.commit_hash.slice(0, 7)}</a>` : html`<span class="text-cyan-600 dark:text-cyan-400">${l.commit_hash.slice(0, 7)}</span>`}</span>` : ""}
-    ${l.folder ? html`<span class="inline-flex items-center gap-1"><span class="text-gray-400 dark:text-gray-600">folder</span><a href="vscode://file/${l.folder}" class="inline-flex items-center gap-1 text-gray-600 dark:text-gray-300 hover:text-accent-600 dark:hover:text-accent-400 transition"><img src="/static/vendor/icons/vscode.svg" class="w-3.5 h-3.5 shrink-0" alt="" />${l.folder}</a></span>` : ""}
+      ? html`<div class="mt-4 pt-4 border-t border-gray-100 dark:border-gray-800"><div class="flex flex-wrap gap-x-5 gap-y-1.5 text-xs font-mono">
+    ${l.project ? html`<span><span class="${label}">project</span> ${repoUrl ? html`<a href="${repoUrl}" ${!isLocal ? raw('target="_blank" rel="noopener"') : ""} class="text-gray-700 dark:text-gray-300 hover:text-accent-600 dark:hover:text-accent-400 transition">${l.project}</a>` : html`<span class="text-gray-700 dark:text-gray-300">${l.project}</span>`}</span>` : ""}
+    ${l.repository ? html`<span class="inline-flex items-center gap-1"><span class="${label}">repo</span>${l.repository_platform && REPO_DOMAINS[l.repository_platform] ? html`<img src="/static/vendor/icons/${l.repository_platform}.svg" class="w-3 h-3 dark:invert opacity-60 shrink-0" alt="" />` : ""}${repoUrl ? html`<a href="${repoUrl}" ${!isLocal ? raw('target="_blank" rel="noopener"') : ""} class="text-gray-700 dark:text-gray-300 hover:text-accent-600 dark:hover:text-accent-400 transition">${l.repository}</a>` : html`<span class="text-gray-700 dark:text-gray-300">${l.repository}</span>`}</span>` : ""}
+    ${l.branch ? html`<span><span class="${label}">branch</span> <span class="text-accent-600 dark:text-accent-400">${l.branch}</span></span>` : ""}
+    ${l.commit_hash ? html`<span><span class="${label}">commit</span> ${commitUrl ? html`<a href="${commitUrl}" target="_blank" rel="noopener" class="text-accent-600 dark:text-accent-400 hover:underline transition">${l.commit_hash.slice(0, 7)}</a>` : html`<span class="text-accent-600 dark:text-accent-400">${l.commit_hash.slice(0, 7)}</span>`}</span>` : ""}
+    ${l.folder ? html`<a href="${vscodeFileUrl(l.folder)}" class="inline-flex items-center gap-1 text-gray-700 dark:text-gray-300 hover:text-accent-600 dark:hover:text-accent-400 transition"><img src="/static/vendor/icons/vscode.svg" class="w-3.5 h-3.5 shrink-0" alt="" />Open folder in VS Code</a>` : ""}
   </div></div>`
       : ""
   }
-  <div id="lesson-feedback">${
-    answer
-      ? html`<p class="mt-6 pt-4 border-t border-gray-100 dark:border-gray-800 text-sm text-gray-700 dark:text-gray-200">${answeredSentence(answer, l, d.confidence, d.topicCreated, d.course)}</p>`
-      : html`<div class="mt-6 pt-4 border-t border-gray-100 dark:border-gray-800 space-y-2">
-    <p class="text-sm text-gray-900 dark:text-gray-100">${FEEDBACK_QUESTION}</p>
-    <div role="group" aria-label="${FEEDBACK_QUESTION}" class="flex flex-wrap gap-2">${FEEDBACK_ANSWERS.map(
-      (a) =>
-        html`<form method="post" action="/lessons/${encodeURIComponent(l.id)}/feedback" ${raw(feedbackHx)}><input type="hidden" name="feedback" value="${a.value}" /><input type="hidden" name="next" value="/lessons/${encodeURIComponent(l.id)}" /><button type="submit" class="px-3 py-1 rounded text-sm font-medium transition bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 ${ANSWER_HOVER[a.value]} dark:hover:text-white"><span aria-hidden="true">${a.glyph}</span> ${a.word}</button></form>`,
-    )}</div>
-  </div>`
-  }</div>
-  <div class="mt-4 pt-4 border-t border-gray-100 dark:border-gray-800 text-xs text-gray-300 dark:text-gray-600">ID: ${l.id}</div>
 </div>
 ${dangerDialog(
   "confirmOpen",
@@ -1144,8 +1242,12 @@ ${dangerDialog(
     },
     breaks: true, gfm: true,
   });
-  document.getElementById('summary-content').innerHTML = DOMPurify.sanitize(marked.parse(${raw(jsonForScript(l.summary))}));
+  ${showTldr ? html`document.getElementById('summary-content').innerHTML = DOMPurify.sanitize(marked.parse(${raw(jsonForScript(l.summary))}));` : ""}
   document.getElementById('body-content').innerHTML = DOMPurify.sanitize(marked.parse(${raw(jsonForScript(l.body))}));
+  // The tip (the last paragraph that opens with the light bulb, U+1F4A1) sits right above the
+  // question: set it apart. A body without one is left as it is.
+  Array.from(document.querySelectorAll('#body-content > p')).reverse().find(function (p) { return p.textContent.trim().startsWith('\\u{1F4A1}'); })?.classList.add('dc-tip');
+  ${LESSON_ANSWER_SCRIPT}
 </script>`;
 
   return layout({

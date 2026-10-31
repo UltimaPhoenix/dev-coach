@@ -108,12 +108,10 @@ describe("web app", () => {
       ),
     );
     const page = await (await get("/lessons/v1")).text();
-    const question = page.indexOf(
-      '<p class="text-sm text-gray-900 dark:text-gray-100">Already knew it?</p>',
-    );
+    const question = page.indexOf(">Already knew it?</p>");
     expect(question).toBeGreaterThan(0);
     expect(page).toContain('role="group" aria-label="Already knew it?"');
-    const buttons = ["✅</span> yes", "✨</span> new to me", "❌</span> lost me"].map((b) =>
+    const buttons = ["✅</span>yes", "✨</span>new to me", "❌</span>lost me"].map((b) =>
       page.indexOf(b),
     );
     expect(buttons.every((i) => i > question)).toBe(true);
@@ -187,7 +185,8 @@ describe("web app", () => {
     ).toBe(400);
     expect((await post("/lessons/w1/feedback", { feedback: "understood" })).status).toBe(303);
     const answered = await (await get("/lessons/w1")).text();
-    expect(answered).toContain("✨ new to me"); // the meta badge
+    // the question is the answer's one place: the reopened question marks it, no badge elsewhere
+    expect(answered).toMatch(/data-key="n" [^>]*aria-pressed="true"/);
     expect(answered).toMatch(
       /New to me — recorded\. Only “yes” moves confidence \(python: \d+\/10\)\./,
     );
@@ -303,7 +302,6 @@ describe("web view branches (rich rendering)", () => {
       ),
     );
     const html = await (await get("/lessons/g1")).text();
-    expect(html).toContain("✅ knew it");
     expect(html).toContain("Already knew it — it counts toward your confidence");
     expect(html).toContain("github.com/UltimaPhoenix/dev-coach");
     expect(html).toContain("/commit/abcdef1234567");
@@ -390,7 +388,7 @@ describe("web view branches — exhaustive", () => {
     });
     const gl = await (await get("/lessons/gl")).text();
     expect(gl).toContain("/-/commit/deadbeef1234"); // gitlab commit URL form
-    expect(gl).toContain("❌ lost me"); // dont_know branch
+    expect(gl).toMatch(/data-key="l" [^>]*aria-pressed="true"/); // dont_know branch
     expect(gl).toContain("Lost me — recorded. Ask your agent for a step-by-step course on it");
     expect(gl).toContain("/devcoach:course");
     expect(gl).toContain("Context:"); // task_context branch
@@ -1136,5 +1134,305 @@ describe("web courses", () => {
     expect(del.headers.get("location")).toBe("/courses");
     expect(existsSync(courses.courseDir(course.id))).toBe(false);
     expect((await get(`/courses/${course.id}`)).status).toBe(404);
+  });
+});
+
+describe("web lesson page: the answer under the tip, the reading column", () => {
+  const V2_SUMMARY = "You set `busy_timeout` to 0, so the second writer failed at once.";
+  const FOLDER = "/Users/someone/work/my project#1";
+  const same = { "sec-fetch-site": "same-origin" };
+  beforeAll(() => {
+    db.withConnection((c) => {
+      const mk = (o: Record<string, unknown>) =>
+        db.insertLesson(
+          c,
+          parseLesson({
+            timestamp: "2026-10-30T10:00:00Z",
+            topic_id: "sqlite",
+            categories: ["database"],
+            title: String(o.id),
+            level: "mid",
+            summary: "s",
+            ...o,
+          }),
+        );
+      mk({
+        id: "rc-v2",
+        summary: V2_SUMMARY,
+        body: "You set **`busy_timeout`** to 0, so the second writer failed at once. SQLite has no lock queue.\n\n💡 *Senior tip:* set it where the connection opens.",
+        folder: FOLDER,
+        project: "dev-coach",
+      });
+      mk({
+        id: "rc-legacy",
+        summary: "Docker caches each layer by its content hash.",
+        body: "## Layers\n\nEvery `RUN` creates a layer.\n\n💡 *Senior tip:* copy the manifests first.",
+      });
+      mk({ id: "rc-lost", topic_id: "cdn", body: "Edge caches key on the URL." });
+    });
+  });
+
+  it("the control follows #body-content: the topic · level rule, the question, keys y n l, the off switch", async () => {
+    const page = await (await get("/lessons/rc-v2")).text();
+    const bodyAt = page.indexOf('<div id="body-content" class="markdown-body dc-prose"></div>');
+    expect(bodyAt).toBeGreaterThan(0);
+    const controlAt = page.indexOf('<section id="lesson-feedback"');
+    expect(controlAt).toBeGreaterThan(bodyAt);
+    // nothing between the body and the control: the answer sits right under the tip
+    expect(
+      page
+        .slice(bodyAt, controlAt)
+        .replace(/<div id="body-content"[^>]*><\/div>/, "")
+        .trim(),
+    ).toBe("");
+    const control = page.slice(controlAt, page.indexOf("</section>", controlAt));
+    expect(control).toContain('aria-live="polite"');
+    expect(control).toContain('hx-target="#lesson-feedback-state"');
+    expect(control.indexOf("<span>sqlite · mid</span>")).toBeLessThan(
+      control.indexOf(">Already knew it?</p>"),
+    );
+    expect(control).toContain('role="group" aria-label="Already knew it?"');
+    const keys = [...control.matchAll(/\saria-keyshortcuts="([^"]*)"/g)].map((m) => m[1]);
+    expect(keys.join(" ")).toBe("y n l");
+    for (const k of keys) {
+      expect(control).toContain(`data-key="${k}"`);
+      expect(control).toContain(`:aria-keyshortcuts="keys ? '${k}' : false"`); // removed when off
+    }
+    expect(control).not.toContain('aria-pressed="true"');
+    expect(control).toContain('<button type="button" @click="toggleKeys()"');
+    expect(control).toContain("<span x-text=\"keys ? 'turn off' : 'turn on'\">turn off</span>");
+    expect(control).toContain(
+      '<span x-show="keys" class="inline-flex items-baseline gap-1">Keys <kbd',
+    );
+    expect(control).toContain("hidden sm:inline-block"); // the per-button hints, from sm up
+    expect(control).toMatch(/data-key="y" [^>]*x-init="if \(refocus\)/); // focus lands here after a clear
+    expect(control).toContain(
+      "Only “yes” moves confidence; a “yes” puts sqlite on your knowledge map.",
+    );
+    expect(page).toContain("localStorage.getItem(STORE) !== 'off'");
+  });
+
+  it("POST know → the sentence with *change*; clear → the three buttons again", async () => {
+    const yes = await postForm(
+      "/lessons/rc-v2/feedback",
+      { feedback: "know", next: "/lessons/rc-v2" },
+      same,
+    );
+    expect(yes.status).toBe(303);
+    const answered = await (await get("/lessons/rc-v2")).text();
+    expect(answered).toContain(
+      "Already knew it — it counts toward your confidence (sqlite: 6/10).",
+    );
+    expect(answered).toContain(
+      'aria-expanded="false" :aria-expanded="editing" aria-controls="fb-answers"',
+    );
+    expect(answered).toContain(`x-text="editing ? 'keep' : 'change'">change</button>`);
+    // the question is still there, closed, with the current answer pressed and its own Clear
+    expect(answered).toContain('id="fb-answers" x-show="editing" style="display:none"');
+    expect(answered).toMatch(/data-key="y" [^>]*aria-pressed="true"/);
+    expect(answered).toContain(">Clear the answer</button>");
+    expect(answered).toContain("Only “yes” moves your sqlite confidence (now 6/10).");
+
+    await postForm("/lessons/rc-v2/feedback", { feedback: "clear", next: "/lessons/rc-v2" }, same);
+    const cleared = await (await get("/lessons/rc-v2")).text();
+    expect(cleared).not.toContain("it counts toward your confidence");
+    expect(cleared).not.toContain('id="fb-answers"');
+    expect(cleared).not.toContain("Clear the answer");
+    expect(cleared.match(/<button type="submit" data-key="[ynl]"/g)).toHaveLength(3);
+    expect(cleared).not.toContain('aria-pressed="true"');
+    expect(cleared).toContain("Only “yes” moves your sqlite confidence (now 5/10).");
+  });
+
+  it("lost me: the host-neutral course sentence, or Continue the course once one exists", async () => {
+    await post("/lessons/rc-lost/feedback", { feedback: "dont_know", next: "/lessons/rc-lost" });
+    const lost = await (await get("/lessons/rc-lost")).text();
+    expect(lost).toContain(
+      "Lost me — recorded. Ask your agent for a step-by-step course on it (Claude Code: <code",
+    );
+    expect(lost).not.toContain("Continue the course");
+    const course = db.withConnection((c) =>
+      courses.createCourse(c, {
+        title: "CDN caching, step by step",
+        topic_id: "cdn",
+        goal: "Read a cache key",
+        lesson_id: "rc-lost",
+      }),
+    );
+    try {
+      const seeded = await (await get("/lessons/rc-lost")).text();
+      expect(seeded).toContain("Continue the course · 0/0</a>");
+      expect(seeded).not.toContain("Ask your agent");
+    } finally {
+      db.withConnection((c) => courses.deleteCourse(c, course.id));
+    }
+  });
+
+  it("TL;DR only for a legacy body: a v2 body that opens with its summary has none", async () => {
+    const v2 = await (await get("/lessons/rc-v2")).text();
+    expect(v2).not.toContain("TL;DR");
+    expect(v2).not.toContain("summary-content");
+    const legacy = await (await get("/lessons/rc-legacy")).text();
+    expect(legacy).toContain(">TL;DR</p>");
+    expect(legacy).toContain("document.getElementById('summary-content').innerHTML");
+    // no summary, nothing to show
+    db.withConnection((c) =>
+      db.insertLesson(
+        c,
+        parseLesson({
+          id: "rc-nosum",
+          timestamp: "2026-10-30T09:00:00Z",
+          topic_id: "sqlite",
+          categories: ["database"],
+          title: "No summary",
+          level: "mid",
+          summary: "",
+          body: "Body only.",
+        }),
+      ),
+    );
+    expect(await (await get("/lessons/rc-nosum")).text()).not.toContain("TL;DR");
+  });
+
+  it("a shared lesson without a name says “shared anonymously”; a Windows folder links with slashes", async () => {
+    db.withConnection((c) =>
+      db.insertLesson(
+        c,
+        parseLesson({
+          id: "rc-anon",
+          timestamp: "2026-10-30T08:00:00Z",
+          topic_id: "sqlite",
+          categories: ["database"],
+          title: "Anonymous",
+          level: "senior",
+          summary: "s",
+          imported: true,
+          shared_by: null,
+          folder: String.raw`C:\Users\someone\my repo`,
+        }),
+      ),
+    );
+    const page = await (await get("/lessons/rc-anon")).text();
+    expect(page).toContain("🤝 shared anonymously");
+    expect(page).not.toContain("shared by anonymous");
+    expect(page).toContain('href="vscode://file/C:/Users/someone/my%20repo"');
+    expect(page.replace(/href="vscode:\/\/file[^"]*"/g, "")).not.toContain("someone");
+  });
+
+  it("the folder is a link to VS Code; the page never prints the path", async () => {
+    const page = await (await get("/lessons/rc-v2")).text();
+    expect(page).toContain(
+      'href="vscode://file//Users/someone/work/my%20project%231" class="inline-flex',
+    );
+    expect(page).toContain("Open folder in VS Code</a>");
+    const outsideTheLink = page.replace(/href="vscode:\/\/file[^"]*"/g, "");
+    for (const part of [FOLDER, "/Users/someone", "my project"]) {
+      expect(outsideTheLink).not.toContain(part);
+    }
+  });
+
+  it("metadata reads topic · level · date; the id moves to ⋯ Copy id; muted text keeps 4.5:1", async () => {
+    const page = await (await get("/lessons/rc-legacy")).text();
+    const meta = page.slice(page.indexOf('id="lesson-meta"'), page.indexOf(">TL;DR</p>"));
+    const [topic, level, date] = ['">sqlite</span>', ">mid</a>", "data-ts="].map((s) =>
+      meta.indexOf(s),
+    );
+    expect(topic).toBeGreaterThan(0);
+    expect(topic).toBeLessThan(level);
+    expect(level).toBeLessThan(date);
+    expect(page).not.toMatch(/rounded-full[^"]*"[^>]*>mid</); // the level is a word, not a pill
+    expect(page).toContain(
+      `data-copy="rc-legacy" @click="copyText($el.dataset.copy, $el.querySelector('[data-copy-label]'))"`,
+    );
+    expect(page).toContain(">Copy id</span>");
+    expect(page).not.toContain("ID: rc-legacy");
+    // gray-300/400 on white and gray-600 on the dark panel fail 4.5:1; cyan-600 fails on white
+    const card = page.slice(page.indexOf('id="lesson-meta"'), page.indexOf("Delete this lesson?"));
+    expect(card).not.toMatch(/(?<![\w:-])text-gray-[34]00\b/);
+    expect(card).not.toContain("dark:text-gray-600");
+    expect(card).not.toContain("cyan-");
+    expect(page).toContain('aria-label="Star this lesson"');
+  });
+
+  it("the tip gets its rule; the stylesheet has the reading column and honours reduced motion", async () => {
+    const page = await (await get("/lessons/rc-legacy")).text();
+    expect(page).toContain("startsWith('\\u{1F4A1}'); })?.classList.add('dc-tip')");
+    const css = await (await get("/static/style.css")).text();
+    expect(css).toContain(".dc-prose > * { max-width: 38rem; }");
+    expect(css).toContain(".dc-prose > pre, .dc-prose > table { max-width: none; }");
+    expect(css).toContain("@media (prefers-reduced-motion: reduce)");
+    expect((await get("/static/share.js")).status).toBe(200);
+    expect(await (await get("/static/share.js")).text()).toContain("window.copyText = function");
+  });
+
+  it("the page keys: a visible button only — never with a modifier, in a field, under a dialog, or once off", async () => {
+    const page = await (await get("/lessons/rc-legacy")).text();
+    const src = page.slice(page.indexOf("function lessonAnswer()"), page.lastIndexOf("</script>"));
+    const store = new Map<string, string>();
+    let modalOpen = false;
+    const clicked: string[] = [];
+    const button = (key: string, shown = true) => ({
+      dataset: { key },
+      getClientRects: () => (shown ? [{}] : []),
+      click: () => clicked.push(key),
+    });
+    const root = { querySelectorAll: () => [button("y"), button("n"), button("l", false)] };
+    const storage = {
+      getItem: (k: string) => store.get(k) ?? null,
+      setItem: (k: string, v: string) => store.set(k, v),
+      removeItem: (k: string) => store.delete(k),
+    };
+    const doc = {
+      querySelectorAll: () => (modalOpen ? [{ getClientRects: () => [{}] }] : []),
+    };
+    const load = (ls: unknown) =>
+      new Function("localStorage", "document", `${src}; return lessonAnswer;`)(ls, doc);
+    const outside = { closest: () => null, isContentEditable: false };
+    const press = (c: any, key: string, extra: Record<string, unknown> = {}, dialog = false) => {
+      let prevented = false;
+      c.key(
+        { key, target: outside, preventDefault: () => (prevented = true), ...extra },
+        root,
+        dialog,
+      );
+      return prevented;
+    };
+    const c = load(storage)();
+    expect(c.keys).toBe(true); // on by default
+    expect(press(c, "y")).toBe(true);
+    press(c, "Y"); // caps lock is still y
+    for (const mod of ["ctrlKey", "metaKey", "altKey", "shiftKey", "repeat", "isComposing"]) {
+      expect(press(c, "n", { [mod]: true })).toBe(false);
+    }
+    press(c, "n", { keyCode: 229 }); // IME
+    press(c, "n", { defaultPrevented: true });
+    press(c, "n", { target: { closest: () => ({}), isContentEditable: false } }); // in a field
+    press(c, "n", { target: { closest: () => null, isContentEditable: true } });
+    press(c, "l"); // its button is hidden: the question is closed
+    press(c, "x");
+    modalOpen = true; // a visible modal dialog
+    press(c, "n");
+    modalOpen = false;
+    press(c, "n", {}, true); // the delete dialog, clicked open but not painted yet
+    expect(clicked).toEqual(["y", "y"]);
+    c.toggleKeys(); // turn off
+    expect(store.get("lesson-keys")).toBe("off");
+    expect(press(c, "n")).toBe(false);
+    expect(load(storage)().keys).toBe(false); // remembered in this browser
+    c.toggleKeys(); // back on: the default, nothing stored
+    expect(store.has("lesson-keys")).toBe(false);
+    expect(press(c, "n")).toBe(true);
+    expect(clicked).toEqual(["y", "y", "n"]);
+    // a browser that refuses storage still gets working keys, and toggling does not throw
+    const refusing = {
+      getItem: () => {
+        throw new Error("denied");
+      },
+      setItem: () => {
+        throw new Error("denied");
+      },
+    };
+    const r = load(refusing)();
+    expect(r.keys).toBe(true);
+    expect(() => r.toggleKeys()).not.toThrow();
   });
 });

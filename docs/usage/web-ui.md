@@ -159,32 +159,40 @@ anywhere on the page**. See [Sharing a lesson](#sharing-a-lesson).
 
 ### Lesson detail (`/lessons/<id>`)
 
-Full lesson content laid out in reading order:
+One reading column, in the order you read a lesson: the lesson, then the question it asks, then
+where it came from.
 
-- **Title row** — `← Back to lessons`, star toggle, title, level pill (Junior / Mid / Senior), **↗ Share**,
-  and the same **⋯ More** button as the Lessons toolbar, holding the rare actions — today
-  **🗑 Delete lesson…** (asks for confirmation, then returns to the list)
-- **Metadata row** — relative date with tooltip, topic ID, category chips, feedback badge + Clear;
-  a lesson someone shared with you also shows `🤝 shared by <name>`
-- **TL;DR callout** — one-sentence summary in a highlighted indigo box, always visible above the body
-- **Lesson body** — full markdown content with syntax-highlighted code blocks
-- **Task context** — a `Context:` line with the coding task that triggered the lesson (when available)
-- **Git metadata** — a row of lowercase labels, `project · repo · branch · commit · folder`, linking back
-  to where the lesson came from:
+- **Title row** — `← Back to lessons`, star toggle, title, **↗ Share**, and the same **⋯ More** button
+  as the Lessons toolbar, holding the rare actions: **📋 Copy id** (for `devcoach lesson <id>` and
+  friends) and **🗑 Delete lesson…** (asks for confirmation, then returns to the list). On a phone the
+  title gets its own line and the buttons sit under it.
+- **Metadata line** — `topic · level · date` (the level is a plain word: click it to list every lesson
+  at that level; hover the date for the exact time), then a lesson someone shared with you shows
+  `🤝 shared by <name>`, a lesson that seeded a course shows `🎓 Course · 2/5`, and the category chips
+  filter the list.
+- **TL;DR callout** — the one-sentence summary above the body, for older lessons only. A lesson in the
+  current card format opens with its summary, so the box would repeat the first paragraph.
+- **Lesson body** — the prose in your system's sans-serif at a reading width (about 70 characters a
+  line); code blocks and tables use the full width, so a 76-column example fits without scrolling. The
+  closing 💡 tip is set apart with an accent rule.
+- **Already knew it?** — right under the tip, after a quiet `topic · level` rule (the echo of the
+  chat card's closing band): `✅ yes` / `✨ new to me` / `❌ lost me`, the same answers as the line under
+  a chat card. Under the buttons, a line says what a *yes* would do to the topic today (`now 5/10`).
+  Once answered, the question becomes a sentence saying what the answer did: a *yes* counts toward
+  the topic's confidence (shown as it is now, e.g. `sqlite: 6/10`; a topic that wasn't on your map yet
+  is added at 6/10, and the sentence says so), *new to me* changes nothing, *lost me* points at a
+  step-by-step course (ask your agent; in Claude Code `/devcoach:course <topic>`), or at the course it
+  already seeded, with its progress. **change** reopens the question with your answer marked: pick
+  another one (it replaces the old answer in one step) or **Clear the answer**.
+- **Context and provenance** — a `Context:` line with the coding task that triggered the lesson (when
+  available), then a row of lowercase labels linking back to where the lesson came from:
   - **project** — the folder name where you were working
   - **repo** — link with a platform icon (GitHub, GitLab, Bitbucket, or local). Click to open the remote
     repository in your browser or view local details
   - **branch** — the git branch you were on when the lesson was taught
   - **commit** — the exact commit (clickable to view on GitHub/GitLab/Bitbucket or as a local hash)
-  - **folder** — a VS Code icon link that opens the project folder in VS Code, so you can immediately
-    review the code that triggered the lesson
-- **Already knew it?** — `✅ yes` / `✨ new to me` / `❌ lost me`, the same answers as the line under a
-  chat card. Once answered, the question becomes a sentence saying what the answer did: a *yes*
-  counts toward the topic's confidence (shown as it is now, e.g. `sqlite: 6/10`; a topic that wasn't
-  on your map yet is added at 6/10, and the sentence says so), *new to me* changes nothing, *lost me*
-  points at a step-by-step course (or the course it already seeded, with its progress). The answer
-  also shows as a badge next to the date, with **Clear** to take it back.
-- **ID line** — the full lesson ID, for `devcoach lesson <id>` and friends
+  - **Open folder in VS Code** — opens the project folder, so you can review the code that triggered
+    the lesson. The page links the folder; it never prints its path.
 
 <Tabs>
   <TabItem value="docker" label="Docker layer caching (Junior)" default>
@@ -384,4 +392,17 @@ The knowledge map, feedback history, and git context together create a feedback 
 
 ## Keyboard shortcuts
 
-The web UI has no keyboard shortcuts. Use the CLI for faster access to individual commands.
+On a lesson page, while the question **Already knew it?** is open (the lesson is unanswered, or you
+pressed **change**), one key answers it — the same letters as the chat line:
+
+| Key | Answer |
+|---|---|
+| `y` | ✅ yes — I already knew it |
+| `n` | ✨ new to me |
+| `l` | ❌ lost me |
+
+The keys do nothing once the lesson is answered (until **change**), with Ctrl, ⌘, Alt or Shift held,
+while you type in a field, or while a dialog is open. To answer with the keyboard otherwise, Tab to
+the buttons and press Enter. **Keys y n l · turn off**, under the buttons, switches the letters off
+in this browser (they stay off until you turn them on again there); speech-input users who say single
+letters should turn them off. Nothing else on the dashboard is bound to a single key.

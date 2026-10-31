@@ -24,17 +24,21 @@
     setTimeout(function () { btn.textContent = original; }, 1500);
   }
 
-  window.copyShare = function (kind, btn) {
-    var el = document.getElementById('share-payloads');
-    if (!el) return;
-    var text = el.dataset[kind] || '';
-    var done = function () { flash(btn, '✓ Copied'); };
-    var fail = function () { flash(btn, fallbackCopy(text) ? '✓ Copied' : 'Copy failed'); };
+  /* Copy `text`, then say so for 1.5 s in `label` (the element whose text changes). */
+  window.copyText = function (text, label) {
+    var done = function () { flash(label, '✓ Copied'); };
+    var fail = function () { flash(label, fallbackCopy(text) ? '✓ Copied' : 'Copy failed'); };
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(text).then(done, fail);
     } else {
       fail();
     }
+  };
+
+  window.copyShare = function (kind, btn) {
+    var el = document.getElementById('share-payloads');
+    if (!el) return;
+    window.copyText(el.dataset[kind] || '', btn);
   };
 
   /* Drop a .devcoach.md (or lessons .json) anywhere on the lessons page: the dropped file goes

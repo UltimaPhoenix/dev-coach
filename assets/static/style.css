@@ -224,6 +224,40 @@
 }
 .markdown-body tr:nth-child(even) td { background: var(--md-table-even-bg); }
 
+/* ── Lesson page: the reading column ────────────────────────────────────────
+   Prose in the system sans at a reading measure (38rem, about 70–77 characters a line); the
+   title, metadata, the answer control and all code stay mono. Code blocks and tables may use the
+   full page (48rem), so a 76-column fence fits without scrolling. */
+.markdown-body.dc-prose {
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 1.0625rem;
+  line-height: 1.65;
+}
+.dc-prose > * { max-width: 38rem; }
+.dc-prose > pre, .dc-prose > table { max-width: none; }
+/* The 💡 tip, the body's last word, right above the question: an accent rule (3:1 or better on
+   the card in both themes: accent-500 on white, accent-400 on the dark panel). */
+.dc-prose .dc-tip {
+  margin-top: 1.25rem;
+  padding-left: 0.875rem;
+  border-left: 3px solid rgb(var(--dc-accent-500));
+}
+.dark .dc-prose .dc-tip { border-left-color: rgb(var(--dc-accent-400)); }
+
+/* ── Reduced motion ──────────────────────────────────────────────────────────
+   Menus and popovers scale in, the page fades its colours on a theme switch: none of it when
+   the system asks for less motion. `!important` because the utilities (Tailwind's `transition`,
+   `duration-*`, Alpine's x-transition classes) are injected after this file. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0s !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 /* ── Lessons table: Select-mode checkboxes + drag-to-resize handles ─────────── */
 
 .dc-check {
