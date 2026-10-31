@@ -3,6 +3,7 @@
 // Tailwind (static/vendor/tailwind.js) and vendored Alpine/HTMX/Flatpickr/marked render them identically.
 import { html, raw } from "hono/html";
 import type { HtmlEscapedString } from "hono/utils/html";
+import type { LessonLink } from "../core/db";
 import {
   type CourseWithSteps,
   FEEDBACK_ANSWERS,
@@ -1107,6 +1108,135 @@ function feedbackControl(
 </section>`;
 }
 
+/**
+ * The provenance rail: when the lesson was taught and where — the sender first for a lesson
+ * someone shared — then project, repo, branch and commit. Beside the card from `lg`, labelled and
+ * stacked; below it, one wrapped line of values above the title (the labels stay for screen
+ * readers). The folder is a link to VS Code; its path is never printed.
+ */
+function provenanceRail(l: Lesson): Html {
+  const isLocal = l.repository_platform === "local";
+  let repoUrl: string | null = null;
+  // A local repository opens in VS Code only for your own lessons: a share never carries one
+  // (buildSharePayload keeps remote hosts only), so on an imported lesson it is a crafted path.
+  if (isLocal && l.repository && !l.imported) repoUrl = vscodeFileUrl(l.repository);
+  else if (l.repository_platform && REPO_DOMAINS[l.repository_platform] && l.repository)
+    repoUrl = `https://${REPO_DOMAINS[l.repository_platform]}/${l.repository}`;
+  let commitUrl: string | null = null;
+  if (repoUrl && l.commit_hash && !isLocal) {
+    commitUrl =
+      l.repository_platform === "gitlab"
+        ? `${repoUrl}/-/commit/${l.commit_hash}`
+        : l.repository_platform === "bitbucket"
+          ? `${repoUrl}/commits/${l.commit_hash}`
+          : `${repoUrl}/commit/${l.commit_hash}`;
+  }
+  const newTab = isLocal ? "" : raw('target="_blank" rel="noopener"');
+  const value = "text-gray-700 dark:text-gray-200";
+  const linkClass = `${value} hover:text-accent-600 dark:hover:text-accent-400 transition`;
+  const accent = "text-accent-600 dark:text-accent-400";
+  const repoLink = (text: string) =>
+    repoUrl ? html`<a href="${repoUrl}" ${newTab} class="${linkClass}">${text}</a>` : text;
+
+  type Row = { label: string; shown: boolean; value: Html | string; title?: string };
+  const rows: Row[] = [];
+  if (l.imported)
+    rows.push({
+      label: "sender",
+      shown: false,
+      value: l.shared_by
+        ? html`🤝 shared by <span class="${value}">${l.shared_by}</span>`
+        : "🤝 shared anonymously",
+    });
+  rows.push({
+    label: "when",
+    shown: true,
+    value: html`<time datetime="${l.timestamp}" data-ts="${l.timestamp}" title="${l.timestamp.slice(0, 16).replace("T", " ")}" class="${value}">${l.timestamp.slice(0, 10)}</time>`,
+  });
+  if (l.project)
+    rows.push({
+      label: "project",
+      shown: true,
+      value: html`<span class="${value}">${repoLink(l.project)}</span>`,
+      title: l.project,
+    });
+  if (l.repository) {
+    const icon =
+      l.repository_platform && REPO_DOMAINS[l.repository_platform]
+        ? html`<img src="/static/vendor/icons/${l.repository_platform}.svg" class="inline-block align-[-1px] mr-1 w-3 h-3 dark:invert opacity-60" alt="" />`
+        : "";
+    rows.push({
+      label: "repo",
+      shown: true,
+      value: html`<span class="${value}">${icon}${repoLink(l.repository)}</span>`,
+      title: l.repository,
+    });
+  }
+  if (l.branch)
+    rows.push({
+      label: "branch",
+      shown: true,
+      value: html`<span class="${accent}">${l.branch}</span>`,
+      title: l.branch,
+    });
+  if (l.commit_hash) {
+    const short = l.commit_hash.slice(0, 7);
+    rows.push({
+      label: "commit",
+      shown: true,
+      value: commitUrl
+        ? html`<a href="${commitUrl}" target="_blank" rel="noopener" class="${accent} hover:underline">${short}</a>`
+        : html`<span class="${accent}">${short}</span>`,
+    });
+  }
+  if (l.folder)
+    rows.push({
+      label: "folder",
+      shown: false,
+      value: html`<a href="${vscodeFileUrl(l.folder)}" class="inline-flex items-center gap-1 align-middle ${linkClass}" title="Open folder in VS Code"><img src="/static/vendor/icons/vscode.svg" class="w-3.5 h-3.5 shrink-0" alt="" /><span class="sr-only lg:not-sr-only">Open folder in VS Code</span></a>`,
+    });
+
+  return html`<aside id="lesson-rail" aria-label="Where this lesson came from" class="mb-3 lg:mb-0 lg:sticky lg:top-6 lg:pt-6 min-w-0 font-mono text-xs text-gray-500 dark:text-gray-400">
+  <dl class="flex flex-wrap items-baseline gap-x-4 gap-y-1 lg:grid lg:grid-cols-[auto_minmax(0,1fr)] lg:gap-x-3 lg:gap-y-2">${rows.map(
+    (r) =>
+      html`
+    <div class="flex items-baseline min-w-0 max-w-full lg:contents"><dt class="sr-only${r.shown ? " lg:not-sr-only" : ""}">${r.label}</dt><dd class="min-w-0 [overflow-wrap:anywhere] lg:truncate${r.shown ? "" : " lg:col-span-2"}"${r.title ? html` title="${r.title}"` : ""}>${r.value}</dd></div>`,
+  )}
+  </dl>
+</aside>`;
+}
+
+type Neighbours = { newer: LessonLink | null; older: LessonLink | null };
+
+/**
+ * Newer / older through the whole log, newest first like the lessons list. Plain links and no
+ * keys: the page's only keys are the answer's y n l (ruling 2) — ← and → belong to screen
+ * readers and to scrolling a code block. An end of the log is said, never linked. The top pager
+ * is compact (the titles are its tooltips and screen-reader text); the bottom one names them.
+ */
+function lessonPager(n: Neighbours, place: "top" | "bottom"): Html | string {
+  if (!n.newer && !n.older) return "";
+  const href = (x: LessonLink) => `/lessons/${encodeURIComponent(x.id)}`;
+  const muted = "text-gray-500 dark:text-gray-400";
+  if (place === "top") {
+    const pill = "inline-flex items-center gap-1.5 h-7 px-2.5 rounded-lg border text-xs transition";
+    const live = `${pill} bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-accent-400 dark:hover:border-accent-400`;
+    const end = `${pill} border-dashed border-gray-300 dark:border-gray-700 ${muted}`;
+    return html`<nav aria-label="Newer and older lessons" class="flex items-center gap-2">
+    ${n.newer ? html`<a href="${href(n.newer)}" rel="prev" title="${n.newer.title}" class="${live}"><span aria-hidden="true">↑</span>Newer<span class="sr-only">: ${n.newer.title}</span></a>` : html`<span class="${end}">Newest</span>`}
+    ${n.older ? html`<a href="${href(n.older)}" rel="next" title="${n.older.title}" class="${live}">Older<span class="sr-only">: ${n.older.title}</span><span aria-hidden="true">↓</span></a>` : html`<span class="${end}">Oldest</span>`}
+  </nav>`;
+  }
+  const side = (x: LessonLink | null, rel: string, label: Html, end: string, right: boolean) =>
+    x
+      ? html`<a href="${href(x)}" rel="${rel}" class="group block min-w-0${right ? " text-right" : ""}"><span class="text-xs ${muted}">${label}</span><span class="mt-1 block text-sm text-gray-700 dark:text-gray-200 group-hover:text-accent-600 dark:group-hover:text-accent-400 [overflow-wrap:anywhere] transition">${x.title}</span></a>`
+      : html`<p class="text-xs ${muted}${right ? " text-right" : ""}">${end}</p>`;
+  return html`<nav aria-label="Keep reading" class="mt-6 pt-4 border-t border-gray-200 dark:border-gray-800 grid grid-cols-2 gap-6">
+  ${side(n.newer, "prev", html`<span aria-hidden="true">↑</span> Newer`, "This is your newest lesson.", false)}
+  ${side(n.older, "next", html`Older <span aria-hidden="true">↓</span>`, "This is your oldest lesson.", true)}
+</nav>`;
+}
+
 export function lessonDetailPage(d: {
   lesson: Lesson;
   uiTheme: string;
@@ -1119,30 +1249,14 @@ export function lessonDetailPage(d: {
   confidence: number | null;
   /** Flash after a "yes" that started tracking the topic (POST feedback → `?answered=topic-created`). */
   topicCreated: boolean;
+  /** The lessons either side of this one in the log (`db.getAdjacentLessons`). */
+  neighbours: Neighbours;
 }): Html {
   const l = d.lesson;
   const sh = d.share;
   const lessonUrl = `/lessons/${encodeURIComponent(l.id)}`;
   const showTldr = needsTldr(l);
-
-  const isLocal = l.repository_platform === "local";
-  let repoUrl: string | null = null;
-  if (isLocal && l.repository) repoUrl = vscodeFileUrl(l.repository);
-  else if (l.repository_platform && REPO_DOMAINS[l.repository_platform] && l.repository)
-    repoUrl = `https://${REPO_DOMAINS[l.repository_platform]}/${l.repository}`;
-  let commitUrl: string | null = null;
-  if (repoUrl && l.commit_hash && !isLocal) {
-    commitUrl =
-      l.repository_platform === "gitlab"
-        ? `${repoUrl}/-/commit/${l.commit_hash}`
-        : l.repository_platform === "bitbucket"
-          ? `${repoUrl}/commits/${l.commit_hash}`
-          : `${repoUrl}/commit/${l.commit_hash}`;
-  }
-  const hasMeta = Boolean(l.project || l.repository || l.branch || l.commit_hash || l.folder);
-  const date = l.timestamp.slice(0, 10);
-  const tip = l.timestamp.slice(0, 16).replace("T", " ");
-  // Provenance labels and the metadata line: gray-500 / gray-400 (4.5:1 on the card, both themes).
+  // The back link and the metadata line: gray-500 / gray-400 (4.5:1 on the card, both themes).
   const label = "text-gray-500 dark:text-gray-400";
   const menuItem =
     "w-full text-left px-3 py-2 rounded-lg text-sm transition flex items-center gap-2 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800";
@@ -1150,13 +1264,16 @@ export function lessonDetailPage(d: {
     "w-4 h-4 inline-flex items-center justify-center shrink-0 text-[13px] leading-none";
 
   const body = html`
-<div x-data="{ confirmOpen: false }" @keydown.escape.window="confirmOpen = false" class="max-w-3xl mx-auto">
-<div class="mb-4"><a href="/lessons" class="${label} hover:text-gray-900 dark:hover:text-white text-sm transition">← Back to lessons</a></div>
+<div x-data="{ confirmOpen: false }" @keydown.escape.window="confirmOpen = false" class="max-w-3xl lg:max-w-5xl mx-auto">
+<div class="mb-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2"><a href="/lessons" class="${label} hover:text-gray-900 dark:hover:text-white text-sm transition">← Back to lessons</a>${lessonPager(d.neighbours, "top")}</div>
 ${
   d.imported
     ? html`<div class="mb-4 px-4 py-2 rounded-lg border text-sm bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-700 text-green-700 dark:text-green-300">${d.imported === "new" ? html`✓ Imported “${l.title}”${l.shared_by ? html`, shared by ${l.shared_by}` : ""}. It's in your log now — feedback works as usual and it never counts against your daily limit.` : html`“${l.title}” was already in your log — nothing changed.`}</div>`
     : ""
 }
+<div class="lg:grid lg:grid-cols-[15rem_minmax(0,1fr)] lg:gap-x-8 lg:items-start">
+${provenanceRail(l)}
+<div class="min-w-0">
 <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-6">
   <div class="flex flex-wrap items-center gap-3 mb-2">
     <form id="lesson-star" method="post" action="${lessonUrl}/star" hx-post="${lessonUrl}/star" hx-target="#lesson-star" hx-select="#lesson-star" hx-swap="outerHTML">
@@ -1180,12 +1297,8 @@ ${
   <div id="lesson-meta" class="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm ${label} mb-5">
     <span class="inline-flex flex-wrap items-baseline gap-x-1.5">
       <span class="text-accent-600 dark:text-accent-400">${l.topic_id}</span><span aria-hidden="true">·</span>
-      <a href="/lessons?level=${l.level}" title="Every ${l.level} lesson" class="hover:text-gray-900 dark:hover:text-gray-100 hover:underline">${l.level}</a><span aria-hidden="true">·</span>
-      <span class="relative group/date cursor-default"><span data-ts="${l.timestamp}">${date}</span>
-        <span class="absolute z-10 bottom-full left-0 mb-1 px-2 py-1 rounded bg-gray-800 dark:bg-gray-700 text-white text-xs whitespace-nowrap pointer-events-none opacity-0 group-hover/date:opacity-100 transition-opacity duration-150">${tip}</span>
-      </span>
+      <a href="/lessons?level=${l.level}" title="Every ${l.level} lesson" class="hover:text-gray-900 dark:hover:text-gray-100 hover:underline">${l.level}</a>
     </span>
-    ${l.imported ? html`<span title="This lesson was shared with you">🤝 ${l.shared_by ? html`shared by <span class="text-gray-700 dark:text-gray-200">${l.shared_by}</span>` : "shared anonymously"}</span>` : ""}
     ${d.course ? html`<a href="/courses/${encodeURIComponent(d.course.id)}" title="${d.course.title}" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-accent-50 dark:bg-accent-900/30 text-accent-700 dark:text-accent-300 border border-accent-200 dark:border-accent-700 hover:border-accent-400 transition">🎓 Course · ${d.course.done}/${d.course.total}${d.course.status === "completed" ? " ✓" : ""}</a>` : ""}
     ${l.categories.map((cat) => html`<a href="/lessons?category=${encodeURIComponent(cat)}" class="inline-block bg-gray-100 dark:bg-gray-800 hover:bg-accent-50 dark:hover:bg-accent-900/50 text-gray-600 dark:text-gray-300 text-xs rounded px-2 py-0.5 transition border border-gray-200 dark:border-gray-700 hover:border-accent-400 dark:hover:border-accent-600">${cat}</a>`)}
   </div>
@@ -1200,17 +1313,9 @@ ${
   <div id="body-content" class="markdown-body dc-prose"></div>
   ${feedbackControl(l, d.confidence, d.topicCreated, d.course)}
   ${l.task_context ? html`<div class="mt-6 pt-4 border-t border-gray-100 dark:border-gray-800 text-sm text-gray-700 dark:text-gray-300"><span class="${label}">Context:</span> ${l.task_context}</div>` : ""}
-  ${
-    hasMeta
-      ? html`<div class="mt-4 pt-4 border-t border-gray-100 dark:border-gray-800"><div class="flex flex-wrap gap-x-5 gap-y-1.5 text-xs font-mono">
-    ${l.project ? html`<span><span class="${label}">project</span> ${repoUrl ? html`<a href="${repoUrl}" ${!isLocal ? raw('target="_blank" rel="noopener"') : ""} class="text-gray-700 dark:text-gray-300 hover:text-accent-600 dark:hover:text-accent-400 transition">${l.project}</a>` : html`<span class="text-gray-700 dark:text-gray-300">${l.project}</span>`}</span>` : ""}
-    ${l.repository ? html`<span class="inline-flex items-center gap-1"><span class="${label}">repo</span>${l.repository_platform && REPO_DOMAINS[l.repository_platform] ? html`<img src="/static/vendor/icons/${l.repository_platform}.svg" class="w-3 h-3 dark:invert opacity-60 shrink-0" alt="" />` : ""}${repoUrl ? html`<a href="${repoUrl}" ${!isLocal ? raw('target="_blank" rel="noopener"') : ""} class="text-gray-700 dark:text-gray-300 hover:text-accent-600 dark:hover:text-accent-400 transition">${l.repository}</a>` : html`<span class="text-gray-700 dark:text-gray-300">${l.repository}</span>`}</span>` : ""}
-    ${l.branch ? html`<span><span class="${label}">branch</span> <span class="text-accent-600 dark:text-accent-400">${l.branch}</span></span>` : ""}
-    ${l.commit_hash ? html`<span><span class="${label}">commit</span> ${commitUrl ? html`<a href="${commitUrl}" target="_blank" rel="noopener" class="text-accent-600 dark:text-accent-400 hover:underline transition">${l.commit_hash.slice(0, 7)}</a>` : html`<span class="text-accent-600 dark:text-accent-400">${l.commit_hash.slice(0, 7)}</span>`}</span>` : ""}
-    ${l.folder ? html`<a href="${vscodeFileUrl(l.folder)}" class="inline-flex items-center gap-1 text-gray-700 dark:text-gray-300 hover:text-accent-600 dark:hover:text-accent-400 transition"><img src="/static/vendor/icons/vscode.svg" class="w-3.5 h-3.5 shrink-0" alt="" />Open folder in VS Code</a>` : ""}
-  </div></div>`
-      : ""
-  }
+</div>
+${lessonPager(d.neighbours, "bottom")}
+</div>
 </div>
 ${dangerDialog(
   "confirmOpen",

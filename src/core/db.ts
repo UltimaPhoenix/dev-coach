@@ -699,6 +699,47 @@ export function listSharedBy(db: DatabaseSync): string[] {
   ).map((r) => r.shared_by as string);
 }
 
+/** A neighbour in the log: enough to link to it and name it. */
+export interface LessonLink {
+  id: string;
+  title: string;
+}
+
+/**
+ * The lessons either side of `lesson` in the log as the lessons list shows it by default (newest
+ * first, own and shared alike), the id breaking timestamp ties so the walk never loops or skips.
+ * `null` at either end, and both `null` when the lookup fails: a pager is never worth an error page.
+ */
+export function getAdjacentLessons(
+  db: DatabaseSync,
+  lesson: Pick<Lesson, "id" | "timestamp">,
+): { newer: LessonLink | null; older: LessonLink | null } {
+  const link = (r: Row | undefined): LessonLink | null =>
+    r ? { id: r.id as string, title: r.title as string } : null;
+  try {
+    return {
+      newer: link(
+        getRow(
+          db,
+          "SELECT id, title FROM lessons WHERE (timestamp, id) > (?, ?) ORDER BY timestamp ASC, id ASC LIMIT 1",
+          lesson.timestamp,
+          lesson.id,
+        ),
+      ),
+      older: link(
+        getRow(
+          db,
+          "SELECT id, title FROM lessons WHERE (timestamp, id) < (?, ?) ORDER BY timestamp DESC, id DESC LIMIT 1",
+          lesson.timestamp,
+          lesson.id,
+        ),
+      ),
+    };
+  } catch {
+    return { newer: null, older: null };
+  }
+}
+
 export function getLessonById(db: DatabaseSync, lessonId: string): Lesson | null {
   const r = getRow(db, "SELECT * FROM lessons WHERE id = ?", lessonId);
   return r ? rowToLesson(r) : null;

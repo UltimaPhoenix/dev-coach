@@ -1323,22 +1323,21 @@ describe("web lesson page: the answer under the tip, the reading column", () => 
     expect(page).toContain(
       'href="vscode://file//Users/someone/work/my%20project%231" class="inline-flex',
     );
-    expect(page).toContain("Open folder in VS Code</a>");
+    expect(page).toContain("Open folder in VS Code</span></a>");
     const outsideTheLink = page.replace(/href="vscode:\/\/file[^"]*"/g, "");
     for (const part of [FOLDER, "/Users/someone", "my project"]) {
       expect(outsideTheLink).not.toContain(part);
     }
   });
 
-  it("metadata reads topic · level · date; the id moves to ⋯ Copy id; muted text keeps 4.5:1", async () => {
+  it("metadata reads topic · level (the date is the rail's); the id moves to ⋯ Copy id; muted text keeps 4.5:1", async () => {
     const page = await (await get("/lessons/rc-legacy")).text();
     const meta = page.slice(page.indexOf('id="lesson-meta"'), page.indexOf(">TL;DR</p>"));
-    const [topic, level, date] = ['">sqlite</span>', ">mid</a>", "data-ts="].map((s) =>
-      meta.indexOf(s),
-    );
+    const [topic, level] = ['">sqlite</span>', ">mid</a>"].map((s) => meta.indexOf(s));
     expect(topic).toBeGreaterThan(0);
     expect(topic).toBeLessThan(level);
-    expect(level).toBeLessThan(date);
+    expect(meta).not.toContain("data-ts="); // printed once, in the rail above the title
+    expect(page.indexOf("data-ts=")).toBeLessThan(page.indexOf("<h1"));
     expect(page).not.toMatch(/rounded-full[^"]*"[^>]*>mid</); // the level is a word, not a pill
     expect(page).toContain(
       `data-copy="rc-legacy" @click="copyText($el.dataset.copy, $el.querySelector('[data-copy-label]'))"`,
@@ -1434,5 +1433,305 @@ describe("web lesson page: the answer under the tip, the reading column", () => 
     const r = load(refusing)();
     expect(r.keys).toBe(true);
     expect(() => r.toggleKeys()).not.toThrow();
+  });
+});
+
+describe("web lesson page: the provenance rail and the newer/older pager", () => {
+  // The chain sits before every other lesson in this file's database, so its older end is ours;
+  // the newest is "now" (a future timestamp is clamped to the current second) and its id wins
+  // the tie with any other lesson stamped in that second.
+  const NOW = "2099-01-01T00:00:00Z";
+  const OLDEST = "1999-01-01T00:00:00Z";
+  const FOLDER = "/Users/someone/secret dir";
+  beforeAll(() => {
+    db.withConnection((c) => {
+      const mk = (o: Record<string, unknown>) =>
+        db.insertLesson(
+          c,
+          parseLesson({
+            topic_id: "git",
+            categories: ["git"],
+            title: `Title of ${o.id}`,
+            level: "mid",
+            summary: "s",
+            ...o,
+          }),
+        );
+      mk({ id: "zz-newest", timestamp: NOW });
+      mk({
+        id: "pg-c",
+        timestamp: "2001-06-02T10:00:00Z",
+        project: "dev-coach",
+        repository: "octo/dev-coach",
+        repository_platform: "github",
+        branch: "feat/rail",
+        commit_hash: "0123456789abcdef",
+        folder: FOLDER,
+      });
+      // a timestamp tie: the id decides, so the walk neither loops nor skips
+      mk({ id: "pg-b", timestamp: "2001-06-01T10:00:00Z" });
+      mk({ id: "pg-a", timestamp: "2001-06-01T10:00:00Z" });
+      mk({
+        id: "pg-shared",
+        timestamp: "2001-01-01T09:30:00Z",
+        imported: true,
+        shared_by: "Ada",
+        title: "WAL mode",
+      });
+      mk({ id: "pg-oldest", timestamp: OLDEST });
+    });
+  });
+
+  const page = async (id: string) => (await get(`/lessons/${id}`)).text();
+  const between = (s: string, from: string, to: string) => {
+    const at = s.indexOf(from);
+    return at < 0 ? "" : s.slice(at, s.indexOf(to, at));
+  };
+  const rail = (p: string) => between(p, '<aside id="lesson-rail"', "</aside>");
+  const topPager = (p: string) =>
+    between(p, '<nav aria-label="Newer and older lessons"', '<aside id="lesson-rail"');
+  const bottomPager = (p: string) => between(p, '<nav aria-label="Keep reading"', "</nav>");
+  /** Every link to a lesson page on the page (not the list's `/lessons?…` filters). */
+  const lessonLinks = (p: string) =>
+    [...p.matchAll(/href="\/lessons\/([^"?/]+)"/g)].map((m) => decodeURIComponent(m[1]));
+
+  it("getAdjacentLessons: newest first like the list, the id breaking ties, null at the ends", () => {
+    db.withConnection((c) => {
+      const around = (id: string) => {
+        const l = db.getLessonById(c, id);
+        if (!l) throw new Error(id);
+        const n = db.getAdjacentLessons(c, l);
+        return [n.newer?.id ?? null, n.older?.id ?? null];
+      };
+      expect(around("pg-c")[1]).toBe("pg-b");
+      expect(around("pg-b")).toEqual(["pg-c", "pg-a"]);
+      expect(around("pg-a")).toEqual(["pg-b", "pg-shared"]);
+      expect(around("pg-shared")).toEqual(["pg-a", "pg-oldest"]);
+      expect(around("zz-newest")[0]).toBeNull();
+      expect(around("pg-oldest")).toEqual(["pg-shared", null]);
+      expect(db.getAdjacentLessons(c, { id: "pg-b", timestamp: "2001-06-01T10:00:00Z" })).toEqual({
+        newer: { id: "pg-c", title: "Title of pg-c" },
+        older: { id: "pg-a", title: "Title of pg-a" },
+      });
+    });
+    // no lessons table: no neighbours, never an error page
+    const bare = db.getConnection(":memory:");
+    expect(db.getAdjacentLessons(bare, { id: "x", timestamp: OLDEST })).toEqual({
+      newer: null,
+      older: null,
+    });
+    bare.close();
+  });
+
+  it("a middle lesson links its neighbours at the top (compact) and the bottom (with titles)", async () => {
+    const p = await page("pg-b");
+    const top = topPager(p);
+    expect(top).toContain('href="/lessons/pg-c" rel="prev" title="Title of pg-c"');
+    expect(top).toContain('>Newer<span class="sr-only">: Title of pg-c</span>');
+    expect(top).toContain('href="/lessons/pg-a" rel="next" title="Title of pg-a"');
+    expect(top.indexOf("pg-c")).toBeLessThan(top.indexOf("pg-a")); // newer first, like the list
+    const bottom = bottomPager(p);
+    expect(bottom).toContain('href="/lessons/pg-c" rel="prev"');
+    expect(bottom).toContain('href="/lessons/pg-a" rel="next"');
+    expect(bottom).toContain(">Title of pg-c</span></a>");
+    expect(bottom).toContain(">Title of pg-a</span></a>");
+    expect(p.indexOf('<nav aria-label="Keep reading"')).toBeGreaterThan(
+      p.indexOf('<section id="lesson-feedback"'),
+    );
+    for (const id of new Set(lessonLinks(p)))
+      expect((await get(`/lessons/${id}`)).status).toBe(200);
+  });
+
+  it("the newest and the oldest lesson say so and link to nothing that 404s", async () => {
+    const newest = await page("zz-newest");
+    expect(topPager(newest)).toContain(">Newest</span>");
+    expect(bottomPager(newest)).toContain("This is your newest lesson.");
+    expect(newest).not.toContain('rel="prev"');
+    expect(newest).toMatch(/href="\/lessons\/[^"]+" rel="next"/);
+
+    const oldest = await page("pg-oldest");
+    expect(topPager(oldest)).toContain(">Oldest</span>");
+    expect(bottomPager(oldest)).toContain("This is your oldest lesson.");
+    expect(oldest).not.toContain('rel="next"');
+    expect(oldest).toContain('href="/lessons/pg-shared" rel="prev"');
+
+    for (const p of [newest, oldest]) {
+      const ids = new Set(lessonLinks(p));
+      expect(ids.size).toBeGreaterThan(0);
+      for (const id of ids) expect((await get(`/lessons/${id}`)).status).toBe(200);
+    }
+  });
+
+  it("walking Older from the newest visits every lesson once and ends at the oldest", async () => {
+    const total = db.withConnection((c) => db.exportLessons(c).length);
+    const seen: string[] = [];
+    let id: string | undefined = "zz-newest";
+    while (id && seen.length <= total) {
+      seen.push(id);
+      const next = (await page(id)).match(/href="\/lessons\/([^"]+)" rel="next"/);
+      id = next ? decodeURIComponent(next[1]) : undefined;
+    }
+    expect(seen.length).toBe(total);
+    expect(new Set(seen).size).toBe(total);
+    expect(seen.at(-1)).toBe("pg-oldest");
+    expect(seen.slice(-5)).toEqual(["pg-c", "pg-b", "pg-a", "pg-shared", "pg-oldest"]);
+  });
+
+  it("with no other lesson there is no pager at all", async () => {
+    const { lessonDetailPage } = await import("../src/web/views");
+    const lesson = parseLesson({
+      id: "alone",
+      timestamp: OLDEST,
+      topic_id: "git",
+      categories: [],
+      title: "Alone",
+      level: "mid",
+      summary: "s",
+    });
+    const alone = String(
+      await lessonDetailPage({
+        lesson,
+        uiTheme: "system",
+        share: { id: "alone", open: false, name: "", includeContext: false, text: "", link: "" },
+        imported: null,
+        course: null,
+        confidence: null,
+        topicCreated: false,
+        neighbours: { newer: null, older: null },
+      }),
+    );
+    expect(alone).toContain('<aside id="lesson-rail"');
+    expect(alone).not.toContain('aria-label="Newer and older lessons"');
+    expect(alone).not.toContain('aria-label="Keep reading"');
+  });
+
+  it("the rail: when, project, repo, branch, commit — above the title, never the folder path", async () => {
+    const p = await page("pg-c");
+    const r = rail(p);
+    expect(p.indexOf('<aside id="lesson-rail"')).toBeLessThan(p.indexOf("<h1"));
+    // one wrapped line of values below lg (labels for screen readers), a labelled column from lg
+    expect(r).toContain('<dl class="flex flex-wrap items-baseline');
+    expect(r).toContain("lg:grid lg:grid-cols-[auto_minmax(0,1fr)]");
+    const labels = [...r.matchAll(/<dt class="([^"]*)">([^<]*)<\/dt>/g)];
+    expect(labels.map((m) => m[2])).toEqual([
+      "when",
+      "project",
+      "repo",
+      "branch",
+      "commit",
+      "folder",
+    ]);
+    for (const [, cls, label] of labels)
+      expect(cls).toBe(label === "folder" ? "sr-only" : "sr-only lg:not-sr-only");
+    expect(r).toContain(
+      `<time datetime="${"2001-06-02T10:00:00Z"}" data-ts="2001-06-02T10:00:00Z"`,
+    );
+    expect(r).toContain(">2001-06-02</time>");
+    expect(r).toContain('href="https://github.com/octo/dev-coach"');
+    expect(r).toContain('href="https://github.com/octo/dev-coach/commit/0123456789abcdef"');
+    expect(r).toContain(">0123456</a>");
+    expect(r).toContain(">feat/rail</span>");
+    expect(r).toContain('href="vscode://file//Users/someone/secret%20dir" class="inline-flex');
+    expect(r).toContain(">Open folder in VS Code</span></a>");
+    // the folder never shows: not in the rail, not anywhere outside the VS Code link
+    const outsideTheLink = p.replace(/href="vscode:\/\/file[^"]*"/g, "");
+    for (const part of [FOLDER, "/Users/someone", "secret dir", "secret%20dir"]) {
+      expect(outsideTheLink).not.toContain(part);
+    }
+    // provenance has one place: the old block at the end of the card is gone
+    expect(p.match(/>project</g)?.length).toBe(1);
+    expect(between(p, 'id="lesson-meta"', "<section")).not.toContain("data-ts=");
+  });
+
+  it("a shared lesson's rail opens with the sender; the meta line no longer carries it", async () => {
+    const p = await page("pg-shared");
+    const r = rail(p);
+    expect(r).toContain('<dt class="sr-only">sender</dt>');
+    expect(r).toContain("🤝 shared by <span");
+    expect(r).toContain(">Ada</span>");
+    expect(r.indexOf("shared by")).toBeLessThan(r.indexOf(">when<"));
+    expect(between(p, 'id="lesson-meta"', "<section")).not.toContain("shared by");
+    expect(p).not.toContain("shared by anonymous");
+    const anonymous = await page("rc-anon");
+    expect(rail(anonymous)).toContain("🤝 shared anonymously");
+    expect(anonymous).not.toContain("shared by anonymous");
+  });
+
+  it("an imported lesson never links a local path, even when a crafted share carries one", async () => {
+    db.withConnection((c) =>
+      db.insertLesson(
+        c,
+        parseLesson({
+          id: "pg-crafted",
+          timestamp: "2001-01-01T09:00:00Z",
+          topic_id: "git",
+          categories: [],
+          title: "Crafted",
+          level: "mid",
+          summary: "s",
+          imported: true,
+          shared_by: "Mallory",
+          project: "innocent",
+          repository: "/etc",
+          repository_platform: "local",
+        }),
+      ),
+    );
+    const r = rail(await page("pg-crafted"));
+    expect(r).not.toContain("vscode://");
+    expect(r).toContain(">innocent</span>");
+    db.withConnection((c) => db.deleteLesson(c, "pg-crafted"));
+  });
+
+  it("no ← → keys: the pager is plain links, and the page's keys stay y n l", async () => {
+    const p = await page("pg-b");
+    for (const binding of [
+      "ArrowLeft",
+      "ArrowRight",
+      "keydown.left",
+      "keydown.right",
+      ".window.left",
+      ".window.right",
+    ]) {
+      expect(p).not.toContain(binding);
+    }
+    const shortcuts = [...p.matchAll(/\saria-keyshortcuts="([^"]*)"/g)].map((m) => m[1]);
+    expect(shortcuts).toEqual(["y", "n", "l"]);
+    expect(topPager(p) + bottomPager(p)).not.toMatch(
+      /data-key|aria-keyshortcuts|accesskey|@keydown/,
+    );
+    // the page script's handler ignores the arrows and every letter but y n l
+    const src = p.slice(p.indexOf("function lessonAnswer()"), p.lastIndexOf("</script>"));
+    const c = new Function("localStorage", "document", `${src}; return lessonAnswer;`)(
+      { getItem: () => null },
+      { querySelectorAll: () => [] },
+    )();
+    const clicked: string[] = [];
+    const root = {
+      querySelectorAll: () =>
+        ["y", "n", "l"].map((key) => ({
+          dataset: { key },
+          getClientRects: () => [{}],
+          click: () => clicked.push(key),
+        })),
+    };
+    for (const key of ["ArrowLeft", "ArrowRight", "j", "k"]) {
+      let prevented = false;
+      c.key(
+        { key, target: { closest: () => null }, preventDefault: () => (prevented = true) },
+        root,
+        false,
+      );
+      expect(prevented).toBe(false);
+    }
+    expect(clicked).toEqual([]);
+  });
+
+  it("the rail and the pager keep 4.5:1 text and palette tokens", async () => {
+    const p = await page("pg-c");
+    const chrome = rail(p) + topPager(p) + bottomPager(p);
+    expect(chrome).not.toMatch(/(?<![\w:-])text-gray-[34]00\b/); // fails 4.5:1 on the light canvas
+    expect(chrome).not.toContain("dark:text-gray-600");
+    expect(chrome).not.toMatch(/cyan-|indigo-|#[0-9a-f]{3,6}\b/i);
   });
 });

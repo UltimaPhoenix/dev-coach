@@ -561,6 +561,7 @@ export function createApp(opts: AppOptions = {}): Hono {
         lesson,
         course,
         confidence,
+        neighbours: db.getAdjacentLessons(conn, lesson),
         settingName: settings.share_name,
         uiTheme: settings.ui_theme,
       };
@@ -577,6 +578,7 @@ export function createApp(opts: AppOptions = {}): Hono {
         course: found.course,
         confidence: found.confidence,
         topicCreated: q.answered === "topic-created",
+        neighbours: found.neighbours,
       }),
     );
   });
