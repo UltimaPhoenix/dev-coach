@@ -4,6 +4,7 @@
 import { html, raw } from "hono/html";
 import type { HtmlEscapedString } from "hono/utils/html";
 import type { CourseWithSteps, KnowledgeEntry, Lesson, Settings } from "../core/models";
+import type { DoctorHint } from "../core/runtime";
 import type { SharedLesson } from "../core/share";
 
 type Html = HtmlEscapedString | Promise<HtmlEscapedString>;
@@ -191,6 +192,88 @@ export function layout(o: {
 </html>`;
 }
 
+// ── First run and empty states ───────────────────────────────────────────────
+// What a new user sees before the first lesson: pulled by the pages only, never echoed by a hook.
+// The copy is host-neutral ("your agent"); Claude Code is named only next to the plugin's command.
+
+/** The pacing settings, as the empty states describe them. */
+export interface Pacing {
+  maxPerDay: number;
+  minGapMinutes: number;
+}
+
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
+
+/** "4 hours", "1 hour 30 minutes", "15 minutes"; null when there is no gap. */
+function gapPhrase(minutes: number): string | null {
+  if (minutes <= 0) return null;
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  if (!h) return plural(m, "minute");
+  return m ? `${plural(h, "hour")} ${plural(m, "minute")}` : plural(h, "hour");
+}
+
+/** "at most 2 a day, 4 hours apart" — or "at most 2 lessons a day, …" with a unit. */
+function pacingPhrase(p: Pacing, unit?: string): string {
+  const perDay = unit ? plural(p.maxPerDay, unit) : String(p.maxPerDay);
+  const gap = gapPhrase(p.minGapMinutes);
+  return `at most ${perDay} a day${gap ? `, ${gap} apart` : ""}`;
+}
+
+const inlineCode = (text: string) =>
+  html`<code class="px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-100 text-xs whitespace-nowrap">${text}</code>`;
+
+/** Copies `text` from a data attribute, so nothing user-shaped ever sits in a JS literal. */
+function copyButton(text: string): Html {
+  return html`<button type="button" data-copy="${text}" x-data="{ done: false }" @click="navigator.clipboard.writeText($el.dataset.copy).then(() => { done = true; setTimeout(() => { done = false }, 1500) }, () => {})" x-text="done ? '✓ Copied' : 'Copy'" class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border transition bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-accent-400 hover:text-accent-700 dark:hover:text-accent-300">Copy</button>`;
+}
+
+/** Setting up happens in the agent: the words every host understands, then the plugin's command. */
+function setupHint(): Html {
+  return html`Say <em class="not-italic font-semibold text-gray-800 dark:text-gray-100">“set up devcoach”</em> to your agent. <span data-plugin-hint>With the Claude Code plugin, type ${inlineCode("/devcoach:setup")}.</span>`;
+}
+
+/** The one diagnostic for this install (`doctorHint`): a terminal command, or the plugin's own. */
+function doctorLine(hint: DoctorHint, lead: string): Html {
+  const command = html`<span class="inline-flex items-center gap-2">${inlineCode(hint.command)}${copyButton(hint.command)}</span>`;
+  return html`<p data-doctor class="mt-5 text-gray-500 dark:text-gray-400 leading-relaxed">${lead}
+    ${
+      hint.where === "claude-code"
+        ? html`<span data-plugin-hint>In Claude Code, run ${command}.</span>`
+        : html`Run ${command} in a terminal.`
+    }</p>`;
+}
+
+/** /knowledge before onboarding: an empty knowledge table means the profile was never set up. */
+function firstRunBlock(doctor: DoctorHint): Html {
+  return html`<section id="first-run" aria-labelledby="first-run-title" class="max-w-2xl mb-8 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm p-5 sm:p-6 text-sm">
+  <h2 id="first-run-title" class="text-lg font-bold text-gray-900 dark:text-gray-100 mb-2">Set up devcoach</h2>
+  <p class="text-gray-700 dark:text-gray-300 leading-relaxed">Your profile is empty, so this map is too. ${setupHint()}</p>
+  ${doctorLine(doctor, "Your agent does not know devcoach?")}
+</section>`;
+}
+
+/** /lessons with no lesson and no filter: when lessons come, and what is missing if none did. */
+function lessonsEmpty(d: { setUp: boolean; pacing: Pacing; doctor: DoctorHint }): Html {
+  return html`<section id="lessons-empty" aria-labelledby="lessons-empty-title" class="max-w-xl mx-auto mt-8 sm:mt-12 text-sm">
+  <h1 id="lessons-empty-title" class="text-xl font-bold text-gray-900 dark:text-gray-100 mb-3">No lessons yet</h1>
+  <p class="text-gray-700 dark:text-gray-300 leading-relaxed">Lessons come after real work in your agent, ${pacingPhrase(d.pacing, "lesson")}. Change the pacing in <a href="/settings" class="underline underline-offset-2 hover:text-gray-900 dark:hover:text-gray-100">Settings</a>.</p>
+  ${
+    d.setUp
+      ? ""
+      : html`<p class="mt-4 rounded-lg border border-accent-200 dark:border-accent-800 bg-accent-50 dark:bg-accent-900/20 px-3 py-2 text-gray-700 dark:text-gray-200 leading-relaxed"><span class="font-semibold text-gray-900 dark:text-gray-100">First, set up your profile.</span> ${setupHint()}</p>`
+  }
+  ${doctorLine(d.doctor, "Nothing after a few tasks?")}
+</section>`;
+}
+
+/** "a", "a and b", "a, b and c" — each item already marked up. */
+function andList(items: Html[]): Html[] {
+  return items.flatMap((item, i) =>
+    i === 0 ? [item] : [html`${i === items.length - 1 ? " and " : ", "}`, item],
+  );
+}
+
 // ── Profile (profile.html) ───────────────────────────────────────────────────
 
 export interface ProfileData {
@@ -198,11 +281,17 @@ export interface ProfileData {
   allGroups: string[];
   stats: Record<string, unknown>;
   rateLimit: { allowed: boolean; reason?: string | null };
-  maxPerDay: number;
+  pacing: Pacing;
+  /** The diagnostic command for this install, shown in the first-run block. */
+  doctor: DoctorHint;
   uiTheme: string;
 }
 
 export function profilePage(d: ProfileData): Html {
+  // An empty knowledge table reliably means onboarding has not run (topics come only from it,
+  // or from the Edit mode below). The stats line says nothing before the first lesson.
+  const setUp = Object.values(d.categorised).some((topics) => topics.length > 0);
+  const hasLessons = Number(d.stats.total_lessons ?? 0) > 0;
   const groupOptions = (current: string) =>
     d.allGroups
       .filter((g) => g !== "Other")
@@ -257,10 +346,12 @@ export function profilePage(d: ProfileData): Html {
   </div>
 </div>
 
-<div class="mb-6 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-500 dark:text-gray-400">
+${
+  hasLessons
+    ? html`<div class="mb-6 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-500 dark:text-gray-400">
   <span><span class="font-semibold text-gray-800 dark:text-gray-100">${Number(d.stats.total_lessons ?? 0)}</span> lessons total</span>
   <span class="text-gray-300 dark:text-gray-600">·</span>
-  <span><span class="font-semibold text-gray-800 dark:text-gray-100">${Number(d.stats.lessons_today ?? 0)}</span> / ${d.maxPerDay} today</span>
+  <span><span class="font-semibold text-gray-800 dark:text-gray-100">${Number(d.stats.lessons_today ?? 0)}</span> / ${d.pacing.maxPerDay} today</span>
   <span class="text-gray-300 dark:text-gray-600">·</span>
   <span><span class="font-semibold text-gray-800 dark:text-gray-100">${Number(d.stats.lessons_this_week ?? 0)}</span> this week</span>
   <span class="text-gray-300 dark:text-gray-600">·</span>
@@ -269,7 +360,10 @@ export function profilePage(d: ProfileData): Html {
       ? html`<span class="text-green-600 dark:text-green-400 font-medium">Available now</span>`
       : html`<span class="text-yellow-600 dark:text-yellow-400">${d.rateLimit.reason}</span>`
   }
-</div>
+</div>`
+    : ""
+}
+${setUp ? "" : firstRunBlock(d.doctor)}
 
 ${Object.entries(d.categorised).map(([category, topics]) => {
   return html`
@@ -400,6 +494,11 @@ export interface LessonsData {
   total: number;
   totalPages: number;
   uiTheme: string;
+  /** Whether onboarding has run (the knowledge table is not empty). */
+  setUp: boolean;
+  pacing: Pacing;
+  /** The diagnostic command for this install, shown when there is no lesson yet. */
+  doctor: DoctorHint;
 }
 
 const PERIOD_LABELS: Record<string, string> = {
@@ -442,25 +541,32 @@ function lessonsQs(s: LessonsSelected, overrides: Record<string, string> = {}): 
   return `?${q.toString()}`;
 }
 
+interface ActiveFilter {
+  label: string;
+  /** The same list without this filter. */
+  clear: string;
+  /** A period or a date range — what "Search all time" drops. */
+  time?: true;
+  star?: true;
+}
+
+/** Lessons exist, the filters hide them all: name the filters, offer the two ways out. */
+function filteredEmpty(s: LessonsSelected, filters: ActiveFilter[]): Html {
+  const name = (f: ActiveFilter) =>
+    html`<span class="font-semibold text-gray-700 dark:text-gray-200">${f.label}</span>`;
+  const time = filters.find((f) => f.time);
+  const others = andList(filters.filter((f) => !f.time).map(name));
+  const linkClass =
+    "text-accent-700 dark:text-accent-300 underline underline-offset-2 hover:text-accent-600 dark:hover:text-accent-200";
+  return html`<section id="lessons-filtered-empty" class="max-w-lg mx-auto py-16 text-center text-sm text-gray-500 dark:text-gray-400">
+  <p>${others.length ? html`No lessons match ${others}${time ? html` in ${name(time)}` : ""}.` : html`No lessons in ${time ? name(time) : ""}.`}</p>
+  <p class="mt-2">${time ? html`<a href="${lessonsQs(s, { period: "all", date_from: "", date_to: "" })}" class="${linkClass}">Search all time</a> · ` : ""}<a href="/lessons" class="${linkClass}">Clear every filter</a></p>
+</section>`;
+}
+
 export function lessonsPage(d: LessonsData): Html {
   const s = d.s;
   const customDate = Boolean(s.date_from || s.date_to);
-  const anyFilter =
-    (s.period !== "all" && !customDate) ||
-    customDate ||
-    Boolean(
-      s.category ||
-        s.level ||
-        s.project ||
-        s.repository ||
-        s.branch ||
-        s.commit ||
-        s.starred ||
-        s.imported ||
-        s.shared_by ||
-        s.search ||
-        s.feedback,
-    );
   const periodLabel = customDate
     ? s.date_from && s.date_to
       ? `${s.date_from} → ${s.date_to}`
@@ -476,6 +582,41 @@ export function lessonsPage(d: LessonsData): Html {
       : s.imported === "0"
         ? "👤 My own"
         : "🤝 Shared";
+  // Every active filter once: the chips above the list and the sentence of the filtered-empty state.
+  const candidates: (ActiveFilter | false | "")[] = [
+    customDate && {
+      label: `📅 ${periodLabel}`,
+      clear: lessonsQs(s, { date_from: "", date_to: "" }),
+      time: true,
+    },
+    s.period !== "all" &&
+      !customDate && {
+        label: `🕐 ${periodLabel}`,
+        clear: lessonsQs(s, { period: "all" }),
+        time: true,
+      },
+    s.feedback && {
+      label: FEEDBACK_LABELS[s.feedback] ?? s.feedback,
+      clear: lessonsQs(s, { feedback: "" }),
+    },
+    s.starred && { label: "★ Starred", clear: lessonsQs({ ...s, starred: false }), star: true },
+    (s.imported || s.shared_by) && {
+      label: sharedLabel,
+      clear: lessonsQs(s, { imported: "", shared_by: "" }),
+    },
+    s.search && { label: `🔍 "${s.search}"`, clear: lessonsQs(s, { search: "" }) },
+    s.category && { label: s.category, clear: lessonsQs(s, { category: "" }) },
+    s.level && {
+      label: `${LEVEL_EMOJI[s.level] ?? ""} ${s.level}`,
+      clear: lessonsQs(s, { level: "" }),
+    },
+    s.project && { label: `📁 ${s.project}`, clear: lessonsQs(s, { project: "" }) },
+    s.repository && { label: `⎇ ${s.repository}`, clear: lessonsQs(s, { repository: "" }) },
+    s.branch && { label: `⎇ ${s.branch}`, clear: lessonsQs(s, { branch: "" }) },
+    s.commit && { label: s.commit.slice(0, 7), clear: lessonsQs(s, { commit: "" }) },
+  ];
+  const activeFilters = candidates.filter((f): f is ActiveFilter => Boolean(f));
+  const anyFilter = activeFilters.length > 0;
   // [imported value, sender, label] — the sender travels in data attributes, never in a JS literal.
   const sharedOptions: [string, string, string][] = [
     ["", "", "All lessons"],
@@ -672,18 +813,11 @@ export function lessonsPage(d: LessonsData): Html {
   ${
     anyFilter
       ? html`<div class="flex flex-wrap gap-1.5 mb-4">
-    ${customDate ? chip(`📅 ${periodLabel}`, lessonsQs(s, { date_from: "", date_to: "" })) : ""}
-    ${s.period !== "all" && !customDate ? chip(`🕐 ${periodLabel}`, lessonsQs(s, { period: "all" })) : ""}
-    ${s.feedback ? chip(FEEDBACK_LABELS[s.feedback] ?? s.feedback, lessonsQs(s, { feedback: "" })) : ""}
-    ${s.starred ? html`<span class="inline-flex items-center gap-1 pl-2.5 pr-1 py-0.5 rounded-full text-xs bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300 border border-yellow-200 dark:border-yellow-800">★ Starred<a href="${lessonsQs({ ...s, starred: false })}" class="ml-0.5 w-4 h-4 flex items-center justify-center rounded-full hover:bg-yellow-200 dark:hover:bg-yellow-700 transition">×</a></span>` : ""}
-    ${s.imported || s.shared_by ? chip(sharedLabel, lessonsQs(s, { imported: "", shared_by: "" })) : ""}
-    ${s.search ? chip(`🔍 "${s.search}"`, lessonsQs(s, { search: "" })) : ""}
-    ${s.category ? chip(s.category, lessonsQs(s, { category: "" })) : ""}
-    ${s.level ? chip(`${LEVEL_EMOJI[s.level] ?? ""} ${s.level}`, lessonsQs(s, { level: "" })) : ""}
-    ${s.project ? chip(`📁 ${s.project}`, lessonsQs(s, { project: "" })) : ""}
-    ${s.repository ? chip(`⎇ ${s.repository}`, lessonsQs(s, { repository: "" })) : ""}
-    ${s.branch ? chip(`⎇ ${s.branch}`, lessonsQs(s, { branch: "" })) : ""}
-    ${s.commit ? chip(s.commit.slice(0, 7), lessonsQs(s, { commit: "" })) : ""}
+    ${activeFilters.map((f) =>
+      f.star
+        ? html`<span class="inline-flex items-center gap-1 pl-2.5 pr-1 py-0.5 rounded-full text-xs bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300 border border-yellow-200 dark:border-yellow-800">${f.label}<a href="${f.clear}" class="ml-0.5 w-4 h-4 flex items-center justify-center rounded-full hover:bg-yellow-200 dark:hover:bg-yellow-700 transition">×</a></span>`
+        : chip(f.label, f.clear),
+    )}
   </div>`
       : ""
   }
@@ -772,11 +906,9 @@ ${
 </div>`
     : ""
 }`
-    : html`<div class="flex flex-col items-center justify-center py-16 text-center">
-  <p class="text-3xl mb-3">📭</p>
-  <p class="text-gray-500 dark:text-gray-400 text-sm">No lessons match the current filters.</p>
-  ${anyFilter ? html`<a href="/lessons" class="mt-2 text-accent-500 hover:text-accent-400 text-sm transition">Clear all filters</a>` : ""}
-</div>`
+    : anyFilter
+      ? filteredEmpty(s, activeFilters)
+      : lessonsEmpty(d)
 }
 <div x-show="selectMode" style="display:none" x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0 translate-y-2" x-transition:enter-end="opacity-100 translate-y-0" class="fixed inset-x-0 bottom-0 z-50 border-t border-gray-200 dark:border-gray-800 bg-white/95 dark:bg-gray-900/95 backdrop-blur px-4 sm:px-6 py-3">
   <div class="max-w-7xl mx-auto flex items-center gap-3">

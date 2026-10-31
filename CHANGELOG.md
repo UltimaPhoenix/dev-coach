@@ -21,6 +21,11 @@ Notable changes to devcoach. Versions follow [Semantic Versioning](https://semve
   bucket download, and a plain unzip anywhere a Node ≥ 24 is.
 - CI runs the installer end to end on Windows (install, connect, run a hook, uninstall) and the
   unit suite there.
+- **The dashboard says what to do before the first lesson.** With no profile, the knowledge map
+  shows how to set up devcoach (say *"set up devcoach"* to your agent) and the diagnostic command
+  for your install, with Copy; `/lessons` with no lesson says when lessons come (the pacing from
+  Settings) instead of "No lessons match the current filters"; a list emptied by filters names
+  them and offers *Search all time* · *Clear every filter*.
 
 ### Fixed
 - On Windows, `devcoach install` now registers the Claude Code hooks in the exec form Claude Code
