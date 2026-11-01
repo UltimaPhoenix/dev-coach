@@ -95,7 +95,6 @@ const AGENTS_SKILL_DIR = join(homedir(), ".agents", "skills", "devcoach");
 
 // PATH lookups go through resolveCommand: `;`-separated with PATHEXT on Windows.
 const findOnPath = (bin: string): string | null => resolveCommand(bin);
-const onPath = (bin: string): boolean => findOnPath(bin) !== null;
 
 /** A token cmd.exe will read back as one argument. */
 const quoteForCmd = (s: string): string => (/[\s"]/.test(s) ? `"${s.replace(/"/g, '\\"')}"` : s);
