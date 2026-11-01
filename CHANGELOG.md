@@ -14,8 +14,8 @@ Notable changes to devcoach. Versions follow [Semantic Versioning](https://semve
 - **One tagline everywhere.** devcoach introduced itself five different ways ("Progressive
   technical coaching, right inside your AI agent", "Progressive in-context technical
   coaching…", "Progressive technical coach for Claude Code…", …). Every surface now uses the same
-  two lines: *Stay sharp while your AI does the work* and *Learn what you don't know yet from the
-  code your AI agent writes*. This covers the npm, Claude Code plugin (+ self-marketplace), Gemini
+  two lines: *Learn from the code your AI writes* and *one short lesson on what you don't know
+  yet, drawn from a task your agent just finished*. This covers the npm, Claude Code plugin (+ self-marketplace), Gemini
   extension, `.mcpb`, MCP Registry and Homebrew descriptions, `devcoach --help`, the docs site
   tagline and description, `llms.txt`, and the social card.
 - **The docs home is a landing page.** It opens with what devcoach does in two lines, the install

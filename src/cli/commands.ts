@@ -889,7 +889,7 @@ function buildProgram(): Command {
   program.exitOverride();
   program
     .name("devcoach")
-    .description("devcoach — learn what you don't know yet from the code your AI agent writes")
+    .description("devcoach — learn from the code your AI writes")
     .version(`devcoach ${VERSION}`, "-v, --version", "output the version number")
     .allowExcessArguments(false)
     .showHelpAfterError("(add --help for usage)")

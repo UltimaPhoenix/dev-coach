@@ -2,7 +2,7 @@
 
 <p align="center">
   <a href="https://ultimaphoenix.github.io/dev-coach/">
-    <img src="https://ultimaphoenix.github.io/dev-coach/img/og-card.jpg" alt="devcoach — stay sharp while your AI does the work" width="760">
+    <img src="https://ultimaphoenix.github.io/dev-coach/img/og-card.jpg" alt="devcoach — learn from the code your AI writes" width="760">
   </a>
 </p>
 
@@ -14,7 +14,7 @@
 [![Docs](https://img.shields.io/badge/docs-GitHub%20Pages-purple)](https://ultimaphoenix.github.io/dev-coach/)
 [![License](https://img.shields.io/badge/license-AGPL%203.0-blue)](LICENSE)
 
-**Stay sharp while your AI does the work.**
+**Learn from the code your AI writes.**
 
 devcoach connects to Claude Code, Claude Desktop, Gemini CLI *(beta)*, Codex CLI *(beta)*, Cursor, Windsurf, and other MCP-compatible tools. When your agent finishes a task, devcoach teaches you one thing from it **that you don't know yet**: it keeps a map of what you already know precisely so it can skip it, and pitches each lesson at your level — no generic tutorials, no repeated topics, nothing to open.
 
