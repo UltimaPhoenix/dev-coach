@@ -12,10 +12,13 @@ import {
   checkServerCommand,
   chooseServerCommand,
   claudeDesktopLogPath,
+  hookCommandFor,
   interpreterOf,
   NPX_COMMAND,
   readHostLog,
   resolveCommand,
+  scoopStablePath,
+  withSubcommand,
 } from "../src/cli/mcp-command";
 import {
   classifyPath,
@@ -553,6 +556,73 @@ describe("a host's log and why it cannot start devcoach", () => {
     expect(missing.at(-1)).toEqual({
       level: "bad",
       text: `devcoach's script ${join(dir, "gone.js")} does not exist`,
+    });
+  });
+});
+
+describe("Windows channels — Scoop and install.ps1", () => {
+  it("classifies the Scoop and install.ps1 layouts, and the Node each one brings", () => {
+    expect(
+      classifyPath("C:\\Users\\x\\scoop\\apps\\devcoach\\2.8.0\\dist\\bin.js", "win32"),
+    ).toEqual({ channel: "scoop", manager: null, boundTo: null, ephemeral: false });
+    expect(
+      classifyPath("C:\\Users\\x\\AppData\\Local\\devcoach\\app\\dist\\bin.js", "win32").channel,
+    ).toBe("windows-installer");
+    expect(nodeManagerOf("C:\\Users\\x\\scoop\\apps\\nodejs-lts\\current\\node.exe", "win32")).toBe(
+      "scoop",
+    );
+    expect(nodeManagerOf("C:\\Users\\x\\AppData\\Local\\devcoach\\node\\node.exe", "win32")).toBe(
+      "bundled",
+    );
+  });
+
+  it("scoopStablePath writes Scoop's `current` junction back over a version directory", () => {
+    expect(scoopStablePath("C:\\Users\\x\\scoop\\apps\\devcoach\\2.8.0\\dist\\bin.js")).toBe(
+      "C:\\Users\\x\\scoop\\apps\\devcoach\\current\\dist\\bin.js",
+    );
+    for (const untouched of [
+      "C:\\Users\\x\\scoop\\apps\\nodejs-lts\\current\\node.exe",
+      "C:\\Users\\x\\AppData\\Local\\devcoach\\node\\node.exe",
+      "/opt/homebrew/bin/devcoach",
+    ])
+      expect(scoopStablePath(untouched)).toBe(untouched);
+  });
+
+  it("chooseServerCommand on Windows registers node.exe + the script through Scoop's current", () => {
+    expect(
+      chooseServerCommand({
+        hit: "C:\\Users\\x\\scoop\\shims\\devcoach.cmd",
+        entry: "C:\\Users\\x\\scoop\\apps\\devcoach\\2.8.0\\dist\\bin.js",
+        execPath: "C:\\Users\\x\\scoop\\apps\\nodejs-lts\\26.13.0\\node.exe",
+        platform: "win32",
+      }),
+    ).toEqual({
+      command: "C:\\Users\\x\\scoop\\apps\\nodejs-lts\\current\\node.exe",
+      args: ["C:\\Users\\x\\scoop\\apps\\devcoach\\current\\dist\\bin.js", "mcp"],
+      note: undefined,
+    });
+  });
+
+  it("hookCommandFor: exec form on Windows (node.exe + script), shell form elsewhere and for npx", () => {
+    const win = {
+      command: "C:\\Users\\x\\AppData\\Local\\devcoach\\node\\node.exe",
+      args: ["C:\\Users\\x\\AppData\\Local\\devcoach\\app\\dist\\bin.js", "mcp"],
+    };
+    expect(hookCommandFor(win, "stop-hook", "ignored", "win32")).toEqual({
+      command: win.command,
+      args: ["C:\\Users\\x\\AppData\\Local\\devcoach\\app\\dist\\bin.js", "stop-hook"],
+    });
+    // npx has only a .cmd shim, which cannot be spawned without a shell: shell form stays
+    expect(hookCommandFor(NPX_COMMAND, "stop-hook", "npx -y devcoach stop-hook", "win32")).toEqual({
+      command: "npx -y devcoach stop-hook",
+    });
+    const mac = { command: "/opt/homebrew/bin/devcoach", args: ["mcp"] };
+    expect(
+      hookCommandFor(mac, "stop-hook", "/opt/homebrew/bin/devcoach stop-hook", "darwin"),
+    ).toEqual({ command: "/opt/homebrew/bin/devcoach stop-hook" });
+    expect(withSubcommand(NPX_COMMAND, "prompt-hook")).toEqual({
+      command: "npx",
+      args: ["-y", "devcoach", "prompt-hook"],
     });
   });
 });

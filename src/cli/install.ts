@@ -7,7 +7,7 @@
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { homedir, platform } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, isAbsolute, join } from "node:path";
 import { createInterface } from "node:readline/promises";
 import * as coach from "../core/coach";
 import * as db from "../core/db";
@@ -19,6 +19,7 @@ import {
   chooseServerCommand,
   claudeDesktopLogPath,
   type Finding,
+  hookCommandFor,
   readHostLog,
   resolveCommand,
   type ServerCommand,
@@ -36,8 +37,13 @@ interface McpConfig {
 interface HookCmd {
   type: string;
   command: string;
+  /** Exec form (Claude Code, Windows): the argument vector, spawned without a shell. */
+  args?: string[];
   timeout?: number;
 }
+
+/** A hook as one string, both forms — what every devcoach-ownership check reads. */
+const hookText = (h: HookCmd): string => [h.command, ...(h.args ?? [])].join(" ");
 interface HookEntry {
   hooks?: HookCmd[];
 }
@@ -187,14 +193,17 @@ function installTo(path: string, entry: object, force: boolean): string {
   return `${c.green("✓")} Installed into ${path}`;
 }
 
+/** One Claude Code hook: shell form, or the exec form on Windows (see `hookCommandFor`). */
+function claudeHook(method: ServerCommand, subcommand: string, timeout: number): HookCmd {
+  const form = hookCommandFor(method, subcommand, `${hookPrefix()} ${subcommand}`);
+  return { type: "command", ...form, timeout };
+}
+
 /** The exact hook layout devcoach owns in Claude Code: one merged Stop entry + the priming hook. */
-function desiredHooks(): Record<string, HookEntry> {
-  const prefix = hookPrefix();
+function desiredHooks(method: ServerCommand): Record<string, HookEntry> {
   return {
-    Stop: { hooks: [{ type: "command", command: `${prefix} stop-hook`, timeout: 60 }] },
-    UserPromptSubmit: {
-      hooks: [{ type: "command", command: `${prefix} prompt-hook`, timeout: 30 }],
-    },
+    Stop: { hooks: [claudeHook(method, "stop-hook", 60)] },
+    UserPromptSubmit: { hooks: [claudeHook(method, "prompt-hook", 30)] },
   };
 }
 
@@ -272,7 +281,7 @@ function upsertOwnedHooks(path: string, desired: Record<string, HookEntry>): str
     const list = hooks[event];
     const ours = list
       .map((e, i): [HookEntry, number] => [e, i])
-      .filter(([e]) => (e.hooks ?? []).some((h) => isDevcoachHookCommand(h.command ?? "")))
+      .filter(([e]) => (e.hooks ?? []).some((h) => isDevcoachHookCommand(hookText(h))))
       .map(([, i]) => i);
     const [only] = ours;
     if (
@@ -291,7 +300,7 @@ function upsertOwnedHooks(path: string, desired: Record<string, HookEntry>): str
   return `${c.green("✓")} Hooks installed into ${path} (${Object.keys(desired).join(" + ")})`;
 }
 
-function installHook(): string {
+function installHook(method: ServerCommand): string {
   const read = readJsonFile<HooksFile>(CLAUDE_CODE_SETTINGS);
   if (!read.ok) return read.error;
   if (pluginHooksActive(read.data)) {
@@ -300,7 +309,7 @@ function installHook(): string {
       "(installing both would double-count interactions)"
     );
   }
-  return upsertOwnedHooks(CLAUDE_CODE_SETTINGS, desiredHooks());
+  return upsertOwnedHooks(CLAUDE_CODE_SETTINGS, desiredHooks(method));
 }
 
 function installGeminiHook(): string {
@@ -360,7 +369,7 @@ function hasDevcoachHooks(path: string, event: string): boolean {
   return (
     read.ok &&
     (read.data.hooks?.[event] ?? []).some((e) =>
-      (e.hooks ?? []).some((h) => isDevcoachHookCommand(h.command ?? "")),
+      (e.hooks ?? []).some((h) => isDevcoachHookCommand(hookText(h))),
     )
   );
 }
@@ -433,7 +442,7 @@ export function cmdInstall(o: InstallOpts): void {
       needsRestart = true;
     }
     log(`  MCP server…  ${msg}`);
-    if (!o.skipHook) log(`  Hooks…       ${installHook()}`);
+    if (!o.skipHook) log(`  Hooks…       ${installHook(method)}`);
     log(`  Skill…       ${installSkillTo(CLAUDE_CODE_SKILL_DIR, o.force)}`);
     log();
   }
@@ -509,7 +518,7 @@ function collectDevcoachHooks(data: HooksFile): { event: string; cmd: HookCmd }[
   for (const [event, entries] of Object.entries(data.hooks ?? {})) {
     for (const e of entries ?? []) {
       for (const h of e.hooks ?? []) {
-        if (isDevcoachHookCommand(h.command ?? "")) ours.push({ event, cmd: h });
+        if (isDevcoachHookCommand(hookText(h))) ours.push({ event, cmd: h });
       }
     }
   }
@@ -523,12 +532,21 @@ function checkHookCommands(
   fix: string,
 ): void {
   for (const { cmd } of ours) {
-    const bin = cmd.command.split(" ")[0] ?? "";
-    if (bin.startsWith("/") && !existsSync(bin))
+    const text = hookText(cmd);
+    const bin = cmd.args ? cmd.command : (cmd.command.split(" ")[0] ?? "");
+    if (isAbsolute(bin) && !existsSync(bin))
       r.bad(`hook command not found: ${bin} — re-run ${c.bold(fix)}`);
-    if (cmd.command.startsWith("npx "))
+    const script = cmd.args?.[0];
+    if (script && isAbsolute(script) && !existsSync(script))
+      r.bad(`hook script not found: ${script} — re-run ${c.bold(fix)}`);
+    if (text.startsWith("npx "))
       r.warn("hook runs via npx — needs the npx cache (or network) on every stop");
-    if (cmd.timeout == null) r.warn(`hook entry has no timeout (${cmd.command})`);
+    if (platform() === "win32" && !cmd.args)
+      r.warn(
+        "shell-form hook on Windows — needs Git Bash (PowerShell refuses npx.ps1); " +
+          `re-run ${c.bold(fix)} to switch to the exec form (node.exe + script)`,
+      );
+    if (cmd.timeout == null) r.warn(`hook entry has no timeout (${text})`);
   }
 }
 
@@ -725,9 +743,7 @@ export function cmdDoctor(): void {
     } else if (!ours.length) {
       bad(`no devcoach hooks in ${CLAUDE_CODE_SETTINGS} — run ${c.bold("devcoach install")}`);
     } else {
-      const legacy = ours.filter(
-        ({ cmd }) => cmd.command.includes("onboard-hook") || cmd.command.includes("lesson-ready"),
-      );
+      const legacy = ours.filter(({ cmd }) => /onboard-hook|lesson-ready/.test(hookText(cmd)));
       const stopCount = ours.filter((o) => o.event === "Stop").length;
       if (legacy.length)
         warn(
@@ -872,7 +888,7 @@ function removeOwnedHooks(path: string): string {
   for (const [event, list] of Object.entries(hooks)) {
     if (!list) continue;
     const kept = list.filter(
-      (e) => !(e.hooks ?? []).some((h) => isDevcoachHookCommand(h.command ?? "")),
+      (e) => !(e.hooks ?? []).some((h) => isDevcoachHookCommand(hookText(h))),
     );
     if (kept.length === list.length) continue;
     cleared.push(event);

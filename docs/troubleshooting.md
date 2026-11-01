@@ -47,7 +47,7 @@ devcoach writes to `~/.devcoach/coaching.db`. If you get a permission error, che
 
 - **claude.ai web:** MCP servers are not supported. You can use the [skill copy](./install/claude-ai.md) (coaching behaviour only, no data storage).
 - **Ephemeral sandboxes:** If your agent runs in a fresh sandbox on each restart (like GitHub Codespaces), devcoach cannot persist data across sessions. It works fine for the current session, but lessons won't carry over.
-- **Windows:** devcoach is tested on macOS and Linux. Windows support depends on Node.js ≥ 24 and `node:sqlite` availability (generally solid, but report issues).
+- **Windows:** supported since 2.8.0 (Beta) through the [one-line installer or Scoop](./install/windows.md); every release is installed, connected and uninstalled on a Windows runner by CI. Gemini CLI and Codex CLI hooks on Windows are untested.
 - **Multi-user machines:** devcoach writes to `~/.devcoach/`, so each user gets their own coaching database. Profiles are not shared.
 
 ---

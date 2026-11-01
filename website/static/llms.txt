@@ -26,6 +26,7 @@ devcoach decides whether to deliver a lesson after each completed task, based on
 
 - [Install overview](https://ultimaphoenix.github.io/dev-coach/install): choose a method.
 - [Homebrew](https://ultimaphoenix.github.io/dev-coach/install/homebrew): macOS/Linux; also installs the CLI.
+- [Windows](https://ultimaphoenix.github.io/dev-coach/install/windows): one PowerShell line (`irm https://ultimaphoenix.github.io/dev-coach/install.ps1 | iex`, private Node.js, checksum-verified) or Scoop (`scoop bucket add ultimaphoenix https://github.com/UltimaPhoenix/scoop-bucket`); also installs the CLI.
 - [Claude Code plugin](https://ultimaphoenix.github.io/dev-coach/install/claude-code-plugin): one-click, bundles everything.
 - [Claude Desktop extension](https://ultimaphoenix.github.io/dev-coach/install/claude-desktop): the `.mcpb` bundle attached to every release (self-signed).
 - [Gemini CLI (beta)](https://ultimaphoenix.github.io/dev-coach/install/gemini-cli): `npx -y devcoach install --gemini` or the extension zip.

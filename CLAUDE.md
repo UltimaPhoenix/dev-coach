@@ -76,6 +76,10 @@ dev-coach/
 │                           #   (plugin-tree, plugin-market, mcp-entry, homebrew) × session kinds (fresh-cue, fresh-explicit,
 │                           #   lesson, skip, plan-mode, restored). `npm run test:e2e` = smoke (4 calls);
 │                           #   `-- --all` = 24 scenarios; `-- --list`, `-- --only a:b`; one sandbox per scenario
+├── scripts/build-standalone.mjs # devcoach-<v>-standalone.zip: the same self-contained bundle + scripts/standalone/
+│                       #   {devcoach.cmd, devcoach} launchers — what install.ps1 and the Scoop bucket download
+├── scripts/scoop-manifest.mjs # bucket/devcoach.json for UltimaPhoenix/scoop-bucket (CI job `scoop`, twin of `homebrew`)
+├── website/static/install.ps1 # the Windows one-liner (irm … | iex): private Node + standalone zip + PATH + devcoach install
 ├── scripts/sync-plugin.mjs # pins plugin/, gemini-extension/, server.json + self-marketplace to package.json; copies the skill,
 │                           #   the LICENSE and the launcher (assets/launcher/launch.mjs → both scripts/launch.mjs)
 ├── scripts/marketplace-entry.mjs # the devcoach marketplace entry, derived from plugin.json (+ category/tags); used by update-marketplace.mjs
@@ -84,7 +88,7 @@ dev-coach/
 │                           #   restore). Course pages: viewport sized to the page (OOPIF + fullPage clips). The docs site's
 │                           #   share page is captured from website/build (the workflow builds it; /ping stubbed via page.route)
 ├── mcpb/                   # Claude Desktop Extension: manifest.json (v0.4, server.type node) + icon.png/svg
-├── scripts/build-mcpb.mjs  # self-contained bundle (tsup.mcpb.config.ts, deps inlined) → guards (no bare imports;
+├── scripts/build-mcpb.mjs  # stages scripts/lib/self-contained.mjs (tsup.mcpb.config.ts, deps inlined; guards: no bare imports,
 │                           #   CLI + MCP initialize from outside the repo) → validate → pack via @anthropic-ai/mcpb
 ├── plugin/                 # Claude Code plugin (launcher + hooks + /devcoach:setup, :ui, :share, :import, :course commands + skill
 │                           #   mirror — skills/ and scripts/launch.mjs synced, never hand-edited; scripts/launch.config.json is its own)
@@ -435,6 +439,35 @@ HOME=$(mktemp -d) node dist/bin.js stats     # or DEVCOACH_DIR=$(mktemp -d) …
 { "mcpServers": { "devcoach": { "type": "stdio", "command": "npx", "args": ["-y", "devcoach", "mcp"] } } }
 ```
 
+## Windows
+
+Three channels, one artifact: `devcoach-<version>-standalone.zip` (`npm run standalone`; the
+`.mcpb`'s self-contained bundle + `devcoach.cmd`/`devcoach` launchers that prefer a `node.exe` in a
+sibling `node\` directory and fall back to the PATH). `website/static/install.ps1` (served at
+`ultimaphoenix.github.io/dev-coach/install.ps1`, `/next/` for the canary) downloads it and a private
+Node LTS from nodejs.org, verifies both against their `SHASUMS256.txt`, lays out
+`%LOCALAPPDATA%\devcoach\{app,node,bin}` (data stays in `~\.devcoach`), prepends `bin\` to the user
+PATH (`HKCU\Environment` + `WM_SETTINGCHANGE`), writes `uninstall.ps1` + an Apps & Features entry,
+then runs `devcoach install`. Windows PowerShell 5.1 and 7, x64 + ARM64, no admin, no execution
+policy (`irm | iex` runs in memory; `.cmd` launchers, never `.ps1` shims). The Scoop bucket
+(`UltimaPhoenix/scoop-bucket`, `bucket/devcoach.json` from `scripts/scoop-manifest.mjs`, pushed by
+the `scoop` CI job with `SCOOP_BUCKET_TOKEN`) `depends` on Scoop's `nodejs-lts` and shims
+`devcoach.cmd` — Scoop never shims a `.js`. winget was studied and deferred: it only takes exe/msi/
+msix (a `.cmd`/`.js` portable is rejected), i.e. a Node SEA + code signing.
+
+What Windows changes in the code: Claude Code hooks are written in the **exec form** (`command:
+node.exe`, `args: [bin.js, "stop-hook"]`, `hookCommandFor` in `cli/mcp-command.ts`) — shell form
+breaks in Git Bash (unquoted backslashes) and in PowerShell (`npx` → `npx.ps1` → execution policy);
+`npx` keeps the shell form (a `.cmd` shim cannot be spawned without a shell); `hookText()` in
+`install.ts` is the one string every ownership check reads, both forms. `chooseServerCommand`
+rewrites Scoop's version directory to the `current` junction (`scoopStablePath`). Every
+`detached: true` spawn passes `windowsHide: true` (else a console window pops up). `tests/setup.ts`
+sandboxes `USERPROFILE` too (`os.homedir()` reads it on Windows). `classifyPath` knows the channels
+`scoop` and `windows-installer`, `nodeManagerOf` the providers `scoop` and `bundled`. CI: the
+`windows` job (windows-latest, Node 24) runs the unit suite (advisory until green there) and
+`install.ps1 -Archive` end to end — install, exec-form hooks, user PATH, the hook on the private
+Node, uninstall. Gemini/Codex hook forms on Windows are untested.
+
 ## Release
 
 Releases are cut from the `workflow_dispatch` run of `.github/workflows/ci.yml` **on `develop`**
@@ -461,7 +494,8 @@ trusted publishing, tokenless), `release` (GitHub Release with the self-signed `
 Code plugin zip, the Gemini extension zip, a CycloneDX SBOM and `SHASUMS256.txt`), `homebrew`
 (regenerates `Formula/devcoach.rb` in `UltimaPhoenix/homebrew-tap`), `marketplace` (pins the entry
 in `UltimaPhoenix/claude-plugins-marketplace`) and `mcp-registry`. A plain `v*` tag push runs the
-same publish/release jobs. CI checks run on Node 24 and the `.node-version` (26). The `.mcpb` is
+same publish/release jobs, plus `scoop` (the bucket) after `release`; the standalone zip joins the
+release assets and the canary prerelease (with its own `SHASUMS256.txt`). CI checks run on Node 24 and the `.node-version` (26). The `.mcpb` is
 built via `npm run mcpb` (`scripts/build-mcpb.mjs` + `mcpb/manifest.json` + `icon.png`);
 `npm run mcpb:sign` self-signs it (no code-signing certificate is configured — it installs as an
 unverified publisher). The release run also publishes

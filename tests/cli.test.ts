@@ -552,6 +552,43 @@ describe("cli", () => {
     }
   });
 
+  it("owns exec-form hooks too (the Windows layout: node.exe + the script in args)", async () => {
+    const settings = cleanClaudeSettings();
+    const exec = {
+      type: "command",
+      command: "C:\\Users\\x\\AppData\\Local\\devcoach\\node\\node.exe",
+      args: ["C:\\Users\\x\\AppData\\Local\\devcoach\\app\\dist\\bin.js", "stop-hook"],
+      timeout: 60,
+    };
+    const foreign = { type: "command", command: "my-other-tool --check" };
+    const savedPath = process.env.PATH;
+    process.env.PATH = fakeBin("claude", "#!/bin/sh\nexit 0\n");
+    try {
+      // repair: the exec-form entry is recognised as ours and replaced by this platform's form
+      writeFileSync(
+        settings,
+        JSON.stringify({ hooks: { Stop: [{ hooks: [exec] }, { hooks: [foreign] }] } }),
+      );
+      expect((await run(["install", "--claude-code"])).out).toContain("Hooks installed");
+      const repaired = JSON.parse(readFileSync(settings, "utf8"));
+      const stop = repaired.hooks.Stop.flatMap((e: any) => e.hooks);
+      expect(stop).toHaveLength(2);
+      expect(stop.some((h: any) => h.command === "my-other-tool --check")).toBe(true);
+      expect(stop.some((h: any) => "args" in h)).toBe(process.platform === "win32");
+
+      // uninstall sweeps it as well
+      writeFileSync(
+        settings,
+        JSON.stringify({ hooks: { Stop: [{ hooks: [exec] }, { hooks: [foreign] }] } }),
+      );
+      await run(["uninstall", "--claude-code"]);
+      const swept = JSON.parse(readFileSync(settings, "utf8"));
+      expect(swept.hooks.Stop).toEqual([{ hooks: [foreign] }]);
+    } finally {
+      process.env.PATH = savedPath;
+    }
+  });
+
   it("install skips the hooks when the devcoach plugin is enabled", async () => {
     const settings = cleanClaudeSettings();
     writeFileSync(settings, JSON.stringify({ enabledPlugins: { "devcoach@ultimaphoenix": true } }));

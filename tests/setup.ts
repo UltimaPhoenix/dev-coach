@@ -4,5 +4,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-process.env.HOME = mkdtempSync(join(tmpdir(), "dc-test-"));
+const home = mkdtempSync(join(tmpdir(), "dc-test-"));
+process.env.HOME = home;
+process.env.USERPROFILE = home; // os.homedir() reads USERPROFILE on Windows, HOME elsewhere
 process.env.NO_COLOR = "1";
