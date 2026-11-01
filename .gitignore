@@ -6,6 +6,7 @@ dist/
 dist-mcpb/
 dist-plugin/
 dist-gemini/
+dist-standalone/
 mcpb/build/
 *.tsbuildinfo
 

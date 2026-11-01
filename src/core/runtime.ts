@@ -17,6 +17,10 @@ export type Channel =
   | "npx"
   | "homebrew"
   | "npm-global"
+  /** `scoop install devcoach` — `scoop\apps\devcoach\<version>\`, reached through `current`. */
+  | "scoop"
+  /** install.ps1's layout: `%LOCALAPPDATA%\devcoach\app\` next to a private `node\`. */
+  | "windows-installer"
   | "source"
   | "unknown";
 
@@ -30,6 +34,9 @@ export type NodeManager =
   | "mise"
   | "n"
   | "homebrew"
+  | "scoop"
+  /** The private Node install.ps1 puts in `%LOCALAPPDATA%\devcoach\node\`. */
+  | "bundled"
   | "system"
   | "unknown";
 
@@ -80,6 +87,8 @@ function channelOf(p: string): Channel {
   if (lower.includes("/claude extensions/")) return "claude-desktop-extension";
   if (lower.includes("/_npx/")) return "npx";
   if (lower.includes("/cellar/devcoach/")) return "homebrew";
+  if (lower.includes("/scoop/apps/devcoach/")) return "scoop";
+  if (lower.includes("/devcoach/app/dist/")) return "windows-installer";
   if (lower.includes("/node_modules/devcoach/")) return "npm-global";
   if (/\/(src\/core\/runtime\.ts|src\/bin\.ts|dist\/[^/]+\.js)$/.test(lower)) return "source";
   return "unknown";
@@ -112,6 +121,8 @@ export function nodeManagerOf(
   if (versioned) return versioned.manager;
   if (lower.includes("/fnm_multishells/")) return "fnm";
   if (lower.includes("/.volta/") || lower.includes("/volta/")) return "volta";
+  if (lower.includes("/scoop/apps/nodejs")) return "scoop";
+  if (lower.includes("/devcoach/node/")) return "bundled";
   if (
     lower.includes("/cellar/node") ||
     lower.includes("/opt/homebrew/") ||

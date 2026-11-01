@@ -67,6 +67,7 @@ function sandbox(opts: { npm?: boolean } = {}): Sandbox {
     env: {
       PATH: [bin, "/usr/bin", "/bin"].join(delimiter),
       HOME: dir,
+      USERPROFILE: dir,
       DEVCOACH_RUNTIME_DIR: data,
       FAKE_NPM_CALLS: calls,
     },

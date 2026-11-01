@@ -12,7 +12,8 @@ export function browserCommand(platform: NodeJS.Platform, url: string): [string,
 export function openInBrowser(url: string, platform: NodeJS.Platform = process.platform): void {
   const [cmd, args] = browserCommand(platform, url);
   try {
-    const child = spawn(cmd, args, { detached: true, stdio: "ignore" });
+    // windowsHide: a detached child gets its own console window on Windows otherwise.
+    const child = spawn(cmd, args, { detached: true, stdio: "ignore", windowsHide: true });
     child.on("error", () => undefined);
     child.unref();
   } catch {

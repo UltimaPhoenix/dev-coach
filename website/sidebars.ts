@@ -19,6 +19,7 @@ const sidebars: SidebarsConfig = {
       link: { type: "doc", id: "install/index" },
       items: [
         "install/homebrew",
+        "install/windows",
         "install/claude-code-plugin",
         "install/claude-desktop",
         "install/gemini-cli",
