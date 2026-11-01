@@ -4,14 +4,14 @@
 // [{hooks: [{type:"command", …}]}]}}), so one self-healing upsert serves every config
 // file; what differs per client is only the file path, the event names, and the
 // timeout unit (Claude/Codex: seconds, Gemini: milliseconds).
-import { spawnSync } from "node:child_process";
+import { type SpawnSyncReturns, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { homedir, platform } from "node:os";
 import { dirname, isAbsolute, join } from "node:path";
 import { createInterface } from "node:readline/promises";
 import * as coach from "../core/coach";
 import * as db from "../core/db";
-import { describeRuntime, describeWhere } from "../core/runtime";
+import { classifyPath, describeRuntime, describeWhere } from "../core/runtime";
 import { readSkill, readSkillReferences } from "../skill";
 import { VERSION } from "../version";
 import {
@@ -42,8 +42,12 @@ interface HookCmd {
   timeout?: number;
 }
 
-/** A hook as one string, both forms — what every devcoach-ownership check reads. */
+/** A hook as one string, both forms — what the text-based ownership check reads. */
 const hookText = (h: HookCmd): string => [h.command, ...(h.args ?? [])].join(" ");
+
+/** The subcommands a devcoach hook runs, past and present (the last argument of an exec form). */
+const HOOK_SUBCOMMANDS =
+  /^(?:stop-hook|prompt-hook|gemini-stop-hook|gemini-prompt-hook|codex-stop-hook|codex-prompt-hook|onboard-hook|lesson-ready)$/;
 interface HookEntry {
   hooks?: HookCmd[];
 }
@@ -93,12 +97,48 @@ const AGENTS_SKILL_DIR = join(homedir(), ".agents", "skills", "devcoach");
 const findOnPath = (bin: string): string | null => resolveCommand(bin);
 const onPath = (bin: string): boolean => findOnPath(bin) !== null;
 
-/** The devcoach entry script running right now, symlinks resolved. */
+/** A token cmd.exe will read back as one argument. */
+const quoteForCmd = (s: string): string => (/[\s"]/.test(s) ? `"${s.replace(/"/g, '\\"')}"` : s);
+
+/**
+ * Run a client's own CLI (`claude mcp add …`). Null when it is not on the PATH or cannot be
+ * started — on Windows the npm-installed clients are `.cmd` shims, which only start through a
+ * shell (a plain spawn fails with ENOENT), so the caller falls back to editing the file.
+ */
+function runClientCli(bin: string, args: string[]): SpawnSyncReturns<string> | null {
+  const resolved = findOnPath(bin);
+  if (!resolved) return null;
+  const viaShell = /\.(cmd|bat)$/i.test(resolved);
+  const res = viaShell
+    ? spawnSync(quoteForCmd(resolved), args.map(quoteForCmd), { encoding: "utf8", shell: true })
+    : spawnSync(resolved, args, { encoding: "utf8" });
+  return res.error ? null : res;
+}
+
+/**
+ * The devcoach entry script running right now, symlinks resolved — except a Scoop `current`
+ * junction (`…\apps\<app>\current\…`, whatever the Scoop root is called): that path is the one
+ * `scoop update` keeps valid, its target is not.
+ */
 function runningEntry(): string {
+  const raw = process.argv[1] ?? "";
+  if (process.platform === "win32" && /[\\/]apps[\\/][^\\/]+[\\/]current[\\/]/i.test(raw))
+    return raw;
   try {
-    return realpathSync(process.argv[1] ?? "");
+    return realpathSync(raw);
   } catch {
-    return process.argv[1] ?? "";
+    return raw;
+  }
+}
+
+/** The Node running this install: resolved out of an ephemeral per-shell directory (fnm). */
+function stableExecPath(): string {
+  const exec = process.execPath;
+  if (!classifyPath(exec).ephemeral) return exec;
+  try {
+    return realpathSync(exec);
+  } catch {
+    return exec;
   }
 }
 
@@ -107,7 +147,7 @@ function detectInstallMethod(): ServerCommand {
   return chooseServerCommand({
     hit: findOnPath("devcoach"),
     entry: runningEntry(),
-    execPath: process.execPath,
+    execPath: stableExecPath(),
     platform: process.platform,
   });
 }
@@ -133,9 +173,9 @@ function hookPrefix(): string {
  * stays separate to keep its long-standing output byte-stable.)
  */
 function installViaClientCli(bin: string, addArgs: string[], removeArgs: string[] | null): string {
-  if (!onPath(bin)) return "";
-  if (removeArgs) spawnSync(bin, removeArgs, { encoding: "utf8" });
-  const res = spawnSync(bin, addArgs, { encoding: "utf8" });
+  if (removeArgs) runClientCli(bin, removeArgs);
+  const res = runClientCli(bin, addArgs);
+  if (!res) return "";
   if (res.status === 0) return `${c.green("✓")} Registered via \`${bin} mcp add\``;
   const combined = `${res.stderr ?? ""}${res.stdout ?? ""}`.toLowerCase();
   if (combined.includes("already")) {
@@ -145,15 +185,19 @@ function installViaClientCli(bin: string, addArgs: string[], removeArgs: string[
 }
 
 function installViaClaudeCli(scope: string, force: boolean): string {
-  if (!onPath("claude")) return "";
-  if (force)
-    spawnSync("claude", ["mcp", "remove", "--scope", scope, "devcoach"], { encoding: "utf8" });
+  if (force) runClientCli("claude", ["mcp", "remove", "--scope", scope, "devcoach"]);
   const m = detectInstallMethod();
-  const res = spawnSync(
-    "claude",
-    ["mcp", "add", "--scope", scope, "devcoach", m.command, "--", ...m.args],
-    { encoding: "utf8" },
-  );
+  const res = runClientCli("claude", [
+    "mcp",
+    "add",
+    "--scope",
+    scope,
+    "devcoach",
+    m.command,
+    "--",
+    ...m.args,
+  ]);
+  if (!res) return "";
   if (res.status === 0)
     return `${c.green("✓")} Registered via \`claude mcp add\` (scope: ${scope})`;
   const combined = `${res.stderr ?? ""}${res.stdout ?? ""}`.toLowerCase();
@@ -264,6 +308,22 @@ function isDevcoachHookCommand(cmd: string): boolean {
 }
 
 /**
+ * Ours, in either form. The exec form is recognised by its shape — a `bin.js` run with one of
+ * our subcommands — because nothing in it needs to be called devcoach (install.ps1's
+ * `-InstallDir D:\tools\dc`, a system node.exe): a text-only match would leave such hooks
+ * unowned, and every re-run of `devcoach install` would add a second Stop entry.
+ */
+function isDevcoachHook(h: HookCmd): boolean {
+  if (isDevcoachHookCommand(hookText(h))) return true;
+  const args = h.args ?? [];
+  return (
+    args.length >= 2 &&
+    /[\\/]bin\.js$/i.test(args[0] ?? "") &&
+    HOOK_SUBCOMMANDS.test(args[args.length - 1] ?? "")
+  );
+}
+
+/**
  * Install (or repair) a devcoach-owned hook pair in a client's JSON hooks file. The
  * entries are fully devcoach-owned — like the skill, a stale or legacy layout (two Stop
  * entries, npx prefix, missing timeout) is normalized WITHOUT --force; user hooks and
@@ -281,7 +341,7 @@ function upsertOwnedHooks(path: string, desired: Record<string, HookEntry>): str
     const list = hooks[event];
     const ours = list
       .map((e, i): [HookEntry, number] => [e, i])
-      .filter(([e]) => (e.hooks ?? []).some((h) => isDevcoachHookCommand(hookText(h))))
+      .filter(([e]) => (e.hooks ?? []).some((h) => isDevcoachHook(h)))
       .map(([, i]) => i);
     const [only] = ours;
     if (
@@ -368,9 +428,7 @@ function hasDevcoachHooks(path: string, event: string): boolean {
   const read = readJsonFile<HooksFile>(path);
   return (
     read.ok &&
-    (read.data.hooks?.[event] ?? []).some((e) =>
-      (e.hooks ?? []).some((h) => isDevcoachHookCommand(hookText(h))),
-    )
+    (read.data.hooks?.[event] ?? []).some((e) => (e.hooks ?? []).some((h) => isDevcoachHook(h)))
   );
 }
 
@@ -518,7 +576,7 @@ function collectDevcoachHooks(data: HooksFile): { event: string; cmd: HookCmd }[
   for (const [event, entries] of Object.entries(data.hooks ?? {})) {
     for (const e of entries ?? []) {
       for (const h of e.hooks ?? []) {
-        if (isDevcoachHookCommand(hookText(h))) ours.push({ event, cmd: h });
+        if (isDevcoachHook(h)) ours.push({ event, cmd: h });
       }
     }
   }
@@ -541,7 +599,7 @@ function checkHookCommands(
       r.bad(`hook script not found: ${script} — re-run ${c.bold(fix)}`);
     if (text.startsWith("npx "))
       r.warn("hook runs via npx — needs the npx cache (or network) on every stop");
-    if (platform() === "win32" && !cmd.args)
+    if (platform() === "win32" && !cmd.args && fix === "devcoach install")
       r.warn(
         "shell-form hook on Windows — needs Git Bash (PowerShell refuses npx.ps1); " +
           `re-run ${c.bold(fix)} to switch to the exec form (node.exe + script)`,
@@ -868,8 +926,8 @@ function removeMcpEntry(path: string): string {
 
 /** Unregister through a client's own CLI; "" when the binary is not on PATH (caller falls back). */
 function removeViaClientCli(bin: string, removeArgs: string[]): string {
-  if (!onPath(bin)) return "";
-  const res = spawnSync(bin, removeArgs, { encoding: "utf8" });
+  const res = runClientCli(bin, removeArgs);
+  if (!res) return "";
   const combined = `${res.stderr ?? ""}${res.stdout ?? ""}`.toLowerCase();
   if (res.status === 0) return `${c.green("✓")} Removed via \`${bin} mcp remove\``;
   if (/not found|no .*server|does not exist|no such/.test(combined)) {
@@ -887,9 +945,7 @@ function removeOwnedHooks(path: string): string {
   const cleared: string[] = [];
   for (const [event, list] of Object.entries(hooks)) {
     if (!list) continue;
-    const kept = list.filter(
-      (e) => !(e.hooks ?? []).some((h) => isDevcoachHookCommand(hookText(h))),
-    );
+    const kept = list.filter((e) => !(e.hooks ?? []).some((h) => isDevcoachHook(h)));
     if (kept.length === list.length) continue;
     cleared.push(event);
     if (kept.length) hooks[event] = kept;
@@ -1031,7 +1087,8 @@ export async function cmdUninstall(o: UninstallOpts): Promise<void> {
   }
   log(
     c.dim(
-      "Then remove the program itself: brew uninstall devcoach · npm uninstall -g devcoach\n" +
+      "Then remove the program itself: brew uninstall devcoach · npm uninstall -g devcoach · " +
+        "scoop uninstall devcoach · %LOCALAPPDATA%\\devcoach\\uninstall.ps1\n" +
         "(npx: nothing to remove).",
     ),
   );

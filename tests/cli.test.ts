@@ -554,10 +554,12 @@ describe("cli", () => {
 
   it("owns exec-form hooks too (the Windows layout: node.exe + the script in args)", async () => {
     const settings = cleanClaudeSettings();
+    // install.ps1 -InstallDir D:\tools\dc with -UseSystemNode: nothing in it is called devcoach,
+    // so ownership must come from the shape (a bin.js running one of our subcommands)
     const exec = {
       type: "command",
-      command: "C:\\Users\\x\\AppData\\Local\\devcoach\\node\\node.exe",
-      args: ["C:\\Users\\x\\AppData\\Local\\devcoach\\app\\dist\\bin.js", "stop-hook"],
+      command: "C:\\Program Files\\nodejs\\node.exe",
+      args: ["D:\\tools\\dc\\app\\dist\\bin.js", "stop-hook"],
       timeout: 60,
     };
     const foreign = { type: "command", command: "my-other-tool --check" };

@@ -101,10 +101,7 @@ jobs:
   windows:
     needs: check
     runs-on: windows-latest
-    env:
-      # PowerShell 7.4+ turns a native command's non-zero exit into a terminating error; the
-      # checks below read $LASTEXITCODE themselves.
-      PSNativeCommandUseErrorActionPreference: "false"
+    timeout-minutes: 20 # the launcher tests spawn real children; a hang must not cost 6 hours
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -141,7 +138,7 @@ jobs:
           if ($userPath -notlike "*$dir\bin*") { throw "user PATH does not contain $dir\bin: $userPath" }
 
           & $cmd doctor
-          # the Stop hook on the private Node: a stop with no session is silent and exits 0
+          # the Stop hook on the private Node: before onboarding it answers the onboarding cue and exits 0
           '{}' | & $stop.command $stop.args[0] $stop.args[1]
           if ($LASTEXITCODE -ne 0) { throw "stop-hook exited $LASTEXITCODE" }
 

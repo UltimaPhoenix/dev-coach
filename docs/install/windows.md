@@ -46,14 +46,15 @@ does, in order:
 | the `devcoach` command | `%LOCALAPPDATA%\devcoach\bin\` (on your user PATH) |
 | **your data** — lessons, profile, notebook | `~\.devcoach\` — never touched by install or uninstall |
 
-Open a **new** terminal afterwards: the one you ran the script in does not see the PATH change.
-Then head to **[Coaching in your agent](../usage/coaching.md)**.
+The console you ran it in already has `devcoach`; terminals opened earlier need reopening to see
+the PATH change. Then head to **[Coaching in your agent](../usage/coaching.md)**.
 
 ### Updating
 
-Re-run the same line. It replaces the devcoach bundle, keeps Node unless a newer LTS is out, and
-runs `devcoach install` again so the hooks and the skill match the new version. Close Claude Code
-and Claude Desktop first if it says a directory is in use — they hold `node.exe` while devcoach runs.
+Re-run the same line. It replaces the devcoach bundle, keeps the private Node while it is on the
+same LTS line (a new line, 26 → 28, is downloaded; `-NodeVersion` pins one), and runs
+`devcoach install` again so the hooks and the skill match the new version. Close Claude Code and
+Claude Desktop first if it says a directory is in use — they hold `node.exe` while devcoach runs.
 
 ### Options
 
@@ -75,6 +76,7 @@ irm https://ultimaphoenix.github.io/dev-coach/install.ps1 -OutFile install.ps1
 | `DEVCOACH_USE_SYSTEM_NODE=1` | `-UseSystemNode` | No private Node: the `node` on your PATH (must be ≥ 24) |
 | `DEVCOACH_NO_MODIFY_PATH=1` | `-NoModifyPath` | Leave the user PATH alone |
 | `DEVCOACH_SKIP_CONNECT=1` | `-SkipConnect` | Do not run `devcoach install` at the end |
+| `DEVCOACH_SKIP_SIGNATURE_CHECK=1` | `-SkipSignatureCheck` | Accept a `node.exe` whose Authenticode check fails (by default the install refuses it) |
 | | `-ConnectArgs --gemini` | Extra arguments for `devcoach install` ([Gemini CLI](./gemini-cli.md), [Codex CLI](./codex.md)) |
 | | `-Archive path\to\devcoach-2.8.0-standalone.zip` | Install from a downloaded zip (offline) |
 
@@ -95,7 +97,10 @@ devcoach install
 ```
 
 Scoop installs its `nodejs-lts` next to devcoach (the manifest depends on it) and shims the
-`devcoach` command, so nothing else is needed. Update with `scoop update devcoach`, then
+`devcoach` command, so nothing else is needed. Mind that Scoop puts that Node first on your user
+PATH, as `brew install` does with Homebrew's Node: if you already manage Node with `nodejs`,
+nvm-windows or fnm and want it left alone, the one-liner above keeps its Node private instead.
+Update with `scoop update devcoach`, then
 `devcoach install` again to refresh the hooks and the skill — exactly like `brew upgrade`. Before
 `scoop uninstall devcoach`, run `devcoach uninstall`: Scoop cannot undo what devcoach wired into
 your agents. CI updates the bucket at every release.

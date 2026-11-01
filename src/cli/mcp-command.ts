@@ -130,16 +130,20 @@ export function chooseServerCommand(inputs: {
   platform: NodeJS.Platform;
 }): ServerCommand {
   const { hit, entry, execPath, platform } = inputs;
-  if (!hit) return NPX_COMMAND;
-  const where = classifyPath(isWin(platform) ? entry : hit, platform);
-  if (where.ephemeral || classifyPath(entry, platform).ephemeral) return NPX_COMMAND;
-  const note = where.boundTo
-    ? `bound to Node ${where.boundTo} (${where.manager}) — after removing or switching that ` +
+  // Windows needs no PATH hit: node.exe + the script are known from this very process.
+  if (!hit && !isWin(platform)) return NPX_COMMAND;
+  const where = classifyPath(isWin(platform) ? entry : (hit as string), platform);
+  const node = isWin(platform) ? classifyPath(execPath, platform) : null;
+  if (where.ephemeral || classifyPath(entry, platform).ephemeral || node?.ephemeral)
+    return NPX_COMMAND;
+  const bound = where.boundTo ? where : node?.boundTo ? node : null;
+  const note = bound?.boundTo
+    ? `bound to Node ${bound.boundTo} (${bound.manager}) — after removing or switching that ` +
       "version, run `devcoach install --force` again"
     : undefined;
   if (isWin(platform))
     return { command: scoopStablePath(execPath), args: [scoopStablePath(entry), "mcp"], note };
-  return { command: hit, args: ["mcp"], note };
+  return { command: hit as string, args: ["mcp"], note };
 }
 
 /** The same launcher as `method`, running another subcommand (`stop-hook` instead of `mcp`). */

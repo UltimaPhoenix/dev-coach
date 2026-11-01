@@ -603,6 +603,25 @@ describe("Windows channels — Scoop and install.ps1", () => {
     });
   });
 
+  it("on Windows the pair is known without a PATH hit; an ephemeral node.exe (fnm shell) means npx", () => {
+    const entry = "C:\\Users\\x\\AppData\\Local\\devcoach\\app\\dist\\bin.js";
+    const node = "C:\\Users\\x\\AppData\\Local\\devcoach\\node\\node.exe";
+    expect(chooseServerCommand({ hit: null, entry, execPath: node, platform: "win32" })).toEqual({
+      command: node,
+      args: [entry, "mcp"],
+      note: undefined,
+    });
+    const shell = "C:\\Users\\x\\AppData\\Local\\fnm_multishells\\123_1\\node.exe";
+    expect(chooseServerCommand({ hit: null, entry, execPath: shell, platform: "win32" })).toBe(
+      NPX_COMMAND,
+    );
+    const versioned =
+      "C:\\Users\\x\\AppData\\Roaming\\fnm\\node-versions\\v26.13.0\\installation\\node.exe";
+    expect(
+      chooseServerCommand({ hit: null, entry, execPath: versioned, platform: "win32" }).note,
+    ).toContain("bound to Node v26.13.0 (fnm)");
+  });
+
   it("hookCommandFor: exec form on Windows (node.exe + script), shell form elsewhere and for npx", () => {
     const win = {
       command: "C:\\Users\\x\\AppData\\Local\\devcoach\\node\\node.exe",
