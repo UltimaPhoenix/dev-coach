@@ -61,6 +61,20 @@ describe("hooks in-process (runHook dispatcher + payload-injected entrypoints)",
     expect(capture(() => runHook("prompt-hook", fresh))).toEqual({ out: "", code: 0 });
     expect(capture(() => runHook("lesson-ready", fresh))).toEqual({ out: "", code: 0 });
     expect(capture(() => runHook("frobnicate", fresh))).toEqual({ out: "", code: 0 });
+    // The onboarding cue names the command the model must run — `devcoach` by default, what
+    // the launcher put in DEVCOACH_COMMAND otherwise (the Gemini extension is not on the PATH).
+    const plain = JSON.parse(capture(() => runHook("stop-hook", fresh)).out).reason as string;
+    expect(plain).toContain("`devcoach api get_onboarding`");
+    expect(plain).toContain("`devcoach api complete_onboarding -`");
+    process.env.DEVCOACH_COMMAND = 'node "/x/launch.mjs"';
+    try {
+      const cue = JSON.parse(capture(() => runHook("stop-hook", fresh)).out).reason as string;
+      expect(cue).toContain('`node "/x/launch.mjs" api get_onboarding`');
+      expect(cue).toContain('`node "/x/launch.mjs" api complete_onboarding -`');
+      expect(cue).not.toContain("`devcoach api");
+    } finally {
+      delete process.env.DEVCOACH_COMMAND;
+    }
   });
 
   it("stop-hook without a DB is silent on forced continuations and in plan mode", () => {
@@ -156,6 +170,30 @@ describe("hooks in-process (runHook dispatcher + payload-injected entrypoints)",
   it("claude cue text is unchanged by the multi-client refactor (regression)", () => {
     const cue = capture(() => cmdStopHook(payload()));
     expect(JSON.parse(cue.out).reason).toContain("Invoke the `devcoach` skill (Skill tool) NOW");
+  });
+
+  it("the cue and the prime name `devcoach api …`, or the command DEVCOACH_COMMAND carries", () => {
+    const plain = JSON.parse(capture(() => cmdStopHook(payload())).out).reason as string;
+    expect(plain).toContain("`devcoach api get_briefing`");
+    expect(plain).toContain("`devcoach api log_lesson -`");
+    expect(plain).toContain(`\`devcoach api skip_lesson '{"reason":"…"}'\``);
+    expect(
+      JSON.parse(capture(() => cmdPromptHook(payload())).out).hookSpecificOutput.additionalContext,
+    ).toContain("`devcoach api skip_lesson");
+    // the Gemini extension's launcher: nothing of it is on the PATH, so the cue spells its path
+    process.env.DEVCOACH_COMMAND = 'node "/x/launch.mjs"';
+    try {
+      const cue = JSON.parse(capture(() => cmdStopHook(payload(), "gemini")).out).reason as string;
+      expect(cue).toContain('`node "/x/launch.mjs" api get_briefing`');
+      expect(cue).toContain('`node "/x/launch.mjs" api log_lesson -`');
+      expect(cue).not.toContain("`devcoach api");
+      const prime = JSON.parse(capture(() => cmdPromptHook(payload(), "gemini")).out)
+        .hookSpecificOutput.additionalContext as string;
+      expect(prime).toContain('`node "/x/launch.mjs" api skip_lesson');
+      expect(prime).not.toContain("`devcoach api");
+    } finally {
+      delete process.env.DEVCOACH_COMMAND;
+    }
   });
 
   it("gemini/codex stops honor the shared stop_hook_active and plan-mode suppression", () => {

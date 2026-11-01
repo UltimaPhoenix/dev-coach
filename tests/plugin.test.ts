@@ -1,5 +1,13 @@
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -10,6 +18,23 @@ import { describe, expect, it } from "vitest";
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const read = (...p: string[]) => readFileSync(join(root, ...p), "utf8");
 const readJson = (...p: string[]) => JSON.parse(read(...p));
+
+/** Unix mode of a zip entry, read from the central directory's external attributes (0 when not Unix). */
+function zipMode(zip: Buffer, name: string): number {
+  const signature = Buffer.from([0x50, 0x4b, 0x01, 0x02]);
+  for (let at = zip.indexOf(signature); at !== -1; ) {
+    const nameLength = zip.readUInt16LE(at + 28);
+    const extraLength = zip.readUInt16LE(at + 30);
+    const commentLength = zip.readUInt16LE(at + 32);
+    const os = zip[at + 5] ?? 0; // "version made by", high byte: 3 = Unix
+    const attrs = zip.readUInt32LE(at + 38);
+    if (zip.subarray(at + 46, at + 46 + nameLength).toString("utf8") === name) {
+      return os === 3 ? (attrs >>> 16) & 0o7777 : 0;
+    }
+    at = zip.indexOf(signature, at + 46 + nameLength + extraLength + commentLength);
+  }
+  return 0;
+}
 
 describe("claude code plugin packaging", () => {
   it("plugin manifest version matches package.json (run `npm run plugin:sync`)", () => {
@@ -30,7 +55,9 @@ describe("claude code plugin packaging", () => {
     expect(manifest.author).toEqual({ name: "UltimaPhoenix", url: expect.any(String) });
     expect(manifest.homepage).toMatch(/^https:\/\//);
     expect(manifest.license).toEqual(expect.any(String));
-    expect(manifest.keywords).toEqual(expect.arrayContaining(["mcp"]));
+    expect(manifest.keywords).toEqual(expect.arrayContaining(["skills"]));
+    expect(manifest.keywords).not.toContain("mcp");
+    expect(manifest.description).not.toMatch(/MCP/); // the plugin bundles the CLI, not a server
   });
 
   it("bundled skill dir is identical to assets/ (single source of truth)", () => {
@@ -66,7 +93,7 @@ describe("claude code plugin packaging", () => {
     }
     // category/tags belong to the marketplace entry only (plugin.json rejects them in strict mode).
     expect(entry.category).toBe("learning");
-    expect(entry.tags).toEqual(expect.arrayContaining(["coaching", "mcp"]));
+    expect(entry.tags).toEqual(expect.arrayContaining(["coaching", "skills"]));
   });
 
   it("build-plugin-zip.mjs packs the offline-marketplace zip AND a plugin-root zip for archive sources", () => {
@@ -76,7 +103,8 @@ describe("claude code plugin packaging", () => {
       stdio: "pipe",
     });
     const version = readJson("package.json").version;
-    const entries = (name: string) => Object.keys(unzipSync(readFileSync(join(dist, name))));
+    const bytes = (name: string) => readFileSync(join(dist, name));
+    const entries = (name: string) => Object.keys(unzipSync(bytes(name)));
     const offline = entries(`devcoach-plugin-${version}.zip`);
     expect(offline).toContain(".claude-plugin/marketplace.json");
     expect(offline).toContain("plugin/.claude-plugin/plugin.json");
@@ -85,7 +113,7 @@ describe("claude code plugin packaging", () => {
     const archive = entries(`devcoach-plugin-archive-${version}.zip`);
     for (const path of [
       ".claude-plugin/plugin.json",
-      ".mcp.json",
+      "bin/devcoach",
       "hooks/hooks.json",
       "scripts/launch.mjs",
       "scripts/launch.config.json",
@@ -96,9 +124,18 @@ describe("claude code plugin packaging", () => {
     ]) {
       expect(archive, path).toContain(path);
     }
+    expect(archive).not.toContain(".mcp.json"); // the plugin is no MCP server any more
     expect(archive.some((p) => p.startsWith("plugin/"))).toBe(false);
     expect(archive.some((p) => p.endsWith("marketplace.json"))).toBe(false);
     expect(archive).toHaveLength(offline.length - 1);
+    // bin/devcoach must come out of the zip executable: it is the `devcoach` command on the Bash
+    // tool's PATH, and an unzip only keeps the bit when the entry carries Unix attributes.
+    const archiveZip = bytes(`devcoach-plugin-archive-${version}.zip`);
+    expect(zipMode(archiveZip, "bin/devcoach") & 0o111).not.toBe(0);
+    expect(zipMode(archiveZip, "hooks/hooks.json") & 0o111).toBe(0);
+    expect(
+      zipMode(bytes(`devcoach-plugin-${version}.zip`), "plugin/bin/devcoach") & 0o111,
+    ).not.toBe(0);
   });
 
   it("update-beta-marketplace.mjs pins the canary zip (archive + sha256) in the beta catalog", () => {
@@ -195,48 +232,60 @@ describe("claude code plugin packaging", () => {
     expect(read("plugin", "LICENSE")).toBe(read("LICENSE"));
   });
 
-  it("registers the devcoach MCP server over stdio via pinned node install", () => {
-    const mcp = readJson("plugin", ".mcp.json");
-    const server = mcp.mcpServers.devcoach;
-    expect(server.type).toBe("stdio");
-    expect(server.command).toBe("node");
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: literal plugin-root placeholder, not a template
-    expect(server.args).toEqual(["${CLAUDE_PLUGIN_ROOT}/scripts/launch.mjs", "mcp"]);
+  it("ships no MCP server: no .mcp.json, and the launcher config names the `devcoach` command", () => {
+    expect(readdirSync(join(root, "plugin"))).not.toContain(".mcp.json");
+    // What the hook cues tell the model to run (the launcher exports it as DEVCOACH_COMMAND).
+    expect(readJson("plugin", "scripts", "launch.config.json").command).toBe("devcoach");
   });
 
-  // Plugin MCP tools are namespaced mcp__plugin_<plugin>_<server>__<tool>; the bare
-  // mcp__devcoach__ name only exists when devcoach is wired as a plain MCP server — every
-  // command allows both spellings of the tools it needs.
+  it("ships bin/devcoach — the `devcoach` command on the Bash tool's PATH while the plugin is enabled", () => {
+    const shim = read("plugin", "bin", "devcoach");
+    expect(shim.startsWith("#!/bin/sh\n")).toBe(true);
+    expect(shim).toContain('exec node "$(dirname "$0")/../scripts/launch.mjs" "$@"');
+    expect(statSync(join(root, "plugin", "bin", "devcoach")).mode & 0o111).not.toBe(0);
+  });
+
+  // The model drives devcoach through `devcoach api …` in the Bash tool: every command
+  // pre-approves exactly that prefix for its turn, and nothing wider.
   it.each([
     ["ui", ["open_ui", "stop_ui"]],
     ["share", ["share_lesson", "get_lessons"]],
     ["import", ["import_lesson", "add_topic"]],
     ["course", ["create_course", "add_course_step", "update_course_progress", "get_courses"]],
     ["setup", ["get_onboarding", "complete_onboarding", "get_profile"]],
-  ])("ships the /devcoach:%s command wired to its tools", (name, tools) => {
-    const cmd = read("plugin", "commands", `${name}.md`);
-    expect(cmd).toMatch(/^---\ndescription: .+/);
-    const allowed = cmd.match(/^allowed-tools: (.+)$/m)?.[1] ?? "";
-    for (const tool of tools) {
-      expect(allowed).toContain(`mcp__plugin_devcoach_devcoach__${tool}`);
-      expect(allowed).toContain(`mcp__devcoach__${tool}`);
-      expect(cmd.split("---")[2]).toContain(tool);
-    }
-  });
+  ])(
+    "ships the /devcoach:%s command, pre-approving `devcoach api` for its operations",
+    (name, ops) => {
+      const cmd = read("plugin", "commands", `${name}.md`);
+      expect(cmd).toMatch(/^---\ndescription: .+/);
+      const allowed = cmd.match(/^allowed-tools: (.+)$/m)?.[1] ?? "";
+      expect(allowed).toContain("Bash(devcoach *)");
+      expect(allowed).not.toContain("mcp__");
+      // `Bash(node:*)` pre-approved EVERY node command; `Bash(node */launch.mjs *)` would too
+      // (everything before the first `*` is the prefix). Only the launcher's exact path may be.
+      expect(allowed).not.toMatch(/Bash\(node:\*\)|Bash\(node \*/);
+      for (const op of ops) expect(cmd.split("---")[2]).toContain(op);
+    },
+  );
 
   // /devcoach:setup is the explicit way in when coaching never started: it must check the
   // runtime FIRST (through the launcher, which can diagnose itself when devcoach cannot load),
-  // then the server, and only then run onboarding — from the skill's one flow, not a copy.
-  it("/devcoach:setup checks runtime → server → profile, in that order", () => {
+  // then the command, and only then run onboarding — from the skill's one flow, not a copy.
+  it("/devcoach:setup checks runtime → command → profile, in that order", () => {
     const cmd = read("plugin", "commands", "setup.md");
     // biome-ignore lint/suspicious/noTemplateCurlyInString: literal plugin-root placeholder, not a template
     expect(cmd).toContain('node "${CLAUDE_PLUGIN_ROOT}/scripts/launch.mjs" doctor');
-    expect(cmd).toMatch(/^allowed-tools: Bash\(node:\*\)/m);
-    const order = ["**Runtime.**", "**Server.**", "**Profile.**"].map((s) => cmd.indexOf(s));
+    const allowed = cmd.match(/^allowed-tools: (.+)$/m)?.[1] ?? "";
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: literal plugin-root placeholder, not a template
+    expect(allowed).toContain("Bash(node ${CLAUDE_PLUGIN_ROOT}/scripts/launch.mjs *)");
+    expect(allowed).toContain("Bash(devcoach *)");
+    const order = ["**Runtime.**", "**Command.**", "**Profile.**"].map((s) => cmd.indexOf(s));
     expect(order.every((i) => i > 0)).toBe(true);
     expect([...order].sort((a, b) => a - b)).toEqual(order);
+    expect(cmd).toContain("devcoach api get_onboarding");
     expect(cmd).toContain("references/onboarding.md");
-    expect(cmd).toContain("/mcp");
+    expect(cmd).not.toContain("/mcp");
+    expect(cmd).not.toContain("**Server.**");
   });
 
   it("ships the merged stop-hook + prompt-hook, each with a timeout", () => {

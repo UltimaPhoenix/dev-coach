@@ -16,12 +16,17 @@ const freshHome = (): string => mkdtempSync(join(tmpdir(), "dc-spawn-"));
 const dbPathOf = (home: string): string => join(home, ".devcoach", "coaching.db");
 
 /** Run a hook subcommand as a real child process with the payload piped on stdin. */
-function hook(cmd: string, home: string, payload: object | string): string {
+function hook(
+  cmd: string,
+  home: string,
+  payload: object | string,
+  env: NodeJS.ProcessEnv = {},
+): string {
   return execFileSync(process.execPath, [...BIN, cmd], {
     cwd: root,
     encoding: "utf8",
     input: typeof payload === "string" ? payload : JSON.stringify(payload),
-    env: { ...process.env, HOME: home, NO_COLOR: "1" },
+    env: { ...process.env, HOME: home, NO_COLOR: "1", ...env },
   });
 }
 
@@ -66,7 +71,7 @@ describe("hooks via real child processes (piped stdin)", () => {
     const cue = JSON.parse(hook("stop-hook", home, payload));
     expect(cue.decision).toBe("block");
     expect(cue.reason).toContain("devcoach` skill");
-    expect(cue.reason).toContain("skip_lesson");
+    expect(cue.reason).toContain("`devcoach api skip_lesson");
     expect(cue.systemMessage).toContain("devcoach");
 
     // Reset-on-emission: the stop right after a cue is silent again (no cue storm)…
@@ -111,7 +116,7 @@ describe("hooks via real child processes (piped stdin)", () => {
     expect(hook("stop-hook", home, payload)).toBe("");
     const primed = JSON.parse(hook("prompt-hook", home, payload));
     expect(primed.hookSpecificOutput.hookEventName).toBe("UserPromptSubmit");
-    expect(primed.hookSpecificOutput.additionalContext).toContain("devcoach");
+    expect(primed.hookSpecificOutput.additionalContext).toContain("`devcoach api skip_lesson");
     expect(interactions(home, "s1")).toBe(1); // still 1 — peek only
 
     // Plan mode never primes.
@@ -145,6 +150,24 @@ describe("hooks via real child processes (piped stdin)", () => {
     );
     expect(codex.decision).toBe("block");
     expect(codex.reason).not.toContain("Skill tool");
+  }, 30_000);
+
+  it("DEVCOACH_COMMAND (set by the plugin / extension launcher) is the command the cue and the prime name", () => {
+    const home = freshHome();
+    seedProfile(home, 0); // every eligible stop cues; the prime fires on the next prompt
+    const payload = { session_id: "s1", permission_mode: "default" };
+    const env = { DEVCOACH_COMMAND: 'node "/x/launch.mjs"' };
+    const cue = JSON.parse(hook("stop-hook", home, payload, env));
+    expect(cue.reason).toContain('`node "/x/launch.mjs" api get_briefing`');
+    expect(cue.reason).not.toContain("`devcoach api");
+    const primed = JSON.parse(hook("prompt-hook", home, payload, env));
+    expect(primed.hookSpecificOutput.additionalContext).toContain(
+      '`node "/x/launch.mjs" api skip_lesson',
+    );
+    // without it: the bare command, as a Homebrew / npm install and the plugin's bin/ provide it
+    expect(JSON.parse(hook("stop-hook", home, payload)).reason).toContain(
+      "`devcoach api get_briefing`",
+    );
   }, 30_000);
 
   it("two concurrent hooks on one DB both exit 0 (busy_timeout)", async () => {

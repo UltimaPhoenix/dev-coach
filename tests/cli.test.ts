@@ -27,6 +27,22 @@ const cleanClaudeSettings = (): string => {
   writeFileSync(p, "{}");
   return p;
 };
+// What a 2.x `devcoach install` registered: an MCP server entry devcoach now only ever removes.
+const oldMcpEntry = { command: "devcoach", args: ["mcp"] };
+// Claude Desktop's config file held one too. On Linux it follows XDG_CONFIG_HOME, which CI
+// runners set: pin it inside the sandbox HOME so install, uninstall and doctor never look at the
+// runner's real config.
+const desktopConfig = (home: string): string => {
+  if (process.platform === "darwin")
+    return join(home, "Library", "Application Support", "Claude", "claude_desktop_config.json");
+  process.env.XDG_CONFIG_HOME = join(home, ".config");
+  return join(home, ".config", "Claude", "claude_desktop_config.json");
+};
+const savedXdg = process.env.XDG_CONFIG_HOME;
+const restoreXdg = () => {
+  if (savedXdg === undefined) delete process.env.XDG_CONFIG_HOME;
+  else process.env.XDG_CONFIG_HOME = savedXdg;
+};
 
 async function run(args: string[]): Promise<{ out: string; code: number | null }> {
   const lines: string[] = [];
@@ -224,118 +240,47 @@ describe("cli", () => {
     expect(both).toContain("devcoach@ultimaphoenix-beta");
   });
 
-  // Claude Desktop starts devcoach from its own config with its own PATH, which it prints in its
-  // log. The fixture is the real log of a failed start (2026-10-05): six `Failed to spawn process:
-  // No such file or directory`, nothing from devcoach. Doctor must say which of the two causes.
-  // On Linux both paths follow XDG_CONFIG_HOME, which CI runners set: pin it inside the sandbox
-  // HOME for these tests so doctor and install never look at the runner's real config.
-  const desktopPaths = (home: string) => {
-    if (process.platform !== "darwin") process.env.XDG_CONFIG_HOME = join(home, ".config");
-    return process.platform === "darwin"
-      ? {
-          config: join(
-            home,
-            "Library",
-            "Application Support",
-            "Claude",
-            "claude_desktop_config.json",
-          ),
-          log: join(home, "Library", "Logs", "Claude", "mcp-server-devcoach.log"),
-        }
-      : {
-          config: join(home, ".config", "Claude", "claude_desktop_config.json"),
-          log: join(home, ".config", "Claude", "logs", "mcp-server-devcoach.log"),
-        };
-  };
-  const savedXdg = process.env.XDG_CONFIG_HOME;
-  const restoreXdg = () => {
-    if (savedXdg === undefined) delete process.env.XDG_CONFIG_HOME;
-    else process.env.XDG_CONFIG_HOME = savedXdg;
-  };
-
   it.skipIf(process.platform === "win32")(
-    "doctor checks Claude Desktop's entry on the PATH from Desktop's own log",
+    "doctor checks the `devcoach` command the skill runs, and flags an MCP registration left behind",
     async () => {
       cleanClaudeSettings();
       const home = process.env.HOME as string;
-      const { config, log } = desktopPaths(home);
-      mkdirSync(dirname(config), { recursive: true });
-      mkdirSync(dirname(log), { recursive: true });
-      const hostBin = mkdtempSync(join(tmpdir(), "dc-desktop-path-"));
-      const fixture = readFileSync(
-        join(__dirname, "fixtures", "claude-desktop-mcp-devcoach.log"),
-        "utf8",
-      ).replace(
-        /paths: \[[\s\S]*?\[length\]: \d+/,
-        `paths: [\n      '${hostBin}',\n      [length]: 1`,
-      );
-      writeFileSync(log, fixture);
-      try {
-        writeFileSync(config, JSON.stringify({ mcpServers: {} }));
-        expect((await run(["doctor"])).out).toContain("not registered — add it with");
-
-        // yesterday's case: the bare name is on no directory of Desktop's PATH
-        writeFileSync(
-          config,
-          JSON.stringify({ mcpServers: { devcoach: { command: "devcoach", args: ["mcp"] } } }),
-        );
-        const bare = (await run(["doctor"])).out;
-        expect(bare).toContain("registered: devcoach mcp");
-        expect(bare).toContain("`devcoach` is not found on Claude Desktop's PATH (from its log)");
-        expect(bare).toContain(`log: ${log}`);
-        expect(bare).toContain(
-          "last error in it: Failed to spawn process: No such file or directory",
-        );
-
-        // the other cause: the file exists, its #! interpreter does not
-        const script = join(hostBin, "devcoach");
-        writeFileSync(script, "#!/opt/gone/node\n", { mode: 0o755 });
-        const interp = (await run(["doctor"])).out;
-        expect(interp).toContain(
-          `command resolves to ${script} on Claude Desktop's PATH (from its log)`,
-        );
-        expect(interp).toContain("its interpreter /opt/gone/node does not exist");
-      } finally {
-        rmSync(dirname(config), { recursive: true, force: true });
-        rmSync(dirname(log), { recursive: true, force: true });
-        restoreXdg();
-      }
-    },
-  );
-
-  it.skipIf(process.platform === "win32")(
-    "install writes Claude Desktop an absolute command — npx when devcoach only lives in npx's cache",
-    async () => {
-      const { config } = desktopPaths(process.env.HOME as string);
+      const desktop = desktopConfig(home);
       const savedPath = process.env.PATH;
       try {
-        const real = fakeBin("devcoach", "#!/bin/sh\necho 0.0.0\n");
-        process.env.PATH = real;
-        await run(["install", "--claude-desktop", "--force"]);
-        expect(JSON.parse(readFileSync(config, "utf8")).mcpServers.devcoach).toEqual({
-          command: join(real, "devcoach"),
-          args: ["mcp"],
-        });
-
-        // `npx -y devcoach install` puts npx's cache first on PATH: that path will vanish
-        const npxBin = join(
-          mkdtempSync(join(tmpdir(), "dc-npxcache-")),
-          "_npx",
-          "0123",
-          "node_modules",
-          ".bin",
+        // the skill runs `devcoach api …` in the agent's shell: without the command, say what to do
+        process.env.PATH = mkdtempSync(join(tmpdir(), "dc-nobin-"));
+        const missing = (await run(["doctor"])).out;
+        expect(missing).toContain("`devcoach` is not on this shell's PATH");
+        expect(missing).toContain("npx -y devcoach");
+        expect(missing).not.toContain("still registered");
+        const binDir = fakeBin("devcoach", "#!/bin/sh\nexit 0\n");
+        process.env.PATH = binDir;
+        expect((await run(["doctor"])).out).toContain(
+          `\`devcoach\` command on PATH (${join(binDir, "devcoach")})`,
         );
-        mkdirSync(npxBin, { recursive: true });
-        writeFileSync(join(npxBin, "devcoach"), "#!/bin/sh\n", { mode: 0o755 });
-        process.env.PATH = npxBin;
-        await run(["install", "--claude-desktop", "--force"]);
-        expect(JSON.parse(readFileSync(config, "utf8")).mcpServers.devcoach).toEqual({
-          command: "npx",
-          args: ["-y", "devcoach", "mcp"],
-        });
+        // the plugin ships bin/devcoach on the Bash tool's PATH while it is enabled
+        writeFileSync(
+          join(home, ".claude", "settings.json"),
+          JSON.stringify({ enabledPlugins: { "devcoach@ultimaphoenix": true } }),
+        );
+        expect((await run(["doctor"])).out).toContain("provided by the plugin");
+
+        // a 2.x install registered an MCP server: devcoach no longer runs as one
+        writeFileSync(
+          join(home, ".claude.json"),
+          JSON.stringify({ mcpServers: { devcoach: oldMcpEntry } }),
+        );
+        mkdirSync(dirname(desktop), { recursive: true });
+        writeFileSync(desktop, JSON.stringify({ mcpServers: { devcoach: oldMcpEntry } }));
+        const stale = (await run(["doctor"])).out;
+        expect(stale).toContain(`still registered in ${join(home, ".claude.json")}`);
+        expect(stale).toContain(`still registered in ${desktop}`);
+        expect(stale).toContain("to remove it");
       } finally {
         process.env.PATH = savedPath;
-        rmSync(dirname(config), { recursive: true, force: true });
+        rmSync(join(home, ".claude.json"), { force: true });
+        rmSync(dirname(desktop), { recursive: true, force: true });
         restoreXdg();
       }
     },
@@ -468,10 +413,42 @@ describe("cli", () => {
     expect((await run(["restore", "/no/such/file.zip"])).code).toBe(1);
   });
 
-  it("install writes Claude Desktop config", async () => {
-    const r = await run(["install", "--claude-desktop", "--force"]);
-    expect(r.out).toContain("Installed into");
-  });
+  it.skipIf(process.platform === "win32")(
+    "install removes the MCP registration a 2.x devcoach wrote — Claude Code's and Claude Desktop's",
+    async () => {
+      cleanClaudeSettings();
+      const home = process.env.HOME as string;
+      const codeConfig = join(home, ".claude.json");
+      const desktop = desktopConfig(home);
+      const savedPath = process.env.PATH;
+      process.env.PATH = ""; // no `claude` CLI → the JSON files are edited directly
+      try {
+        writeFileSync(
+          codeConfig,
+          JSON.stringify({ mcpServers: { devcoach: oldMcpEntry, other: { command: "x" } } }),
+        );
+        mkdirSync(dirname(desktop), { recursive: true });
+        writeFileSync(desktop, JSON.stringify({ mcpServers: { devcoach: oldMcpEntry } }));
+        const r = await run(["install", "--claude-code", "--force"]);
+        expect(r.out).toContain(`Old MCP…     ✓ Removed from ${codeConfig}`);
+        expect(r.out).toContain(`Removed from ${desktop}`);
+        expect(r.out).toContain("Restart Claude Desktop");
+        expect(JSON.parse(readFileSync(codeConfig, "utf8")).mcpServers).toEqual({
+          other: { command: "x" },
+        });
+        expect(JSON.parse(readFileSync(desktop, "utf8")).mcpServers).toEqual({});
+        // nothing left to remove → the line is not printed at all
+        const again = await run(["install", "--claude-code"]);
+        expect(again.out).not.toContain("Old MCP");
+        expect(again.out).not.toContain("Restart Claude Desktop");
+      } finally {
+        process.env.PATH = savedPath;
+        rmSync(codeConfig, { force: true });
+        rmSync(dirname(desktop), { recursive: true, force: true });
+        restoreXdg();
+      }
+    },
+  );
 
   it("install reports (and never clobbers) a malformed Claude Code settings file", async () => {
     const settings = join(process.env.HOME as string, ".claude", "settings.json");
@@ -490,14 +467,16 @@ describe("cli", () => {
     }
   });
 
-  it("install via a present `claude` CLI registers + writes/repairs the hooks", async () => {
+  it("install writes/repairs the hooks; a 2.x MCP registration is removed through a present `claude` CLI", async () => {
     const settings = cleanClaudeSettings();
+    const codeConfig = join(process.env.HOME as string, ".claude.json");
+    writeFileSync(codeConfig, JSON.stringify({ mcpServers: { devcoach: oldMcpEntry } }));
     const binDir = fakeBin("claude", "#!/bin/sh\nexit 0\n");
     const savedPath = process.env.PATH;
     process.env.PATH = binDir;
     try {
       const r = await run(["install", "--claude-code", "--force"]);
-      expect(r.out).toContain("Registered via");
+      expect(r.out).toContain("Removed via `claude mcp remove`");
       expect(r.out).toContain("Hooks installed");
       const saved = JSON.parse(readFileSync(settings, "utf8"));
       expect(saved.hooks.Stop).toHaveLength(1);
@@ -549,6 +528,7 @@ describe("cli", () => {
       expect(swept.hooks.Stop[0].hooks[0].command).toContain("stop-hook");
     } finally {
       process.env.PATH = savedPath;
+      rmSync(codeConfig, { force: true });
     }
   });
 
@@ -566,25 +546,29 @@ describe("cli", () => {
     }
   });
 
-  it("install surfaces an existing/failed `claude mcp add`", async () => {
+  it("install surfaces a failed `claude mcp remove`, and edits the file when the CLI knows no such server", async () => {
+    const codeConfig = join(process.env.HOME as string, ".claude.json");
     const savedPath = process.env.PATH;
     try {
-      process.env.PATH = fakeBin("claude", '#!/bin/sh\necho "already exists" >&2\nexit 1\n');
-      expect((await run(["install", "--claude-code", "--skip-hook"])).out).toContain(
-        "Already registered",
-      );
+      writeFileSync(codeConfig, JSON.stringify({ mcpServers: { devcoach: oldMcpEntry } }));
       process.env.PATH = fakeBin("claude", "#!/bin/sh\necho boom >&2\nexit 1\n");
       expect((await run(["install", "--claude-code", "--skip-hook"])).out).toContain(
-        "claude mcp add failed",
+        "claude mcp remove failed",
       );
+      expect(JSON.parse(readFileSync(codeConfig, "utf8")).mcpServers.devcoach).toBeDefined();
+      // the CLI's bookkeeping differs from the file: the file still says so, so it is edited
+      process.env.PATH = fakeBin(
+        "claude",
+        '#!/bin/sh\necho "No MCP server found with name: devcoach" >&2\nexit 1\n',
+      );
+      expect((await run(["install", "--claude-code", "--skip-hook"])).out).toContain(
+        `Removed from ${codeConfig}`,
+      );
+      expect(JSON.parse(readFileSync(codeConfig, "utf8")).mcpServers.devcoach).toBeUndefined();
     } finally {
       process.env.PATH = savedPath;
+      rmSync(codeConfig, { force: true });
     }
-  });
-
-  it("install into Claude Desktop reports an already-registered server", async () => {
-    expect((await run(["install", "--claude-desktop", "--force"])).out).toContain("Installed into");
-    expect((await run(["install", "--claude-desktop"])).out).toContain("Already registered");
   });
 
   it("install writes the Claude Code skill + stamp; welcome/stats hint when missing or outdated", async () => {
@@ -608,7 +592,7 @@ describe("cli", () => {
       // …and install refreshes it without --force (the skill file is devcoach-owned).
       expect((await run(["install", "--claude-code"])).out).toContain(`Installed into ${skillDir}`);
       expect(readFileSync(join(skillDir, ".devcoach-version"), "utf8").trim()).toBe(VERSION);
-      // Missing + Stop hooks present → hinted; missing + no hooks (Desktop-only) → silent.
+      // Missing + Stop hooks present → hinted; missing + no hooks (nothing wired yet) → silent.
       rmSync(join(process.env.HOME as string, ".claude", "skills"), {
         recursive: true,
         force: true,
@@ -621,19 +605,22 @@ describe("cli", () => {
     }
   });
 
-  it("install --gemini writes settings.json hooks + MCP (fallback path) and the shared skill", async () => {
+  it("install --gemini writes settings.json hooks and the shared skill, and drops a 2.x MCP entry", async () => {
     const home = process.env.HOME as string;
     const settings = join(home, ".gemini", "settings.json");
     const skillDir = join(home, ".agents", "skills", "devcoach");
     rmSync(join(home, ".gemini"), { recursive: true, force: true });
     rmSync(join(home, ".agents"), { recursive: true, force: true });
+    mkdirSync(dirname(settings), { recursive: true });
+    writeFileSync(settings, JSON.stringify({ mcpServers: { devcoach: oldMcpEntry } }));
     // An empty PATH dir guarantees the no-CLI fallback even when a real gemini is installed.
     const savedPath = process.env.PATH;
     process.env.PATH = mkdtempSync(join(tmpdir(), "dc-nobin-"));
     const r = await run(["install", "--gemini", "--force"]);
     expect(r.out).toContain("Gemini CLI (beta)");
+    expect(r.out).toContain(`Removed from ${settings}`);
     const saved = JSON.parse(readFileSync(settings, "utf8"));
-    expect(saved.mcpServers.devcoach.args).toContain("mcp");
+    expect(saved.mcpServers.devcoach).toBeUndefined();
     expect(saved.hooks.AfterAgent[0].hooks[0].command).toContain("gemini-stop-hook");
     expect(saved.hooks.AfterAgent[0].hooks[0].timeout).toBe(60000);
     expect(saved.hooks.BeforeAgent[0].hooks[0].command).toContain("gemini-prompt-hook");
@@ -664,14 +651,19 @@ describe("cli", () => {
     }
   });
 
-  it("install --gemini registers via a present `gemini` CLI and skips hooks+skill when the extension is installed", async () => {
+  it("install --gemini removes a 2.x MCP entry through a present `gemini` CLI and skips hooks+skill when the extension is installed", async () => {
     const home = process.env.HOME as string;
     rmSync(join(home, ".gemini"), { recursive: true, force: true });
     rmSync(join(home, ".agents"), { recursive: true, force: true });
+    mkdirSync(join(home, ".gemini"), { recursive: true });
+    writeFileSync(
+      join(home, ".gemini", "settings.json"),
+      JSON.stringify({ mcpServers: { devcoach: oldMcpEntry } }),
+    );
     const savedPath = process.env.PATH;
     process.env.PATH = fakeBin("gemini", "#!/bin/sh\nexit 0\n"); // fake shadows any real gemini
     try {
-      expect((await run(["install", "--gemini"])).out).toContain("Registered via `gemini mcp add`");
+      expect((await run(["install", "--gemini"])).out).toContain("Removed via `gemini mcp remove`");
       // Extension manifest present → hooks and skill are its job (double-count guard).
       const extDir = join(home, ".gemini", "extensions", "devcoach");
       mkdirSync(extDir, { recursive: true });
@@ -689,7 +681,7 @@ describe("cli", () => {
     }
   });
 
-  it("install --codex writes hooks.json + skill and prints the TOML snippet without the codex CLI", async () => {
+  it("install --codex writes hooks.json + skill; a 2.x MCP table in config.toml is a manual step without the codex CLI", async () => {
     const home = process.env.HOME as string;
     const hooksJson = join(home, ".codex", "hooks.json");
     rmSync(join(home, ".codex"), { recursive: true, force: true });
@@ -700,16 +692,21 @@ describe("cli", () => {
     try {
       const r = await run(["install", "--codex"]);
       expect(r.out).toContain("Codex CLI (beta)");
-      expect(r.out).toContain("[mcp_servers.devcoach]"); // manual TOML snippet, config left alone
+      expect(r.out).not.toContain("Old MCP"); // no config.toml entry → nothing to say
       const saved = JSON.parse(readFileSync(hooksJson, "utf8"));
       expect(saved.hooks.Stop[0].hooks[0].command).toContain("codex-stop-hook");
       expect(saved.hooks.Stop[0].hooks[0].timeout).toBe(60);
       expect(saved.hooks.UserPromptSubmit[0].hooks[0].command).toContain("codex-prompt-hook");
       expect(existsSync(join(home, ".agents", "skills", "devcoach", "SKILL.md"))).toBe(true);
 
-      // With a fake codex CLI on PATH the MCP step goes through `codex mcp add`.
+      // A 2.x install registered the server in config.toml, which devcoach never writes itself.
+      const toml = join(home, ".codex", "config.toml");
+      writeFileSync(toml, '[mcp_servers.devcoach]\ncommand = "devcoach"\nargs = ["mcp"]\n');
+      expect((await run(["install", "--codex"])).out).toContain("Manual step");
+      expect(readFileSync(toml, "utf8")).toContain("[mcp_servers.devcoach]"); // left to the user
+      // With a fake codex CLI on PATH the entry goes through `codex mcp remove`.
       process.env.PATH = fakeBin("codex", "#!/bin/sh\nexit 0\n");
-      expect((await run(["install", "--codex"])).out).toContain("Registered via `codex mcp add`");
+      expect((await run(["install", "--codex"])).out).toContain("Removed via `codex mcp remove`");
     } finally {
       process.env.PATH = savedPath;
     }
@@ -748,6 +745,17 @@ describe("cli", () => {
     expect(after.out).toContain("BeforeAgent priming hook wired");
     expect(after.out).toContain("Codex CLI wiring (beta)");
     expect(after.out).toContain("Stop hook wired");
+    expect(after.out).not.toContain("still registered");
+
+    // 2.x registrations left behind: one warning each, pointing at the install flag
+    const geminiSettings = join(home, ".gemini", "settings.json");
+    const gs = JSON.parse(readFileSync(geminiSettings, "utf8"));
+    gs.mcpServers = { devcoach: oldMcpEntry };
+    writeFileSync(geminiSettings, JSON.stringify(gs));
+    writeFileSync(join(home, ".codex", "config.toml"), "[mcp_servers.devcoach]\n");
+    const stale = (await run(["doctor"])).out;
+    expect(stale).toContain(`still registered in ${geminiSettings}`);
+    expect(stale).toContain(`still registered in ${join(home, ".codex", "config.toml")}`);
 
     // Extension + settings hooks together → the double-registration alarm.
     const extDir = join(home, ".gemini", "extensions", "devcoach");
@@ -955,13 +963,15 @@ describe("cli rich rendering branches", () => {
     expect((await run(["restore", file])).out).toContain("duplicates skipped");
   });
 
-  it("install uses the bare `devcoach` command when it is on PATH", async () => {
+  it("install writes the hook command from the `devcoach` found on PATH", async () => {
+    const settings = cleanClaudeSettings();
     const binDir = fakeBin("devcoach", "#!/bin/sh\nexit 0\n");
     const savedPath = process.env.PATH;
     process.env.PATH = binDir; // devcoach present, claude absent
     try {
-      const r = await run(["install", "--claude-desktop", "--force"]);
-      expect(r.out).toContain("devcoach mcp"); // detectInstallMethod chose the bare command
+      await run(["install", "--claude-code", "--force"]);
+      const saved = JSON.parse(readFileSync(settings, "utf8"));
+      expect(saved.hooks.Stop[0].hooks[0].command).toBe(`${join(binDir, "devcoach")} stop-hook`);
     } finally {
       process.env.PATH = savedPath;
     }
@@ -1122,7 +1132,7 @@ describe("cli share / import", () => {
 describe("cli uninstall", () => {
   const home = () => process.env.HOME as string;
 
-  it("removes the MCP entry, the devcoach hooks and the skill — user hooks and other keys survive", async () => {
+  it("removes the devcoach hooks, the skill and a 2.x MCP entry — user hooks and other keys survive", async () => {
     const savedPath = process.env.PATH;
     process.env.PATH = ""; // no `claude` CLI → the JSON path for both install and uninstall
     try {
@@ -1132,10 +1142,12 @@ describe("cli uninstall", () => {
       before.hooks.Stop.push({ hooks: [{ type: "command", command: "my-other-tool --check" }] });
       before.theme = "dark";
       writeFileSync(settings, JSON.stringify(before));
+      // the registration a 2.x install wrote, next to a server devcoach must not touch
       const codeConfig = join(home(), ".claude.json");
-      const cfg = JSON.parse(readFileSync(codeConfig, "utf8"));
-      cfg.mcpServers.other = { command: "x" };
-      writeFileSync(codeConfig, JSON.stringify(cfg));
+      writeFileSync(
+        codeConfig,
+        JSON.stringify({ mcpServers: { devcoach: oldMcpEntry, other: { command: "x" } } }),
+      );
       const skillDir = join(home(), ".claude", "skills", "devcoach");
       expect(existsSync(join(skillDir, "SKILL.md"))).toBe(true);
 
@@ -1165,20 +1177,34 @@ describe("cli uninstall", () => {
     }
   });
 
-  it("unregisters through a present `claude` CLI and clears the Desktop config", async () => {
-    const savedPath = process.env.PATH;
-    process.env.PATH = fakeBin("claude", "#!/bin/sh\nexit 0\n");
-    try {
-      await run(["install", "--claude-desktop", "--force"]);
-      const r = await run(["uninstall"]);
-      expect(r.out).toContain("Removed via `claude mcp remove`");
-      expect(r.out).toContain("Claude Desktop");
-      expect(r.out).toContain("Removed from");
-      expect(r.out).toContain("Restart Claude Desktop");
-    } finally {
-      process.env.PATH = savedPath;
-    }
-  });
+  it.skipIf(process.platform === "win32")(
+    "unregisters through a present `claude` CLI and clears the Desktop config",
+    async () => {
+      const savedPath = process.env.PATH;
+      process.env.PATH = fakeBin("claude", "#!/bin/sh\nexit 0\n");
+      const desktop = desktopConfig(home());
+      try {
+        writeFileSync(
+          join(home(), ".claude.json"),
+          JSON.stringify({ mcpServers: { devcoach: oldMcpEntry } }),
+        );
+        mkdirSync(dirname(desktop), { recursive: true });
+        writeFileSync(desktop, JSON.stringify({ mcpServers: { devcoach: oldMcpEntry } }));
+        const r = await run(["uninstall"]);
+        expect(r.out).toContain("Removed via `claude mcp remove`");
+        expect(r.out).toContain(`Removed from ${desktop}`);
+        expect(r.out).toContain("Restart Claude Desktop");
+        expect(JSON.parse(readFileSync(desktop, "utf8")).mcpServers).toEqual({});
+        // nothing in the Desktop file any more → it is not even mentioned
+        expect((await run(["uninstall"])).out).not.toContain("Claude Desktop");
+      } finally {
+        process.env.PATH = savedPath;
+        rmSync(join(home(), ".claude.json"), { force: true });
+        rmSync(dirname(desktop), { recursive: true, force: true });
+        restoreXdg();
+      }
+    },
+  );
 
   it("--all covers Gemini/Codex (manual TOML note without codex) and keeps the shared skill while in use", async () => {
     const savedPath = process.env.PATH;
@@ -1188,11 +1214,19 @@ describe("cli uninstall", () => {
       await run(["install", "--codex", "--force"]);
       const shared = join(home(), ".agents", "skills", "devcoach");
       expect(existsSync(join(shared, "SKILL.md"))).toBe(true);
+      // a 2.x entry in settings.json goes with the hooks
+      const geminiSettings = join(home(), ".gemini", "settings.json");
+      const gs = JSON.parse(readFileSync(geminiSettings, "utf8"));
+      gs.mcpServers = { devcoach: oldMcpEntry };
+      writeFileSync(geminiSettings, JSON.stringify(gs));
       // removing only Gemini keeps the skill Codex still reads
       const g = await run(["uninstall", "--gemini"]);
       expect(g.out).toContain("Gemini CLI");
+      expect(g.out).toContain(`Removed from ${geminiSettings}`);
       expect(g.out).toContain("Kept");
       expect(existsSync(join(shared, "SKILL.md"))).toBe(true);
+      // Codex's TOML holds a 2.x table: devcoach never writes TOML, so without the CLI it is a manual step
+      writeFileSync(join(home(), ".codex", "config.toml"), "[mcp_servers.devcoach]\n");
       const all = await run(["uninstall", "--all"]);
       expect(all.out).toContain("Manual step"); // no codex CLI → TOML left to the user
       expect(all.out).toContain("Removed " + shared);

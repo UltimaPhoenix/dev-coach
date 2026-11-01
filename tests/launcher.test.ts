@@ -22,6 +22,7 @@ import { isHookMode, MIN_NODE_MAJOR, nodeProblem, runtimeKey } from "../assets/l
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const read = (...p: string[]) => readFileSync(join(root, ...p), "utf8");
 const LAUNCHER = join(root, "plugin", "scripts", "launch.mjs");
+const GEMINI_LAUNCHER = join(root, "gemini-extension", "scripts", "launch.mjs");
 const PINNED = JSON.parse(read("plugin", "package.json")).dependencies.devcoach as string;
 
 // A stand-in for npm: writes a stub devcoach whose bin prints its argv. FAKE_NPM selects the
@@ -102,10 +103,10 @@ describe("launcher helpers", () => {
     expect(nodeProblem("18.19.1")).toContain("node:sqlite");
   });
 
-  it("knows a hook from a server or a CLI subcommand", () => {
+  it("knows a hook from an api call or a CLI subcommand", () => {
     for (const hook of ["stop-hook", "prompt-hook", "gemini-stop-hook", "lesson-ready"])
       expect(isHookMode(hook)).toBe(true);
-    for (const other of ["mcp", "doctor", "ui", undefined]) expect(isHookMode(other)).toBe(false);
+    for (const other of ["api", "doctor", "ui", undefined]) expect(isHookMode(other)).toBe(false);
   });
 
   it("derives a directory-safe key from a version or a tarball spec", () => {
@@ -122,22 +123,32 @@ describe("launcher mirrors", () => {
     expect(read("gemini-extension", "scripts", "launch.mjs")).toBe(source);
   });
 
-  it("each host says where its runtime lives and whether its hooks can show a notice", () => {
+  it("each host says where its runtime lives, whether its hooks can show a notice, and which command the cues name", () => {
     const plugin = JSON.parse(read("plugin", "scripts", "launch.config.json"));
-    expect(plugin).toMatchObject({ dataEnv: "CLAUDE_PLUGIN_DATA", hookNotice: true });
+    // Claude Code puts the plugin's bin/ on the Bash tool's PATH → the cues say `devcoach`.
+    expect(plugin).toMatchObject({
+      dataEnv: "CLAUDE_PLUGIN_DATA",
+      hookNotice: true,
+      command: "devcoach",
+    });
     expect(plugin.setupHint).toContain("/devcoach:setup");
     const gemini = JSON.parse(read("gemini-extension", "scripts", "launch.config.json"));
-    // outside the extension dir: an extension update replaces that directory
-    expect(gemini).toMatchObject({ dataHome: [".devcoach", "gemini-ext"], hookNotice: false });
+    // outside the extension dir: an extension update replaces that directory; nothing of it is
+    // on the PATH, so the cues name the launcher itself
+    expect(gemini).toMatchObject({
+      dataHome: [".devcoach", "gemini-ext"],
+      hookNotice: false,
+      command: "launcher",
+    });
   });
 });
 
 describe("launcher install", () => {
   it("installs the pinned version once, hands off, and never calls npm again", () => {
     const sb = sandbox();
-    const first = run(sb, "mcp");
+    const first = run(sb, "api");
     expect(first.status).toBe(0);
-    expect(first.stdout).toBe("devcoach-stub mcp\n"); // npm's output never reaches stdout
+    expect(first.stdout).toBe("devcoach-stub api\n"); // npm's output never reaches stdout
     expect(installs(sb)).toBe(1);
     expect(runtimeDirs(sb)).toEqual([PINNED]);
     expect(readFileSync(join(sb.data, "install.log"), "utf8")).toContain(`devcoach@${PINNED}`);
@@ -147,11 +158,11 @@ describe("launcher install", () => {
 
   it("a new pin installs beside the old runtime and prunes it — and the pre-2.6.4 layout", () => {
     const sb = sandbox();
-    expect(run(sb, "mcp").status).toBe(0);
+    expect(run(sb, "api").status).toBe(0);
     mkdirSync(join(sb.data, "node_modules", "devcoach"), { recursive: true }); // old layout
     writeFileSync(join(sb.data, "package.json"), "{}");
-    const next = run(sb, "mcp", { DEVCOACH_RUNTIME_SPEC: "9.9.9" });
-    expect(next.stdout).toBe("devcoach-stub mcp\n");
+    const next = run(sb, "api", { DEVCOACH_RUNTIME_SPEC: "9.9.9" });
+    expect(next.stdout).toBe("devcoach-stub api\n");
     expect(runtimeDirs(sb)).toEqual(["9.9.9"]);
     expect(existsSync(join(sb.data, "node_modules"))).toBe(false);
     expect(existsSync(join(sb.data, "package.json"))).toBe(false);
@@ -161,7 +172,7 @@ describe("launcher install", () => {
     const sb = sandbox();
     const env = { FAKE_NPM: "slow", FAKE_NPM_DELAY: "600" };
     const codes = await Promise.all(
-      [start(sb, "mcp", env), start(sb, "mcp", env), start(sb, "mcp", env)].map(exited),
+      [start(sb, "api", env), start(sb, "api", env), start(sb, "api", env)].map(exited),
     );
     expect(codes).toEqual([0, 0, 0]);
     expect(runtimeDirs(sb)).toEqual([PINNED]);
@@ -176,20 +187,21 @@ describe("launcher install", () => {
     spawnSync("pkill", ["-f", sb.data]); // the orphaned fake npm
     expect(runtimeDirs(sb).some((d) => d.includes(".tmp-"))).toBe(true);
     expect(runtimeDirs(sb)).not.toContain(PINNED);
-    const again = run(sb, "mcp");
-    expect(again.stdout).toBe("devcoach-stub mcp\n");
+    const again = run(sb, "api");
+    expect(again.stdout).toBe("devcoach-stub api\n");
     expect(runtimeDirs(sb)).toEqual([PINNED]);
   });
 });
 
 describe("launcher failures say why", () => {
-  it("npm fails: the server exits 1 with the reason and the log; doctor prints the diagnosis", () => {
+  it("npm fails: an api call exits 1 with the full diagnosis on stderr (no JSON on stdout); doctor prints the same", () => {
     const sb = sandbox();
-    const mcp = run(sb, "mcp", { FAKE_NPM: "fail" });
-    expect(mcp.status).toBe(1);
-    expect(mcp.stdout).toBe("");
-    expect(mcp.stderr).toContain(`could not install devcoach ${PINNED}`);
-    expect(mcp.stderr).toContain(join(sb.data, "install.log"));
+    const api = run(sb, "api", { FAKE_NPM: "fail" });
+    expect(api.status).toBe(1);
+    expect(api.stdout).toBe(""); // nothing the model could mistake for an answer
+    expect(api.stderr).toContain("the devcoach runtime is not available");
+    expect(api.stderr).toContain(`could not install devcoach ${PINNED}`);
+    expect(api.stderr).toContain(join(sb.data, "install.log"));
     expect(existsSync(join(sb.data, "runtime", PINNED))).toBe(false);
     const doctor = run(sb, "doctor", { FAKE_NPM: "fail" });
     expect(doctor.status).toBe(1);
@@ -200,22 +212,39 @@ describe("launcher failures say why", () => {
 
   it("npm missing: says so, without a stack trace", () => {
     const sb = sandbox({ npm: false });
-    const mcp = run(sb, "mcp");
-    expect(mcp.status).toBe(1);
-    expect(mcp.stderr).toContain("`npm` was not found on the PATH");
-    expect(mcp.stderr).not.toContain("    at ");
+    const api = run(sb, "api");
+    expect(api.status).toBe(1);
+    expect(api.stderr).toContain("`npm` was not found on the PATH");
+    expect(api.stderr).not.toContain("    at ");
   });
 
   it("a runtime that cannot be loaded is dropped, so the next start reinstalls", () => {
     const sb = sandbox();
-    expect(run(sb, "mcp").status).toBe(0);
+    expect(run(sb, "api").status).toBe(0);
     const bin = join(sb.data, "runtime", PINNED, "node_modules", "devcoach", "dist", "bin.js");
     writeFileSync(bin, 'import "./missing-chunk.js";\n');
-    const broken = run(sb, "mcp");
+    const broken = run(sb, "api");
     expect(broken.status).toBe(1);
     expect(broken.stderr).toContain("could not start");
     expect(existsSync(join(sb.data, "runtime", PINNED))).toBe(false);
-    expect(run(sb, "mcp").stdout).toBe("devcoach-stub mcp\n");
+    expect(run(sb, "api").stdout).toBe("devcoach-stub api\n");
+  });
+});
+
+describe("launcher hands devcoach the command the cues must name", () => {
+  it("`devcoach` under the plugin (its bin/ is on the Bash tool's PATH), its own path under the Gemini extension", () => {
+    const sb = sandbox();
+    expect(run(sb, "api").status).toBe(0);
+    const bin = join(sb.data, "runtime", PINNED, "node_modules", "devcoach", "dist", "bin.js");
+    writeFileSync(bin, "console.log(process.env.DEVCOACH_COMMAND);\n");
+    expect(run(sb, "api").stdout).toBe("devcoach\n");
+    // same runtime dir (DEVCOACH_RUNTIME_DIR), the Gemini launcher's config says `launcher`
+    const gemini = spawnSync(process.execPath, [GEMINI_LAUNCHER, "api"], {
+      env: sb.env,
+      encoding: "utf8",
+      timeout: 30_000,
+    });
+    expect(gemini.stdout).toBe(`node "${GEMINI_LAUNCHER}"\n`);
   });
 });
 

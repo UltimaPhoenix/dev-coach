@@ -27,12 +27,13 @@ describe("gemini cli extension packaging (beta)", () => {
     }
   });
 
-  it("registers the devcoach MCP server via the pinned node install", () => {
+  it("runs devcoach through its launcher — no MCP server; the hook cues name the launcher's path", () => {
     const manifest = readJson("gemini-extension", "gemini-extension.json");
-    const server = manifest.mcpServers.devcoach;
-    expect(server.command).toBe("node");
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: literal Gemini placeholder, not a template
-    expect(server.args).toEqual(["${extensionPath}/scripts/launch.mjs", "mcp"]);
+    expect(manifest.mcpServers).toBeUndefined();
+    expect(manifest.description).not.toMatch(/MCP/);
+    // Gemini puts nothing of an extension on the PATH, so the launcher tells the cues to spell
+    // its own absolute path (DEVCOACH_COMMAND = `node "<launcher>"`) instead of `devcoach`.
+    expect(readJson("gemini-extension", "scripts", "launch.config.json").command).toBe("launcher");
   });
 
   it("ships the AfterAgent + BeforeAgent hooks with Gemini's millisecond timeouts", () => {
