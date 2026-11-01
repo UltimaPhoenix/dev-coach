@@ -30,6 +30,8 @@ jobs:
       - run: npm install --no-save playwright
       - run: npx playwright install --with-deps chromium
       - run: node scripts/screenshots.mjs
+      # The README's demo GIF, recorded from the docs home's terminal demo (ffmpeg ships with the runner).
+      - run: node scripts/demo-gif.mjs
       - name: Commit refreshed screenshots
         run: |
           git config user.name  "github-actions[bot]"

@@ -12,6 +12,7 @@ devcoach decides whether to deliver a lesson after each completed task, based on
 - [Why devcoach](https://ultimaphoenix.github.io/dev-coach/why): the problem (skill erosion under AI-assisted dev) and how in-context coaching addresses it; comparison vs courses, docs, and inline AI explanations.
 - [How it works](https://ultimaphoenix.github.io/dev-coach/how-it-works): the session-startup, coaching-loop, lesson-selection, and depth-calibration flows.
 - [FAQ](https://ultimaphoenix.github.io/dev-coach/faq): concise answers to common questions — what it is, who it's for, supported agents, privacy, pricing, install.
+- [Troubleshooting](https://ultimaphoenix.github.io/dev-coach/troubleshooting): `devcoach doctor`, what each common error means and its fix, known limitations, and how to uninstall cleanly.
 - [Vision & roadmap](https://ultimaphoenix.github.io/dev-coach/vision): free, local, not commercialized; what's being explored next.
 
 ## Using devcoach

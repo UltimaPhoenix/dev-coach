@@ -50,6 +50,21 @@ See [CLAUDE.md](CLAUDE.md) for the full project structure, stack, and convention
 
 Keep PRs focused. A change that fixes a bug and adds a feature should be two PRs.
 
+## Branches & releases
+
+- `develop` is the integration branch: every PR targets it, and each merge publishes a **canary**
+  (`npx -y devcoach@next`, docs at `/next/`).
+- `main` only receives releases and is always the last published version (the Claude Code
+  self-marketplace installs from it).
+- A release is one click: run the **CI** workflow (*Run workflow* → patch / minor / major) on
+  `develop`. CI bumps the version on `develop`, tags it, fast-forwards `main`, then publishes to npm via
+  **OIDC provenance**, attaches the `.mcpb` + plugin zips to a GitHub Release, and updates the Homebrew
+  tap, the plugin marketplace and the MCP Registry. First-time setup: configure a Trusted Publisher on
+  npmjs.com for the `devcoach` package (GitHub Actions, repo `UltimaPhoenix/dev-coach`, workflow `ci.yml`).
+- The README's demo GIF (`docs/screenshots/lesson-loop.gif`) is recorded from the docs home's terminal
+  demo by `scripts/demo-gif.mjs` (after `npm run build --prefix website`; needs Playwright and ffmpeg).
+  The *Update documentation screenshots* workflow regenerates it with the screenshots.
+
 ## Licensing & the CLA
 
 devcoach is licensed under **AGPL-3.0**. No commercial license is offered today; if one is ever
