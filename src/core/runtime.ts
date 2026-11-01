@@ -187,6 +187,3 @@ export function describeWhere(where: PathClass): string {
   if (where.ephemeral) parts.push("temporary location");
   return parts.join(", ");
 }
-
-
-}

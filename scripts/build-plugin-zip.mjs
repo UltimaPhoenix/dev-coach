@@ -4,7 +4,7 @@
 //       self-contained marketplace — .claude-plugin/marketplace.json (source "./plugin") at the
 //       root + the plugin/ payload, so after `unzip` a user runs `/plugin marketplace add <dir>`.
 //   dist-plugin/devcoach-plugin-archive-<version>.zip  the plugin ROOT at the top of the zip
-//       (.claude-plugin/plugin.json, hooks/, .mcp.json, skills/, …): the shape an `archive`
+//       (.claude-plugin/plugin.json, hooks/, bin/, skills/, …): the shape an `archive`
 //       marketplace source expects. The beta marketplace pins this one to each canary — the
 //       marketplace layout above is NOT a plugin archive (its root has no plugin.json), which
 //       once left the beta plugin installed but inert.
@@ -19,14 +19,19 @@ import { zipSync } from "fflate";
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const version = JSON.parse(readFileSync(join(root, "package.json"), "utf8")).version;
 
-// Collect files into flat { "archive/path": Uint8Array } maps (fflate's zipSync shape).
+// Collect files into flat { "archive/path": [bytes, attributes] } maps (fflate's zipSync shape).
+// Each entry carries its Unix mode: bin/devcoach is the `devcoach` command on the Bash tool's
+// PATH, and an unzip keeps its executable bit only when the zip says so (os 3 = Unix,
+// st_mode in the high 16 bits of the external attributes).
 const read = (absPath) => new Uint8Array(readFileSync(absPath));
+const unixAttrs = (mode) => ((0o100000 | (mode & 0o777)) << 16) >>> 0;
 const collect = (absDir, archiveDir, into) => {
   for (const entry of readdirSync(absDir)) {
     const abs = join(absDir, entry);
     const arc = archiveDir ? `${archiveDir}/${entry}` : entry;
-    if (statSync(abs).isDirectory()) collect(abs, arc, into);
-    else into[arc] = read(abs);
+    const stat = statSync(abs);
+    if (stat.isDirectory()) collect(abs, arc, into);
+    else into[arc] = [read(abs), { os: 3, attrs: unixAttrs(stat.mode) }];
   }
   return into;
 };
@@ -35,7 +40,7 @@ const pluginRoot = collect(join(root, "plugin"), "", {});
 const marketplace = {
   ".claude-plugin/marketplace.json": read(join(root, ".claude-plugin", "marketplace.json")),
 };
-for (const [path, bytes] of Object.entries(pluginRoot)) marketplace[`plugin/${path}`] = bytes;
+for (const [path, file] of Object.entries(pluginRoot)) marketplace[`plugin/${path}`] = file;
 
 const out = process.env.DEVCOACH_DIST_PLUGIN ?? join(root, "dist-plugin");
 mkdirSync(out, { recursive: true });

@@ -1,5 +1,5 @@
 // Zod models for lessons, knowledge, settings, and profile.
-// Keys stay snake_case to keep DB rows and MCP JSON byte-identical with the Python implementation.
+// Keys stay snake_case to keep DB rows and the API JSON byte-identical with the Python implementation.
 import { z } from "zod";
 
 // ── Domain enums ─────────────────────────────────────────────────────────────

@@ -99,7 +99,6 @@ const COURSE_REPLY_CHECK =
   "`devcoach api add_course_step` (position order, anchor = the section id). Teach one step per " +
   "message and tell the user the course is on the dashboard under Courses (/devcoach:ui).";
 
-const PORT_RANGE = "port must be 1024-65535";
 const portSchema = z.number().int().default(7860).describe("Port (default 7860)");
 const portInRange = (port: number) => port >= 1024 && port <= 65535;
 
@@ -165,10 +164,7 @@ const logLesson = define({
         commit_hash: args.commit_hash ?? git.commit_hash ?? null,
         folder: args.folder ?? git.folder ?? null,
         repository_platform:
-          args.repository_platform ??
-          git.repository_platform ??
-          usage.repository_platform ??
-          null,
+          args.repository_platform ?? git.repository_platform ?? usage.repository_platform ?? null,
       });
       db.withConnection((c) => {
         db.insertLesson(c, lesson);
@@ -788,7 +784,10 @@ const createCourse = define({
     title: z.string().min(1).describe("Course title, e.g. 'From sums to logarithms'"),
     topic_id: z.string().min(1).describe("The lesson-style topic id the course belongs to"),
     goal: z.string().nullish().describe("One sentence: what the user will be able to do"),
-    lesson_id: z.string().nullish().describe("The seed lesson's id, when the course grows from one"),
+    lesson_id: z
+      .string()
+      .nullish()
+      .describe("The seed lesson's id, when the course grows from one"),
     prerequisites: z
       .array(z.object({ concept: z.string().min(1), known: z.boolean() }))
       .default([])

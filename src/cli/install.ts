@@ -1,11 +1,16 @@
-// Install + doctor: the per-client config writers (Claude Code / Claude Desktop are the
-// stable defaults; Gemini CLI and Codex CLI are beta targets) and the read-only wiring
-// diagnosis. All three CLI clients share the same hook JSON layout ({hooks: {Event:
-// [{hooks: [{type:"command", …}]}]}}), so one self-healing upsert serves every config
-// file; what differs per client is only the file path, the event names, and the
-// timeout unit (Claude/Codex: seconds, Gemini: milliseconds).
+// Install + doctor: the per-client config writers (Claude Code is the default target; Gemini
+// CLI and Codex CLI are beta targets) and the read-only wiring diagnosis. devcoach wires two
+// things into an agent — the hooks that cue a lesson and the skill that delivers it; the model
+// then runs `devcoach api …` in the agent's shell. All three clients share the same hook JSON
+// layout ({hooks: {Event: [{hooks: [{type:"command", …}]}]}}), so one self-healing upsert
+// serves every config file; what differs per client is only the file path, the event names,
+// and the timeout unit (Claude/Codex: seconds, Gemini: milliseconds).
+//
+// Up to 2.x devcoach also registered itself as an MCP server (Claude Code, Claude Desktop,
+// Gemini, Codex). It no longer runs as one, so `install` and `uninstall` remove that old
+// registration wherever they find it, and `doctor` warns about one left behind.
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { homedir, platform } from "node:os";
 import { dirname, join } from "node:path";
 import { createInterface } from "node:readline/promises";
@@ -14,15 +19,7 @@ import * as db from "../core/db";
 import { describeRuntime, describeWhere } from "../core/runtime";
 import { readSkill, readSkillReferences } from "../skill";
 import { VERSION } from "../version";
-import {
-  checkServerCommand,
-  chooseServerCommand,
-  claudeDesktopLogPath,
-  type Finding,
-  readHostLog,
-  resolveCommand,
-  type ServerCommand,
-} from "./mcp-command";
+import { resolveCommand } from "./path-lookup";
 import { c } from "./term";
 
 const log = (s = ""): void => {
@@ -48,6 +45,7 @@ interface HooksFile {
   [k: string]: unknown;
 }
 
+/** Claude Desktop's config file — only ever read to remove the MCP entry a 2.x devcoach wrote. */
 function claudeDesktopConfigPath(): string {
   const sys = platform();
   if (sys === "darwin") {
@@ -66,6 +64,7 @@ function claudeDesktopConfigPath(): string {
   const xdg = process.env.XDG_CONFIG_HOME ?? join(homedir(), ".config");
   return join(xdg, "Claude", "claude_desktop_config.json");
 }
+const CLAUDE_CODE_CONFIG = join(homedir(), ".claude.json");
 const CLAUDE_CODE_SETTINGS = join(homedir(), ".claude", "settings.json");
 const CLAUDE_CODE_SKILL_DIR = join(homedir(), ".claude", "skills", "devcoach");
 const GEMINI_DIR = join(homedir(), ".gemini");
@@ -87,25 +86,6 @@ const AGENTS_SKILL_DIR = join(homedir(), ".agents", "skills", "devcoach");
 const findOnPath = (bin: string): string | null => resolveCommand(bin);
 const onPath = (bin: string): boolean => findOnPath(bin) !== null;
 
-/** The devcoach entry script running right now, symlinks resolved. */
-function runningEntry(): string {
-  try {
-    return realpathSync(process.argv[1] ?? "");
-  } catch {
-    return process.argv[1] ?? "";
-  }
-}
-
-/** The command a host starts devcoach with — see `chooseServerCommand`. */
-function detectInstallMethod(): ServerCommand {
-  return chooseServerCommand({
-    hit: findOnPath("devcoach"),
-    entry: runningEntry(),
-    execPath: process.execPath,
-    platform: process.platform,
-  });
-}
-
 /**
  * Hook command prefix. Hooks may run with a minimal GUI PATH, so prefer the absolute
  * binary path — except when the PATH hit lives in an ephemeral per-shell dir (fnm
@@ -118,43 +98,6 @@ function hookPrefix(): string {
   if (!hit || hit.includes("/_npx/") || hit.includes("\\_npx\\")) return "npx -y devcoach";
   if (hit.includes("fnm_multishells")) return "devcoach";
   return hit.includes(" ") ? `"${hit}"` : hit;
-}
-
-/**
- * Register the MCP server through a beta client's own CLI (`gemini mcp add` / `codex
- * mcp add`) — the client then owns scope and file placement. Returns "" when the
- * client binary is not on PATH so the caller can fall back. (`installViaClaudeCli`
- * stays separate to keep its long-standing output byte-stable.)
- */
-function installViaClientCli(bin: string, addArgs: string[], removeArgs: string[] | null): string {
-  if (!onPath(bin)) return "";
-  if (removeArgs) spawnSync(bin, removeArgs, { encoding: "utf8" });
-  const res = spawnSync(bin, addArgs, { encoding: "utf8" });
-  if (res.status === 0) return `${c.green("✓")} Registered via \`${bin} mcp add\``;
-  const combined = `${res.stderr ?? ""}${res.stdout ?? ""}`.toLowerCase();
-  if (combined.includes("already")) {
-    return `${c.yellow("Already registered")} in ${bin} (use --force to overwrite)`;
-  }
-  return `${c.red(`${bin} mcp add failed:`)} ${(res.stderr || res.stdout || "").trim()}`;
-}
-
-function installViaClaudeCli(scope: string, force: boolean): string {
-  if (!onPath("claude")) return "";
-  if (force)
-    spawnSync("claude", ["mcp", "remove", "--scope", scope, "devcoach"], { encoding: "utf8" });
-  const m = detectInstallMethod();
-  const res = spawnSync(
-    "claude",
-    ["mcp", "add", "--scope", scope, "devcoach", m.command, "--", ...m.args],
-    { encoding: "utf8" },
-  );
-  if (res.status === 0)
-    return `${c.green("✓")} Registered via \`claude mcp add\` (scope: ${scope})`;
-  const combined = `${res.stderr ?? ""}${res.stdout ?? ""}`.toLowerCase();
-  if (combined.includes("already")) {
-    return `${c.yellow("Already registered")} in Claude Code (use --force to overwrite)`;
-  }
-  return `${c.red("claude mcp add failed:")} ${(res.stderr || res.stdout || "").trim()}`;
 }
 
 // Read a JSON config file safely: missing → empty object; malformed → error (never overwrite it).
@@ -170,21 +113,6 @@ function readJsonFile<T extends object>(path: string): JsonRead<T> {
       error: `${c.red("✗")} ${path} is not valid JSON — fix it and re-run (left unchanged)`,
     };
   }
-}
-
-function installTo(path: string, entry: object, force: boolean): string {
-  const read = readJsonFile<McpConfig>(path);
-  if (!read.ok) return read.error;
-  const data = read.data;
-  data.mcpServers ??= {};
-  const servers = data.mcpServers;
-  if (servers.devcoach && !force) {
-    return `${c.yellow("Already registered")} in ${path} (use --force to overwrite)`;
-  }
-  servers.devcoach = entry;
-  mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, `${JSON.stringify(data, null, 2)}\n`);
-  return `${c.green("✓")} Installed into ${path}`;
 }
 
 /** The exact hook layout devcoach owns in Claude Code: one merged Stop entry + the priming hook. */
@@ -398,11 +326,108 @@ export function skillHint(): string {
   return "";
 }
 
+// ── Old MCP registrations ────────────────────────────────────────────────────
+// A devcoach older than 3.0 registered itself as an MCP server. A host that still starts
+// `devcoach mcp` only sees it exit with the reason, so both `install` and `uninstall` take the
+// entry away: through the client's own CLI when it is on PATH (its bookkeeping stays
+// consistent), straight from the JSON file otherwise. Nothing is spawned when the file has
+// no entry — the common case on every install.
+
+/** What became of one registration. `none` = there was nothing to remove. */
+interface McpCleanup {
+  status: "removed" | "none" | "manual" | "failed";
+  message: string;
+}
+
+const notRegistered = (where: string): McpCleanup => ({
+  status: "none",
+  message: `${c.yellow("Not registered")} in ${where}`,
+});
+
+/** True when `mcpServers.devcoach` is in the JSON config at `path`. */
+function hasMcpEntry(path: string): boolean {
+  const read = readJsonFile<McpConfig>(path);
+  return read.ok && Boolean(read.data.mcpServers?.devcoach);
+}
+
+/** True when Codex's config.toml has a `[mcp_servers.devcoach]` table (a text scan is enough). */
+function hasCodexMcpEntry(): boolean {
+  try {
+    return /\[mcp_servers\.devcoach\]/.test(readFileSync(CODEX_CONFIG_TOML, "utf8"));
+  } catch {
+    return false;
+  }
+}
+
+/** Remove `mcpServers.devcoach` from a JSON config file; other keys are untouched. */
+function removeMcpEntry(path: string): McpCleanup {
+  if (!existsSync(path)) {
+    return { status: "none", message: `${c.yellow("Not registered")} (${path} does not exist)` };
+  }
+  const read = readJsonFile<McpConfig>(path);
+  if (!read.ok) return { status: "failed", message: read.error };
+  const servers = read.data.mcpServers;
+  if (!servers?.devcoach) return notRegistered(path);
+  delete servers.devcoach;
+  writeFileSync(path, `${JSON.stringify(read.data, null, 2)}\n`);
+  return { status: "removed", message: `${c.green("✓")} Removed from ${path}` };
+}
+
+/** Unregister through a client's own CLI; null when the binary is not on PATH (caller falls back). */
+function removeViaClientCli(bin: string, removeArgs: string[]): McpCleanup | null {
+  if (!onPath(bin)) return null;
+  const res = spawnSync(bin, removeArgs, { encoding: "utf8" });
+  const combined = `${res.stderr ?? ""}${res.stdout ?? ""}`.toLowerCase();
+  if (res.status === 0) {
+    return { status: "removed", message: `${c.green("✓")} Removed via \`${bin} mcp remove\`` };
+  }
+  if (/not found|no .*server|does not exist|no such/.test(combined)) return notRegistered(bin);
+  return {
+    status: "failed",
+    message: `${c.red(`${bin} mcp remove failed:`)} ${(res.stderr || res.stdout || "").trim()}`,
+  };
+}
+
+/** The old entry in a JSON config: the client's CLI removes it when present, else the file is edited. */
+function removeJsonMcp(path: string, bin: string, removeArgs: string[]): McpCleanup {
+  if (!hasMcpEntry(path)) return removeMcpEntry(path); // says why there is nothing to do
+  const viaCli = removeViaClientCli(bin, removeArgs);
+  // The CLI's bookkeeping can differ from the file (another scope, an older layout): when it
+  // knows no such server but the file still carries one, the file is what the host reads.
+  return viaCli && viaCli.status !== "none" ? viaCli : removeMcpEntry(path);
+}
+
+function removeClaudeCodeMcp(): McpCleanup {
+  return removeJsonMcp(CLAUDE_CODE_CONFIG, "claude", [
+    "mcp",
+    "remove",
+    "--scope",
+    "user",
+    "devcoach",
+  ]);
+}
+
+function removeGeminiMcp(): McpCleanup {
+  return removeJsonMcp(GEMINI_SETTINGS, "gemini", ["mcp", "remove", "-s", "user", "devcoach"]);
+}
+
+/** Codex keeps MCP servers in TOML, which devcoach never writes: its CLI removes the entry, or the user does. */
+function removeCodexMcp(): McpCleanup {
+  if (!hasCodexMcpEntry()) return notRegistered(CODEX_CONFIG_TOML);
+  return (
+    removeViaClientCli("codex", ["mcp", "remove", "devcoach"]) ?? {
+      status: "manual",
+      message:
+        `${c.yellow("Manual step")} — codex CLI not found. Delete the [mcp_servers.devcoach] table ` +
+        `from ${CODEX_CONFIG_TOML}: devcoach no longer runs as an MCP server`,
+    }
+  );
+}
+
 // ── Install ──────────────────────────────────────────────────────────────────
 
 export interface InstallOpts {
   claudeCode: boolean;
-  claudeDesktop: boolean;
   gemini: boolean;
   codex: boolean;
   force: boolean;
@@ -410,82 +435,52 @@ export interface InstallOpts {
 }
 
 export function cmdInstall(o: InstallOpts): void {
-  // Bare `devcoach install` keeps its original meaning: the Claude pair. The beta
-  // targets (--gemini, --codex) are opt-in and can be combined with any other flag.
-  const anyExplicit = o.claudeCode || o.claudeDesktop || o.gemini || o.codex;
+  // Bare `devcoach install` keeps its original meaning: Claude Code. The beta targets
+  // (--gemini, --codex) are opt-in and can be combined with any other flag.
+  const anyExplicit = o.claudeCode || o.gemini || o.codex;
   const doCode = o.claudeCode || !anyExplicit;
-  const doDesktop = o.claudeDesktop || !anyExplicit;
-  const method = detectInstallMethod();
-  const m = { command: method.command, args: method.args };
-  let needsRestart = false;
+  let desktopRemoved = false;
+  // Printed only when there was something to take away: a fresh install has no old entry.
+  const oldMcp = (cleanup: McpCleanup): void => {
+    if (cleanup.status !== "none") log(`  Old MCP…     ${cleanup.message}`);
+  };
 
-  log(c.bold("Setting up devcoach") + c.dim(`  (${m.command} ${m.args.join(" ")})`));
-  if (method.note) log(c.yellow(`  ${method.note}`));
+  log(c.bold("Setting up devcoach"));
   log();
 
   if (doCode) {
     log(c.bold("Claude Code"));
-    // "user" scope = all projects — matches the user-level Stop hooks (~/.claude/settings.json).
-    let msg = installViaClaudeCli("user", o.force);
-    if (!msg) {
-      const codeConfig = join(homedir(), ".claude.json");
-      msg = installTo(codeConfig, { type: "stdio", env: {}, ...m }, o.force);
-      needsRestart = true;
-    }
-    log(`  MCP server…  ${msg}`);
     if (!o.skipHook) log(`  Hooks…       ${installHook()}`);
     log(`  Skill…       ${installSkillTo(CLAUDE_CODE_SKILL_DIR, o.force)}`);
-    log();
-  }
-
-  if (doDesktop) {
-    log(c.bold("Claude Desktop"));
-    log(`  MCP server…  ${installTo(claudeDesktopConfigPath(), m, o.force)}`);
-    needsRestart = true;
+    oldMcp(removeClaudeCodeMcp());
+    const desktop = removeMcpEntry(claudeDesktopConfigPath());
+    oldMcp(desktop);
+    desktopRemoved = desktop.status === "removed";
     log();
   }
 
   if (o.gemini) {
     log(c.bold("Gemini CLI (beta)"));
-    let msg = installViaClientCli(
-      "gemini",
-      ["mcp", "add", "-s", "user", "devcoach", m.command, ...m.args],
-      o.force ? ["mcp", "remove", "-s", "user", "devcoach"] : null,
-    );
-    if (!msg) msg = installTo(GEMINI_SETTINGS, m, o.force);
-    log(`  MCP server…  ${msg}`);
     if (!o.skipHook) log(`  Hooks…       ${installGeminiHook()}`);
     log(`  Skill…       ${installGeminiSkill(o.force)}`);
+    oldMcp(removeGeminiMcp());
     log();
   }
 
   if (o.codex) {
     log(c.bold("Codex CLI (beta)"));
-    let msg = installViaClientCli(
-      "codex",
-      ["mcp", "add", "devcoach", "--", m.command, ...m.args],
-      o.force ? ["mcp", "remove", "devcoach"] : null,
-    );
-    if (!msg) {
-      // Codex stores MCP servers in TOML, which devcoach deliberately does not write —
-      // hand the user the exact snippet instead of risking their config.
-      msg =
-        `${c.yellow("Manual step")} — codex CLI not found. Add to ${CODEX_CONFIG_TOML}:\n` +
-        `                 [mcp_servers.devcoach]\n` +
-        `                 command = "${m.command}"\n` +
-        `                 args = [${m.args.map((a) => `"${a}"`).join(", ")}]`;
-    }
-    log(`  MCP server…  ${msg}`);
     if (!o.skipHook)
       log(`  Hooks…       ${upsertOwnedHooks(CODEX_HOOKS_JSON, desiredCodexHooks())}`);
     log(`  Skill…       ${installSkillTo(AGENTS_SKILL_DIR, o.force)}`);
+    oldMcp(removeCodexMcp());
     log(
       `  ${c.yellow("→")} Codex asks once to trust new hooks — approve devcoach on the next run.`,
     );
     log();
   }
 
-  if (needsRestart) log(`${c.yellow("→")} Restart Claude Desktop to pick up the new server.\n`);
+  if (desktopRemoved)
+    log(`${c.yellow("→")} Restart Claude Desktop to drop the old server entry.\n`);
   log(
     c.dim(
       "Tip: run devcoach backup to export your profile, lessons and settings.\n" +
@@ -532,65 +527,32 @@ function checkHookCommands(
   }
 }
 
-/** An `mcpServers.devcoach` value as `{command, args}`, or null when it is not one. */
-function asServerEntry(value: unknown): { command: string; args: string[] } | null {
-  const v = value as { command?: unknown; args?: unknown } | null | undefined;
-  if (!v || typeof v.command !== "string") return null;
-  const args = Array.isArray(v.args)
-    ? v.args.filter((a): a is string => typeof a === "string")
-    : [];
-  return { command: v.command, args };
-}
-
-function report(r: Reporter, findings: Finding[]): void {
-  for (const f of findings) r[f.level](f.text);
+/** A registration from before 3.0 that was never cleaned up — `install` takes it away. */
+function warnStaleMcp(r: Reporter, file: string, fix: string): void {
+  r.warn(
+    `a devcoach MCP server is still registered in ${file} — devcoach no longer runs as one; ` +
+      `run ${c.bold(fix)} to remove it`,
+  );
 }
 
 /**
- * Claude Desktop starts devcoach from claude_desktop_config.json with its OWN PATH — which it
- * prints in its log at every start. When the log shows it, the command is resolved on exactly
- * that PATH; the log's last error line is shown as well (`Failed to spawn process: …`).
+ * The skill runs `devcoach api …` with the agent's shell tool, so the command must resolve
+ * there: the plugin puts its bin/devcoach on that PATH while it is enabled; a Homebrew or npm
+ * install puts the real one on the user's. Without either the skill falls back to npx.
  */
-function doctorClaudeDesktop(r: Reporter): void {
-  log(c.bold("\nClaude Desktop"));
-  const configPath = claudeDesktopConfigPath();
-  const read = readJsonFile<McpConfig>(configPath);
-  if (!read.ok) {
-    r.bad(`${configPath} is not valid JSON — Claude Desktop cannot read it`);
-    return;
-  }
-  const entry = asServerEntry(read.data.mcpServers?.devcoach);
-  if (!entry) {
-    // Not an error: most setups use devcoach from Claude Code only.
-    log(c.dim(`    not registered — add it with ${c.bold("devcoach install --claude-desktop")}`));
-    return;
-  }
-  r.ok(`registered: ${[entry.command, ...entry.args].join(" ")}`);
-  const logPath = claudeDesktopLogPath();
-  const hostLog = existsSync(logPath)
-    ? readHostLog(tailOf(logPath))
-    : { path: null, lastError: null };
-  report(
-    r,
-    checkServerCommand(entry, {
-      path: hostLog.path ?? undefined,
-      pathSource: hostLog.path ? "Claude Desktop's PATH (from its log)" : "this shell's PATH",
-    }),
-  );
-  if (existsSync(logPath)) {
-    log(`    log: ${logPath}`);
-    if (hostLog.lastError) log(`    last error in it: ${hostLog.lastError}`);
-  }
-}
-
-/** The last 256 KB of a log — enough for the latest starts, cheap on a years-old file. */
-function tailOf(path: string): string {
-  try {
-    const text = readFileSync(path, "utf8");
-    return text.length > 256 * 1024 ? text.slice(-256 * 1024) : text;
-  } catch {
-    return "";
-  }
+function checkDevcoachCommand(r: Reporter, pluginOn: boolean): void {
+  const hit = findOnPath("devcoach");
+  if (pluginOn) {
+    r.ok(
+      "`devcoach` command provided by the plugin (bin/devcoach)" +
+        (hit ? `, also on this shell's PATH (${hit})` : ""),
+    );
+  } else if (hit) r.ok(`\`devcoach\` command on PATH (${hit})`);
+  else
+    r.warn(
+      "`devcoach` is not on this shell's PATH — the skill runs `devcoach api …` in the agent's " +
+        "shell: install it with Homebrew or `npm i -g devcoach`, or it falls back to `npx -y devcoach`",
+    );
 }
 
 function doctorGemini(r: Reporter): void {
@@ -628,12 +590,7 @@ function doctorGemini(r: Reporter): void {
   else if (skill === "outdated")
     r.warn(`skill is out of date — run ${c.bold("devcoach install --gemini")}`);
   else r.warn(`skill not installed — run ${c.bold("devcoach install --gemini")}`);
-  if (read.data.mcpServers?.devcoach) r.ok("MCP server registered (settings.json)");
-  else
-    r.warn(
-      "MCP server not found in settings.json — it may be registered elsewhere " +
-        `(check with ${c.bold("gemini mcp list")})`,
-    );
+  if (read.data.mcpServers?.devcoach) warnStaleMcp(r, GEMINI_SETTINGS, "devcoach install --gemini");
 }
 
 function doctorCodex(r: Reporter): void {
@@ -664,14 +621,7 @@ function doctorCodex(r: Reporter): void {
   else if (skill === "outdated")
     r.warn(`skill is out of date — run ${c.bold("devcoach install --codex")}`);
   else r.warn(`skill not installed — run ${c.bold("devcoach install --codex")}`);
-  // MCP config is TOML — a text scan is enough for a read-only diagnosis.
-  const toml = existsSync(CODEX_CONFIG_TOML) ? readFileSync(CODEX_CONFIG_TOML, "utf8") : "";
-  if (/\[mcp_servers\.devcoach\]/.test(toml)) r.ok("MCP server registered (config.toml)");
-  else
-    r.warn(
-      "MCP server not found in config.toml — it may be registered elsewhere " +
-        `(check with ${c.bold("codex mcp list")})`,
-    );
+  if (hasCodexMcpEntry()) warnStaleMcp(r, CODEX_CONFIG_TOML, "devcoach install --codex");
 }
 
 /**
@@ -756,19 +706,11 @@ export function cmdDoctor(): void {
       warn(`Claude Code skill is out of date — run ${c.bold("devcoach install")}`);
     else warn(`Claude Code skill not installed — run ${c.bold("devcoach install")}`);
 
-    const mcpRead = readJsonFile<McpConfig>(join(homedir(), ".claude.json"));
-    const codeEntry = mcpRead.ok ? asServerEntry(mcpRead.data.mcpServers?.devcoach) : null;
-    if (codeEntry) {
-      ok("MCP server registered (user scope)");
-      report(r, checkServerCommand(codeEntry, { pathSource: "this shell's PATH" }));
-    } else if (!pluginOn)
-      warn(
-        "MCP server not found in ~/.claude.json — it may be registered elsewhere " +
-          `(check with ${c.bold("claude mcp get devcoach")})`,
-      );
+    checkDevcoachCommand(r, pluginOn);
+    if (hasMcpEntry(CLAUDE_CODE_CONFIG)) warnStaleMcp(r, CLAUDE_CODE_CONFIG, "devcoach install");
+    const desktopConfig = claudeDesktopConfigPath();
+    if (hasMcpEntry(desktopConfig)) warnStaleMcp(r, desktopConfig, "devcoach install");
   }
-
-  if (existsSync(claudeDesktopConfigPath())) doctorClaudeDesktop(r);
 
   // The beta targets appear only when their config dir exists — a Claude-only setup
   // keeps the exact pre-0.10 doctor output.
@@ -833,34 +775,10 @@ export function cmdDoctor(): void {
 }
 
 // ── Uninstall ────────────────────────────────────────────────────────────────
-// The exact inverse of `install`: every devcoach-owned entry (MCP registration, hook
-// entries, skill dirs) is removed from each client, user content is never touched, and
-// the coaching data survives unless --data is given. Homebrew formulae have no uninstall
-// hook, so `brew uninstall` cannot run this — the formula's caveats point here instead.
-
-/** Remove `mcpServers.devcoach` from a JSON config file; other keys are untouched. */
-function removeMcpEntry(path: string): string {
-  if (!existsSync(path)) return `${c.yellow("Not registered")} (${path} does not exist)`;
-  const read = readJsonFile<McpConfig>(path);
-  if (!read.ok) return read.error;
-  const servers = read.data.mcpServers;
-  if (!servers?.devcoach) return `${c.yellow("Not registered")} in ${path}`;
-  delete servers.devcoach;
-  writeFileSync(path, `${JSON.stringify(read.data, null, 2)}\n`);
-  return `${c.green("✓")} Removed from ${path}`;
-}
-
-/** Unregister through a client's own CLI; "" when the binary is not on PATH (caller falls back). */
-function removeViaClientCli(bin: string, removeArgs: string[]): string {
-  if (!onPath(bin)) return "";
-  const res = spawnSync(bin, removeArgs, { encoding: "utf8" });
-  const combined = `${res.stderr ?? ""}${res.stdout ?? ""}`.toLowerCase();
-  if (res.status === 0) return `${c.green("✓")} Removed via \`${bin} mcp remove\``;
-  if (/not found|no .*server|does not exist|no such/.test(combined)) {
-    return `${c.yellow("Not registered")} in ${bin}`;
-  }
-  return `${c.red(`${bin} mcp remove failed:`)} ${(res.stderr || res.stdout || "").trim()}`;
-}
+// The exact inverse of `install`: every devcoach-owned entry (hook entries, skill dirs, and
+// the MCP registration an older devcoach wrote) is removed from each client, user content is
+// never touched, and the coaching data survives unless --data is given. Homebrew formulae have
+// no uninstall hook, so `brew uninstall` cannot run this — the formula's caveats point here.
 
 /** Drop every devcoach-owned hook entry from a client's JSON hooks file; user hooks stay. */
 function removeOwnedHooks(path: string): string {
@@ -894,7 +812,6 @@ function removeSkillDir(dir: string): string {
 
 export interface UninstallOpts {
   claudeCode: boolean;
-  claudeDesktop: boolean;
   gemini: boolean;
   codex: boolean;
   all: boolean;
@@ -922,10 +839,9 @@ async function confirmDeleteData(yes: boolean): Promise<boolean> {
 }
 
 export async function cmdUninstall(o: UninstallOpts): Promise<void> {
-  // Bare `devcoach uninstall` mirrors bare `install`: the Claude pair. --all covers every client.
-  const anyExplicit = o.claudeCode || o.claudeDesktop || o.gemini || o.codex;
+  // Bare `devcoach uninstall` mirrors bare `install`: Claude Code. --all covers every client.
+  const anyExplicit = o.claudeCode || o.gemini || o.codex;
   const doCode = o.all || o.claudeCode || !anyExplicit;
-  const doDesktop = o.all || o.claudeDesktop || !anyExplicit;
   const doGemini = o.all || o.gemini;
   const doCodex = o.all || o.codex;
 
@@ -937,31 +853,25 @@ export async function cmdUninstall(o: UninstallOpts): Promise<void> {
     const settings = readJsonFile<HooksFile>(CLAUDE_CODE_SETTINGS);
     if (settings.ok && pluginHooksActive(settings.data)) {
       log(
-        `  ${c.yellow("→")} The devcoach plugin is enabled — its hooks, skill and MCP server go away with ` +
+        `  ${c.yellow("→")} The devcoach plugin is enabled — its hooks, skill and command go away with ` +
           "/plugin uninstall devcoach; only user-level entries are removed here.",
       );
     }
-    let msg = removeViaClientCli("claude", ["mcp", "remove", "--scope", "user", "devcoach"]);
-    if (!msg) msg = removeMcpEntry(join(homedir(), ".claude.json"));
-    log(`  MCP server…  ${msg}`);
     log(`  Hooks…       ${removeOwnedHooks(CLAUDE_CODE_SETTINGS)}`);
     log(`  Skill…       ${removeSkillDir(CLAUDE_CODE_SKILL_DIR)}`);
-    log();
-  }
-
-  if (doDesktop) {
-    log(c.bold("Claude Desktop"));
-    log(`  MCP server…  ${removeMcpEntry(claudeDesktopConfigPath())}`);
-    log(`  ${c.yellow("→")} Restart Claude Desktop to drop the server.`);
+    log(`  Old MCP…     ${removeClaudeCodeMcp().message}`);
+    // Claude Desktop's file only ever held the entry a 2.x `install` wrote — silence when it has none.
+    const desktop = removeMcpEntry(claudeDesktopConfigPath());
+    if (desktop.status !== "none") log(`  Old MCP…     ${desktop.message}`);
+    if (desktop.status === "removed")
+      log(`  ${c.yellow("→")} Restart Claude Desktop to drop the server.`);
     log();
   }
 
   if (doGemini) {
     log(c.bold("Gemini CLI (beta)"));
-    let msg = removeViaClientCli("gemini", ["mcp", "remove", "-s", "user", "devcoach"]);
-    if (!msg) msg = removeMcpEntry(GEMINI_SETTINGS);
-    log(`  MCP server…  ${msg}`);
     log(`  Hooks…       ${removeOwnedHooks(GEMINI_SETTINGS)}`);
+    log(`  Old MCP…     ${removeGeminiMcp().message}`);
     if (geminiExtensionActive()) {
       log(
         `  ${c.yellow("→")} The devcoach Gemini extension is installed — remove it with: gemini extensions uninstall devcoach`,
@@ -972,13 +882,8 @@ export async function cmdUninstall(o: UninstallOpts): Promise<void> {
 
   if (doCodex) {
     log(c.bold("Codex CLI (beta)"));
-    let msg = removeViaClientCli("codex", ["mcp", "remove", "devcoach"]);
-    if (!msg) {
-      // devcoach never writes Codex's TOML, so it never edits it either.
-      msg = `${c.yellow("Manual step")} — codex CLI not found. Delete the [mcp_servers.devcoach] table from ${CODEX_CONFIG_TOML}`;
-    }
-    log(`  MCP server…  ${msg}`);
     log(`  Hooks…       ${removeOwnedHooks(CODEX_HOOKS_JSON)}`);
+    log(`  Old MCP…     ${removeCodexMcp().message}`);
     log();
   }
 

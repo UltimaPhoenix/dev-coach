@@ -826,14 +826,14 @@ export { cmdLessonReady, cmdOnboardHook, cmdPromptHook, cmdStopHook };
 
 function printWelcome(): void {
   const commands: [string, string][] = [
-    ["api [operation] [json|-]", "Run a coaching operation as JSON — what the skill calls (no args: list)"],
+    [
+      "api [operation] [json|-]",
+      "Run a coaching operation as JSON — what the skill calls (no args: list)",
+    ],
     ["ui [--port N] [--open|--stop]", "Launch the web dashboard  (default port: 7860)"],
     ["setup", "First-run wizard: import backup or build your knowledge profile"],
     ["install", "Register the hooks + skill (Claude Code default; --gemini/--codex beta)"],
-    [
-      "uninstall",
-      "Remove the hooks and skill (--all: every agent; --data: wipe ~/.devcoach)",
-    ],
+    ["uninstall", "Remove the hooks and skill (--all: every agent; --data: wipe ~/.devcoach)"],
     ["onboard-hook", "Claude Code Stop hook: cue onboarding when no profile exists"],
     ["lesson-ready", "Claude Code Stop hook: cue a lesson when one is due"],
     ["doctor", "Diagnose the agent wiring — explains why a lesson would(n't) fire"],
@@ -906,9 +906,8 @@ function buildProgram(): Command {
     .argument("[operation]", "Operation name, e.g. get_briefing, log_lesson")
     .argument("[input]", "The input as JSON, or - to read it from stdin (default: {})")
     .option("--json", "With no operation: the full catalogue, each input as JSON Schema")
-    .action(
-      (operation: string | undefined, input: string | undefined, opts: { json?: boolean }) =>
-        cmdApi(operation, input, opts),
+    .action((operation: string | undefined, input: string | undefined, opts: { json?: boolean }) =>
+      cmdApi(operation, input, opts),
     );
 
   // devcoach stopped being an MCP server in 3.0: coaching runs through the hooks, the skill and

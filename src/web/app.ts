@@ -206,7 +206,7 @@ export function createApp(opts: AppOptions = {}): Hono {
   app.options("/ping", (c) => c.body(null, 204, PING_HEADERS));
 
   // ── Shutdown (`devcoach ui --stop`, the stop_ui tool) ─────────────────────
-  // The dashboard started by the MCP open_ui tool is detached from any terminal, so Ctrl-C cannot
+  // The dashboard started by `devcoach api open_ui` is detached from any terminal, so Ctrl-C cannot
   // reach it; this is its off switch. Same-origin only: a web page elsewhere must not stop it.
   app.post("/shutdown", (c) => {
     if (isCrossSite(c)) return c.text("Forbidden", 403);

@@ -83,7 +83,7 @@ export const DEFAULT_PROFILE: Record<string, number> = {
 /** `share_name` is free text: at most this many characters, trimmed; empty means "not set". */
 export const SHARE_NAME_MAX = 80;
 
-/** The one normalisation every writer of `share_name` goes through (CLI, MCP, web, restore). */
+/** The one normalisation every writer of `share_name` goes through (CLI, agent API, web, restore). */
 export function normalizeShareName(raw: string): string {
   return raw.trim().slice(0, SHARE_NAME_MAX);
 }
@@ -121,7 +121,7 @@ function runSql(db: DatabaseSync, sql: string, ...params: SqlParam[]): number {
 export function getConnection(dbPath: string = DB_PATH, readOnly = false): DatabaseSync {
   if (dbPath !== ":memory:") mkdirSync(dirname(dbPath), { recursive: true });
   const db = new DatabaseSyncImpl(dbPath, { readOnly });
-  // Two writers can collide (the MCP server plus a Stop hook from a concurrent
+  // Two writers can collide (an `api` call plus a Stop hook from a concurrent
   // session); wait briefly instead of failing SQLITE_BUSY and dropping a cue.
   db.exec("PRAGMA busy_timeout = 3000");
   return db;
