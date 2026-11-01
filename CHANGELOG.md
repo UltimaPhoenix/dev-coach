@@ -25,6 +25,12 @@ Notable changes to devcoach. Versions follow [Semantic Versioning](https://semve
   page drops the sidebar and breadcrumbs; the navbar gains **Docs**, **Install** and **Why
   devcoach**. The demo shows its last frame at rest (no JS, or reduced motion) and has a Pause
   button.
+- **The README fits on a few screens** (615 → 127 lines): what devcoach does, the coaching loop as
+  a GIF, install per agent, what happens next, screenshots, and links into the docs. Nothing was
+  dropped: troubleshooting, known limitations and uninstalling moved to a new
+  [Troubleshooting](docs/troubleshooting.md) page, "what to expect" to the coaching guide, branches
+  & releases to `CONTRIBUTING.md`. The GIF is recorded from the docs home's demo by
+  `scripts/demo-gif.mjs`, and the screenshots workflow refreshes it.
 
 ## [2.7.1] — 2026-10-08
 

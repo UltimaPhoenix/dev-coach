@@ -35,6 +35,7 @@ const sidebars: SidebarsConfig = {
     },
     "how-it-works",
     "faq",
+    "troubleshooting",
     "vision",
   ],
 };
