@@ -18,6 +18,13 @@ Notable changes to devcoach. Versions follow [Semantic Versioning](https://semve
   code your AI agent writes*. This covers the npm, Claude Code plugin (+ self-marketplace), Gemini
   extension, `.mcpb`, MCP Registry and Homebrew descriptions, `devcoach --help`, the docs site
   tagline and description, `llms.txt`, and the social card.
+- **The docs home is a landing page.** It opens with what devcoach does in two lines, the install
+  command for your agent (Claude Code, Homebrew, npx, Gemini CLI, Codex CLI, Claude Desktop) with
+  a copy button, and a terminal that plays the coaching loop: a task, the agent's reply, the
+  lesson card, a one-key answer. Three steps follow (you work, a lesson lands, you answer). The
+  page drops the sidebar and breadcrumbs; the navbar gains **Docs**, **Install** and **Why
+  devcoach**. The demo shows its last frame at rest (no JS, or reduced motion) and has a Pause
+  button.
 
 ## [2.7.1] — 2026-10-08
 

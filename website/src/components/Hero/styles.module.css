@@ -1,0 +1,139 @@
+/* Copy on the left, the playing terminal on the right; one column under 997px (Docusaurus'
+   desktop breakpoint). Colours come from Infima and the brand accent, so both themes follow. */
+.hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 2.5rem;
+  align-items: center;
+  padding: 1.5rem 0 2.5rem;
+}
+@media (min-width: 997px) {
+  .hero {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
+    gap: 3rem;
+    padding-top: 2.5rem;
+  }
+}
+.copy {
+  min-width: 0;
+}
+.eyebrow {
+  margin: 0 0 0.9rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ifm-color-emphasis-600);
+  text-wrap: balance;
+}
+.title {
+  margin: 0;
+  font-size: clamp(2.3rem, 5vw, 3.6rem);
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+  text-wrap: balance;
+}
+.accent {
+  color: var(--devcoach-accent);
+}
+.lead {
+  margin: 1.1rem 0 1.4rem;
+  max-width: 34rem;
+  font-size: 1.15rem;
+  line-height: 1.55;
+  color: var(--ifm-color-emphasis-800);
+}
+/* Six agents: labels never break, the row wraps instead of hiding the last tabs off-screen. */
+.tabs {
+  flex-wrap: wrap;
+  margin-bottom: 0.25rem;
+}
+.tabs :global(.tabs__item) {
+  padding: 0.45rem 0.75rem;
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+.tabs + div :global(.theme-code-block) {
+  margin-bottom: 0.5rem;
+}
+.hint,
+.desktop {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--ifm-color-emphasis-700);
+}
+.desktop {
+  margin: 0.75rem 0 0.5rem;
+  font-size: 0.95rem;
+  color: var(--ifm-font-color-base);
+}
+.facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 1.3rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+.facts li {
+  margin: 0;
+  padding: 0.2rem 0.7rem;
+  border: 1px solid var(--ifm-color-emphasis-300);
+  border-radius: 999px;
+  font-size: 0.8rem;
+  color: var(--ifm-color-emphasis-800);
+}
+.demo {
+  display: grid;
+  gap: 0.6rem;
+  min-width: 0;
+}
+.demoLink {
+  justify-self: end;
+  font-size: 0.85rem;
+}
+
+.steps {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1rem;
+  margin: 0 0 2.5rem;
+  padding: 0;
+  list-style: none;
+}
+@media (min-width: 768px) {
+  .steps {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+.step {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.8rem;
+  margin: 0;
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--ifm-color-emphasis-200);
+  border-radius: 12px;
+  background: var(--ifm-background-surface-color);
+}
+.stepN {
+  display: inline-grid;
+  place-items: center;
+  width: 1.8rem;
+  height: 1.8rem;
+  border-radius: 50%;
+  border: 1px solid var(--devcoach-accent);
+  color: var(--devcoach-accent);
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+.stepTitle {
+  margin: 0 0 0.25rem;
+  font-weight: 700;
+}
+.stepBody {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--ifm-color-emphasis-800);
+}
