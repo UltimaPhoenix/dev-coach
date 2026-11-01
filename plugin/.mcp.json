@@ -3,7 +3,8 @@
     "devcoach": {
       "type": "stdio",
       "command": "node",
-      "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/launch.mjs", "mcp"]
+      "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/launch.mjs", "mcp"],
+      "env": { "DEVCOACH_HOOK_TOOLS": "1" }
     }
   }
 }

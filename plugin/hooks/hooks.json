@@ -4,8 +4,14 @@
       {
         "hooks": [
           {
-            "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/launch.mjs\" stop-hook",
+            "type": "mcp_tool",
+            "server": "plugin:devcoach:devcoach",
+            "tool": "hook_stop",
+            "input": {
+              "session_id": "${session_id}",
+              "stop_hook_active": "${stop_hook_active}",
+              "permission_mode": "${permission_mode}"
+            },
             "timeout": 60
           }
         ]
@@ -15,8 +21,14 @@
       {
         "hooks": [
           {
-            "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/launch.mjs\" prompt-hook",
+            "type": "mcp_tool",
+            "server": "plugin:devcoach:devcoach",
+            "tool": "hook_prompt",
+            "input": {
+              "session_id": "${session_id}",
+              "stop_hook_active": "${stop_hook_active}",
+              "permission_mode": "${permission_mode}"
+            },
             "timeout": 30
           }
         ]

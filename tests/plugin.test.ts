@@ -195,13 +195,15 @@ describe("claude code plugin packaging", () => {
     expect(read("plugin", "LICENSE")).toBe(read("LICENSE"));
   });
 
-  it("registers the devcoach MCP server over stdio via pinned node install", () => {
+  it("registers the devcoach MCP server over stdio via pinned node install, with the hook tools on", () => {
     const mcp = readJson("plugin", ".mcp.json");
     const server = mcp.mcpServers.devcoach;
     expect(server.type).toBe("stdio");
     expect(server.command).toBe("node");
     // biome-ignore lint/suspicious/noTemplateCurlyInString: literal plugin-root placeholder, not a template
     expect(server.args).toEqual(["${CLAUDE_PLUGIN_ROOT}/scripts/launch.mjs", "mcp"]);
+    // The hook tools exist only for the plugin: its server is the one the mcp_tool hooks call.
+    expect(server.env).toEqual({ DEVCOACH_HOOK_TOOLS: "1" });
   });
 
   // Plugin MCP tools are namespaced mcp__plugin_<plugin>_<server>__<tool>; the bare
@@ -222,6 +224,8 @@ describe("claude code plugin packaging", () => {
       expect(allowed).toContain(`mcp__devcoach__${tool}`);
       expect(cmd.split("---")[2]).toContain(tool);
     }
+    // There is no CLI to fall back on.
+    expect(cmd).not.toMatch(/devcoach (ui|install|doctor|backup|restore)\b/);
   });
 
   // /devcoach:setup is the explicit way in when coaching never started: it must check the
@@ -239,16 +243,37 @@ describe("claude code plugin packaging", () => {
     expect(cmd).toContain("/mcp");
   });
 
-  it("ships the merged stop-hook + prompt-hook, each with a timeout", () => {
+  // The hooks are mcp_tool entries: no process per stop — Claude Code calls the plugin's own
+  // server (named plugin:<plugin>:<server>) and reads the tool's text as the hook's output.
+  it("ships the Stop + UserPromptSubmit hooks as mcp_tool calls into the plugin's server", () => {
     const { hooks } = readJson("plugin", "hooks", "hooks.json");
-    type Entry = { hooks: { command: string; timeout?: number }[] };
+    type Entry = {
+      hooks: {
+        type: string;
+        server: string;
+        tool: string;
+        input: Record<string, string>;
+        timeout?: number;
+      }[];
+    };
     const stop = (hooks.Stop as Entry[]).flatMap((e) => e.hooks);
-    expect(stop).toHaveLength(1);
-    expect(stop[0].command).toContain("stop-hook");
-    expect(stop[0].timeout).toBe(60);
     const prompt = (hooks.UserPromptSubmit as Entry[]).flatMap((e) => e.hooks);
+    expect(stop).toHaveLength(1);
     expect(prompt).toHaveLength(1);
-    expect(prompt[0].command).toContain("prompt-hook");
-    expect(prompt[0].timeout).toBe(30);
+    expect(stop[0]).toMatchObject({ type: "mcp_tool", tool: "hook_stop", timeout: 60 });
+    expect(prompt[0]).toMatchObject({ type: "mcp_tool", tool: "hook_prompt", timeout: 30 });
+    for (const hook of [stop[0], prompt[0]]) {
+      expect(hook.server).toBe("plugin:devcoach:devcoach");
+      // Only the mapped fields reach the tool, substituted from the hook's JSON input.
+      expect(hook.input).toEqual({
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: Claude Code's substitution syntax
+        session_id: "${session_id}",
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: Claude Code's substitution syntax
+        stop_hook_active: "${stop_hook_active}",
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: Claude Code's substitution syntax
+        permission_mode: "${permission_mode}",
+      });
+      expect(hook).not.toHaveProperty("command");
+    }
   });
 });

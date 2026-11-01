@@ -1,19 +1,24 @@
 #!/usr/bin/env node
-// devcoach launcher — the single source for the Claude Code plugin and the Gemini CLI extension
-// (scripts/sync-plugin.mjs copies it into both; never edit the copies).
+// devcoach launcher — what the Claude Code plugin ships (scripts/sync-plugin.mjs copies it into
+// plugin/scripts/; never edit the copy).
 //
-// The host ships only config + this file: the devcoach binary comes from npm. On first use the
+// The plugin ships only config + this file: the devcoach binary comes from npm. On first use the
 // *pinned* version (the package.json beside scripts/) is installed once into a persistent data
-// dir, then every start (the MCP server, each hook) imports it in-process.
+// dir, then every start imports it in-process. The only thing this file ever starts is the MCP
+// server: the hooks are `mcp_tool` entries that call the server's own hook tools, so no hook
+// process exists.
+//
+//   launch.mjs mcp        install if needed, then hand off to the server (exit 1 + the reason when
+//                         devcoach cannot run — exit 0 read as a mute "failed to connect")
+//   launch.mjs doctor     install if needed, then print the diagnosis (exit 1 when devcoach cannot run)
+//   launch.mjs --install  install only
 //
 // What this file guarantees, because each of these once produced a mute "failed to connect":
 //   • a runtime directory exists only when its install FINISHED — npm runs in a temp dir that is
 //     renamed into place, so an interrupted install can never look installed;
-//   • concurrent starts (the MCP server and the first prompt's hook race on a fresh machine)
-//     cannot corrupt each other: the first rename wins, the others use its result;
-//   • a hook never makes the user wait for npm: it starts the install in the background;
+//   • concurrent starts cannot corrupt each other: the first rename wins, the others use its result;
 //   • every failure says why, where the host can show it (see reportFailure).
-import { spawn, spawnSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import {
   closeSync,
   existsSync,
@@ -24,8 +29,6 @@ import {
   realpathSync,
   renameSync,
   rmSync,
-  statSync,
-  utimesSync,
   writeFileSync,
 } from "node:fs";
 import { homedir } from "node:os";
@@ -35,8 +38,6 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 export const MIN_NODE_MAJOR = 24;
 const INSTALL_TIMEOUT_MS = 180_000;
 const WAIT_STEP_MS = 250;
-const HOOK_RETRY_AFTER_MS = 10 * 60_000; // a failed background install is retried at most this often
-const NOTICE_EVERY_MS = 24 * 60 * 60_000; // one visible notice a day, never one per prompt
 const LOG_TAIL_LINES = 15;
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -50,11 +51,6 @@ export function nodeProblem(version) {
     `Node ${version} is too old: devcoach needs Node ${MIN_NODE_MAJOR} or newer ` +
     "(it uses the built-in node:sqlite). Upgrade Node (e.g. `brew upgrade node`), then restart."
   );
-}
-
-/** A hook subcommand: must never block a prompt nor break a turn. */
-export function isHookMode(mode) {
-  return /-hook$/.test(mode ?? "") || mode === "lesson-ready";
 }
 
 /** A directory-safe key for what gets installed (a version, or a test tarball spec). */
@@ -75,6 +71,7 @@ function loadContext() {
     (config.dataHome ? join(homedir(), ...config.dataHome) : join(root, ".data"));
   const runtimeRoot = join(data, "runtime");
   const runtimeDir = join(runtimeRoot, runtimeKey(spec));
+  const pkgDir = join(runtimeDir, "node_modules", "devcoach");
   return {
     config,
     pinned,
@@ -82,10 +79,9 @@ function loadContext() {
     data,
     runtimeRoot,
     runtimeDir,
-    binJs: join(runtimeDir, "node_modules", "devcoach", "dist", "bin.js"),
+    pkgDir,
+    binJs: join(pkgDir, "dist", "bin.js"),
     log: join(data, "install.log"),
-    failure: join(data, "install-failed.json"),
-    notice: join(data, "notice.stamp"),
   };
 }
 
@@ -171,8 +167,7 @@ export function ensureRuntime(ctx) {
   );
   writeFileSync(ctx.log, `[${new Date().toISOString()}] npm install devcoach@${ctx.spec}\n`);
   const out = openSync(ctx.log, "a");
-  // npm's output goes to the log: it must never reach the MCP server's stdout (the protocol)
-  // nor a hook's stdout (the cue).
+  // npm's output goes to the log: it must never reach the MCP server's stdout (the protocol).
   const r = spawnSync(
     "npm",
     ["install", "--omit=dev", "--no-audit", "--no-fund", "--no-progress"],
@@ -204,55 +199,32 @@ export function ensureRuntime(ctx) {
     if (!existsSync(ctx.binJs))
       return `could not move the installed runtime into ${ctx.runtimeDir}`;
   }
-  rmSync(ctx.failure, { force: true });
   prune(ctx);
   return null;
 }
 
-function recordFailure(ctx, reason) {
+/** The version the installed tree declares, when one is installed. */
+function installedVersion(ctx) {
   try {
-    mkdirSync(ctx.data, { recursive: true });
-    writeFileSync(ctx.failure, JSON.stringify({ at: new Date().toISOString(), reason }));
-  } catch {
-    // a read-only data dir: the reason still reaches the caller
-  }
-}
-
-function lastFailure(ctx) {
-  try {
-    const { at, reason } = JSON.parse(readFileSync(ctx.failure, "utf8"));
-    return { ageMs: Date.now() - Date.parse(at), reason: String(reason) };
+    return String(JSON.parse(readFileSync(join(ctx.pkgDir, "package.json"), "utf8")).version);
   } catch {
     return null;
   }
 }
 
-/** True at most once per NOTICE_EVERY_MS (the stamp's mtime is the clock). */
-function noticeDue(ctx) {
-  try {
-    if (Date.now() - statSync(ctx.notice).mtimeMs < NOTICE_EVERY_MS) return false;
-  } catch {
-    // no stamp yet
-  }
-  try {
-    mkdirSync(ctx.data, { recursive: true });
-    writeFileSync(ctx.notice, "");
-    utimesSync(ctx.notice, new Date(), new Date());
-  } catch {
-    // cannot remember: better one notice too many than none
-  }
-  return true;
-}
-
+/** The full picture, for `doctor`: what is wrong (`reason`), or that everything is in place. */
 function diagnosis(ctx, reason) {
   const npm = spawnSync("npm", ["--version"], {
     encoding: "utf8",
     shell: process.platform === "win32",
   });
-  const tail = logTail(ctx);
+  const tail = reason ? logTail(ctx) : "";
+  const installed = installedVersion(ctx);
   return [
-    `${ctx.config.label}: the devcoach runtime is not available.`,
-    `  reason:   ${reason}`,
+    reason
+      ? `${ctx.config.label}: the devcoach runtime is not available.`
+      : `${ctx.config.label}: devcoach ${installed ?? ctx.spec} is installed — the MCP server starts from it.`,
+    ...(reason ? [`  reason:   ${reason}`] : []),
     `  node:     ${process.versions.node} (needs ≥ ${MIN_NODE_MAJOR}) — ${process.execPath}`,
     `  npm:      ${npm.status === 0 ? npm.stdout.trim() : "not found on PATH"}`,
     `  pinned:   devcoach ${ctx.spec}`,
@@ -263,71 +235,33 @@ function diagnosis(ctx, reason) {
 }
 
 /**
- * Say why devcoach cannot run, where the host shows it:
- *   mcp   → stderr + exit 1 (the host's MCP log; exit 0 here read as a mute "failed to connect")
- *   hook  → one systemMessage a day when the host renders it, otherwise silence; always exit 0
- *   other → the full diagnosis (this is what `launch.mjs doctor` prints), exit 1
+ * Say why devcoach cannot run, where the host shows it, and exit 1:
+ *   doctor → the full diagnosis (what /devcoach:setup reads)
+ *   other  → one line on stderr (the host's MCP log)
  */
 function reportFailure(ctx, mode, reason) {
-  if (isHookMode(mode)) {
-    if (ctx.config.hookNotice && noticeDue(ctx)) {
-      const hint = ctx.config.setupHint ? ` ${ctx.config.setupHint}` : "";
-      process.stdout.write(
-        `${JSON.stringify({ systemMessage: `🎓 devcoach is not running: ${reason}${hint}` })}\n`,
-      );
-    }
-    process.exit(0);
-  }
-  if (mode === "mcp") {
-    console.error(`${ctx.config.label}: ${reason}`);
-    process.exit(1);
-  }
-  console.error(diagnosis(ctx, reason));
+  console.error(mode === "doctor" ? diagnosis(ctx, reason) : `${ctx.config.label}: ${reason}`);
   process.exit(1);
 }
 
-/** A hook found no runtime: install in the background, let the prompt go. */
-function installInBackground(ctx) {
-  const failed = lastFailure(ctx);
-  if (failed && failed.ageMs < HOOK_RETRY_AFTER_MS) return failed.reason;
-  if (installsInProgress(ctx).some((i) => alive(i.pid))) return null;
-  const child = spawn(process.execPath, [fileURLToPath(import.meta.url), "--install"], {
-    detached: true,
-    stdio: "ignore",
-    env: process.env,
-  });
-  child.unref();
-  return null;
-}
-
 async function main() {
-  const mode = process.argv[2];
+  const mode = process.argv[2] ?? "mcp";
   const ctx = loadContext();
 
   const node = nodeProblem(process.versions.node);
   if (node) reportFailure(ctx, mode, node);
 
-  if (mode === "--install") {
-    const reason = ensureRuntime(ctx);
-    if (reason) recordFailure(ctx, reason);
-    process.exit(reason ? 1 : 0);
-  }
-
   if (!existsSync(ctx.binJs)) {
-    if (isHookMode(mode)) {
-      const reason = installInBackground(ctx);
-      if (reason) reportFailure(ctx, mode, reason);
-      process.exit(0); // installing: nothing to say yet, and nothing to run
-    }
     const reason = ensureRuntime(ctx);
-    if (reason) {
-      recordFailure(ctx, reason);
-      reportFailure(ctx, mode, reason);
-    }
+    if (reason) reportFailure(ctx, mode, reason);
+  }
+  if (mode === "--install") process.exit(0);
+  if (mode === "doctor") {
+    console.log(diagnosis(ctx, null));
+    process.exit(0);
   }
 
-  // Hand off in-process to the real binary — it reads the subcommand from argv.
-  process.env.DEVCOACH_LAUNCHER = `${ctx.config.label} · devcoach ${ctx.spec} · ${ctx.runtimeDir}`;
+  // Hand off in-process to the real binary: the MCP server over stdio.
   try {
     await import(pathToFileURL(ctx.binJs).href);
   } catch (err) {

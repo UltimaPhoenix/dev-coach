@@ -1,6 +1,6 @@
-// The launcher (assets/launcher/launch.mjs → plugin/ and gemini-extension/) as real child
-// processes: a sandboxed data dir and a FAKE `npm` first on PATH, so the install path runs for
-// real without the network. Each scenario here once ended as a mute "failed to connect".
+// The launcher (assets/launcher/launch.mjs → plugin/scripts/launch.mjs) as real child processes:
+// a sandboxed data dir and a FAKE `npm` first on PATH, so the install path runs for real without
+// the network. Each failure scenario here once ended as a mute "failed to connect".
 import { type ChildProcess, spawn, spawnSync } from "node:child_process";
 import {
   chmodSync,
@@ -17,7 +17,7 @@ import { delimiter, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 // @ts-expect-error — a plain .mjs script: the pure helpers are imported without running main()
-import { isHookMode, MIN_NODE_MAJOR, nodeProblem, runtimeKey } from "../assets/launcher/launch.mjs";
+import { MIN_NODE_MAJOR, nodeProblem, runtimeKey } from "../assets/launcher/launch.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const read = (...p: string[]) => readFileSync(join(root, ...p), "utf8");
@@ -36,7 +36,7 @@ const finish = () => {
   const dist = path.join(process.cwd(), "node_modules", "devcoach", "dist");
   fs.mkdirSync(dist, { recursive: true });
   fs.writeFileSync(path.join(dist, "bin.js"), 'console.log("devcoach-stub " + process.argv.slice(2).join(" "));\\n');
-  fs.writeFileSync(path.join(process.cwd(), "node_modules", "devcoach", "package.json"), '{"type":"module"}');
+  fs.writeFileSync(path.join(process.cwd(), "node_modules", "devcoach", "package.json"), '{"type":"module","version":"${PINNED}"}');
   process.exit(0);
 };
 if (mode === "slow") setTimeout(finish, Number(process.env.FAKE_NPM_DELAY || 1500)); else finish();
@@ -102,12 +102,6 @@ describe("launcher helpers", () => {
     expect(nodeProblem("18.19.1")).toContain("node:sqlite");
   });
 
-  it("knows a hook from a server or a CLI subcommand", () => {
-    for (const hook of ["stop-hook", "prompt-hook", "gemini-stop-hook", "lesson-ready"])
-      expect(isHookMode(hook)).toBe(true);
-    for (const other of ["mcp", "doctor", "ui", undefined]) expect(isHookMode(other)).toBe(false);
-  });
-
   it("derives a directory-safe key from a version or a tarball spec", () => {
     expect(runtimeKey("2.6.3")).toBe("2.6.3");
     expect(runtimeKey("2.7.0-next.612.g686a538")).toBe("2.7.0-next.612.g686a538");
@@ -115,25 +109,20 @@ describe("launcher helpers", () => {
   });
 });
 
-describe("launcher mirrors", () => {
-  it("plugin and Gemini launchers are the single source, byte for byte (npm run plugin:sync)", () => {
-    const source = read("assets", "launcher", "launch.mjs");
-    expect(read("plugin", "scripts", "launch.mjs")).toBe(source);
-    expect(read("gemini-extension", "scripts", "launch.mjs")).toBe(source);
+describe("launcher mirror", () => {
+  it("the plugin's launcher is the single source, byte for byte (npm run plugin:sync)", () => {
+    expect(read("plugin", "scripts", "launch.mjs")).toBe(read("assets", "launcher", "launch.mjs"));
   });
 
-  it("each host says where its runtime lives and whether its hooks can show a notice", () => {
+  it("the plugin says where its runtime lives; it has no hook modes to configure", () => {
     const plugin = JSON.parse(read("plugin", "scripts", "launch.config.json"));
-    expect(plugin).toMatchObject({ dataEnv: "CLAUDE_PLUGIN_DATA", hookNotice: true });
-    expect(plugin.setupHint).toContain("/devcoach:setup");
-    const gemini = JSON.parse(read("gemini-extension", "scripts", "launch.config.json"));
-    // outside the extension dir: an extension update replaces that directory
-    expect(gemini).toMatchObject({ dataHome: [".devcoach", "gemini-ext"], hookNotice: false });
+    expect(plugin).toEqual({ label: "devcoach plugin", dataEnv: "CLAUDE_PLUGIN_DATA" });
+    expect(read("assets", "launcher", "launch.mjs")).not.toMatch(/-hook\b/);
   });
 });
 
 describe("launcher install", () => {
-  it("installs the pinned version once, hands off, and never calls npm again", () => {
+  it("installs the pinned version once, hands off to the server, and never calls npm again", () => {
     const sb = sandbox();
     const first = run(sb, "mcp");
     expect(first.status).toBe(0);
@@ -141,7 +130,32 @@ describe("launcher install", () => {
     expect(installs(sb)).toBe(1);
     expect(runtimeDirs(sb)).toEqual([PINNED]);
     expect(readFileSync(join(sb.data, "install.log"), "utf8")).toContain(`devcoach@${PINNED}`);
-    expect(run(sb, "doctor").stdout).toBe("devcoach-stub doctor\n");
+    // No argument at all is the server too (bin.js ignores its arguments).
+    expect(run(sb, "").stdout).toBe("devcoach-stub \n");
+    expect(installs(sb)).toBe(1);
+  });
+
+  it("doctor installs what is missing and then reports a ready runtime, exit 0", () => {
+    const sb = sandbox();
+    const doctor = run(sb, "doctor");
+    expect(doctor.status).toBe(0);
+    expect(doctor.stderr).toBe("");
+    expect(doctor.stdout).toContain(`devcoach plugin: devcoach ${PINNED} is installed`);
+    expect(doctor.stdout).toContain("the MCP server starts from it");
+    expect(doctor.stdout).toMatch(/node:\s+\d+\.\d+\.\d+ \(needs ≥ 24\)/);
+    expect(doctor.stdout).toContain("npm:      99.0.0");
+    expect(doctor.stdout).toContain(join(sb.data, "runtime", PINNED));
+    expect(doctor.stdout).not.toContain("not installed");
+    expect(installs(sb)).toBe(1);
+  });
+
+  it("--install installs and exits without starting anything", () => {
+    const sb = sandbox();
+    const install = run(sb, "--install");
+    expect(install.status).toBe(0);
+    expect(install.stdout).toBe("");
+    expect(runtimeDirs(sb)).toEqual([PINNED]);
+    expect(run(sb, "--install").status).toBe(0);
     expect(installs(sb)).toBe(1);
   });
 
@@ -193,9 +207,15 @@ describe("launcher failures say why", () => {
     expect(existsSync(join(sb.data, "runtime", PINNED))).toBe(false);
     const doctor = run(sb, "doctor", { FAKE_NPM: "fail" });
     expect(doctor.status).toBe(1);
+    expect(doctor.stdout).toBe("");
     expect(doctor.stderr).toContain("the devcoach runtime is not available");
+    expect(doctor.stderr).toContain(`reason:   could not install devcoach ${PINNED}`);
     expect(doctor.stderr).toMatch(/node:\s+\d+\.\d+\.\d+ \(needs ≥ 24\)/);
+    expect(doctor.stderr).toContain("(not installed)");
     expect(doctor.stderr).toContain("npm ERR! network unreachable"); // the log's tail
+    const install = run(sb, "--install", { FAKE_NPM: "fail" });
+    expect(install.status).toBe(1);
+    expect(install.stderr).toContain(`could not install devcoach ${PINNED}`);
   });
 
   it("npm missing: says so, without a stack trace", () => {
@@ -204,6 +224,9 @@ describe("launcher failures say why", () => {
     expect(mcp.status).toBe(1);
     expect(mcp.stderr).toContain("`npm` was not found on the PATH");
     expect(mcp.stderr).not.toContain("    at ");
+    const doctor = run(sb, "doctor");
+    expect(doctor.status).toBe(1);
+    expect(doctor.stderr).toContain("npm:      not found on PATH");
   });
 
   it("a runtime that cannot be loaded is dropped, so the next start reinstalls", () => {
@@ -216,35 +239,5 @@ describe("launcher failures say why", () => {
     expect(broken.stderr).toContain("could not start");
     expect(existsSync(join(sb.data, "runtime", PINNED))).toBe(false);
     expect(run(sb, "mcp").stdout).toBe("devcoach-stub mcp\n");
-  });
-});
-
-describe("launcher hooks never block a prompt", () => {
-  it("runtime missing: the hook returns at once and the install continues in the background", async () => {
-    const sb = sandbox();
-    const t0 = Date.now();
-    const hook = run(sb, "prompt-hook", { FAKE_NPM: "slow", FAKE_NPM_DELAY: "1500" });
-    expect(Date.now() - t0).toBeLessThan(1400);
-    expect(hook.status).toBe(0);
-    expect(hook.stdout).toBe(""); // installing is not a failure: nothing to say
-    expect(await until(() => existsSync(join(sb.data, "runtime", PINNED)))).toBe(true);
-    expect(run(sb, "prompt-hook").stdout).toBe("devcoach-stub prompt-hook\n");
-    expect(installs(sb)).toBe(1);
-  });
-
-  it("a failed install becomes ONE visible notice a day, never a broken turn", async () => {
-    const sb = sandbox();
-    const env = { FAKE_NPM: "fail" };
-    expect(run(sb, "stop-hook", env).stdout).toBe(""); // starts the background install
-    expect(await until(() => existsSync(join(sb.data, "install-failed.json")))).toBe(true);
-    const noticed = run(sb, "stop-hook", env);
-    expect(noticed.status).toBe(0);
-    const message = JSON.parse(noticed.stdout).systemMessage as string;
-    expect(message).toContain("devcoach is not running");
-    expect(message).toContain("/devcoach:setup");
-    const quiet = run(sb, "prompt-hook", env);
-    expect(quiet.status).toBe(0);
-    expect(quiet.stdout).toBe("");
-    expect(installs(sb)).toBe(1); // no npm on every prompt after a failure
   });
 });

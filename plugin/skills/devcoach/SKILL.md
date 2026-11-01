@@ -225,8 +225,8 @@ checkpoints, never touch the notebook.
   `import_lesson({payload})` verbatim
 - "Open the dashboard" → `open_ui` (optional `port`); report the URL
 - "Close / stop the dashboard" → `stop_ui` (same `port`) — it stops whichever dashboard listens
-  there, one you opened or one started from a terminal; if the user runs `devcoach ui` in their own
-  terminal, Ctrl+C there stops it just as gracefully (in-flight requests finish)
+  there, one you opened now or one still up from an earlier `open_ui` (in-flight requests finish);
+  the dashboard also stops on its own when the session ends
 - "Lessons shared with me" → `get_lessons({imported: true})`; "what did Ada send me" →
   `get_lessons({shared_by: "Ada"})` (exact sender name)
 - "Show me the lesson X shared" → `get_lessons({shared_by: X, search})` → the card,

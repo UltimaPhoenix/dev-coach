@@ -57,10 +57,12 @@ project's files (Automatic (Deep) stays available regardless — its value doesn
 depend on `scanClaudeHistory`'s metadata scan). Do **not** default to Automatic
 silently — surface the choice and wait for the user's answer before proceeding.
 
-**If Import backup:** ask for the file path and call `restore` (CLI) with it. Restore
-brings back knowledge entries automatically — no further DB steps needed. Call
-`get_onboarding` again after restore; if `knowledge_ready` is now true, skip to the
-notebook-composition part of Step 4. If `notebook_ready` is also true, proceed normally.
+**If Import backup:** restoring goes through the dashboard — call `open_ui`, tell the user to
+open **Settings → Restore** at the URL it reports and pick their backup zip there, and wait
+for them to say it is done. Restore brings back knowledge entries automatically — no further
+DB steps needed. Call `get_onboarding` again after the restore; if `knowledge_ready` is now
+true, skip to the notebook-composition part of Step 4. If `notebook_ready` is also true,
+proceed normally.
 
 ## Step 2 — Build the topic list for the chosen mode
 
@@ -216,12 +218,9 @@ underneath (no table, no prose paragraph):
 ```
 Topics with no group go under a trailing `### Other` heading, same bullet shape.
 
-Then tell the user **how to change any of it later**, across all three surfaces:
+Then tell the user **how to change any of it later**, on both surfaces:
 - **In chat** — just ask, e.g. *"set my Python confidence to 7"*, *"add Rust at 4"*,
   or *"redo onboarding"*. (Backed by the `update_knowledge`, `add_topic`, and
   `add_group` tools.)
-- **CLI** — `devcoach profile` to view; `devcoach knowledge-add <topic> <0-10>
-  [--group <Group>]` to add/update; `devcoach knowledge-remove <topic>` to remove;
-  `devcoach group-add` / `devcoach group-assign` to organise groups.
-- **UI** — `devcoach ui` (web dashboard at http://localhost:7860), or ask me to open
-  it (the `open_ui` tool; plugin installs also get the `/devcoach:ui` command).
+- **UI** — the web dashboard (http://localhost:7860): ask me to open it (the `open_ui`
+  tool; plugin installs also get the `/devcoach:ui` command).
