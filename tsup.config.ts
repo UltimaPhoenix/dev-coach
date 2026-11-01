@@ -6,8 +6,8 @@ export default defineConfig({
   target: "node24",
   platform: "node",
   bundle: true,
-  // Split the dynamic imports in src/bin.ts into separate chunks: hooks (run on every
-  // agent stop) load without paying for Commander/zod/MCP SDK/Hono.
+  // Split the dynamic imports into separate chunks: bin.js stays a thin entry, the MCP server
+  // (zod + the SDK) is its own chunk, and the Hono dashboard loads only when open_ui runs.
   splitting: true,
   minify: true,
   treeshake: true,

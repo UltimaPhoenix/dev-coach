@@ -1,21 +1,17 @@
-// devcoach CLI entry. The shebang is injected by tsup. Hook subcommands run on EVERY
-// agent stop, so they load the lean hooks chunk (node built-ins + core only); every
-// other subcommand loads the full CLI (Commander/zod/MCP SDK/Hono) via dynamic import,
-// which tsup code-splits into separate chunks. The one static import is `core/runtime`
-// (node:fs + node:os + the version): it must load on ANY Node, to say what is wrong.
+// devcoach entry: the MCP server over stdio, and nothing else. The shebang is injected by tsup.
+// There is no CLI in this design — the hooks are `mcp_tool` entries that call the server's own
+// hook tools, and the dashboard starts from the `open_ui` tool — so every argument but
+// `--version` / `--help` is ignored (`mcp`, the subcommand every manifest still passes, included).
+// The one static import is `core/runtime` (node:fs + node:os + the version): it must load on ANY
+// Node, to say what is wrong; the server loads via a dynamic import tsup splits into its own chunk.
 import { describeRuntime, describeWhere, nodeProblem } from "./core/runtime";
 
-const cmd = process.argv[2] ?? "";
-const HOOK_CMDS = new Set([
-  "stop-hook",
-  "prompt-hook",
-  "gemini-stop-hook",
-  "gemini-prompt-hook",
-  "codex-stop-hook",
-  "codex-prompt-hook",
-  "onboard-hook",
-  "lesson-ready",
-]);
+const args = new Set(process.argv.slice(2));
+
+const HELP =
+  "devcoach is an MCP server: install it as a Claude Code plugin (/plugin install " +
+  "devcoach@ultimaphoenix) or add it to your agent's MCP config as `devcoach` over stdio; " +
+  "the web dashboard opens from the `open_ui` tool. Options: --version, --help.";
 
 /** `devcoach 2.6.3 (homebrew): ` — so a crash in a host's log says which install it came from. */
 function prefix(): string {
@@ -24,29 +20,26 @@ function prefix(): string {
 }
 
 // Below Node 24 `node:sqlite` does not exist, and the first import of it dies with a bare
-// stack. Say it instead — except in a hook, which must never break the agent's turn.
+// stack. Say it instead.
 const tooOld = nodeProblem(process.versions.node);
 if (tooOld) {
-  if (HOOK_CMDS.has(cmd)) process.exit(0);
   console.error(`${tooOld} at ${process.execPath}. Upgrade Node, then restart.`);
   process.exit(1);
 }
 
+if (args.has("--version") || args.has("-v")) {
+  console.log(describeRuntime().version);
+  process.exit(0);
+}
+if (args.has("--help") || args.has("-h")) {
+  console.log(HELP);
+  process.exit(0);
+}
+
 try {
-  if (HOOK_CMDS.has(cmd)) {
-    const { runHook } = await import("./cli/hooks");
-    runHook(cmd);
-  } else {
-    const { runCli } = await import("./cli/commands");
-    await runCli();
-  }
+  const { runStdio } = await import("./mcp/server");
+  await runStdio();
 } catch (err) {
-  // A write refused because the database was upgraded by a newer devcoach: the message says
-  // which versions, no stack. Exit 3 tells it apart from a crash (1) and a usage error (2).
-  if ((err as { name?: string } | null)?.name === "SchemaTooNewError") {
-    console.error((err as Error).message);
-    process.exit(3);
-  }
   console.error(prefix(), err);
   process.exit(1);
 }

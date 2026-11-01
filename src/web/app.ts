@@ -5,7 +5,6 @@ import { dirname, extname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { type ServerType, serve } from "@hono/node-server";
 import { type Context, Hono } from "hono";
-import { c, link } from "../cli/term";
 import * as coach from "../core/coach";
 import * as courses from "../core/courses";
 import * as db from "../core/db";
@@ -205,7 +204,7 @@ export function createApp(opts: AppOptions = {}): Hono {
   });
   app.options("/ping", (c) => c.body(null, 204, PING_HEADERS));
 
-  // ── Shutdown (`devcoach ui --stop`, the stop_ui tool) ─────────────────────
+  // ── Shutdown (the stop_ui tool, the dashboard's own Stop button) ─────────────────────
   // The dashboard started by the MCP open_ui tool is detached from any terminal, so Ctrl-C cannot
   // reach it; this is its off switch. Same-origin only: a web page elsewhere must not stop it.
   app.post("/shutdown", (c) => {
@@ -799,18 +798,17 @@ export function gracefulShutdown(server: ServerType, graceMs = 2000): Promise<vo
 }
 
 export interface StartUiOptions {
-  /** Called with the dashboard URL once it listens (used by `--open`). */
+  /** Called with the dashboard URL once it listens (open_ui answers the model with it). */
   onReady?: (url: string) => void;
   /** Install SIGINT/SIGTERM/SIGHUP handlers that shut down gracefully (default: true). */
   handleSignals?: boolean;
-  /** Called when the port cannot be bound (default: print the message and exit with `exitCode`). */
+  /** Called when the port cannot be bound (default: log the message to stderr). */
   onListenError?: (failure: ListenFailure) => void;
 }
 
-/** Why `startUi` could not listen, already worded for the terminal. */
+/** Why `startUi` could not listen, worded for whoever asked (the model, a log). */
 export interface ListenFailure {
   message: string;
-  exitCode: number;
   /** Set when a devcoach dashboard already answers on that port. */
   existingUrl?: string;
 }
@@ -834,7 +832,7 @@ export async function pingUi(
 
 /**
  * Turn a `listen` error into one clear line plus a hint: a dashboard already running on the port
- * (exit 0 — the user can open it, or stop it), another process on the port, a privileged port, or
+ * (the user can open it, or stop it), another process on the port, a privileged port, or
  * anything else.
  */
 export async function explainListenError(
@@ -849,31 +847,23 @@ export async function explainListenError(
       const version = running.version ? ` (v${running.version})` : "";
       return {
         existingUrl: url,
-        exitCode: 0,
-        message: `${c.yellow("devcoach UI is already running at")} ${c.cyan(link(url))}${version}\n${c.dim(
-          "Open it there, start another with --port <n>, or stop it with: devcoach ui --stop",
-        )}`,
+        message:
+          `devcoach UI is already running at ${url}${version} — open it there, start another ` +
+          "on a different port, or stop it with stop_ui",
       };
     }
     return {
-      exitCode: 1,
-      message: `${c.red(`✗ Port ${port} is already in use by another process`)}\n${c.dim(
-        "Pick another port: devcoach ui --port <n>",
-      )}`,
+      message: `Port ${port} is already in use by another process — pick another port`,
     };
   }
   if (err.code === "EACCES") {
-    return {
-      exitCode: 1,
-      message: c.red(`✗ Port ${port} is not allowed (permission denied) — use a port ≥ 1024`),
-    };
+    return { message: `Port ${port} is not allowed (permission denied) — use a port ≥ 1024` };
   }
-  return {
-    exitCode: 1,
-    message: c.red(`✗ Could not start the devcoach UI on port ${port}: ${err.message}`),
-  };
+  return { message: `Could not start the devcoach UI on port ${port}: ${err.message}` };
 }
 
+// The dashboard runs inside the MCP server, whose stdout IS the protocol: everything it says
+// goes to stderr (every host copies a server's stderr into its MCP log).
 export function startUi(port: number, opts: StartUiOptions = {}): ServerType {
   let stopping = false;
   // Stop accepting, drain, and let the process end on its own once the server is closed (nothing
@@ -885,7 +875,7 @@ export function startUi(port: number, opts: StartUiOptions = {}): ServerType {
       return;
     }
     stopping = true;
-    if (process.stdout.isTTY) console.log(c.dim(`devcoach UI stopping (${why})…`));
+    console.error(`devcoach UI stopping (${why})…`);
     void gracefulShutdown(server).then(() => {
       if (exitAfter) process.exit(0);
     });
@@ -893,8 +883,7 @@ export function startUi(port: number, opts: StartUiOptions = {}): ServerType {
   const app = createApp({ onShutdown: () => stop("stop requested", false) });
   const server = serve({ fetch: app.fetch, port, hostname: "127.0.0.1" }, (info) => {
     const url = `http://localhost:${info.port}`;
-    console.log(`devcoach UI running at ${c.cyan(link(url))}`);
-    if (process.stdout.isTTY) console.log(c.dim("Press Ctrl+C to stop"));
+    console.error(`devcoach UI running at ${url}`);
     opts.onReady?.(url);
   });
   const signals = ["SIGINT", "SIGTERM", "SIGHUP"] as const;
@@ -911,12 +900,8 @@ export function startUi(port: number, opts: StartUiOptions = {}): ServerType {
   server.once("error", (err: NodeJS.ErrnoException) => {
     for (const sig of signals) process.off(sig, onSignal[sig]);
     void explainListenError(port, err).then((failure) => {
-      if (opts.onListenError) {
-        opts.onListenError(failure);
-        return;
-      }
-      console.error(failure.message);
-      process.exit(failure.exitCode);
+      if (opts.onListenError) opts.onListenError(failure);
+      else console.error(failure.message);
     });
   });
   return server;

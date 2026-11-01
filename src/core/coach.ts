@@ -241,7 +241,7 @@ export function listTaughtTopics(db: DatabaseSync): string[] {
   }
 }
 
-// ── Lesson-cue decision engine (used by the Stop hook, doctor, and prompt-hook) ──
+// ── Lesson-cue decision engine (used by the hook_stop and hook_prompt tools) ──
 
 export interface CueDecision {
   cue: boolean;
@@ -289,7 +289,7 @@ export function evaluateCue(
 
 /**
  * Read-only dry run of `evaluateCue` for the NEXT eligible stop — no bump, no state
- * change. Drives `doctor`'s verdict and the prompt-hook's priming decision.
+ * change. Drives the prompt hook's priming decision.
  */
 export function explainCue(
   db: DatabaseSync,

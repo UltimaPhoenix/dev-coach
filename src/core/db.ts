@@ -916,7 +916,7 @@ export function listNudgeSessions(db: DatabaseSync): NudgeSessionRow[] {
   }));
 }
 
-/** Read the current counter without bumping (doctor / prompt-hook dry runs). */
+/** Read the current counter without bumping (the prompt hook's dry run). */
 export function peekNudge(db: DatabaseSync, sessionId: string, scope: string): number {
   const row =
     scope === "global"

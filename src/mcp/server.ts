@@ -1,11 +1,13 @@
 // MCP server on the official MCP TypeScript SDK v2 (@modelcontextprotocol/server).
-// 25 tools, 11 resources, and the devcoach_instructions prompt. Tools follow the build-mcp-server
-// review: title + hint annotations, tight Zod schemas with .describe(), outputSchema/structuredContent
-// for model returns, isError on failure. log_lesson is a pure save (never elicits);
-// feedback arrives next turn via submit_feedback.
-import { spawn } from "node:child_process";
+// 25 tools (+ 2 hook tools under DEVCOACH_HOOK_TOOLS=1), 11 resources, and the
+// devcoach_instructions prompt. Tools follow the build-mcp-server review: title + hint
+// annotations, tight Zod schemas with .describe(), outputSchema/structuredContent for model
+// returns, isError on failure. log_lesson is a pure save (never elicits); feedback arrives next
+// turn via submit_feedback. The web dashboard runs IN this process (open_ui / stop_ui) — there
+// is no CLI to spawn — so it lives and dies with the session's server.
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
+import type { ServerType } from "@hono/node-server";
 import { McpServer, ResourceTemplate } from "@modelcontextprotocol/server";
 import { StdioServerTransport } from "@modelcontextprotocol/server/stdio";
 import { z } from "zod";
@@ -15,6 +17,7 @@ import * as courses from "../core/courses";
 import * as db from "../core/db";
 import { detectStack, mergeStacks } from "../core/detect";
 import { detectGitContext, detectGitUserName } from "../core/git";
+import { promptDirective, stopDirective } from "../core/hook-decision";
 import {
   CourseStatusSchema,
   CourseStepKindSchema,
@@ -301,6 +304,44 @@ const stateResult = (tool: string, payload: Payload) =>
   typeof payload.error === "string"
     ? errResult(`${tool} failed: ${payload.error}`)
     : structured(payload);
+
+// ── In-process dashboard ─────────────────────────────────────────────────────
+// open_ui starts the Hono dashboard inside this process (one per port) and stop_ui closes it.
+// The dashboard's own Stop button POSTs /shutdown, which closes the same server — so stop_ui
+// goes through that HTTP path too and works for every dashboard that answers on the port.
+
+const dashboards = new Map<number, ServerType>();
+
+/** Close every dashboard this process started; resolves once they are closed. */
+export async function closeDashboards(): Promise<void> {
+  const { gracefulShutdown } = await import("../web/app");
+  const open = [...dashboards.values()];
+  dashboards.clear();
+  await Promise.all(open.map((server) => gracefulShutdown(server)));
+}
+
+/** The env switch for the hook tools: set by the plugin's .mcp.json, never by a bare install. */
+export const HOOK_TOOLS_ENV = "DEVCOACH_HOOK_TOOLS";
+
+const HOOK_TOOL_DESCRIPTION =
+  "Called by Claude Code's Stop/UserPromptSubmit hook through an mcp_tool hook entry. Never " +
+  "call it yourself; it only returns hook directives.";
+
+// The arguments arrive as an mcp_tool hook entry substitutes them: strings. Nothing is required —
+// a hook that cannot fill a field must still get an answer.
+const hookInputSchema = z.object({
+  session_id: z.string().nullish().describe("The session id, substituted by the hook entry"),
+  stop_hook_active: z
+    .union([z.string(), z.boolean()])
+    .nullish()
+    .describe("'true' when this stop is a hook-forced continuation, substituted by the hook entry"),
+  permission_mode: z
+    .string()
+    .nullish()
+    .describe(
+      "The session's permission mode ('plan' while planning), substituted by the hook entry",
+    ),
+});
 
 // ── Server ───────────────────────────────────────────────────────────────────
 
@@ -624,7 +665,7 @@ export function createServer(): McpServer {
         reason: z
           .string()
           .min(1)
-          .describe("One line: why no lesson was warranted (shown in `devcoach doctor`)"),
+          .describe("One line: why no lesson was warranted (kept with the cue state)"),
       }),
       annotations: {
         title: "Skip Lesson",
@@ -815,7 +856,9 @@ export function createServer(): McpServer {
     "open_ui",
     {
       title: "Open UI",
-      description: "Launch the devcoach web dashboard in the background. port must be 1024-65535.",
+      description:
+        "Start the devcoach web dashboard inside this server (it stops with stop_ui, or when the " +
+        "session ends). Reports the URL. port must be 1024-65535.",
       inputSchema: z.object({
         port: z.number().int().default(7860).describe("Port (default 7860)"),
       }),
@@ -831,17 +874,20 @@ export function createServer(): McpServer {
       if (!(port >= 1024 && port <= 65535)) {
         return { content: [txt(`error: port ${port} is out of valid range (1024-65535)`)] };
       }
-      // A detached child on a busy port would just die unseen (stdio is ignored) — say so instead.
-      const { pingUi } = await import("../web/app");
+      const { pingUi, startUi } = await import("../web/app");
       if (await pingUi(port)) {
         return { content: [txt(`devcoach UI is already running at http://localhost:${port}`)] };
       }
-      const child = spawn(process.execPath, [process.argv[1] ?? "", "ui", "--port", String(port)], {
-        detached: true,
-        stdio: "ignore",
+      return new Promise((resolve) => {
+        const server = startUi(port, {
+          handleSignals: false,
+          onReady: (url) => {
+            dashboards.set(port, server);
+            resolve({ content: [txt(`devcoach UI running at ${url}`)] });
+          },
+          onListenError: (failure) => resolve(errResult(failure.message)),
+        });
       });
-      child.unref();
-      return { content: [txt(`devcoach UI starting at http://localhost:${port}`)] };
     },
   );
 
@@ -850,9 +896,9 @@ export function createServer(): McpServer {
     {
       title: "Stop UI",
       description:
-        "Stop the devcoach web dashboard listening on port (whoever started it — open_ui or a " +
-        "terminal). Graceful: in-flight requests finish first. Reports stopped=false when nothing " +
-        "is running there. port must be 1024-65535.",
+        "Stop the devcoach web dashboard listening on port (whoever started it — open_ui or the " +
+        "dashboard's own Stop button). Graceful: in-flight requests finish first. Reports " +
+        "stopped=false when nothing is running there. port must be 1024-65535.",
       inputSchema: z.object({
         port: z.number().int().default(7860).describe("Port (default 7860)"),
       }),
@@ -870,6 +916,7 @@ export function createServer(): McpServer {
       }
       const { stopUi } = await import("../web/app");
       const stopped = await stopUi(port);
+      dashboards.delete(port);
       return {
         content: [
           txt(
@@ -882,6 +929,58 @@ export function createServer(): McpServer {
       };
     },
   );
+
+  // ── Hook tools (DEVCOACH_HOOK_TOOLS=1) ────────────────────────────────────
+  // Claude Code's `mcp_tool` hook entries call these instead of spawning a process per stop.
+  // Each returns the hook directive as its ONE text block (Claude Code reads it like stdout):
+  // never isError (a non-blocking error would still surface), never a throw — any failure is
+  // the silent `{}`. Registered only for the plugin, whose .mcp.json sets the variable: a bare
+  // install (Claude Desktop, a hand-written MCP entry) never lists them.
+  if (process.env[HOOK_TOOLS_ENV] === "1") {
+    const hookResult = (directive: () => Record<string, unknown>) => {
+      let out: Record<string, unknown>;
+      try {
+        out = directive();
+      } catch {
+        out = {};
+      }
+      return { content: [txt(JSON.stringify(out))] };
+    };
+
+    server.registerTool(
+      "hook_stop",
+      {
+        title: "Internal: Stop hook",
+        description: HOOK_TOOL_DESCRIPTION,
+        inputSchema: hookInputSchema,
+        annotations: {
+          title: "Internal: Stop hook",
+          readOnlyHint: false,
+          destructiveHint: false,
+          idempotentHint: false,
+          openWorldHint: false,
+        },
+      },
+      (args) => hookResult(() => stopDirective(args)),
+    );
+
+    server.registerTool(
+      "hook_prompt",
+      {
+        title: "Internal: prompt hook",
+        description: HOOK_TOOL_DESCRIPTION,
+        inputSchema: hookInputSchema,
+        annotations: {
+          title: "Internal: prompt hook",
+          readOnlyHint: false,
+          destructiveHint: false,
+          idempotentHint: false,
+          openWorldHint: false,
+        },
+      },
+      (args) => hookResult(() => promptDirective(args)),
+    );
+  }
 
   server.registerTool(
     "complete_onboarding",
@@ -1620,6 +1719,11 @@ export async function runStdio(): Promise<void> {
     process.stderr.write(
       `devcoach ${VERSION} mcp · client ${client ? `${client.name} ${client.version}` : "unknown"}\n`,
     );
+  };
+  // The host closing stdin is the end of the session: a dashboard started by open_ui would
+  // otherwise keep this process alive, orphaned, on its port.
+  server.server.onclose = () => {
+    void closeDashboards().finally(() => process.exit(0));
   };
   const transport = new StdioServerTransport();
   await server.connect(transport);

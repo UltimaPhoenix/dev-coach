@@ -6,3 +6,5 @@ import { join } from "node:path";
 
 process.env.HOME = mkdtempSync(join(tmpdir(), "dc-test-"));
 process.env.NO_COLOR = "1";
+// The hook tools are opt-in (the plugin's .mcp.json sets this); tests turn them on explicitly.
+delete process.env.DEVCOACH_HOOK_TOOLS;

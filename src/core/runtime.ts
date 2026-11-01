@@ -1,6 +1,5 @@
 // Where is this devcoach running from, and on which Node? One answer, used by the MCP server's
-// startup line (a host's log is often the only thing a user can send), by `devcoach doctor` and
-// by `devcoach install` when it decides which command a host should start.
+// startup line (a host's log is often the only thing a user can send).
 //
 // Pure: every input (path, platform, home, env) is a parameter with a process default, so the
 // table below is testable for macOS, Linux and Windows from any OS.

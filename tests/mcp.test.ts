@@ -728,45 +728,76 @@ describe("mcp lesson sharing", () => {
   });
 });
 
-describe("mcp open_ui", () => {
-  it("reports a dashboard that already answers on the port instead of spawning one", async () => {
-    const { startUi } = await import("../src/web/app");
-    const server = startUi(0, { handleSignals: false });
-    const port = await new Promise<number>((resolve) =>
-      server.once("listening", () => resolve((server.address() as { port: number }).port)),
-    );
+/** A port nothing listens on right now. */
+async function freePort(): Promise<number> {
+  const { createServer: createNetServer } = await import("node:net");
+  return new Promise((resolve) => {
+    const probe = createNetServer();
+    probe.listen(0, "127.0.0.1", () => {
+      const { port } = probe.address() as { port: number };
+      probe.close(() => resolve(port));
+    });
+  });
+}
+
+describe("mcp open_ui / stop_ui — the dashboard lives in this process", () => {
+  it("open_ui starts the dashboard in-process, reports a second call, stop_ui closes it", async () => {
+    const port = await freePort();
     const { client, server: mcp } = await connect();
     try {
       const r: any = await client.callTool({ name: "open_ui", arguments: { port } });
       expect(r.isError).toBeFalsy();
-      expect(text(r)).toBe(`devcoach UI is already running at http://localhost:${port}`);
-      expect(server.listening).toBe(true);
+      expect(text(r)).toBe(`devcoach UI running at http://localhost:${port}`);
+      const ping = await (await fetch(`http://127.0.0.1:${port}/ping`)).json();
+      expect(ping).toMatchObject({ ok: true });
+      const again: any = await client.callTool({ name: "open_ui", arguments: { port } });
+      expect(text(again)).toBe(`devcoach UI is already running at http://localhost:${port}`);
+      const stop: any = await client.callTool({ name: "stop_ui", arguments: { port } });
+      expect(stop.isError).toBeFalsy();
+      expect(stop.structuredContent).toEqual({ stopped: true, port });
+      // Graceful: the port is free again once the dashboard drained.
+      const { pingUi } = await import("../src/web/app");
+      for (let i = 0; i < 50 && (await pingUi(port)); i++)
+        await new Promise((r) => setTimeout(r, 50));
+      expect(await pingUi(port)).toBeNull();
+      const nothing: any = await client.callTool({ name: "stop_ui", arguments: { port } });
+      expect(nothing.structuredContent).toEqual({ stopped: false, port });
+      const bad: any = await client.callTool({ name: "stop_ui", arguments: { port: 80 } });
+      expect(text(bad)).toContain("out of valid range");
     } finally {
       await client.close();
       await mcp.close();
-      server.close();
     }
   });
-});
 
-describe("mcp stop_ui", () => {
-  it("stops a running dashboard (graceful) and reports when nothing listens", async () => {
-    const { startUi } = await import("../src/web/app");
-    const server = startUi(0, { handleSignals: false });
-    const port = await new Promise<number>((resolve) =>
-      server.once("listening", () => resolve((server.address() as { port: number }).port)),
-    );
-    const closed = new Promise<void>((resolve) => server.once("close", () => resolve()));
+  it("open_ui reports a port another process holds instead of failing silently", async () => {
+    const { createServer: createNetServer } = await import("node:net");
+    const squatter = createNetServer();
+    await new Promise<void>((r) => squatter.listen(0, "127.0.0.1", () => r()));
+    const port = (squatter.address() as { port: number }).port;
     const { client, server: mcp } = await connect();
     try {
-      const r: any = await client.callTool({ name: "stop_ui", arguments: { port } });
-      expect(r.isError).toBeFalsy();
-      expect(r.structuredContent).toEqual({ stopped: true, port });
-      await closed; // the http server really closed
-      const again: any = await client.callTool({ name: "stop_ui", arguments: { port } });
-      expect(again.structuredContent).toEqual({ stopped: false, port });
-      const bad: any = await client.callTool({ name: "stop_ui", arguments: { port: 80 } });
-      expect(text(bad)).toContain("out of valid range");
+      const r: any = await client.callTool({ name: "open_ui", arguments: { port } });
+      expect(r.isError).toBe(true);
+      expect(text(r)).toBe(`Port ${port} is already in use by another process — pick another port`);
+    } finally {
+      await client.close();
+      await mcp.close();
+      squatter.close();
+    }
+  });
+
+  it("closeDashboards shuts every dashboard this process started (the session ended)", async () => {
+    const port = await freePort();
+    const { client, server: mcp } = await connect();
+    const { closeDashboards } = await import("../src/mcp/server");
+    const { pingUi } = await import("../src/web/app");
+    try {
+      await client.callTool({ name: "open_ui", arguments: { port } });
+      expect(await pingUi(port)).not.toBeNull();
+      await closeDashboards();
+      expect(await pingUi(port)).toBeNull();
+      await closeDashboards(); // nothing left: a no-op
     } finally {
       await client.close();
       await mcp.close();
