@@ -1,7 +1,7 @@
 // Agent hooks (stop-hook, prompt-hook, their gemini-/codex- variants, and the legacy
 // onboard-hook/lesson-ready). Kept in a module of their own — hooks run on EVERY agent
 // stop, so src/bin.ts loads this lean chunk (node built-ins + core only) instead of the
-// full CLI bundle (Commander/zod/MCP SDK/Hono). Keep it dependency-free beyond core/.
+// full CLI bundle (Commander/zod/Hono). Keep it dependency-free beyond core/.
 //
 // Gemini CLI and Codex CLI both cloned Claude Code's hook wire protocol: the stop-stage
 // payload carries the same `stop_hook_active` loop guard on all three, so one payload
@@ -28,6 +28,16 @@ import * as db from "../core/db";
  * the payload, so a client renaming a field can only degrade gracefully.
  */
 export type HookClient = "claude" | "gemini" | "codex";
+
+/**
+ * The command the model runs devcoach with, as the cues spell it. `devcoach` is on the agent's
+ * PATH after a Homebrew / npm install and under the Claude Code plugin (its bin/); the Gemini
+ * extension has no PATH entry, so its launcher names its own path in DEVCOACH_COMMAND and the
+ * cue carries it — the only way the model learns it.
+ */
+export function devcoachCommand(): string {
+  return process.env.DEVCOACH_COMMAND?.trim() || "devcoach";
+}
 
 /**
  * The agent passes the hook payload as JSON on stdin. We use three fields:
@@ -133,15 +143,20 @@ function emitBlock(client: HookClient, reason: string, systemMessage?: string): 
 // No DB yet → onboarding has not run. Cue WITHOUT creating coaching.db or any
 // marker file, so an interrupted onboarding leaves nothing behind and re-cues on
 // the next task. The artifacts appear only when complete_onboarding actually runs.
-const ONBOARD_CUE =
-  "devcoach: the user has no coaching profile yet. Ask them how they want to set it up " +
-  "and STRONGLY recommend Automatic — devcoach scans their full Claude Code history " +
-  "across all their projects (call get_onboarding for the detected stack and " +
-  "per-project evidence) so the profile reflects what they actually build. Also offer " +
-  "Guided (a short conversation to map topics and confidence levels) and Import " +
-  "(restore from a backup), but lead with Automatic; do not pick for them. After they " +
-  "choose, build the profile and save it by calling the devcoach `complete_onboarding` " +
-  "MCP tool (not a shell command) before ending your turn.";
+const onboardCue = (): string => {
+  const cmd = devcoachCommand();
+  return (
+    "devcoach: the user has no coaching profile yet. Ask them how they want to set it up " +
+    "and STRONGLY recommend Automatic — devcoach scans their full Claude Code history " +
+    `across all their projects (run \`${cmd} api get_onboarding\` with your shell tool for the ` +
+    "detected stack and per-project evidence) so the profile reflects what they actually " +
+    "build. Also offer Guided (a short conversation to map topics and confidence levels) and " +
+    "Import (restore from a backup), but lead with Automatic; do not pick for them. After they " +
+    `choose, build the profile and save it by running \`${cmd} api complete_onboarding -\` ` +
+    "with the JSON ({topics, groups}) on stdin — a shell command, nothing else saves it — " +
+    "before ending your turn."
+  );
+};
 
 export function cmdOnboardHook(payload: HookPayload = readHookPayload()): void {
   if (shouldSuppressHook(payload)) process.exit(0);
@@ -159,7 +174,7 @@ export function cmdOnboardHook(payload: HookPayload = readHookPayload()): void {
     if (ready) process.exit(0);
   }
   hookDebugLog("onboard-hook", payload.session_id, "onboarding cue");
-  emitBlock("claude", ONBOARD_CUE);
+  emitBlock("claude", onboardCue());
 }
 
 // The notebook's observations are refreshed only every Nth delivered lesson, not after
@@ -169,9 +184,9 @@ const NOTEBOOK_UPDATE_EVERY = 10;
 
 /**
  * How each client's model loads the devcoach skill: Claude Code has the Skill tool,
- * Gemini CLI the activate_skill tool, Codex picks skills by name. Only this sentence
- * varies per client — the rest of the cue and prime text is identical everywhere
- * (the Claude wording is the tuned original and must stay byte-for-byte stable).
+ * Gemini CLI the activate_skill tool, Codex picks skills by name. Only this sentence and
+ * the devcoach command vary per client — the rest of the cue and prime text is identical
+ * everywhere (the Claude wording is the tuned original; change it with care).
  */
 const SKILL_INVOCATION: Record<HookClient, { cue: string; prime: string }> = {
   claude: {
@@ -197,6 +212,7 @@ const SKILL_INVOCATION: Record<HookClient, { cue: string; prime: string }> = {
  * cue self-contained when the skill is not installed.
  */
 export function buildLessonCue(nextLessonNumber: number, client: HookClient = "claude"): string {
+  const cmd = devcoachCommand();
   const updateDue = nextLessonNumber % NOTEBOOK_UPDATE_EVERY === 0;
   const nextCheckpoint =
     Math.ceil(nextLessonNumber / NOTEBOOK_UPDATE_EVERY) * NOTEBOOK_UPDATE_EVERY;
@@ -215,19 +231,20 @@ export function buildLessonCue(nextLessonNumber: number, client: HookClient = "c
     "source of truth for the entire flow, including the explicit no-op when the completed " +
     "work does not warrant a lesson.\n" +
     `${notebookStep}\n\n` +
-    "If the devcoach skill is not available, fall back to: call get_briefing (one call: " +
-    "profile, taught topics, notebook); pick ONE untaught profile topic at or " +
-    "above the user's confidence band; call log_lesson silently (body = 3–6 short paragraphs " +
-    "tied to the task plus a `💡 *Senior tip:*` line, clean markdown without bands or a " +
-    "title line); THEN write the card as the FINAL message of the turn: plain markdown (no " +
+    `If the devcoach skill is not available, fall back to: run \`${cmd} api get_briefing\` ` +
+    "with your shell tool (one command: profile, taught topics, notebook); pick ONE untaught " +
+    `profile topic at or above the user's confidence band; run \`${cmd} api log_lesson -\` ` +
+    "silently with the lesson JSON on stdin (id, topic_id, categories, title, level, summary, " +
+    "body = 3–6 short paragraphs tied to the task plus a `💡 *Senior tip:*` line, clean markdown " +
+    "without bands or a title line); THEN write the card as the FINAL message of the turn: plain markdown (no " +
     "'>' blockquote) between two band headings `### ──────── 🎓 devcoach ────────` and " +
     "`### ──────── [topic] · [level] ────────`, with `**[Title]** · [Category] · [Level]`, " +
     "the body you passed, and the tip — saving is not showing; the card in the final " +
     "message is the only thing the user sees. If instead the work does not warrant a lesson " +
-    "(pure questions, chat, nothing technical), call the devcoach `skip_lesson` tool with a " +
-    "one-line reason.\n\n" +
+    `(pure questions, chat, nothing technical), run \`${cmd} api skip_lesson '{"reason":"…"}'\` ` +
+    "with a one-line reason.\n\n" +
     "The rate-limit check is already done by this hook — skip it. Work in silence: never " +
-    "narrate devcoach tool calls or resource reads ('checking your profile…'). Output only " +
+    "narrate devcoach commands ('checking your profile…'). Output only " +
     "the lesson card (or nothing). No preamble, no meta-commentary."
   );
 }
@@ -284,7 +301,7 @@ function runStopDecision(
   hookDebugLog(hookName, payload.session_id, decision.note);
   switch (decision.kind) {
     case "onboard":
-      emitBlock(opts.client, ONBOARD_CUE);
+      emitBlock(opts.client, onboardCue());
       break;
     case "cue":
       emitBlock(
@@ -320,21 +337,22 @@ export function cmdStopHook(
   if (!existsSync(db.DB_PATH)) {
     if (payload.stop_hook_active || payload.permission_mode === "plan") process.exit(0);
     hookDebugLog(hookName, payload.session_id, "onboarding cue (no DB)");
-    emitBlock(client, ONBOARD_CUE);
+    emitBlock(client, onboardCue());
   }
   runStopDecision(hookName, payload, { onboardCue: true, client });
 }
 
 export function buildPromptPrime(client: HookClient = "claude"): string {
+  const cmd = devcoachCommand();
   return (
     "devcoach: the lesson pacing threshold will be reached at the end of this turn. Resolve " +
     "it before finishing:\n" +
     `- If this task is technical: ${SKILL_INVOCATION[client].prime} and follow it exactly ` +
     "to close your reply — the skill is the single source of truth for the entire lesson " +
     "flow.\n" +
-    "- If it is not technical: silently call the devcoach `skip_lesson` tool with a one-line " +
-    "reason and output nothing about it.\n" +
-    "- Either way, work in silence: never narrate devcoach tool calls or resource reads " +
+    `- If it is not technical: silently run \`${cmd} api skip_lesson '{"reason":"…"}'\` with ` +
+    "your shell tool, a one-line reason, and output nothing about it.\n" +
+    "- Either way, work in silence: never narrate devcoach commands " +
     "('checking your profile…')."
   );
 }

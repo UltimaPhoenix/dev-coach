@@ -7,9 +7,7 @@
       "**",
       "!assets",
       "!dist",
-      "!dist-mcpb",
       "!coverage",
-      "!mcpb/build",
       "!.claude",
       "!node_modules",
       "!website"

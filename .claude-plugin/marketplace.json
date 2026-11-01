@@ -9,7 +9,7 @@
     {
       "name": "devcoach",
       "version": "2.7.1",
-      "description": "Stay sharp while your AI does the work: learn what you don't know yet from the code Claude Code writes, one short lesson at a time. Knowledge map, coaching notebook, web dashboard, all local. Bundles the devcoach MCP server, the Stop hooks and the coaching skill.",
+      "description": "Stay sharp while your AI does the work: learn what you don't know yet from the code Claude Code writes, one short lesson at a time. Knowledge map, coaching notebook, web dashboard, all local. Bundles the devcoach CLI, the Stop hooks and the coaching skill.",
       "author": {
         "name": "UltimaPhoenix",
         "url": "https://github.com/UltimaPhoenix"
@@ -18,8 +18,8 @@
       "repository": "https://github.com/UltimaPhoenix/dev-coach",
       "license": "AGPL-3.0-only",
       "category": "learning",
-      "keywords": ["coaching", "learning", "mentoring", "mcp", "developer-tools"],
-      "tags": ["coaching", "learning", "mcp"],
+      "keywords": ["coaching", "learning", "mentoring", "skills", "developer-tools"],
+      "tags": ["coaching", "learning", "skills"],
       "source": "./plugin"
     }
   ]

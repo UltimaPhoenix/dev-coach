@@ -1,11 +1,10 @@
-// Where is this devcoach running from, and on which Node? One answer, used by the MCP server's
-// startup line (a host's log is often the only thing a user can send), by `devcoach doctor` and
-// by `devcoach install` when it decides which command a host should start.
+// Where is this devcoach running from, and on which Node? One answer, used by `devcoach doctor`,
+// by the crash prefix in src/bin.ts (a host's log is often the only thing a user can send) and
+// by `devcoach install` when it decides which hook command to write.
 //
 // Pure: every input (path, platform, home, env) is a parameter with a process default, so the
 // table below is testable for macOS, Linux and Windows from any OS.
 import { realpathSync } from "node:fs";
-import { homedir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { VERSION } from "../version";
 
@@ -13,7 +12,6 @@ import { VERSION } from "../version";
 export type Channel =
   | "claude-plugin"
   | "gemini-extension"
-  | "claude-desktop-extension"
   | "npx"
   | "homebrew"
   | "npm-global"
@@ -77,7 +75,6 @@ function channelOf(p: string): Channel {
   if (lower.includes("/.claude/plugins/data/") || lower.includes("/.claude/plugins/cache/"))
     return "claude-plugin";
   if (lower.includes("/.devcoach/gemini-ext/")) return "gemini-extension";
-  if (lower.includes("/claude extensions/")) return "claude-desktop-extension";
   if (lower.includes("/_npx/")) return "npx";
   if (lower.includes("/cellar/devcoach/")) return "homebrew";
   if (lower.includes("/node_modules/devcoach/")) return "npm-global";
@@ -136,25 +133,6 @@ export function nodeProblem(version: string): string | null {
   return `devcoach ${VERSION} needs Node ${MIN_NODE_MAJOR} or newer (it uses the built-in node:sqlite); this is Node ${version}`;
 }
 
-/** A path for a log the user may share: the home directory shown as `~` / `%USERPROFILE%`. */
-export function displayPath(
-  path: string,
-  home: string = homedir(),
-  platform: NodeJS.Platform = process.platform,
-): string {
-  if (!home) return path;
-  const sep = platform === "win32" ? "\\" : "/";
-  const token = platform === "win32" ? "%USERPROFILE%" : "~";
-  if (platform === "win32") {
-    if (path.toLowerCase() === home.toLowerCase()) return token;
-    if (path.toLowerCase().startsWith(`${home.toLowerCase()}${sep}`))
-      return token + path.slice(home.length);
-    return path;
-  }
-  if (path === home) return token;
-  return path.startsWith(`${home}${sep}`) ? token + path.slice(home.length) : path;
-}
-
 export interface RuntimeInfo {
   version: string;
   node: string;
@@ -210,22 +188,5 @@ export function describeWhere(where: PathClass): string {
   return parts.join(", ");
 }
 
-/**
- * The line a server writes to stderr when it starts — what every host keeps in its MCP log.
- * `extra` carries what only the caller knows (the data directory, the schema).
- */
-export function runtimeLine(
-  subcommand: string,
-  info: RuntimeInfo,
-  extra: string[] = [],
-  home: string = homedir(),
-  platform: NodeJS.Platform = process.platform,
-): string {
-  const show = (p: string) => displayPath(p, home, platform);
-  return [
-    `devcoach ${info.version} ${subcommand}`,
-    `node ${info.node} via ${info.nodeManager} (${show(info.execPath)})`,
-    `${describeWhere(info.where)} (${show(info.entry)})`,
-    ...extra,
-  ].join(" · ");
+
 }

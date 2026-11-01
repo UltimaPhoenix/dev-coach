@@ -1,5 +1,6 @@
 {
   "label": "devcoach extension",
   "dataHome": [".devcoach", "gemini-ext"],
+  "command": "launcher",
   "hookNotice": false
 }

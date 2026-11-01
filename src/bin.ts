@@ -1,6 +1,6 @@
 // devcoach CLI entry. The shebang is injected by tsup. Hook subcommands run on EVERY
 // agent stop, so they load the lean hooks chunk (node built-ins + core only); every
-// other subcommand loads the full CLI (Commander/zod/MCP SDK/Hono) via dynamic import,
+// other subcommand loads the full CLI (Commander/zod/Hono) via dynamic import,
 // which tsup code-splits into separate chunks. The one static import is `core/runtime`
 // (node:fs + node:os + the version): it must load on ANY Node, to say what is wrong.
 import { describeRuntime, describeWhere, nodeProblem } from "./core/runtime";

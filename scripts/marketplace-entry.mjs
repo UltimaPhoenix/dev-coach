@@ -12,7 +12,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 
 // Vocabulary of the official Anthropic marketplace (development, productivity, learning, …).
 export const MARKETPLACE_CATEGORY = "learning";
-export const MARKETPLACE_TAGS = ["coaching", "learning", "mcp"];
+export const MARKETPLACE_TAGS = ["coaching", "learning", "skills"];
 export const MARKETPLACE_OWNER = { name: "UltimaPhoenix", url: "https://github.com/UltimaPhoenix" };
 export const MARKETPLACE_DESCRIPTION =
   "Plugins by UltimaPhoenix — devcoach: stay sharp while your AI does the work.";

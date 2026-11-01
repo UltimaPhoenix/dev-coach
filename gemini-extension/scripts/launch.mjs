@@ -4,13 +4,14 @@
 //
 // The host ships only config + this file: the devcoach binary comes from npm. On first use the
 // *pinned* version (the package.json beside scripts/) is installed once into a persistent data
-// dir, then every start (the MCP server, each hook) imports it in-process.
+// dir, then every start (each hook, every `devcoach api` call the coaching skill makes, the
+// plugin's bin/devcoach) imports it in-process.
 //
-// What this file guarantees, because each of these once produced a mute "failed to connect":
+// What this file guarantees, because each of these once produced a mute failure:
 //   • a runtime directory exists only when its install FINISHED — npm runs in a temp dir that is
 //     renamed into place, so an interrupted install can never look installed;
-//   • concurrent starts (the MCP server and the first prompt's hook race on a fresh machine)
-//     cannot corrupt each other: the first rename wins, the others use its result;
+//   • concurrent starts (two hooks, or a hook and the model's first `api` call, race on a
+//     fresh machine) cannot corrupt each other: the first rename wins, the others use its result;
 //   • a hook never makes the user wait for npm: it starts the install in the background;
 //   • every failure says why, where the host can show it (see reportFailure).
 import { spawn, spawnSync } from "node:child_process";
@@ -53,6 +54,7 @@ export function nodeProblem(version) {
 }
 
 /** A hook subcommand: must never block a prompt nor break a turn. */
+// (`api` and every other subcommand wait for the install: the model is waiting for the answer.)
 export function isHookMode(mode) {
   return /-hook$/.test(mode ?? "") || mode === "lesson-ready";
 }
@@ -171,8 +173,8 @@ export function ensureRuntime(ctx) {
   );
   writeFileSync(ctx.log, `[${new Date().toISOString()}] npm install devcoach@${ctx.spec}\n`);
   const out = openSync(ctx.log, "a");
-  // npm's output goes to the log: it must never reach the MCP server's stdout (the protocol)
-  // nor a hook's stdout (the cue).
+  // npm's output goes to the log: it must never reach a hook's stdout (the cue) nor an `api`
+  // call's stdout (the JSON the model reads back).
   const r = spawnSync(
     "npm",
     ["install", "--omit=dev", "--no-audit", "--no-fund", "--no-progress"],
@@ -264,9 +266,9 @@ function diagnosis(ctx, reason) {
 
 /**
  * Say why devcoach cannot run, where the host shows it:
- *   mcp   → stderr + exit 1 (the host's MCP log; exit 0 here read as a mute "failed to connect")
  *   hook  → one systemMessage a day when the host renders it, otherwise silence; always exit 0
- *   other → the full diagnosis (this is what `launch.mjs doctor` prints), exit 1
+ *   other → the full diagnosis on stderr, exit 1 — what `launch.mjs doctor` prints, and what the
+ *           model reads when an `api` call cannot run (stdout stays empty: no JSON, no answer)
  */
 function reportFailure(ctx, mode, reason) {
   if (isHookMode(mode)) {
@@ -277,10 +279,6 @@ function reportFailure(ctx, mode, reason) {
       );
     }
     process.exit(0);
-  }
-  if (mode === "mcp") {
-    console.error(`${ctx.config.label}: ${reason}`);
-    process.exit(1);
   }
   console.error(diagnosis(ctx, reason));
   process.exit(1);
@@ -328,6 +326,13 @@ async function main() {
 
   // Hand off in-process to the real binary — it reads the subcommand from argv.
   process.env.DEVCOACH_LAUNCHER = `${ctx.config.label} · devcoach ${ctx.spec} · ${ctx.runtimeDir}`;
+  // The command the hook cues tell the model to run (src/cli/hooks.ts): `devcoach` where the
+  // host puts it on the PATH (the Claude Code plugin's bin/), this launcher where nothing does
+  // (the Gemini extension) — the model has no other way to learn that path.
+  process.env.DEVCOACH_COMMAND =
+    ctx.config.command === "launcher"
+      ? `node "${fileURLToPath(import.meta.url)}"`
+      : ctx.config.command || "devcoach";
   try {
     await import(pathToFileURL(ctx.binJs).href);
   } catch (err) {

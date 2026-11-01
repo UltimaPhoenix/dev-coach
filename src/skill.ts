@@ -27,8 +27,7 @@ export interface SkillReference {
 
 /**
  * The skill's on-demand reference files (assets/references/*.md) — installed next to
- * SKILL.md for progressive disclosure, and appended to the MCP prompt for clients
- * without a skill directory (Claude Desktop).
+ * SKILL.md for progressive disclosure.
  */
 export function readSkillReferences(): SkillReference[] {
   const base = findAssets();

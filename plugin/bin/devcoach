@@ -1,0 +1,6 @@
+#!/bin/sh
+# `devcoach` on the Bash tool's PATH while the plugin is enabled (Claude Code puts a plugin's
+# bin/ there), so the coaching skill runs `devcoach api …` the same way under the plugin as
+# under a Homebrew or npm install. Hands every argument to the launcher, which installs the
+# pinned devcoach once and runs it.
+exec node "$(dirname "$0")/../scripts/launch.mjs" "$@"

@@ -7,7 +7,7 @@ export default defineConfig({
   platform: "node",
   bundle: true,
   // Split the dynamic imports in src/bin.ts into separate chunks: hooks (run on every
-  // agent stop) load without paying for Commander/zod/MCP SDK/Hono.
+  // agent stop) load without paying for Commander/zod/Hono.
   splitting: true,
   minify: true,
   treeshake: true,

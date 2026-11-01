@@ -21,6 +21,7 @@ import {
 } from "../core/share";
 import { fetchSharedInput, isHttpUrl } from "../core/share-fetch";
 import { VERSION } from "../version";
+import { cmdApi } from "./api-command";
 import { cmdDoctor, cmdInstall, cmdUninstall, skillHint } from "./install";
 import { openInBrowser } from "./open";
 import {
@@ -825,13 +826,13 @@ export { cmdLessonReady, cmdOnboardHook, cmdPromptHook, cmdStopHook };
 
 function printWelcome(): void {
   const commands: [string, string][] = [
-    ["mcp", "Start the MCP server (stdio) for Claude Code / Claude Desktop"],
+    ["api [operation] [json|-]", "Run a coaching operation as JSON — what the skill calls (no args: list)"],
     ["ui [--port N] [--open|--stop]", "Launch the web dashboard  (default port: 7860)"],
     ["setup", "First-run wizard: import backup or build your knowledge profile"],
-    ["install", "Register MCP server + hooks + skill (Claude default; --gemini/--codex beta)"],
+    ["install", "Register the hooks + skill (Claude Code default; --gemini/--codex beta)"],
     [
       "uninstall",
-      "Remove the MCP server, hooks and skill (--all: every agent; --data: wipe ~/.devcoach)",
+      "Remove the hooks and skill (--all: every agent; --data: wipe ~/.devcoach)",
     ],
     ["onboard-hook", "Claude Code Stop hook: cue onboarding when no profile exists"],
     ["lesson-ready", "Claude Code Stop hook: cue a lesson when one is due"],
@@ -896,14 +897,33 @@ function buildProgram(): Command {
     // Default action when no subcommand is given: branded welcome screen.
     .action(() => printWelcome());
 
-  // The MCP server (SDK + zod schemas) and the web UI (Hono + views) are the two heavy
-  // corners of the bundle — loaded on demand so plain CLI commands never parse them.
+  // The model's door: one operation per call, JSON in, JSON out (src/cli/api-command.ts).
   program
-    .command("mcp")
-    .description("Start the MCP server (stdio transport)")
-    .action(async () => {
-      const { runStdio } = await import("../mcp/server");
-      await runStdio();
+    .command("api")
+    .description(
+      "Run one coaching operation as JSON — what the devcoach skill calls (no operation: list them)",
+    )
+    .argument("[operation]", "Operation name, e.g. get_briefing, log_lesson")
+    .argument("[input]", "The input as JSON, or - to read it from stdin (default: {})")
+    .option("--json", "With no operation: the full catalogue, each input as JSON Schema")
+    .action(
+      (operation: string | undefined, input: string | undefined, opts: { json?: boolean }) =>
+        cmdApi(operation, input, opts),
+    );
+
+  // devcoach stopped being an MCP server in 3.0: coaching runs through the hooks, the skill and
+  // `devcoach api`. A host still configured to start `devcoach mcp` (an older install) gets the
+  // reason in its MCP log instead of a mute failure.
+  program
+    .command("mcp", { hidden: true })
+    .description("(removed) devcoach no longer runs as an MCP server")
+    .action(() => {
+      console.error(
+        "devcoach no longer runs as an MCP server (since 3.0): coaching works through the hooks, " +
+          "the skill and `devcoach api`. Remove this registration with `devcoach install` (it " +
+          "cleans up old MCP entries) or `claude mcp remove devcoach`.",
+      );
+      process.exit(1);
     });
 
   program.command("profile").description("Show the knowledge map").action(cmdProfile);
@@ -1079,19 +1099,17 @@ function buildProgram(): Command {
   program
     .command("install")
     .description(
-      "Register the MCP server + hooks + skill in Claude Code / Claude Desktop " +
-        "(default), Gemini CLI (--gemini, beta), or Codex CLI (--codex, beta)",
+      "Register the hooks + skill in Claude Code (default), Gemini CLI (--gemini, beta), or " +
+        "Codex CLI (--codex, beta); removes the MCP registration older versions wrote",
     )
     .option("--claude-code", "Target Claude Code only")
-    .option("--claude-desktop", "Target Claude Desktop only")
     .option("--gemini", "Target Google Gemini CLI (beta)")
     .option("--codex", "Target OpenAI Codex CLI (beta)")
-    .option("--force", "Overwrite existing devcoach entry")
-    .option("--skip-hook", "Register MCP server only — skip the hooks")
+    .option("--force", "Rewrite the skill even when it is current")
+    .option("--skip-hook", "Install the skill only — skip the hooks")
     .action(
       (opts: {
         claudeCode?: boolean;
-        claudeDesktop?: boolean;
         gemini?: boolean;
         codex?: boolean;
         force?: boolean;
@@ -1099,7 +1117,6 @@ function buildProgram(): Command {
       }) =>
         cmdInstall({
           claudeCode: Boolean(opts.claudeCode),
-          claudeDesktop: Boolean(opts.claudeDesktop),
           gemini: Boolean(opts.gemini),
           codex: Boolean(opts.codex),
           force: Boolean(opts.force),
@@ -1110,21 +1127,19 @@ function buildProgram(): Command {
   program
     .command("uninstall")
     .description(
-      "Remove devcoach's MCP server, hooks and skill from Claude Code / Claude Desktop " +
-        "(default), Gemini CLI (--gemini), Codex CLI (--codex) or every agent (--all). " +
-        "Coaching data is kept unless --data is given. Run it before brew/npm uninstall.",
+      "Remove devcoach's hooks and skill (and any MCP registration an older version wrote) " +
+        "from Claude Code (default), Gemini CLI (--gemini), Codex CLI (--codex) or every agent " +
+        "(--all). Coaching data is kept unless --data is given. Run it before brew/npm uninstall.",
     )
     .option("--claude-code", "Target Claude Code only")
-    .option("--claude-desktop", "Target Claude Desktop only")
     .option("--gemini", "Also remove from Google Gemini CLI (beta)")
     .option("--codex", "Also remove from OpenAI Codex CLI (beta)")
-    .option("--all", "Every agent: Claude Code, Claude Desktop, Gemini CLI, Codex CLI")
+    .option("--all", "Every agent: Claude Code, Gemini CLI, Codex CLI")
     .option("--data", "Also delete ~/.devcoach (lessons, profile, notebook) — asks first")
     .option("--yes", "Do not ask before deleting the data (with --data)")
     .action(
       async (opts: {
         claudeCode?: boolean;
-        claudeDesktop?: boolean;
         gemini?: boolean;
         codex?: boolean;
         all?: boolean;
@@ -1133,7 +1148,6 @@ function buildProgram(): Command {
       }) =>
         cmdUninstall({
           claudeCode: Boolean(opts.claudeCode),
-          claudeDesktop: Boolean(opts.claudeDesktop),
           gemini: Boolean(opts.gemini),
           codex: Boolean(opts.codex),
           all: Boolean(opts.all),
