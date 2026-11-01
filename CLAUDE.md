@@ -1,5 +1,12 @@
 # devcoach — CLAUDE.md
 
+> **Experiment branch `feat/no-cli`** — read `EXPERIMENT.md` first. On this branch there is NO
+> Commander CLI (`src/cli/` is gone), no Gemini/Codex integration, and the Claude Code hooks are
+> `mcp_tool` entries that call the server's `hook_stop` / `hook_prompt` tools (registered under
+> `DEVCOACH_HOOK_TOOLS=1`, decision logic in `src/core/hook-decision.ts`); `open_ui` runs the
+> dashboard in the server's process. Everything below that describes the CLI, the command hooks
+> or the Gemini extension documents the design on `develop`, kept for reference.
+
 ## What is this project
 
 `devcoach` is a local MCP server (TypeScript/Node) that acts as a progressive technical coach.
