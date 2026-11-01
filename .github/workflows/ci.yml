@@ -170,7 +170,7 @@ jobs:
           node scripts/sync-plugin.mjs
       - run: npm run build
       - run: npm publish --access public --tag next
-      - run: npm run mcpb:sign && npm run plugin:zip && npm run gemini:zip
+      - run: npm run mcpb:sign && npm run plugin:zip
       - name: Publish the rolling GitHub prerelease `next`
         env:
           GH_TOKEN: ${{ github.token }}
@@ -185,7 +185,7 @@ jobs:
           git push --delete origin refs/tags/next 2>/dev/null || true
           NOTES="$(printf 'Canary build **%s** from `develop` @ %s — unreleased, may break.\n\nInstall: `npx -y devcoach@next` · docs: https://ultimaphoenix.github.io/dev-coach/next/' "$VERSION" "$GITHUB_SHA")"
           gh release create next --target "$GITHUB_SHA" --prerelease --title "next (canary)" --notes "$NOTES" \
-            dist-mcpb/*.mcpb dist-plugin/*.zip dist-gemini/*.zip
+            dist-mcpb/*.mcpb dist-plugin/*.zip
 
   # ── Beta channel: pin the canary in UltimaPhoenix/claude-plugins-marketplace-beta ──
   # A separate marketplace, so the plugin keeps its name: it installs as
@@ -308,9 +308,7 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add package.json package-lock.json mcpb/manifest.json server.json \
             plugin/.claude-plugin/plugin.json plugin/skills/devcoach/SKILL.md plugin/package.json \
-            gemini-extension/gemini-extension.json gemini-extension/package.json \
-            gemini-extension/skills/devcoach/SKILL.md \
-            .claude-plugin/marketplace.json plugin/LICENSE gemini-extension/LICENSE
+            .claude-plugin/marketplace.json plugin/LICENSE
           # [skip ci] so neither the branch pushes nor the tag push (all made with a real
           # PAT identity, which DOES re-trigger workflows) start a second run that would
           # double-publish or cut a canary. Publish/release still run in THIS workflow_dispatch
@@ -415,18 +413,13 @@ jobs:
       # Claude Code plugin zip (offline-installable marketplace; vector C). build-mcpb already ran
       # `npm run build`, and plugin:zip re-syncs the plugin before packing.
       - run: npm run plugin:zip
-      # Gemini CLI extension zip (beta): manifest at the archive root, installable after
-      # unzip via `gemini extensions install <dir>`.
-      - run: npm run gemini:zip
       - name: Generate SBOM + checksums for release assets
         run: |
           set -euo pipefail
           # CycloneDX SBOM of production deps (npm sbom is built into npm >= 10.7 — no extra dep).
           npm sbom --sbom-format cyclonedx --omit dev > dist-mcpb/devcoach.cdx.json
-          # Stage the plugin + gemini-extension zips next to the .mcpb so one checksum file
-          # covers every release asset.
+          # Stage the plugin zips next to the .mcpb so one checksum file covers every release asset.
           cp dist-plugin/devcoach-plugin-*.zip dist-mcpb/
-          cp dist-gemini/devcoach-gemini-extension-*.zip dist-mcpb/
           # Checksums over every release asset (.mcpb + zip + SBOM); run inside the dir so paths are bare.
           (cd dist-mcpb && shasum -a 256 *.mcpb *.zip *.cdx.json > SHASUMS256.txt)
       - uses: softprops/action-gh-release@v3

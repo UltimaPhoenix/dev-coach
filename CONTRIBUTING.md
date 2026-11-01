@@ -32,7 +32,7 @@ See [CLAUDE.md](CLAUDE.md) for the full project structure, stack, and convention
   `DEVCOACH_DIR` env var (sandboxing) and `DEVCOACH_CLAUDE_DIR`/`CLAUDE_CONFIG_DIR` (where the
   onboarding scan looks for Claude Code's history)
 - `assets/` is the tracked source of truth (SKILL.md + web static) — edit there, not in `dist/`.
-  `plugin/skills/` and `gemini-extension/skills/` are synced mirrors: never edit them directly,
+  `plugin/skills/` is a synced mirror: never edit it directly,
   run `npm run plugin:sync` (tests assert byte-identity with `assets/`; it also pins the
   plugin, Gemini-extension and `server.json` versions to `package.json`)
 

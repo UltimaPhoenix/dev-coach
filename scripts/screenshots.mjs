@@ -1,18 +1,21 @@
 // Capture devcoach UI screenshots for the docs (Node + Playwright port of the old take_screenshots.py).
-// Flow: restore a demo DB from the fixture into an isolated HOME → start `devcoach ui` → screenshot
-// each page in light + dark → docs/screenshots/<name>-<scheme>.png → stop the server.
+// Flow: start the MCP server on an isolated HOME and open its dashboard (the `open_ui` tool — the
+// dashboard lives in the server, there is no CLI) → restore the demo fixture through the dashboard's
+// own restore form → screenshot each page in light + dark → docs/screenshots/<name>-<scheme>.png →
+// close the session (the dashboard dies with it).
 // The fixture also carries two demo courses (courses.json + courses/<id>/index.html, written to
 // the contract in assets/references/course.md); their highlighter placeholder is filled by the
 // restore, so the zip never holds the library.
 //
 // Requires Playwright + Chromium (the CI workflow installs them; locally: `npm i -D playwright &&
 // npx playwright install chromium`). Run after `npm run build`.
-import { execFileSync, spawn } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { dirname, extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
+import { Client } from "@modelcontextprotocol/client";
+import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
 import { strFromU8, strToU8, unzipSync, zipSync } from "fflate";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -194,16 +197,38 @@ async function main() {
   const home = mkdtempSync(join(tmpdir(), "dc-shots-"));
   const env = { ...process.env, HOME: home, NO_COLOR: "1" };
 
-  console.log(`Restoring demo data from ${fixture} (timestamps shifted to now)…`);
-  execFileSync("node", [bin, "restore", freshenFixture(fixture, home)], { env, stdio: "inherit" });
-  // A stable sender name for the share screenshots (the fixture keeps the product default: empty).
-  execFileSync("node", [bin, "set", "share_name", "Alex"], { env, stdio: "ignore" });
-
-  console.log(`Starting devcoach UI on ${BASE}…`);
-  const server = spawn("node", [bin, "ui", "--port", String(PORT)], { env, stdio: "ignore" });
+  console.log(`Starting the devcoach server and its dashboard on ${BASE}…`);
+  const transport = new StdioClientTransport({
+    command: "node",
+    args: [bin],
+    env,
+    stderr: "ignore",
+  });
+  const client = new Client({ name: "devcoach-screenshots", version: "0.0.0" });
+  await client.connect(transport);
+  const call = async (name, args) => {
+    const r = await client.callTool({ name, arguments: args });
+    if (r.isError) throw new Error(`${name}: ${r.content?.[0]?.text ?? "failed"}`);
+    return r;
+  };
 
   try {
+    await call("open_ui", { port: PORT });
     await waitForServer(BASE);
+
+    console.log(`Restoring demo data from ${fixture} (timestamps shifted to now)…`);
+    const zip = readFileSync(freshenFixture(fixture, home));
+    const form = new FormData();
+    form.set("file", new Blob([zip], { type: "application/zip" }), "fixture-now.zip");
+    const restored = await fetch(`${BASE}/settings/import`, {
+      method: "POST",
+      body: form,
+      redirect: "manual",
+    });
+    if (restored.status !== 303) throw new Error(`restore failed: HTTP ${restored.status}`);
+    // A stable sender name for the share screenshots (the fixture keeps the product default: empty).
+    await call("update_settings", { key: "share_name", value: "Alex" });
+
     const shareText = await (
       await fetch(`${BASE}/lessons/${SHARE_LESSON_ID}/share?format=text`)
     ).text();
@@ -254,7 +279,7 @@ async function main() {
     await browser.close();
     site?.close();
   } finally {
-    server.kill("SIGTERM");
+    await client.close(); // ends the server's session: the dashboard goes with it
   }
   console.log("Done.");
 }

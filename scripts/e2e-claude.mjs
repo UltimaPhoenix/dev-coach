@@ -1,13 +1,14 @@
 #!/usr/bin/env node
-// End-to-end tests against REAL headless Claude Code sessions: every way devcoach gets installed,
-// crossed with the kinds of session a user actually has (first one ever, explicit setup, a lesson,
-// small talk, plan mode, a restored backup).
+// End-to-end tests against REAL headless Claude Code sessions: both plugin install paths (the
+// only ones in this design — the hooks are mcp_tool calls into the plugin's own server), crossed
+// with the kinds of session a user actually has (first one ever, explicit setup, a lesson, small
+// talk, plan mode, a restored backup).
 // Local-only (needs an authenticated `claude` CLI and SPENDS TOKENS) — never run in CI.
 //
 //   npm run test:e2e                     the smoke set (see SMOKE below)
 //   npm run test:e2e -- --all            the whole grid
 //   npm run test:e2e -- --list           what exists, and how many claude calls each run makes
-//   npm run test:e2e -- --only plugin-tree:fresh-cue,mcp-entry:lesson
+//   npm run test:e2e -- --only plugin-tree:fresh-cue,plugin-market:lesson
 //   E2E_MODEL=haiku npm run test:e2e     a cheaper model (default: the CLI's own default)
 //   … --keep                             keep the sandboxes for inspection
 //
@@ -24,6 +25,8 @@ import { createRequire } from "node:module";
 import { homedir, tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { Client } from "@modelcontextprotocol/client";
+import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
 
 const { DatabaseSync } = createRequire(import.meta.url)("node:sqlite");
 
@@ -49,7 +52,6 @@ const MARKET_PLUGINS = [
   "devcoach@devcoach",
 ];
 const pluginsOff = Object.fromEntries(MARKET_PLUGINS.map((p) => [p, false]));
-const hookEntry = (command, timeout) => ({ hooks: [{ type: "command", command, timeout }] });
 
 let tarball; // the working tree, packed once, for the plugin launcher to install
 function workingTreeTarball() {
@@ -98,8 +100,8 @@ const METHODS = {
         },
       };
     },
-    // The CLI for seeding goes through the same launcher the session uses.
-    cli: () => ["node", [join(root, "plugin", "scripts", "launch.mjs")]],
+    // Seeding goes through the same launcher the session uses (its MCP server, over stdio).
+    server: () => ["node", [join(root, "plugin", "scripts", "launch.mjs"), "mcp"]],
   },
   "plugin-market": {
     about:
@@ -115,69 +117,8 @@ const METHODS = {
       writeFileSync(settings, JSON.stringify({ enabledPlugins: { ...pluginsOff, [id]: true } }));
       return { args: ["--settings", settings], env: {}, note: id };
     },
-    cli: () => ["node", [bin]],
-  },
-  "mcp-entry": {
-    about: "a plain MCP entry + hooks in settings (the shape `devcoach install` writes for npx)",
-    prefix: "mcp__devcoach__",
-    setup(sb) {
-      const mcp = join(sb.dir, "mcp.json");
-      writeFileSync(
-        mcp,
-        JSON.stringify({
-          mcpServers: { devcoach: { command: "node", args: [bin, "mcp"] } },
-        }),
-      );
-      const settings = join(sb.dir, "settings.json");
-      writeFileSync(
-        settings,
-        JSON.stringify({
-          enabledPlugins: pluginsOff,
-          hooks: {
-            Stop: [hookEntry(`node ${bin} stop-hook`, 60)],
-            UserPromptSubmit: [hookEntry(`node ${bin} prompt-hook`, 30)],
-          },
-        }),
-      );
-      return {
-        args: ["--mcp-config", mcp, "--strict-mcp-config", "--settings", settings],
-        env: {},
-      };
-    },
-    cli: () => ["node", [bin]],
-  },
-  homebrew: {
-    about:
-      "the Homebrew-installed `devcoach` binary as server and hooks (skipped when not installed)",
-    prefix: "mcp__devcoach__",
-    available: () =>
-      existsSync("/opt/homebrew/bin/devcoach")
-        ? null
-        : "/opt/homebrew/bin/devcoach is not installed",
-    setup(sb) {
-      const brew = "/opt/homebrew/bin/devcoach";
-      const mcp = join(sb.dir, "mcp.json");
-      writeFileSync(
-        mcp,
-        JSON.stringify({ mcpServers: { devcoach: { command: brew, args: ["mcp"] } } }),
-      );
-      const settings = join(sb.dir, "settings.json");
-      writeFileSync(
-        settings,
-        JSON.stringify({
-          enabledPlugins: pluginsOff,
-          hooks: {
-            Stop: [hookEntry(`${brew} stop-hook`, 60)],
-            UserPromptSubmit: [hookEntry(`${brew} prompt-hook`, 30)],
-          },
-        }),
-      );
-      return {
-        args: ["--mcp-config", mcp, "--strict-mcp-config", "--settings", settings],
-        env: {},
-      };
-    },
-    cli: () => ["/opt/homebrew/bin/devcoach", []],
+    // Seeding uses the working tree's server on the sandbox's DEVCOACH_DIR (same database file).
+    server: () => ["node", [bin]],
   },
 };
 
@@ -198,6 +139,24 @@ const TOOLS = [
   "add_group",
   "update_settings",
 ]; // prettier-ignore
+
+/**
+ * Seed through devcoach itself: one tool call over a short-lived stdio session of the method's own
+ * server (there is no CLI in this design). Throws on an isError result.
+ */
+async function mcpCall(method, sb, name, args) {
+  const [command, pre] = method.server(sb);
+  const transport = new StdioClientTransport({ command, args: pre, env: sb.env, stderr: "ignore" });
+  const client = new Client({ name: "devcoach-e2e", version: "0.0.0" });
+  await client.connect(transport);
+  try {
+    const result = await client.callTool({ name, arguments: args });
+    if (result.isError) throw new Error(`${name}: ${result.content?.[0]?.text ?? "failed"}`);
+    return result;
+  } finally {
+    await client.close();
+  }
+}
 
 function makeSandbox(methodId, kindId) {
   const dir = mkdtempSync(join(tmpdir(), `dc-e2e-${methodId}-${kindId}-`));
@@ -231,10 +190,7 @@ function makeSandbox(methodId, kindId) {
     ...TOOLS.map((t) => method.prefix + t),
   ];
   sb.args = [...args, "--allowedTools", allowed.join(","), ...(model ? ["--model", model] : [])];
-  sb.cli = (...a) => {
-    const [cmd, pre] = method.cli(sb);
-    return execFileSync(cmd, [...pre, ...a], { env: sb.env, encoding: "utf8" });
-  };
+  sb.call = (name, toolArgs) => mcpCall(method, sb, name, toolArgs);
   sb.calls = 0;
   return sb;
 }
@@ -304,11 +260,13 @@ const TECH_PROMPT =
   "Review this TypeScript function and point out the bug, briefly:\n\n" +
   "```ts\nfunction sum(xs: number[]): number {\n  let total = 0;\n  for (let i = 0; i <= xs.length; i++) total += xs[i];\n  return total;\n}\n```";
 
-function seedProfile(sb, { notebook = true } = {}) {
-  sb.cli("knowledge-add", "typescript", "--confidence", "4");
-  sb.cli("set", "nudge_every", "0"); // every eligible stop cues
-  sb.cli("set", "min_gap_minutes", "240");
-  sb.cli("set", "max_per_day", "99");
+const setSetting = (sb, key, value) => sb.call("update_settings", { key, value: String(value) });
+
+async function seedProfile(sb, { notebook = true } = {}) {
+  await sb.call("add_topic", { topic: "typescript", confidence: 4 });
+  await setSetting(sb, "nudge_every", 0); // every eligible stop cues
+  await setSetting(sb, "min_gap_minutes", 240);
+  await setSetting(sb, "max_per_day", 99);
   if (notebook) {
     writeFileSync(
       sb.notebook,
@@ -390,8 +348,8 @@ const KINDS = {
   lesson: {
     about: "onboarded, technical task → one visible lesson card, one logged lesson",
     calls: 1,
-    run(sb, check) {
-      seedProfile(sb);
+    async run(sb, check) {
+      await seedProfile(sb);
       let t = claude(sb, TECH_PROMPT);
       let bands = (t.out.match(BAND) ?? []).length;
       if (count(sb, "lessons") !== 1 || bands === 0) {
@@ -415,9 +373,9 @@ const KINDS = {
   skip: {
     about: "onboarded, small talk → skip_lesson, no card, no stray feedback line",
     calls: 1,
-    run(sb, check) {
-      seedProfile(sb);
-      sb.cli("set", "min_gap_minutes", "0");
+    async run(sb, check) {
+      await seedProfile(sb);
+      await setSetting(sb, "min_gap_minutes", 0);
       const t = claude(sb, "Ciao! Come stai oggi? Nessuna domanda tecnica, solo due chiacchiere.");
       check("no lesson row was logged", count(sb, "lessons") === 0);
       check("no lesson card in the reply", (t.out.match(BAND) ?? []).length === 0);
@@ -452,9 +410,9 @@ const KINDS = {
   restored: {
     about: "knowledge present, notebook missing (a restored backup) → only the notebook step runs",
     calls: 1,
-    run(sb, check) {
-      seedProfile(sb, { notebook: false });
-      sb.cli("set", "nudge_every", "99");
+    async run(sb, check) {
+      await seedProfile(sb, { notebook: false });
+      await setSetting(sb, "nudge_every", 99);
       const before = count(sb, "knowledge");
       claude(
         sb,
@@ -474,7 +432,7 @@ const KINDS = {
   },
 };
 
-const SMOKE = ["plugin-tree:fresh-cue", "plugin-tree:lesson", "mcp-entry:fresh-explicit"];
+const SMOKE = ["plugin-tree:fresh-cue", "plugin-tree:lesson", "plugin-tree:fresh-explicit"];
 const grid = Object.keys(METHODS).flatMap((m) =>
   Object.entries(KINDS)
     .filter(([, k]) => !k.only || k.only.includes(m))
@@ -512,9 +470,10 @@ console.log(
 );
 
 console.log("preflight: checking claude auth…");
-const probe = makeSandbox("mcp-entry", "preflight");
-probe.cli("knowledge-add", "typescript", "--confidence", "4"); // a profile: the auth check must not onboard
-probe.cli("set", "nudge_every", "99");
+const probe = makeSandbox("plugin-tree", "preflight");
+// a profile: the auth check must not onboard (this first call also installs the launcher's runtime)
+await probe.call("add_topic", { topic: "typescript", confidence: 4 });
+await setSetting(probe, "nudge_every", 99);
 const smoke = claude(probe, "Reply with exactly: ok");
 if (smoke.status !== 0 || /not logged in/i.test(smoke.out)) {
   console.error((smoke.err || smoke.out).slice(0, 2000));
@@ -546,7 +505,7 @@ for (const id of selected) {
     console.log(`    ${pass ? "✅" : "❌"} ${name}${detail ? ` — ${detail}` : ""}`);
   };
   try {
-    kind.run(sb, check);
+    await kind.run(sb, check);
   } catch (err) {
     check("scenario ran to the end", false, String(err?.message ?? err).slice(0, 300));
   }

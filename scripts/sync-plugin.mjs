@@ -1,14 +1,11 @@
-// Keep the Claude Code plugin (plugin/) and the Gemini CLI extension (gemini-extension/)
-// in sync with the repo's single sources of truth:
+// Keep the Claude Code plugin (plugin/) in sync with the repo's single sources of truth:
 //   • plugin/.claude-plugin/plugin.json  version  ←  package.json version
 //   • plugin/skills/devcoach/            ←  assets/SKILL.md + assets/references/
-//   • gemini-extension/gemini-extension.json  version  ←  package.json version
-//   • gemini-extension/skills/devcoach/  ←  assets/SKILL.md + assets/references/
-//   • both package.json pins             ←  package.json version
+//   • plugin/package.json pin            ←  package.json version
 //   • server.json (MCP Registry) versions ←  package.json version
 //   • .claude-plugin/marketplace.json version ←  package.json version (self-marketplace entry)
-//   • plugin/LICENSE + gemini-extension/LICENSE  ←  LICENSE (AGPL text ships with every install)
-//   • plugin/scripts/launch.mjs + gemini-extension/scripts/launch.mjs  ←  assets/launcher/launch.mjs
+//   • plugin/LICENSE                     ←  LICENSE (AGPL text ships with every install)
+//   • plugin/scripts/launch.mjs          ←  assets/launcher/launch.mjs
 // Idempotent: writing the same content twice is a no-op. Run it in the bump job and before packing.
 //   node scripts/sync-plugin.mjs
 import { copyFileSync, cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -38,50 +35,30 @@ const pluginPkgPath = join(root, "plugin", "package.json");
 const pluginPkg = readFileSync(pluginPkgPath, "utf8");
 writeFileSync(pluginPkgPath, pluginPkg.replace(/"devcoach": "[^"]+"/, `"devcoach": "${version}"`));
 
-// 4. Same three steps for the Gemini CLI extension (manifest version, skill copy, runtime pin).
-const extManifestPath = join(root, "gemini-extension", "gemini-extension.json");
-const extManifest = readFileSync(extManifestPath, "utf8");
-writeFileSync(
-  extManifestPath,
-  extManifest.replace(/"version": "[^"]+"/, `"version": "${version}"`),
-);
-const extSkillDir = join(root, "gemini-extension", "skills", "devcoach");
-mkdirSync(extSkillDir, { recursive: true });
-cpSync(join(root, "assets", "SKILL.md"), join(extSkillDir, "SKILL.md"));
-rmSync(join(extSkillDir, "references"), { recursive: true, force: true });
-cpSync(join(root, "assets", "references"), join(extSkillDir, "references"), { recursive: true });
-const extPkgPath = join(root, "gemini-extension", "package.json");
-const extPkg = readFileSync(extPkgPath, "utf8");
-writeFileSync(extPkgPath, extPkg.replace(/"devcoach": "[^"]+"/, `"devcoach": "${version}"`));
-
-// 5. Pin the MCP Registry manifest (server.json) to this release: the top-level `version` and every
+// 4. Pin the MCP Registry manifest (server.json) to this release: the top-level `version` and every
 //    `packages[].version` (the registry validates them against the npm tarball). The `mcp-registry`
 //    CI job refuses to publish when this drifts from the released version.
 const serverJsonPath = join(root, "server.json");
 const serverJson = readFileSync(serverJsonPath, "utf8");
 writeFileSync(serverJsonPath, serverJson.replace(/"version": "[^"]+"/g, `"version": "${version}"`));
 
-// 6. Pin the self-marketplace entry (the repo doubles as a one-plugin marketplace for
+// 5. Pin the self-marketplace entry (the repo doubles as a one-plugin marketplace for
 //    `claude plugin marketplace add UltimaPhoenix/dev-coach`); its only "version" is the entry's.
 const selfMarketPath = join(root, ".claude-plugin", "marketplace.json");
 const selfMarket = readFileSync(selfMarketPath, "utf8");
 writeFileSync(selfMarketPath, selfMarket.replace(/"version": "[^"]+"/, `"version": "${version}"`));
 
-// 7. Ship the license text with both extensions — an install from the marketplace, the offline
-//    zips and the Gemini extension never see the npm tarball, which is where LICENSE otherwise lives.
-for (const dir of ["plugin", "gemini-extension"]) {
-  copyFileSync(join(root, "LICENSE"), join(root, dir, "LICENSE"));
-}
+// 6. Ship the license text with the plugin — an install from the marketplace and the offline zips
+//    never see the npm tarball, which is where LICENSE otherwise lives.
+copyFileSync(join(root, "LICENSE"), join(root, "plugin", "LICENSE"));
 
-// 8. One launcher for both hosts (assets/launcher/launch.mjs); what differs between them — the
-//    label, the data dir — lives in each scripts/launch.config.json, which is NOT synced.
-for (const dir of ["plugin", "gemini-extension"]) {
-  copyFileSync(
-    join(root, "assets", "launcher", "launch.mjs"),
-    join(root, dir, "scripts", "launch.mjs"),
-  );
-}
+// 7. The launcher (assets/launcher/launch.mjs); what is the plugin's own — the label, the data
+//    dir — lives in plugin/scripts/launch.config.json, which is NOT synced.
+copyFileSync(
+  join(root, "assets", "launcher", "launch.mjs"),
+  join(root, "plugin", "scripts", "launch.mjs"),
+);
 
 console.log(
-  `synced plugin + gemini-extension + server.json + self-marketplace → version ${version}, SKILL.md + LICENSE + launcher copied, devcoach pinned`,
+  `synced plugin + server.json + self-marketplace → version ${version}, SKILL.md + LICENSE + launcher copied, devcoach pinned`,
 );

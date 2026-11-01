@@ -5,7 +5,6 @@ node_modules/
 dist/
 dist-mcpb/
 dist-plugin/
-dist-gemini/
 mcpb/build/
 *.tsbuildinfo
 
