@@ -2,7 +2,7 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.UltimaPhoenix/devcoach",
   "title": "devcoach",
-  "description": "Progressive in-context technical coaching in your AI agent — one local, free lesson per task.",
+  "description": "Learn what you don't know yet from the code your AI agent writes, one short local lesson at a time.",
   "repository": {
     "url": "https://github.com/UltimaPhoenix/dev-coach",
     "source": "github"

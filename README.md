@@ -2,7 +2,7 @@
 
 <p align="center">
   <a href="https://ultimaphoenix.github.io/dev-coach/">
-    <img src="https://ultimaphoenix.github.io/dev-coach/img/og-card.jpg" alt="devcoach — progressive technical coaching, right inside your AI agent" width="760">
+    <img src="https://ultimaphoenix.github.io/dev-coach/img/og-card.jpg" alt="devcoach — stay sharp while your AI does the work" width="760">
   </a>
 </p>
 

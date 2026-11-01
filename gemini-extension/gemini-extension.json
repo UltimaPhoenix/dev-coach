@@ -1,7 +1,7 @@
 {
   "name": "devcoach",
   "version": "2.7.1",
-  "description": "Progressive technical coach: teaches you what you don't know yet as you work, tracks your knowledge map, all local. Bundles the devcoach MCP server + AfterAgent hooks + coaching skill.",
+  "description": "Stay sharp while your AI does the work: learn what you don't know yet from the code Gemini CLI writes, one short lesson at a time. Knowledge map, all local. Bundles the devcoach MCP server + AfterAgent hooks + coaching skill.",
   "mcpServers": {
     "devcoach": {
       "command": "node",
