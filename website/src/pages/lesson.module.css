@@ -103,7 +103,7 @@
 }
 .tldr {
   border-left: 4px solid var(--ifm-color-primary);
-  background: var(--ifm-color-primary-contrast-background, rgba(79, 70, 229, 0.08));
+  background: var(--ifm-color-primary-contrast-background);
   border-radius: 0 10px 10px 0;
   padding: 0.75rem 1rem;
   margin: 1rem 0 1.25rem;

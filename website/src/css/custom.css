@@ -1,13 +1,18 @@
-/* Global styles. Infima is bundled by the classic theme. devcoach brand = indigo/deep-purple. */
+/* Global styles. Infima is bundled by the classic theme. devcoach brand = the dashboard's teal
+   (assets/static/style.css --dc-accent-*) on its IDE-grey dark ramp. Primary = the dashboard's
+   link colour per theme (accent-600 light, accent-300 dark): both clear WCAG AA as text and as a
+   button fill. */
 
 :root {
-  --ifm-color-primary: #4f46e5;
-  --ifm-color-primary-dark: #4338ca;
-  --ifm-color-primary-darker: #3f33bf;
-  --ifm-color-primary-darkest: #342a9d;
-  --ifm-color-primary-light: #635bf0;
-  --ifm-color-primary-lighter: #6f67f1;
-  --ifm-color-primary-lightest: #8e89f4;
+  --ifm-color-primary: #0f766e;
+  --ifm-color-primary-dark: #0d6a63;
+  --ifm-color-primary-darker: #0d645e;
+  --ifm-color-primary-darkest: #0a534d;
+  --ifm-color-primary-light: #108279;
+  --ifm-color-primary-lighter: #11887f;
+  --ifm-color-primary-lightest: #13998f;
+  --ifm-color-primary-contrast-background: #f0fdfa;
+  --ifm-color-primary-contrast-foreground: #134e4a;
   --ifm-code-font-size: 95%;
   --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.1);
 
@@ -15,14 +20,23 @@
   --devcoach-accent: #0d9488;
 }
 
-[data-theme="dark"] {
-  --ifm-color-primary: #818cf8;
-  --ifm-color-primary-dark: #6f7bf6;
-  --ifm-color-primary-darker: #6571f6;
-  --ifm-color-primary-darkest: #4a58f3;
-  --ifm-color-primary-light: #939dfa;
-  --ifm-color-primary-lighter: #9da7fb;
-  --ifm-color-primary-lightest: #bcc3fc;
+.footer--dark {
+  --ifm-footer-background-color: #2b2d30;
+}
+
+/* Infima declares its dark tokens on html[data-theme="dark"]; match it so these win. */
+html[data-theme="dark"] {
+  --ifm-color-primary: #5eead4;
+  --ifm-color-primary-dark: #41e6cc;
+  --ifm-color-primary-darker: #32e4c8;
+  --ifm-color-primary-darkest: #1acbaf;
+  --ifm-color-primary-light: #7beedc;
+  --ifm-color-primary-lighter: #8af0e0;
+  --ifm-color-primary-lightest: #b5f5eb;
+  --ifm-color-primary-contrast-background: #1d3331;
+  --ifm-color-primary-contrast-foreground: #ccfbf1;
+  --ifm-background-color: #1e1f22;
+  --ifm-background-surface-color: #2b2d30;
   --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.3);
 
   /* Bright teal reads better on the dark navbar — matches the social card exactly. */
