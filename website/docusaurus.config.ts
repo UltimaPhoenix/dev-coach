@@ -197,6 +197,10 @@ const config: Config = {
       title: "devcoach",
       logo: { alt: "devcoach", src: "img/favicon.svg" },
       items: [
+        // The home page has no sidebar (it's the landing page), so the way into the docs is here.
+        { to: "/usage/coaching", label: "Docs", position: "left", activeBaseRegex: "/(usage|reference|how-it-works|faq)" },
+        { to: "/install", label: "Install", position: "left", activeBaseRegex: "/install" },
+        { to: "/why", label: "Why devcoach", position: "left" },
         NEXT
           ? { href: SITE_URL, label: "stable docs", position: "right" }
           : { href: NEXT_URL, label: "next", position: "right" },

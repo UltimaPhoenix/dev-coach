@@ -1,0 +1,155 @@
+/* A terminal looks like a terminal in both site themes: one dark palette, the dashboard's
+   IDE-grey ramp and its teal accent. */
+.term {
+  --term-bg: #1e1f22;
+  --term-bar: #2b2d30;
+  --term-line: #393b40;
+  --term-fg: #d6d9dc;
+  --term-dim: #8b9196;
+  --term-strong: #ffffff;
+  --term-accent: #5eead4;
+  --term-ok: #7ee2a8;
+
+  margin: 0;
+  min-width: 0;
+  background: var(--term-bg);
+  border: 1px solid var(--term-line);
+  border-radius: 12px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.28);
+  color: var(--term-fg);
+  font-family: var(--ifm-font-family-monospace);
+  font-size: 0.78rem;
+  line-height: 1.55;
+  overflow: hidden;
+}
+.bar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.8rem;
+  background: var(--term-bar);
+  border-bottom: 1px solid var(--term-line);
+  color: var(--term-dim);
+  font-size: 0.72rem;
+}
+.dots {
+  display: inline-flex;
+  gap: 0.4rem;
+}
+.dots i {
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 50%;
+  background: #ff5f57;
+}
+.dots i:nth-child(2) {
+  background: #febc2e;
+}
+.dots i:nth-child(3) {
+  background: #28c840;
+}
+.barTitle {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.toggle {
+  background: none;
+  border: 1px solid var(--term-line);
+  border-radius: 6px;
+  padding: 0.1rem 0.55rem;
+  color: var(--term-dim);
+  font: inherit;
+  cursor: pointer;
+}
+.toggle:hover,
+.toggle:focus-visible {
+  color: var(--term-strong);
+  border-color: var(--term-dim);
+}
+.toggle:focus-visible {
+  outline: 2px solid var(--term-accent);
+  outline-offset: 2px;
+}
+.body {
+  padding: 0.9rem 1.1rem 1.1rem;
+}
+.line {
+  min-height: 1.55em;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.prompt {
+  color: var(--term-strong);
+}
+.prompt::before {
+  content: "› ";
+  color: var(--term-dim);
+}
+.tool {
+  color: var(--term-dim);
+}
+.bullet {
+  color: var(--term-ok);
+}
+.agent {
+  color: var(--term-fg);
+}
+/* The card: a faint teal rule on its left draws the eye to what devcoach added. */
+.band,
+.title,
+.text {
+  border-left: 2px solid rgba(94, 234, 212, 0.35);
+  padding-left: 0.8rem;
+}
+.band {
+  color: var(--term-accent);
+  font-weight: 600;
+}
+.title {
+  color: var(--term-strong);
+  font-weight: 700;
+  padding-bottom: 0.35rem;
+}
+.text {
+  color: #c8cdd1;
+  padding-bottom: 0.35rem;
+}
+.ask {
+  color: var(--term-dim);
+}
+.ghost {
+  visibility: hidden;
+}
+.cursor {
+  display: inline-block;
+  width: 0.55em;
+  height: 1.1em;
+  margin-left: 1px;
+  background: var(--term-accent);
+  vertical-align: -0.2em;
+  animation: blink 1.05s steps(1) infinite;
+}
+@keyframes blink {
+  50% {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cursor {
+    animation: none;
+  }
+}
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
