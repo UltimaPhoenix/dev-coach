@@ -1,13 +1,13 @@
 # devcoach — Dynamic calibration
 
 Read this file when the hook cue marks the lesson as a notebook checkpoint (every
-10 lessons — never count yourself), then run the four steps below.
+10 lessons — never count yourself), then run the four steps below. Every operation named
+here is one shell command, `devcoach api <operation> '<json>'`.
 
 ## Step 1 — Fetch the window
 
-Call `get_lessons()` (default `limit=10`, newest first) to get the last 10 lessons.
-Call `get_profile` for the current knowledge map (older server without the tool: read the
-`devcoach://profile` resource).
+Run `devcoach api get_lessons` (default `limit` 10, newest first) to get the last 10 lessons.
+Run `devcoach api get_profile` for the current knowledge map.
 
 ## Step 2 — Per-topic signal analysis
 
@@ -15,25 +15,26 @@ Group the 10 lessons by `topic_id`. For each topic that appeared:
 
 | Signal | Condition | Action |
 |---|---|---|
-| Consistent mastery | All feedback `know` or `understood`, no `dont_know` | `update_knowledge(topic, +1)` if confidence < 9 |
-| Persistent gap | 2+ lessons on same topic, any `dont_know` | `update_knowledge(topic, -1)` if confidence > 1 |
+| Consistent mastery | All feedback `know` or `understood`, no `dont_know` | `update_knowledge '{"topic":"…","delta":1}'` if confidence < 9 |
+| Persistent gap | 2+ lessons on same topic, any `dont_know` | `update_knowledge '{"topic":"…","delta":-1}'` if confidence > 1 |
 | Recurring topic | 3+ lessons on same topic, mixed or no feedback | no confidence change — note in notebook |
 | New topic | `topic_id` absent from `get_profile` | `add_topic` — see Step 3 |
 
-Apply at most **one** `update_knowledge` call per topic per calibration run.
-Never call `update_knowledge` on a topic with confidence 10 (already mastered).
+Apply at most **one** `update_knowledge` command per topic per calibration run.
+Never run `update_knowledge` on a topic with confidence 10 (already mastered).
 
 ## Step 3 — New topic discovery
 
 For each lesson whose `topic_id` is not in `get_profile`:
-- 2+ lessons share this `topic_id` in the window → call `add_topic(topic_id, confidence=5)`;
-  assign it to the same group as the closest related existing topic, or `"Other"` if unclear.
+- 2+ lessons share this `topic_id` in the window → run
+  `devcoach api add_topic '{"topic":"<topic_id>","confidence":5,"group":"…"}'`; assign it to
+  the same group as the closest related existing topic, or `"Other"` if unclear.
 - Only 1 lesson on this `topic_id` → note under **Open hypotheses** in the notebook; do not add yet.
 
 ## Step 4 — Update the coaching notebook
 
-Call `get_briefing` for the current notebook text and its `notebook_path` — one
-call covers both. Merge findings into the relevant sections and write the complete
+Run `devcoach api get_briefing` for the current notebook text and its `notebook_path` —
+one command covers both. Merge findings into the relevant sections and write the complete
 revised markdown directly to `notebook_path` (your own Write/Edit tool), overwriting the
 file in one go:
 

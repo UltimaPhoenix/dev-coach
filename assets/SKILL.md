@@ -19,6 +19,7 @@ description: >
   Do NOT use for ordinary development tasks on code, apps, or documents that
   merely contain words like profile, lessons, or notebook — only when the subject
   is the user's own coaching data.
+allowed-tools: Bash(devcoach *)
 ---
 
 # devcoach — Progressive Coaching
@@ -28,24 +29,46 @@ by teaching one thing at a time, at the right moment, based on what they actuall
 
 The three hard rules, before anything else:
 
-1. **`log_lesson` first, card last.** Call `log_lesson` silently, then write the
-   lesson card as the FINAL message of your turn — plain reply text, after all tool
-   calls. The `body` passed to `log_lesson` is INVISIBLE to the user: saving is not
-   showing. The turn is complete only when the card is the last visible text.
+1. **`log_lesson` first, card last.** Run `devcoach api log_lesson -` silently (the lesson
+   JSON on stdin), then write the lesson card as the FINAL message of your turn — plain reply
+   text, after all commands. The `body` you pass to `log_lesson` is INVISIBLE to the user:
+   saving is not showing. The turn is complete only when the card is the last visible text.
 2. **The card is written exactly once, and nothing follows it.** No "lesson logged",
    no summary, no extra commentary — the card (plus the feedback line beneath it)
    ends the reply. Never print the card before `log_lesson` and again after.
-3. **A cue you decline is a `skip_lesson` call.** If a devcoach hook asked for a lesson
+3. **A cue you decline is a `skip_lesson` command.** If a devcoach hook asked for a lesson
    but the completed work doesn't warrant one (pure questions, chat, nothing technical),
-   call `skip_lesson` with a one-line reason and output nothing — not even a "Did that
-   land?" feedback line (it belongs only under a delivered card). Never ignore the cue
-   silently, and never call `skip_lesson` after delivering a lesson.
+   run `devcoach api skip_lesson '{"reason":"…"}'` with a one-line reason and output nothing —
+   not even a "Did that land?" feedback line (it belongs only under a delivered card). Never
+   ignore the cue silently, and never run `skip_lesson` after delivering a lesson.
 
 ---
 
+## The devcoach command
+
+Every devcoach operation is one shell command, run with your shell tool:
+
+```
+devcoach api <operation> ['<json>' | -]
+```
+
+The input is JSON — inline in single quotes, or `-` to read it from stdin through a quoted
+heredoc (`<<'EOF'` … `EOF`; use it for anything that carries a lesson body or pasted text).
+No input means `{}`. The command prints ONE JSON line: `{"ok":true,"result":…}` or
+`{"ok":false,"error":"…"}`. A `reply_check` inside `result` is an instruction to you about what
+to write back; an `error` is relayed, never retried blindly. `devcoach api` alone lists the
+operations; `devcoach api --json` describes every input.
+
+`devcoach` is on the PATH after a Homebrew or npm install, and the Claude Code plugin puts its
+own `devcoach` on the shell's PATH while it is enabled. If the shell cannot find it, use
+`npx -y devcoach api …`; under the Claude Code plugin,
+`node "${CLAUDE_PLUGIN_ROOT}/scripts/launch.mjs" api …`; under the Gemini extension,
+`node ~/.gemini/extensions/devcoach/scripts/launch.mjs api …`. When a hook cue names the exact
+command, prefer it. Never narrate these commands — the user sees only what you write after them.
+
 ## Onboarding
 
-Call `get_onboarding`. If `knowledge_ready` or `notebook_ready` is false — or the
+Run `devcoach api get_onboarding`. If `knowledge_ready` or `notebook_ready` is false — or the
 user explicitly asks to (re-)initialise their profile — read `references/onboarding.md`
 in this skill's directory and follow it. Do not deliver a lesson in the same turn as
 `complete_onboarding`; end the response after confirming setup.
@@ -60,11 +83,11 @@ only an explicit "redo onboarding" goes through `references/onboarding.md`.
 
 ## Read-only database
 
-If `get_briefing` (or `get_profile`) carries a non-null `compat`, this devcoach is older than
-the database another channel upgraded: reads work, every write (`log_lesson`, feedback, courses,
-settings) will fail. Say so to the user in ONE line before anything else — *"devcoach here is
-older than your coaching database (upgraded by devcoach X); update it or use the newer channel"*
-— then do not attempt lessons or courses in this session.
+If the result of `devcoach api get_briefing` (or `get_profile`) carries a non-null `compat`,
+this devcoach is older than the database another channel upgraded: reads work, every write
+(`log_lesson`, feedback, courses, settings) will fail. Say so to the user in ONE line before
+anything else — *"devcoach here is older than your coaching database (upgraded by devcoach X);
+update it or use the newer channel"* — then do not attempt lessons or courses in this session.
 
 ## Courses
 
@@ -77,11 +100,8 @@ time, and lives in ONE HTML document you write yourself.
 
 ## Before delivering a lesson
 
-Call the **`get_briefing`** tool — ONE silent call returns everything below (never fetch
-the pieces one by one; each extra call is noise). Read state through tools, never through
-`devcoach://` resources: tool names resolve in every client, a resource read needs the
-server's client-specific name. Older server without `get_briefing` → read the
-`devcoach://briefing` resource instead.
+Run **`devcoach api get_briefing`** — ONE silent command returns everything below (never
+fetch the pieces one by one; each extra command is noise). Read its `result`:
 
 - `onboarding` — either flag false → onboarding first (see above)
 - `rate_limit` — `allowed: false` → skip entirely, say nothing.
@@ -96,8 +116,8 @@ server's client-specific name. Older server without `get_briefing` → read the
 - `notebook` — the coaching notebook: resume its patterns and hypotheses, elevate its
   "Recommended focus" angles, watch its "Open hypotheses", calibrate depth from
   "Recurring patterns". If empty, proceed without prior context. Never mention it —
-  it is internal. One briefing read covers the whole context window; do not re-read
-  for later lessons in the same window.
+  it is internal. One briefing read covers the whole context window; do not re-run
+  it for later lessons in the same window.
 
 ## When to activate
 
@@ -163,14 +183,22 @@ code review — never academic, never verbose.
 
 ## Logging and feedback
 
-**Once the lesson is chosen**, call `log_lesson` silently: `id` (a unique kebab-case
-slug of the title), `title`, `topic_id` (the single most characterizing word —
-`sqlite`, `docker`; max 3 words like `ci_cd`), `categories`, `level`, `summary` in
-their own fields; `body` = ONLY the prose + the 💡 tip as CLEAN markdown (no bands, no
-blockquote, no title/`Category · Level` line). Git metadata is auto-detected
-server-side — omit it. **When it returns, write the card as the final message of the
-turn**: both bands, the title line, the same prose you passed as `body`, the tip. That
-final message is the only place the user ever sees the lesson.
+**Once the lesson is chosen**, run `devcoach api log_lesson -` silently with the lesson JSON
+on stdin through a quoted heredoc: `id` (a unique kebab-case slug of the title), `title`,
+`topic_id` (the single most characterizing word — `sqlite`, `docker`; max 3 words like
+`ci_cd`), `categories`, `level`, `summary` in their own fields; `body` = ONLY the prose + the
+💡 tip as CLEAN markdown (no bands, no blockquote, no title/`Category · Level` line), line
+breaks as `\n` inside the JSON string. Git metadata is auto-detected — omit it.
+
+```
+devcoach api log_lesson - <<'EOF'
+{"id":"…","topic_id":"…","categories":["…"],"title":"…","level":"mid","summary":"…","body":"…"}
+EOF
+```
+
+**When it returns, write the card as the final message of the turn**: both bands, the title
+line, the same prose you passed as `body`, the tip. That final message is the only place the
+user ever sees the lesson.
 
 `log_lesson` never asks the user anything — it only saves. Feedback is collected as
 text under the card: append the prompt "Did that land? ✅ knew it (y) · 💡 understood
@@ -182,16 +210,18 @@ Read the user's next message loosely: `y` / `yes` / "knew it" / ✅ → `know` �
 → no feedback, drop the question silently. The three answers mean: **know** = already
 knew it (the only one that moves confidence, +1) · **understood** = new, and now
 clear — the level was right · **dont_know** = couldn't follow this session — no
-confidence change; the lesson is kept as a seed for a step-by-step course. Call
-`submit_feedback(id, value)` for `understood` and `dont_know` always, and for `know`
-only when confidence is below the lesson's band (within/above band → already
-calibrated, skip the call). Never call `update_knowledge` on top of feedback.
+confidence change; the lesson is kept as a seed for a step-by-step course. Run
+`devcoach api submit_feedback '{"lesson_id":"<id>","feedback":"<value>"}'` for `understood`
+and `dont_know` always, and for `know` only when confidence is below the lesson's band
+(within/above band → already calibrated, skip the command). Never run `update_knowledge`
+on top of feedback.
 
 **After a ❌:** offer ONCE, in one line — *"Want a step-by-step course on this? 🎓"* — and
 on a *yes* start it on that message (`references/course.md`). No other follow-up.
 
-**Starring:** after feedback, if `get_lessons({search: topic_id})` shows 2+ lessons on
-the topic, offer *"Want to save this one? ⭐"* — `star_lesson` only if the user agrees,
+**Starring:** after feedback, if `devcoach api get_lessons '{"search":"<topic_id>"}'` shows
+2+ lessons on the topic, offer *"Want to save this one? ⭐"* —
+`devcoach api star_lesson '{"lesson_id":"<id>","starred":true}'` only if the user agrees,
 never silently. A star is also the one moment to offer sharing (see
 `references/sharing.md`).
 
@@ -200,10 +230,10 @@ or asks to see one they were given; the only unprompted offer is the one after a
 Before the first share/import of a session, read `references/sharing.md` in this skill's
 directory and follow it (transport, privacy, verbatim codes, what to say on a duplicate).
 
-**Profile expansion:** if the lesson covered a concept absent from
-the profile (`get_profile`), or one that recurs across tasks, offer to track it with an estimated
-confidence (fluent use → 6–7, uncertain → 4–5, first encounter → 2–3); `add_topic`
-only on confirmation.
+**Profile expansion:** if the lesson covered a concept absent from the profile
+(`devcoach api get_profile`), or one that recurs across tasks, offer to track it with an
+estimated confidence (fluent use → 6–7, uncertain → 4–5, first encounter → 2–3);
+`devcoach api add_topic '{"topic":"<id>","confidence":N}'` only on confirmation.
 
 **Notebook checkpoint:** the hook cue tells you when the lesson is a checkpoint (every
 10 lessons) — never count yourself. At a checkpoint, after feedback, read
@@ -212,31 +242,33 @@ checkpoints, never touch the notebook.
 
 ## Profile queries
 
-- "What did I learn today/this week?" → `get_lessons({period: "today" | "week" | …})`
-- "Show me lessons about X" → `get_lessons({category: X})` or `({search: keyword})`
+Each is one `devcoach api …` command; the `result` is what you read.
+
+- "What did I learn today/this week?" → `get_lessons '{"period":"today"}'` (`week`, `month`, …)
+- "Show me lessons about X" → `get_lessons '{"category":"X"}'` or `'{"search":"<keyword>"}'`
 - "How good am I at X?" / "Show my profile" → `get_profile`
-- "Coaching log" → `get_lessons({period: "all"})`
-- "Lessons to revisit" / "the ones I couldn't follow" → `get_lessons({feedback: "dont_know"})`
-- "My courses" → `get_courses` · "Continue the course" → `get_courses({status: "active"})`
+- "Coaching log" → `get_lessons '{"period":"all"}'`
+- "Lessons to revisit" / "the ones I couldn't follow" → `get_lessons '{"feedback":"dont_know"}'`
+- "My courses" → `get_courses` · "Continue the course" → `get_courses '{"status":"active"}'`
   then `references/course.md` §5 · "Start a course on X" → `references/course.md`
 - "Share this / the last lesson" / "share the lesson about X" → `get_lessons` then
-  `share_lesson({lesson_id})` (see Sharing)
+  `share_lesson '{"lesson_id":"<id>"}'` (see Sharing)
 - "Import this lesson" / a pasted `devcoach:lesson:` code, link or URL →
-  `import_lesson({payload})` verbatim
-- "Open the dashboard" → `open_ui` (optional `port`); report the URL
+  `import_lesson -` with `{"payload": …}` on stdin, verbatim
+- "Open the dashboard" → `open_ui` (optional `'{"port":N}'`); report `result.url`
 - "Close / stop the dashboard" → `stop_ui` (same `port`) — it stops whichever dashboard listens
   there, one you opened or one started from a terminal; if the user runs `devcoach ui` in their own
   terminal, Ctrl+C there stops it just as gracefully (in-flight requests finish)
-- "Lessons shared with me" → `get_lessons({imported: true})`; "what did Ada send me" →
-  `get_lessons({shared_by: "Ada"})` (exact sender name)
-- "Show me the lesson X shared" → `get_lessons({shared_by: X, search})` → the card,
+- "Lessons shared with me" → `get_lessons '{"imported":true}'`; "what did Ada send me" →
+  `get_lessons '{"shared_by":"Ada"}'` (exact sender name)
+- "Show me the lesson X shared" → `get_lessons '{"shared_by":"X","search":"…"}'` → the card,
   without `log_lesson` or the feedback line (see `references/sharing.md`)
 
 ## Operating notes
 
-- **From the cue (or prime) to the card: zero visible text.** Never narrate tool calls
-  or resource reads — "checking your profile…", "reading the briefing…", "calling
-  devcoach for taught topics…" are all forbidden. The user sees only the card.
+- **From the cue (or prime) to the card: zero visible text.** Never narrate devcoach
+  commands — "checking your profile…", "reading the briefing…", "running devcoach for
+  taught topics…" are all forbidden. The user sees only the card.
 - Never break the flow of the main response — the lesson is always at the bottom
 - Never mention a skipped lesson, the rate limit, or the notebook
 - The lesson must feel natural and contextual, not a mechanical add-on

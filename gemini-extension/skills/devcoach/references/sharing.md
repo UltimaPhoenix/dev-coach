@@ -5,6 +5,8 @@ lesson to someone ("share this / the last lesson", "share the one about X as a l
 hands you a lesson they were given (a `devcoach:lesson:` code, a share link, a URL, a
 `.devcoach.md` file), or asks to see a lesson someone shared with them. Sharing is
 **user-initiated**: the only time you bring it up yourself is the single offer after a star.
+Every operation named here is one shell command, `devcoach api <operation> '<json>'`, and
+its `result` is what you read.
 
 Route by intent:
 
@@ -18,8 +20,8 @@ just starred a lesson                            →  The one offer (below)
 ## Share
 
 1. **Pick the lesson.** "This" / "the last" = the lesson you delivered in this session if there
-   is one, else `get_lessons({limit: 1, imported: false})`. "The one about X" =
-   `get_lessons({search: X})`; with 2+ matches, list title + date and ask — never guess.
+   is one, else `get_lessons '{"limit":1,"imported":false}'`. "The one about X" =
+   `get_lessons '{"search":"X"}'`; with 2+ matches, list title + date and ask — never guess.
 2. **Pick the transport.** Default `text` (chat, issues, mail — the card plus one
    `devcoach:lesson:1:…` line). `link` when they say link / URL or the receiver may not have
    devcoach yet (the page explains, shows the lesson and installs). `file` when they say file, PR,
@@ -28,25 +30,29 @@ just starred a lesson                            →  The one offer (below)
    happened") — project, branch, commit and task; a local folder path never travels either way.
    The sender name is the `share_name` setting, then git `user.name`; "anonymously" →
    `shared_by: ""`. If they spell a different name, pass it as `shared_by` and offer **once** to
-   remember it (`update_settings({key: "share_name", value})`) — never persist it silently.
-4. **Call `share_lesson`** and reply exactly as its `reply_check` says: `text` → the card as
-   markdown, then the code line inside a fenced code block, character for character (never wrap,
-   truncate, paraphrase or split it); `link` → the link on its own line; `file` → write `markdown`
-   to `filename` (in the workspace unless they named a path) with your file tool and confirm the
-   path. Say once what travelled: only the lesson, or lesson + context.
+   remember it (`update_settings '{"key":"share_name","value":"…"}'`) — never persist it silently.
+4. **Run `devcoach api share_lesson '{"lesson_id":"…","transport":"text"}'`** (plus
+   `include_context` / `shared_by` when decided above) and reply exactly as `result.reply_check`
+   says: `text` → the card as markdown, then the code line inside a fenced code block, character
+   for character (never wrap, truncate, paraphrase or split it); `link` → the link on its own
+   line; `file` → write `markdown` to `filename` (in the workspace unless they named a path) with
+   your file tool and confirm the path. Say once what travelled: only the lesson, or lesson +
+   context.
 
 ## Import
 
-1. Hand `import_lesson({payload})` **exactly what the user gave you** — the code, the whole copied
-   card, the link, a URL, the contents of a `.devcoach.md`, or a lessons JSON export. If they name a
-   file path, read the file and pass its contents. Never retype or "clean up" a code.
-2. Reply in one line per the tool's `reply_check`:
+1. Run `devcoach api import_lesson -` with `{"payload": …}` on stdin through a quoted heredoc
+   (a pasted card spans lines and may contain quotes), `payload` = **exactly what the user gave
+   you** — the code, the whole copied card, the link, a URL, the contents of a `.devcoach.md`, or
+   a lessons JSON export. If they name a file path, read the file and pass its contents. Never
+   retype or "clean up" a code.
+2. Reply in one line per `result.reply_check`:
    - `inserted: 1` → title, who shared it, and that it joined the coaching log (feedback works as
      usual; it never counts against the daily limit).
    - `duplicated: 1` → "already in your log as `<id>`" — a normal outcome, not an error.
    - `topic_tracked: false` → offer to track the topic with `add_topic` (fluent use → 6–7,
      uncertain → 4–5, first encounter → 2–3); only on confirmation.
-   - `isError` → relay the message (damaged or incomplete code, too large, newer devcoach, only
+   - `ok: false` → relay the `error` (damaged or incomplete code, too large, newer devcoach, only
      public URLs) and suggest the fix it implies — usually "copy the whole text again".
 3. Do not deliver a lesson in the same turn and do not add the feedback line: an import is an
    ordinary reply.
@@ -54,12 +60,12 @@ just starred a lesson                            →  The one offer (below)
 ## Show a shared lesson
 
 "Show me what Ada shared", "read me the lesson I imported", "the lesson about X someone sent":
-`get_lessons({shared_by: "Ada"})` when a sender is named (exact name; `search` also matches the
-sender), else `get_lessons({imported: true, search: …})` — ask if 2+ match — then render it as a normal card —
-both bands, the title line with `Category · Level`, the body, the 💡 tip — **without**
-`log_lesson` and **without** the "Did that land?" line. It is already in their log, taught by
-someone else; it costs nothing on the rate limit. Record feedback only if they volunteer it
-("I knew this" → `submit_feedback(id, "know")`).
+`get_lessons '{"shared_by":"Ada"}'` when a sender is named (exact name; `search` also matches the
+sender), else `get_lessons '{"imported":true,"search":"…"}'` — ask if 2+ match — then render it
+as a normal card — both bands, the title line with `Category · Level`, the body, the 💡 tip —
+**without** `log_lesson` and **without** the "Did that land?" line. It is already in their log,
+taught by someone else; it costs nothing on the rate limit. Record feedback only if they
+volunteer it ("I knew this" → `submit_feedback '{"lesson_id":"<id>","feedback":"know"}'`).
 
 ## The one offer
 

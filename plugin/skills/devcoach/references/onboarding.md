@@ -1,6 +1,6 @@
 # devcoach — Onboarding flow
 
-Read this file when `get_onboarding` reports `knowledge_ready: false` or
+Read this file when `devcoach api get_onboarding` reports `knowledge_ready: false` or
 `notebook_ready: false`, or when the user explicitly asks to (re-)initialise their
 profile ("setup devcoach", "redo onboarding", "reset my topics").
 
@@ -23,12 +23,11 @@ always re-runs Steps 1–4 regardless of `knowledge_ready`.
 
 ## Step 1 — Ask how to set up (strongly recommend Automatic; never pick for the user)
 
-Call `get_onboarding` FIRST (older server without the tool: read the `devcoach://onboarding`
-resource) — its `detected_stack`, `detected_projects`,
+Run `devcoach api get_onboarding` FIRST — its `detected_stack`, `detected_projects`,
 `scanned_projects`, and `notebook_path` come from a scan of the user's **full Claude
 Code history** (every project Claude has worked in, ranked by recent activity), not
 just the current folder. Keep `notebook_path` in scope — Step 4 needs it and there is
-no reason to re-read this resource later in the same flow.
+no reason to run the command again later in the same flow.
 
 Then present a single choice using the client's question UI (e.g. AskUserQuestion in
 Claude Code). Offer exactly four options, in this order:
@@ -57,10 +56,11 @@ project's files (Automatic (Deep) stays available regardless — its value doesn
 depend on `scanClaudeHistory`'s metadata scan). Do **not** default to Automatic
 silently — surface the choice and wait for the user's answer before proceeding.
 
-**If Import backup:** ask for the file path and call `restore` (CLI) with it. Restore
-brings back knowledge entries automatically — no further DB steps needed. Call
-`get_onboarding` again after restore; if `knowledge_ready` is now true, skip to the
-notebook-composition part of Step 4. If `notebook_ready` is also true, proceed normally.
+**If Import backup:** ask for the file path and run `devcoach restore <file>` with it.
+Restore brings back knowledge entries automatically — no further DB steps needed. Run
+`devcoach api get_onboarding` again after restore; if `knowledge_ready` is now true, skip
+to the notebook-composition part of Step 4. If `notebook_ready` is also true, proceed
+normally.
 
 ## Step 2 — Build the topic list for the chosen mode
 
@@ -79,7 +79,7 @@ is a general developer baseline, not an invention of yours), save it, and say so
 the Step 5 summary — *"I found no Claude Code history on this machine, so I started
 you from devcoach's general map; it corrects itself as you work, and you can adjust
 any topic now."* Do not stop, do not go back to the mode question, do not switch to
-Guided unless the user asks, and do not call `preview_deep_scan` for plain Automatic.
+Guided unless the user asks, and do not run `preview_deep_scan` for plain Automatic.
 
 **Automatic (Deep) mode:** run the "Automatic (Deep) procedure" below to get an
 evidence-based `topics`/`groups`/`notebook` result, then skip straight to Step 4 (Deep's
@@ -95,10 +95,11 @@ subagent already decides groups and composes the notebook — don't redo Step 3 
 
 ### Automatic (Deep) procedure
 
-1. Call `preview_deep_scan({months: 3})` — cheap, metadata-only, no prompt text read.
+1. Run `devcoach api preview_deep_scan '{"months":3}'` — cheap, metadata-only, no prompt
+   text read.
 2. If `over_soft_limit` is false, go straight to step 4 below — no question asked.
 3. If `over_soft_limit` is true, surface `candidate_count` and ask (three options):
-   *narrow the window* (re-call `preview_deep_scan` with a smaller `months`, loop back
+   *narrow the window* (re-run `preview_deep_scan` with a smaller `months`, loop back
    to step 2); *proceed with all of them anyway* (cap what you hand the subagent at the
    25 most-recently-active `candidates`, and say so if you truncated); *pick specific
    projects* (show `candidates` — name, last_activity, prompt_count — as a plain bullet
@@ -106,7 +107,9 @@ subagent already decides groups and composes the notebook — don't redo Step 3 
    multiple-choice UI).
 4. Spawn a subagent (the `Agent` tool, a general-purpose subagent) with the confirmed
    project paths. Give it a fully self-contained prompt — it has its own Bash/Read/Glob
-   tools and does not inherit devcoach's MCP tools, so instruct it explicitly:
+   tools and knows nothing about devcoach: if it ever needed coaching data it would run
+   the same `devcoach api …` commands you do, but this task needs none (it reads and
+   returns JSON; you save the result) — so instruct it explicitly:
    - For each project path, compute its escaped directory name
      (`path.replace(/[^a-zA-Z0-9]/g, "-")` — the same rule devcoach uses for its own
      memory index) and Glob `~/.claude/projects/<escaped>/*.jsonl` for that project's
@@ -156,14 +159,17 @@ propose them only after all topics are known.
 For **all three modes**, once topics and groups are decided (immediately for both
 Automatic tiers; after the user confirms in Guided mode):
 
-1. Call the MCP tool `complete_onboarding` with `topics` and `groups` only — there is no
-   `notebook` argument. It guarantees `learning-state.md` exists and is non-empty (a
-   placeholder if needed) the instant it saves the profile.
-   ```json
+1. Run `devcoach api complete_onboarding -` with `topics` and `groups` on stdin through a
+   quoted heredoc — only those two keys; there is no `notebook` field. It guarantees
+   `learning-state.md` exists and is non-empty (a placeholder if needed) the instant it
+   saves the profile.
+   ```
+   devcoach api complete_onboarding - <<'EOF'
    { "topics": { "lang_a": 7, "tool_b": 8 }, "groups": { "Languages": ["lang_a"], "DevOps": ["tool_b"] } }
+   EOF
    ```
 2. **Immediately after**, write the real personalized notebook markdown directly to
-   `notebook_path` (from Step 1's `get_onboarding` call) using your own file
+   `notebook_path` (from Step 1's `get_onboarding` result) using your own file
    tools — overwrite the placeholder right away, don't leave it standing. If
    `notebook_path` already has real content (re-onboarding, or restoring), read it first
    and fold prior notes in rather than discarding them.
@@ -218,10 +224,10 @@ Topics with no group go under a trailing `### Other` heading, same bullet shape.
 
 Then tell the user **how to change any of it later**, across all three surfaces:
 - **In chat** — just ask, e.g. *"set my Python confidence to 7"*, *"add Rust at 4"*,
-  or *"redo onboarding"*. (Backed by the `update_knowledge`, `add_topic`, and
-  `add_group` tools.)
+  or *"redo onboarding"*. (Backed by `devcoach api update_knowledge`, `add_topic` and
+  `add_group`.)
 - **CLI** — `devcoach profile` to view; `devcoach knowledge-add <topic> <0-10>
   [--group <Group>]` to add/update; `devcoach knowledge-remove <topic>` to remove;
   `devcoach group-add` / `devcoach group-assign` to organise groups.
 - **UI** — `devcoach ui` (web dashboard at http://localhost:7860), or ask me to open
-  it (the `open_ui` tool; plugin installs also get the `/devcoach:ui` command).
+  it (`devcoach api open_ui`; plugin installs also get the `/devcoach:ui` command).

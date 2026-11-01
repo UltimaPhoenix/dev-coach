@@ -6,7 +6,8 @@ height, a path that starts where the user actually stands. It is **user-initiate
 or a *yes* to the one offer you make after a ❌) and it runs **in chat**; the dashboard is
 the viewer (Courses page, the document, the progress). The course itself is ONE rich,
 self-contained HTML document that **you write with your file tools** at the path
-`create_course` returns — never pasted into the chat.
+`create_course` returns — never pasted into the chat. Every operation named here is one shell
+command, `devcoach api <operation> '<json>'`, and its `result` is what you read.
 
 Never start a course inside a cued turn: resolve the cue first (`log_lesson` or
 `skip_lesson`, the hard rules), then begin on the user's next message. While a course is
@@ -23,14 +24,14 @@ text form with the options in parentheses.
 ## 1. Seed
 
 - From a lesson: the one the user points at — by id, or **by description**: run
-  `get_lessons({search, limit: 5})` with the 2–3 most specific words of what they said
+  `get_lessons '{"search":"…","limit":5}'` with the 2–3 most specific words of what they said
   (`search` covers title, topic, summary and body). One match → it is the seed; say so in
   one line (*"Seed: **HTMX and redirects** · Sep 19"*). Several → offer them as choices
   (title · date · feedback icon) plus a last *"None of these — a free concept"*. None → a
-  free concept. No argument at all → the newest `get_lessons({feedback: "dont_know", limit: 1})`,
-  else the newest lesson.
-- **A course may already exist for that seed**: check `get_courses({lesson_id})` (or
-  `get_courses({status: "active"})` for a free concept with the same title). If one does,
+  free concept. No argument at all → the newest
+  `get_lessons '{"feedback":"dont_know","limit":1}'`, else the newest lesson.
+- **A course may already exist for that seed**: check `get_courses '{"lesson_id":"…"}'` (or
+  `get_courses '{"status":"active"}'` for a free concept with the same title). If one does,
   ask before anything else, as choices: **Continue it** (only when active — resume at its
   first `todo` step), **Redo it** (set it `abandoned`, then create a fresh one), **Keep both**
   (a second course, the id gets a `-2` suffix), **Cancel**. Never overwrite a course
@@ -38,7 +39,7 @@ text form with the options in parentheses.
 - Keep the lesson's `topic_id`; its `task_context` and git metadata come back from
   `create_course` as `seed_context` — draw examples from that work.
 - From a free concept ("teach me logarithms"): pick a `topic_id` as for a lesson.
-- Read `get_briefing` once: the profile's confidence on the topic sets the depth of every
+- Run `get_briefing` once: the profile's confidence on the topic sets the depth of every
   step, and a tracked topic at confidence ≥ 6 is a floor the exploration never digs below.
 
 ## 2. Explore the prerequisites — one question per message
@@ -66,13 +67,15 @@ with *(yes / no / roughly)*.
   that fits in working memory — a step the reader finishes in a few minutes beats a
   complete one. Kinds: `concept` (the idea), `example` (worked, from the user's own work
   when `seed_context` allows), `practice` (try it), `check` (a question with a reveal).
-- `create_course({title, topic_id, goal, lesson_id?, prerequisites})`. Its result carries
-  `course_dir`, `document_path` and `seed_context`.
+- `devcoach api create_course -` with `{title, topic_id, goal, lesson_id?, prerequisites}` on
+  stdin (a quoted heredoc). Its `result` carries `course_dir`, `document_path` and
+  `seed_context`.
 
 ## 4. Write the document
 
-ONE file at `document_path`, then `add_course_step` per section in order
-(`anchor` = the section id). The viewer serves the file inside a sandboxed frame with a
+ONE file at `document_path`, then
+`add_course_step '{"course_id":"…","title":"…","kind":"…","anchor":"step-N"}'` per section
+in order (`anchor` = the section id). The viewer serves the file inside a sandboxed frame with a
 strict CSP, and the same file must read well opened on its own — so the contract:
 
 **Self-contained.** Inline `<style>` and inline `<script>` only. **No external URLs** (no CDN,
@@ -260,19 +263,19 @@ candidates, spot the bug) is offered as choices with a last *"Not sure"*; a **ty
 (write the output, name the value, explain why) is asked as text. The re-check after a miss
 follows the same rule.
 
-- Correct → `update_course_progress({course_id, position, status: "done"})` and the next
-  step in the next message.
+- Correct → `update_course_progress '{"course_id":"…","position":N,"status":"done"}'` and
+  the next step in the next message.
 - Wrong or unsure → re-explain from a different angle (a new example, a smaller piece);
   never advance silently. Two misses → offer to split the step: add the new `<section>` to
   the document right after the current one (update the nav and the pagers) and register it
-  with `add_course_step({…, after: <current position>})` so the order matches.
+  with `add_course_step` carrying `"after": <current position>` so the order matches.
 - "skip" → `status: "skipped"` and move on. "stop" / "later" → leave it `active`; it
-  resumes with `get_courses({status: "active"})` ("continue the course").
+  resumes with `get_courses '{"status":"active"}'` ("continue the course").
 
 ## 6. Finish
 
 When every step is done or skipped the course completes itself. Close with two lines: what
 the user can now do, and where the document lives. If the course grew from a ❌ lesson,
 offer ONCE, as a **Yes / No** choice: *"Want me to mark that lesson as understood now?"* →
-`submit_feedback(lesson_id, "understood")` only on a yes. Offer nothing else — no star, no
-share, no new lesson.
+`submit_feedback '{"lesson_id":"…","feedback":"understood"}'` only on a yes. Offer nothing
+else — no star, no share, no new lesson.
