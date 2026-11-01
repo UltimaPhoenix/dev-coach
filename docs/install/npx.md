@@ -3,11 +3,11 @@ title: npx / npm CLI
 sidebar_label: npx / npm CLI
 ---
 
-# npx / npm CLI (any MCP agent)
+# npx / npm CLI
 
-No install required — `npx` runs devcoach on demand. For **Claude Code** and **Claude Desktop**, one
-command registers the MCP server, wires up automatic lesson delivery (the Stop and UserPromptSubmit
-hooks), and installs the coaching **skill** into `~/.claude/skills/devcoach/`:
+No install required — `npx` runs devcoach on demand. For **Claude Code**, one command wires up
+automatic lesson delivery (the Stop and UserPromptSubmit hooks) and installs the coaching **skill**
+into `~/.claude/skills/devcoach/`:
 
 ```bash
 npx -y devcoach install
@@ -17,9 +17,10 @@ Restart your agent afterward. Prefer a global binary? `npm install -g devcoach`,
 (and drop the `npx -y` prefix everywhere). After upgrading devcoach, re-run `devcoach install` to refresh
 the skill — `devcoach stats` reminds you when it's out of date.
 
-Run through `npx`, `install` registers `npx -y devcoach mcp` (npx's own copy is temporary). With a global
-install it registers devcoach's **absolute path**, so an agent with a shorter PATH than your shell
-(Claude Desktop) still finds it; on Windows it registers `node.exe` and devcoach's script.
+Run through `npx`, `install` writes the hooks as `npx -y devcoach …` (npx's own copy is temporary), and
+the skill falls back to `npx -y devcoach api …` whenever `devcoach` is not on Claude's PATH. With a
+global install the hooks get devcoach's **absolute path**, so an agent with a shorter PATH than your
+shell still finds it, and the skill runs the bare `devcoach` command.
 
 :::note[nvm, fnm, volta, asdf, mise]
 With a Node version manager, `npm install -g` puts devcoach inside the current Node version's directory
@@ -32,28 +33,12 @@ tag — `npx -y devcoach@next` (or `npm install -g devcoach@next`) runs the unre
 [ultimaphoenix.github.io/dev-coach/next](https://ultimaphoenix.github.io/dev-coach/next/). `latest` stays the
 last release.
 
-## Manual MCP config (Claude Code)
+## Manual setup (Claude Code)
 
-If `devcoach install` isn't available, register it yourself.
-
-**Option A — via the `claude mcp` CLI (recommended):**
-
-```bash
-claude mcp add devcoach npx -- -y devcoach mcp
-
-# all projects (user scope):
-claude mcp add --scope user devcoach npx -- -y devcoach mcp
-```
-
-**Option B — edit `~/.claude.json` directly:**
-
-```json
-{ "mcpServers": { "devcoach": { "type": "stdio", "command": "npx", "args": ["-y", "devcoach", "mcp"] } } }
-```
-
-Then add the hooks to `~/.claude/settings.json` for automatic lesson delivery (skip this if you used
-the [plugin](./claude-code-plugin.md) — it already provides them). `stop-hook` decides after each turn
-whether a lesson is due; `prompt-hook` primes the model up front when one is:
+If `devcoach install` isn't available, wire it up yourself. Add the hooks to `~/.claude/settings.json`
+for automatic lesson delivery (skip this if you used the [plugin](./claude-code-plugin.md) — it
+already provides them). `stop-hook` decides after each turn whether a lesson is due; `prompt-hook`
+primes the model up front when one is:
 
 ```json
 {
@@ -70,8 +55,7 @@ whether a lesson is due; `prompt-hook` primes the model up front when one is:
 
 If devcoach is installed globally, prefer its absolute path over `npx -y devcoach` (no npx cache or
 network needed at hook time) — `devcoach install` picks the best command automatically, and repairs
-older two-entry layouts. Run `devcoach doctor` to verify the wiring.
-
-Using another agent (Cursor, Windsurf, …)? See **[Other MCP agents](./other-agents.md)**.
+older two-entry layouts. Then copy the skill — `assets/SKILL.md` and `assets/references/` from the
+npm package — into `~/.claude/skills/devcoach/`. Run `devcoach doctor` to verify the wiring.
 
 → Next: **[Coaching in your agent](../usage/coaching.md)**.

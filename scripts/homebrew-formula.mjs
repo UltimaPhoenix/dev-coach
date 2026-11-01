@@ -26,10 +26,10 @@ process.stdout.write(`class Devcoach < Formula
   def caveats
     <<~EOS
       Connect your agents with:  devcoach install
-      devcoach registers hooks, an MCP server and a skill in your agents' config files.
+      devcoach registers hooks and a skill in your agents' config files.
       Homebrew cannot undo that on brew uninstall (formulae have no uninstall hook), so
       before uninstalling run:
-        devcoach uninstall            # Claude Code + Claude Desktop (--all: also Gemini/Codex)
+        devcoach uninstall            # Claude Code (--all: also Gemini/Codex)
         devcoach uninstall --data     # also delete ~/.devcoach (lessons, profile, notebook)
     EOS
   end

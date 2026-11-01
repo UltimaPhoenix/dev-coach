@@ -1,7 +1,7 @@
 ---
 title: How it works
 description: How devcoach decides when and what to teach — the session-startup, coaching-loop, and lesson-selection flows that fire after your AI agent finishes a task.
-keywords: [how devcoach works, coaching loop, lesson selection, MCP coaching, rate limit, knowledge map]
+keywords: [how devcoach works, coaching loop, lesson selection, agent coaching, rate limit, knowledge map]
 ---
 
 # How it works
@@ -116,4 +116,4 @@ adjusted by observations in the coaching notebook.
 | 10 | Cutting-edge | Latest developments — ignores level floor and taught-topics filter |
 
 Both the priority list and these bands are defined by the devcoach skill (`SKILL.md` + its
-references), which the MCP server also serves as the `devcoach_instructions` prompt.
+references), which the model follows by running `devcoach api …` commands in the agent's shell.

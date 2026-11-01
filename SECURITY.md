@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-devcoach is distributed via npm and as a Claude Desktop extension. Only the **latest released
+devcoach is distributed via npm, Homebrew, a Claude Code plugin and a Gemini CLI extension. Only the **latest released
 version** receives security fixes. Please upgrade before reporting an issue.
 
 | Version | Supported |
@@ -30,5 +30,5 @@ credit you in the changelog unless you prefer to remain anonymous.
 ## Scope notes
 
 devcoach is a **local** tool: it stores everything in a single SQLite file at `~/.devcoach/coaching.db`
-and talks to your agent over stdio (MCP). It opens a local web dashboard only on demand. Reports about
-local data handling, the dashboard server, and the MCP surface are all in scope.
+and is run by your agent as a command (`devcoach api …`) and through its hooks. It opens a local web dashboard only on demand. Reports about
+local data handling, the dashboard server, and the agent API surface are all in scope.

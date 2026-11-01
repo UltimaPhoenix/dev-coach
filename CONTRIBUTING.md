@@ -8,7 +8,7 @@ is what CI tests alongside 24.
 ```bash
 git clone https://github.com/UltimaPhoenix/dev-coach && cd dev-coach
 npm install
-npm run dev -- mcp   # run the MCP server from source (tsx)
+npm run dev -- api   # list the agent API's operations from source (tsx)
 npm run dev -- ui    # run the web dashboard from source
 ```
 
@@ -26,15 +26,15 @@ All three must pass before opening a PR.
 
 See [CLAUDE.md](CLAUDE.md) for the full project structure, stack, and conventions. The critical ones:
 
-- `core/` must never import from `mcp/`, `cli/`, or `web/`
-- Every DB access must be wrapped in try/catch — never crash the MCP server
+- `core/` must never import from `api/`, `cli/`, or `web/`
+- Every DB access must be wrapped in try/catch — never crash a hook, an `api` call or the CLI
 - Paths always derived from `os.homedir()/.devcoach`, never hardcoded — the only overrides are the
   `DEVCOACH_DIR` env var (sandboxing) and `DEVCOACH_CLAUDE_DIR`/`CLAUDE_CONFIG_DIR` (where the
   onboarding scan looks for Claude Code's history)
 - `assets/` is the tracked source of truth (SKILL.md + web static) — edit there, not in `dist/`.
   `plugin/skills/` and `gemini-extension/skills/` are synced mirrors: never edit them directly,
   run `npm run plugin:sync` (tests assert byte-identity with `assets/`; it also pins the
-  plugin, Gemini-extension and `server.json` versions to `package.json`)
+  plugin and Gemini-extension versions to `package.json`)
 
 ## Submitting a PR
 
@@ -58,8 +58,8 @@ Keep PRs focused. A change that fixes a bug and adds a feature should be two PRs
   self-marketplace installs from it).
 - A release is one click: run the **CI** workflow (*Run workflow* → patch / minor / major) on
   `develop`. CI bumps the version on `develop`, tags it, fast-forwards `main`, then publishes to npm via
-  **OIDC provenance**, attaches the `.mcpb` + plugin zips to a GitHub Release, and updates the Homebrew
-  tap, the plugin marketplace and the MCP Registry. First-time setup: configure a Trusted Publisher on
+  **OIDC provenance**, attaches the plugin and Gemini-extension zips (plus an SBOM and checksums) to a
+  GitHub Release, and updates the Homebrew tap and the plugin marketplace. First-time setup: configure a Trusted Publisher on
   npmjs.com for the `devcoach` package (GitHub Actions, repo `UltimaPhoenix/dev-coach`, workflow `ci.yml`).
 - The README's demo GIF (`docs/screenshots/lesson-loop.gif`) is recorded from the docs home's terminal
   demo by `scripts/demo-gif.mjs` (after `npm run build --prefix website`; needs Playwright and ffmpeg).
@@ -76,23 +76,21 @@ the maintainer the right to license your contribution under **both** AGPL and co
 
 See also: [Code of Conduct](CODE_OF_CONDUCT.md) · [Security policy](SECURITY.md) · [License](LICENSE).
 
-## Testing with the MCP inspector
+## Exercising the agent API
+
+What the coaching skill runs from the agent's shell — one operation per call, JSON in, one JSON
+line out (see [docs/reference/agent-api.md](docs/reference/agent-api.md)):
 
 ```bash
 npm run build
-npx @modelcontextprotocol/inspector node dist/bin.js mcp
+node dist/bin.js api                                   # the operations
+node dist/bin.js api --json                            # the catalogue with JSON Schemas
+DEVCOACH_DIR=$(mktemp -d) node dist/bin.js api get_briefing
 ```
 
 ## Sandbox mode (keeps your real `~/.devcoach` safe)
 
 ```bash
 DEVCOACH_DIR=$(mktemp -d) node dist/bin.js stats   # relocates coaching.db + the notebook + hook.log
-HOME=$(mktemp -d) npm run dev -- mcp               # or sandbox the whole home dir
-```
-
-## Building the Claude Desktop extension
-
-```bash
-npm run mcpb          # → dist-mcpb/devcoach-<version>.mcpb
-npm run mcpb:sign     # self-sign (shows as unverified publisher)
+HOME=$(mktemp -d) npm run dev -- api get_briefing  # or sandbox the whole home dir
 ```

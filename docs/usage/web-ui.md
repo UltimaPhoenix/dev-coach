@@ -27,10 +27,10 @@ VS Code, Windows Terminal, GNOME Terminal; elsewhere cmd/ctrl-click the plain UR
 launches your default browser as well. The dashboard binds to `127.0.0.1` only, so it is never
 reachable from other machines. If the port is taken, `devcoach ui` tells you whether a dashboard is
 already running there (open it, or `--stop` it) or another process holds the port (pick `--port`).
-Or let Claude open it for you via the MCP tool:
+Or let Claude open it for you — just ask (*"open the devcoach dashboard"*); the skill runs:
 
-```
-open_ui({ port: 7860 })
+```bash
+devcoach api open_ui '{"port":7860}'
 ```
 
 Using the [Claude Code plugin](../install/claude-code-plugin.md)? It ships a shortcut for exactly that —

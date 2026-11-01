@@ -1,16 +1,16 @@
 ---
 title: Gemini CLI
 sidebar_label: Gemini CLI (Beta)
-description: Install devcoach in Google Gemini CLI — MCP server, AfterAgent lesson hooks, and the coaching skill, via one command or the Gemini extension.
-keywords: [devcoach gemini cli, gemini cli mcp server, gemini cli extension, gemini cli hooks, gemini agent skills]
+description: Install devcoach in Google Gemini CLI — AfterAgent lesson hooks and the coaching skill, via one command or the Gemini extension.
+keywords: [devcoach gemini cli, gemini cli extension, gemini cli hooks, gemini agent skills]
 ---
 
 # Gemini CLI *(Beta)*
 
-devcoach runs the **full coaching loop** in Google's Gemini CLI: the MCP server (tools + resources),
-automatic lesson cues after each task (Gemini's `AfterAgent`/`BeforeAgent` hooks mirror Claude Code's
-Stop/UserPromptSubmit), and the devcoach **agent skill**. Requires **Node.js ≥ 24** and Gemini CLI
-with hooks support.
+devcoach runs the **full coaching loop** in Google's Gemini CLI: automatic lesson cues after each
+task (Gemini's `AfterAgent`/`BeforeAgent` hooks mirror Claude Code's Stop/UserPromptSubmit) and the
+devcoach **agent skill**, which drives devcoach through `devcoach api …` commands in Gemini's shell.
+Requires **Node.js ≥ 24** and Gemini CLI with hooks support.
 
 :::info[Beta]
 The Gemini CLI integration is **beta**: the coaching engine is the same battle-tested core used with
@@ -26,19 +26,22 @@ npx -y devcoach install --gemini
 
 This registers everything devcoach needs:
 
-- **MCP server** — via `gemini mcp add` when the `gemini` CLI is on your PATH (falls back to writing
-  `~/.gemini/settings.json`)
 - **Hooks** — `AfterAgent` (lesson cue after each task) + `BeforeAgent` (priming) in
   `~/.gemini/settings.json`
 - **Skill** — the devcoach coaching skill into `~/.agents/skills/devcoach/` (the cross-tool
   [Agent Skills](https://geminicli.com/docs/cli/skills/) directory Gemini reads natively)
+
+Upgrading from 2.x? The same command removes the MCP server registration the old version wrote
+(through `gemini mcp remove`, or straight from `settings.json`).
 
 Check the wiring anytime with `npx -y devcoach doctor`, and re-run the install after upgrading
 devcoach to refresh the skill.
 
 ## Option B — the Gemini extension
 
-The devcoach extension bundles the MCP server, hooks, and skill in one package. Grab
+The devcoach extension bundles devcoach, the hooks and the skill in one package (nothing of an
+extension is on Gemini's PATH, so the hook cues tell the model to run devcoach through the extension's
+own launcher). Grab
 `devcoach-gemini-extension-<version>.zip` from the
 [latest release](https://github.com/UltimaPhoenix/dev-coach/releases/latest), unzip it, and:
 

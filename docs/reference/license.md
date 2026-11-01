@@ -21,8 +21,8 @@ derivative of devcoach itself** without complying with the AGPL.
 
 ## Does using devcoach put my code under the AGPL?
 
-**No.** devcoach runs as a *separate process* that talks to your agent over stdio (MCP) — you start it
-with `npx -y devcoach mcp`. Talking to it at arm's length is not a derivative work, exactly like
+**No.** devcoach runs as a *separate program* your agent calls — `devcoach api …` from its shell, the
+hooks between turns. Talking to it at arm's length is not a derivative work, exactly like
 querying an AGPL-licensed database. **Your own projects keep whatever license you choose.**
 
 The copyleft only reaches *devcoach's own source code*, and only when you **modify and then distribute
@@ -38,7 +38,7 @@ or host** that modified devcoach.
 | I want to embed devcoach in my paid product and keep my changes closed. | 💼 Not covered by the AGPL — ask first by opening an issue. |
 
 :::note[Using devcoach is always free]
-Using devcoach — the `devcoach` command / MCP server running next to your code — is and stays free,
+Using devcoach — the `devcoach` command running next to your code — is and stays free,
 whatever license your own project has. Embedding devcoach in your product, or reselling a derivative
 of it, is what requires a commercial license.
 :::

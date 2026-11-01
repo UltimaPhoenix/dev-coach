@@ -34,10 +34,10 @@ devcoach --version
 
 | Command | Description |
 |---|---|
-| `devcoach mcp` | Start the MCP server (stdio) — used by your agent's MCP config |
-| `devcoach install [--claude-code] [--claude-desktop] [--gemini] [--codex] [--force] [--skip-hook]` | Register the MCP server (user scope) + hooks + skill for the chosen agents; repairs stale hook layouts |
-| `devcoach uninstall [--claude-code] [--claude-desktop] [--gemini] [--codex] [--all] [--data] [--yes]` | The inverse of `install`: removes the MCP registration, the devcoach hook entries and the skill dirs (user hooks untouched); `--data` also deletes `~/.devcoach` after a prompt. Run it before `brew uninstall` / `npm uninstall -g` |
-| `devcoach doctor` | Diagnose the wiring and the pacing state: hooks, skill, and the command each agent starts devcoach with (Claude Code; Claude Desktop, resolved on the PATH from Claude Desktop's own log; Gemini and Codex when present) — that it exists, which Node it runs on and which devcoach version — then explains why the next stop would or wouldn't cue a lesson |
+| `devcoach api [operation] [json \| -]` | The [agent API](../reference/agent-api.md): run one coaching operation and print its result as one JSON line — what the coaching skill runs from the agent's shell. No operation lists them; `--json` prints the catalogue with each input's JSON Schema; `-` reads the input from stdin |
+| `devcoach install [--claude-code] [--gemini] [--codex] [--force] [--skip-hook]` | Register the hooks + skill for the chosen agents; repairs stale hook layouts and removes the MCP registration a 2.x devcoach wrote |
+| `devcoach uninstall [--claude-code] [--gemini] [--codex] [--all] [--data] [--yes]` | The inverse of `install`: removes the devcoach hook entries, the skill dirs and any old MCP registration (user hooks untouched); `--data` also deletes `~/.devcoach` after a prompt. Run it before `brew uninstall` / `npm uninstall -g` |
+| `devcoach doctor` | Diagnose the wiring and the pacing state: hooks, skill, whether the `devcoach` command the skill runs resolves in the agent's shell (Claude Code; Gemini and Codex when present), any MCP registration a 2.x devcoach left behind — then explains why the next stop would or wouldn't cue a lesson |
 | `devcoach setup` | Interactive terminal onboarding wizard in four steps: backup path (or skip) → automatic or manual topics → optional groups → daily limit and minimum gap |
 | `devcoach ui [--port <n>] [--open]` | Launch the web dashboard (default port 7860; binds `127.0.0.1` only). The URL is printed as a clickable terminal link; `--open` also launches your default browser. **Ctrl+C stops it gracefully** (in-flight requests finish) |
 | `devcoach ui --stop [--port <n>]` | Stop the dashboard listening on that port — yours, or one your agent started with `open_ui` / `/devcoach:ui` (those run detached, so Ctrl+C cannot reach them) |

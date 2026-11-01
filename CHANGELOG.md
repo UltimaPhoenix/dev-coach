@@ -6,7 +6,46 @@ Notable changes to devcoach. Versions follow [Semantic Versioning](https://semve
 
 ## [Unreleased]
 
+### Removed
+- **The MCP server, and with it `devcoach mcp`.** devcoach no longer speaks MCP: in Claude Code the
+  coaching was always triggered by the hooks, and the server was only the model's state API — one
+  that produced a whole class of bugs (`failed to connect`, server-name confusion, Claude Desktop's
+  PATH) and whose tool schemas Claude Code now defers anyway. The model drives devcoach through its
+  shell instead (see Changed). `devcoach mcp` survives only as a hidden stub that explains this on
+  stderr and exits 1, so an agent still configured with the old registration sees the reason in its
+  MCP log instead of a mute failure.
+- **The Claude Desktop extension (`.mcpb`)**, the **other MCP agents** (Cursor, Windsurf, Cline,
+  Continue, Zed) and the **MCP Registry** listing — they relied on the server. Claude Desktop's
+  *Code* tab is Claude Code and keeps working. The `--claude-desktop` flags of `install` and
+  `uninstall` are gone (an old Desktop registration is cleaned up on its own).
+- The `@modelcontextprotocol/server` and `/client` dependencies: the runtime tree is 5 packages.
+
 ### Changed
+- **The model drives devcoach through `devcoach api <operation>`** — the 3.0.0 breaking change. The
+  25 operations keep the names the MCP tools had (`get_briefing`, `log_lesson`, `skip_lesson`,
+  `share_lesson`, `create_course`, …), take their input as JSON — inline, or from stdin with `-` (a
+  quoted heredoc for lesson bodies) — and answer with one JSON line, `{"ok":true,"result":…}` /
+  `{"ok":false,"error":"…"}`, with exit codes 0 / 1 (refused) / 2 (unknown operation, not JSON) / 3
+  (database newer than this devcoach). `devcoach api` lists them, `devcoach api --json` prints the
+  catalogue with a JSON Schema per input. The skill, its references and the plugin commands say
+  `run devcoach api …` wherever they said "call the tool", and `Bash(devcoach *)` is the one
+  permission rule they pre-approve. See the new [Agent API](docs/reference/agent-api.md) page.
+- **The Claude Code plugin ships `bin/devcoach`**: Claude Code puts a plugin's `bin/` on the Bash
+  tool's PATH while it is enabled, so the skill runs the same `devcoach api …` under the plugin as
+  under a Homebrew or npm install (the shim hands every call to the launcher; the zips keep it
+  executable). The Gemini extension has no PATH entry, so its launcher exports `DEVCOACH_COMMAND`
+  and **the hook cues name the exact command** the model must run.
+- **`devcoach install` removes the MCP registration a 2.x devcoach wrote** — Claude Code's
+  (`claude mcp remove`, or `~/.claude.json`), Claude Desktop's config file, Gemini's `settings.json`
+  (`gemini mcp remove`) and Codex's `config.toml` (`codex mcp remove`, or a manual step: devcoach
+  never edits TOML) — and prints an `Old MCP…` line only when it found one; `uninstall` does the
+  same; `doctor` warns about one left behind and checks that the `devcoach` command resolves in the
+  agent's shell. `install` registers nothing but the hooks and the skill now.
+- The plugin / extension launcher's `api` mode (every subcommand but the hooks) installs the runtime
+  synchronously and, when it cannot, prints the full diagnosis on stderr and exits 1 with nothing on
+  stdout, so the model never mistakes a failure for an answer.
+- The release assets are the two Claude Code plugin zips, the Gemini extension zip, a CycloneDX SBOM
+  and `SHASUMS256.txt`, staged in `dist-release/`.
 - **The docs site wears the product's colours**: teal links, buttons and highlights instead of
   indigo, and in dark mode the dashboard's grey canvas and panels (`#1e1f22` / `#2b2d30`) instead
   of Docusaurus' defaults. The footer and the share page's TL;DR box follow. Both themes keep WCAG
@@ -31,6 +70,11 @@ Notable changes to devcoach. Versions follow [Semantic Versioning](https://semve
   [Troubleshooting](docs/troubleshooting.md) page, "what to expect" to the coaching guide, branches
   & releases to `CONTRIBUTING.md`. The GIF is recorded from the docs home's demo by
   `scripts/demo-gif.mjs`, and the screenshots workflow refreshes it.
+
+### Fixed
+- `/devcoach:setup` pre-approved every `node` command for its turn (`Bash(node:*)`). It now allows
+  exactly its own runtime check, `Bash(node ${CLAUDE_PLUGIN_ROOT}/scripts/launch.mjs *)`, plus
+  `Bash(devcoach *)`.
 
 ## [2.7.1] — 2026-10-08
 

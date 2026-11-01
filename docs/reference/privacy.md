@@ -14,13 +14,13 @@ agent runs.
   `~/.devcoach/learning-state.md` notebook). Nothing else, nowhere else.
 - devcoach makes **no network calls of its own** and sends **no telemetry**. Your knowledge map, lessons,
   feedback, and project/git context never leave your computer.
-- It runs as a local **stdio** process started by your agent — there's no server to expose, no account, and
-  no login.
+- It runs as a local command your agent calls (`devcoach api …`) and as the agent's hooks — there's no
+  server to expose, no account, and no login.
 
 ## Why it can't be a hosted / remote connector
 
-claude.ai web and other "remote MCP" connectors require a multi-tenant HTTP/OAuth server. devcoach
-deliberately writes to your local home directory, so it **cannot** run as a remote connector — that
+claude.ai web and other hosted connectors require a multi-tenant HTTP/OAuth service. devcoach
+deliberately writes to your local home directory, so it **cannot** run as a hosted connector — that
 local-only constraint is the whole point. On claude.ai you can still use the
 [skill copy](../install/claude-ai.md), which provides the coaching behaviour without any data storage.
 

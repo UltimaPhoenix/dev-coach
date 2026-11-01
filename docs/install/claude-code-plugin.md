@@ -1,8 +1,8 @@
 ---
 title: Claude Code plugin
 sidebar_label: Claude Code plugin
-description: Install devcoach in Claude Code as a plugin — MCP server, Stop/UserPromptSubmit coaching hooks, and the coaching skill in one click from the marketplace.
-keywords: [devcoach claude code plugin, claude code marketplace, claude code mcp server, claude code hooks, claude code skills]
+description: Install devcoach in Claude Code as a plugin — the devcoach command, the Stop/UserPromptSubmit coaching hooks and the coaching skill in one click from the marketplace.
+keywords: [devcoach claude code plugin, claude code marketplace, claude code hooks, claude code skills]
 ---
 
 # Claude Code plugin
@@ -14,7 +14,8 @@ terminal and want the `devcoach` CLI too? Use [Homebrew](./homebrew.md) instead.
 
 devcoach ships as a **Claude Code plugin** that bundles everything in one install:
 
-- the **MCP server** (25 tools, 11 resources, the `devcoach_instructions` prompt),
+- the **`devcoach` command** on Claude's shell (`bin/devcoach` — the skill drives devcoach with
+  `devcoach api …`, see the [Agent API](../reference/agent-api.md)),
 - the two automatic-coaching **hooks** (`stop-hook` on Stop, `prompt-hook` on UserPromptSubmit), and
 - the coaching **skill** (`SKILL.md` + its reference files).
 
@@ -41,7 +42,7 @@ Add the UltimaPhoenix marketplace once, then install devcoach from it:
 ```
 
 The marketplace is pinned to each devcoach release by CI and carries every UltimaPhoenix plugin, so a
-new one is a single `/plugin install` away. The MCP server, hooks and skill activate on install — no
+new one is a single `/plugin install` away. The command, hooks and skill activate on install — no
 restart needed.
 
 ## Set it up
@@ -50,7 +51,7 @@ restart needed.
 /devcoach:setup
 ```
 
-It checks that devcoach can run on this machine, that its server is connected, and then builds your
+It checks that devcoach can run on this machine, that the `devcoach` command answers, and then builds your
 coaching profile (you pick how: *Automatic* from your Claude Code history is the recommended one).
 You can also skip it: after your first task devcoach offers the same setup on its own. Run it again
 any time — it tells you what is already in place — and `/devcoach:setup redo` rebuilds the profile
@@ -120,12 +121,13 @@ unzip it, then point Claude Code at the unzipped folder (the zip carries its own
 When you enable the plugin, Claude Code wires in its component files. The plugin ships only config plus a
 small bootstrap (`scripts/launch.mjs`) — **no bundled binary and no per-call `npx`**. On first use the
 launcher installs the *pinned* `devcoach` version (from `plugin/package.json`) **once** into the plugin's
-persistent data dir, then runs it directly with `node`; later calls (every hook fire, every server start)
-skip straight to `node` — and it only re-installs when a plugin update bumps the pinned version.
+persistent data dir, then runs it directly with `node`; later calls (every hook fire, every `devcoach api`
+call) skip straight to `node` — and it only re-installs when a plugin update bumps the pinned version.
 
-1. **`.mcp.json`** → Claude Code launches the MCP server as a local stdio process
-   (`node ${CLAUDE_PLUGIN_ROOT}/scripts/launch.mjs mcp`). It opens `~/.devcoach/coaching.db` (SQLite),
-   derived from your home directory.
+1. **`bin/devcoach`** → Claude Code puts a plugin's `bin/` on the Bash tool's PATH while the plugin is
+   enabled, so the coaching skill runs `devcoach api <operation>` exactly as it would with a Homebrew or
+   npm install; the shim hands every call to the launcher. Everything lives in `~/.devcoach/coaching.db`
+   (SQLite), derived from your home directory.
 2. **`hooks/hooks.json`** → Claude Code runs the `Stop` hook after every turn and the
    `UserPromptSubmit` hook on every prompt, both through the same launcher. They read the same
    database and either stay silent or nudge the agent to run onboarding / deliver a lesson. This is
@@ -135,9 +137,9 @@ skip straight to `node` — and it only re-installs when a plugin update bumps t
 
 ## The CLI next to the plugin
 
-The plugin does the coaching on its own and keeps devcoach inside its own data dir — it does **not**
-put the `devcoach` **CLI** on your `PATH`. The CLI stays a useful companion whenever you want the
-dashboard or your data *without going through Claude*:
+The plugin does the coaching on its own and keeps devcoach inside its own data dir — it puts `devcoach`
+on **Claude's** shell, **not** on your own terminal's `PATH`. The CLI stays a useful companion whenever
+you want the dashboard or your data *without going through Claude*:
 
 ```bash
 devcoach ui                    # the web dashboard, from a terminal — no Claude session needed
@@ -154,8 +156,9 @@ Three ways to reach it, from zero-install to a bare command:
    e.g. `/devcoach:ui 8080`), or just ask — *"open the devcoach dashboard"*. The plugin also ships
    `/devcoach:share [last | <id> | about <topic>] [as link|file]` and `/devcoach:import <code or link>`
    for [sharing lessons](../usage/sharing.md), and `/devcoach:course [last | a few words of the lesson's
-   title | a concept] [continue]` for a [step-by-step course](../usage/courses.md). Either way Claude calls the `open_ui` / sharing tools
-   from the plugin's own copy and reports the URL (default http://localhost:7860).
+   title | a concept] [continue]` for a [step-by-step course](../usage/courses.md). Either way Claude runs
+   `devcoach api open_ui` / the sharing operations through the plugin's own copy and reports the URL
+   (default http://localhost:7860).
 2. **From a terminal, without installing** — prefix any [CLI command](../usage/cli.md) with `npx -y`:
    `npx -y devcoach ui`, `npx -y devcoach stats`, …
 3. **A bare `devcoach` command** — install the npm package globally (`npm install -g devcoach`) or via
@@ -174,10 +177,10 @@ for `devcoach uninstall` to undo: removing the plugin is `/plugin uninstall devc
 devcoach is a single-user, local-first tool. All three pieces are local processes that share one
 machine's home directory:
 
-- ✅ **Claude Code** (local, or running on a remote box where the CLI process itself runs) and
-  **Claude Desktop** (bundled Node). The database lives on whatever machine the agent runs on.
-- ❌ **claude.ai web / hosted "remote MCP" connectors** — those require an HTTP/OAuth multi-tenant
-  server. devcoach writes to a local home directory, so it cannot be a remote connector.
+- ✅ **Claude Code** (local, or running on a remote box where the CLI process itself runs — the Code
+  tab of Claude Desktop included). The database lives on whatever machine the agent runs on.
+- ❌ **claude.ai web / hosted connectors** — nothing there can run a program on your machine.
+  devcoach writes to a local home directory, so it cannot be a hosted service.
 - ⚠️ **Ephemeral / cloud sandboxes** — coaching works while the session runs, but `~/.devcoach` is not
   persisted across runs. Use [`devcoach backup`](../usage/cli.md#backup-export--import) / `restore` to
   carry your profile between machines.
@@ -187,10 +190,10 @@ use (to install the pinned `devcoach` package into the plugin's data dir); after
 
 ## Troubleshooting
 
-### `plugin:devcoach:devcoach` failed to connect to MCP server
+### `devcoach: command not found`, or Claude cannot run devcoach
 
-Claude Code could not start devcoach's server. Run **`/devcoach:setup`**: its first step prints the
-reason. Or ask the plugin directly from a terminal:
+Claude could not run devcoach. Run **`/devcoach:setup`**: its first step prints the reason. Or ask
+the plugin directly from a terminal:
 
 ```bash
 node ~/.claude/plugins/cache/ultimaphoenix/devcoach/*/scripts/launch.mjs doctor
@@ -201,9 +204,9 @@ node ~/.claude/plugins/cache/ultimaphoenix/devcoach/*/scripts/launch.mjs doctor
 | `Node 22.x is too old` | Install Node 24 or newer (`brew upgrade node`), then restart Claude Code. With a version manager, make sure the **default** version is ≥ 24: Claude Code starts `node` from its own `PATH`, not from your shell's current selection |
 | `` `npm` was not found on the PATH `` | Install Node with npm (`brew install node`), then restart |
 | `could not install devcoach … from npm` | The first run needs the network. The log path is in the message (`install.log` in the plugin's data dir) — a proxy or an offline machine shows there. Restart once you are online |
-| `devcoach … could not start` | The installed copy was damaged; the plugin has already removed it and reinstalls on the next start. Reconnect from `/mcp` |
+| `devcoach … could not start` | The installed copy was damaged; the plugin has already removed it and reinstalls on the next call. Run `/devcoach:setup` again |
 
-After fixing it, reconnect without restarting: `/mcp` → `plugin:devcoach:devcoach` → *Reconnect*.
+After fixing it, run `/devcoach:setup` again — no restart needed.
 
 Still stuck? Start over from a clean copy — your lessons and profile live in `~/.devcoach` and are
 not touched:
@@ -212,8 +215,8 @@ not touched:
 rm -rf ~/.claude/plugins/data/devcoach-ultimaphoenix     # the plugin's installed copy of devcoach
 ```
 
-then `/mcp` → *Reconnect*. For the full story of one failed start, run `claude --debug` and read
-`~/.claude/debug/<session-id>.txt`: the server's own error line is in there.
+then `/devcoach:setup`. For the full story of one failed call, run `claude --debug` and read
+`~/.claude/debug/<session-id>.txt`: devcoach's own error line is in there.
 
 Do **not** run `devcoach install` to fix a plugin: that command wires devcoach *without* the plugin,
 and the two together count every interaction twice.

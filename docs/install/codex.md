@@ -1,15 +1,16 @@
 ---
 title: Codex CLI
 sidebar_label: Codex CLI (Beta)
-description: Install devcoach in OpenAI Codex CLI — MCP server, Stop-hook lesson cues, and the coaching skill with one command.
-keywords: [devcoach codex, codex cli mcp server, codex hooks, codex skills, codex config.toml]
+description: Install devcoach in OpenAI Codex CLI — Stop-hook lesson cues and the coaching skill with one command.
+keywords: [devcoach codex, codex cli hooks, codex skills, codex hooks.json]
 ---
 
 # Codex CLI *(Beta)*
 
-devcoach runs the **full coaching loop** in OpenAI's Codex CLI: the MCP server, automatic lesson
-cues after each task (Codex's `Stop`/`UserPromptSubmit` hooks use the same wire protocol as Claude
-Code's), and the devcoach **agent skill**. Requires **Node.js ≥ 24** and Codex CLI ≥ 0.114 (hooks).
+devcoach runs the **full coaching loop** in OpenAI's Codex CLI: automatic lesson cues after each
+task (Codex's `Stop`/`UserPromptSubmit` hooks use the same wire protocol as Claude Code's) and the
+devcoach **agent skill**, which drives devcoach through `devcoach api …` commands in Codex's shell.
+Requires **Node.js ≥ 24** and Codex CLI ≥ 0.114 (hooks).
 
 :::info[Beta]
 The Codex CLI integration is **beta**: the coaching engine is the same battle-tested core used with
@@ -25,13 +26,14 @@ npx -y devcoach install --codex
 
 This registers everything devcoach needs:
 
-- **MCP server** — via `codex mcp add` when the `codex` CLI is on your PATH. (Codex stores MCP
-  servers in `~/.codex/config.toml`; if `codex` isn't found, devcoach prints the exact
-  `[mcp_servers.devcoach]` snippet to paste rather than editing your TOML.)
 - **Hooks** — `Stop` (lesson cue after each task) + `UserPromptSubmit` (priming) in
   `~/.codex/hooks.json`
 - **Skill** — the devcoach coaching skill into `~/.agents/skills/devcoach/` (Codex's user-level
   [Agent Skills](https://developers.openai.com/codex/skills) directory)
+
+Upgrading from 2.x? The same command removes the `[mcp_servers.devcoach]` table the old version
+registered — through `codex mcp remove` when the `codex` CLI is on your PATH; otherwise it asks you to
+delete it from `~/.codex/config.toml` yourself (devcoach never edits your TOML).
 
 :::note[Trust the hooks once]
 Codex asks you to **trust** newly configured hooks the first time they run — approve the devcoach

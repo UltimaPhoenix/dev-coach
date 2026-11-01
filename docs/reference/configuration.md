@@ -6,15 +6,15 @@ devcoach has seven settings, all stored in the `settings` table of the database:
 
 | Setting | Default | Range / values | Set via |
 |---------|---------|----------------|---------|
-| `max_per_day` | 2 | 1–20 | CLI · MCP tool · web UI |
-| `min_gap_minutes` | 240 | 0–1440 | CLI · MCP tool · web UI |
-| `nudge_every` | 10 | 0–1000 | CLI · MCP tool · web UI |
-| `nudge_scope` | `session` | `session` \| `global` | CLI · MCP tool · web UI |
-| `share_name` | *(empty)* | ≤ 80 chars; empty → git `user.name` | CLI · MCP tool · web UI |
+| `max_per_day` | 2 | 1–20 | CLI · agent API · web UI |
+| `min_gap_minutes` | 240 | 0–1440 | CLI · agent API · web UI |
+| `nudge_every` | 10 | 0–1000 | CLI · agent API · web UI |
+| `nudge_scope` | `session` | `session` \| `global` | CLI · agent API · web UI |
+| `share_name` | *(empty)* | ≤ 80 chars; empty → git `user.name` | CLI · agent API · web UI |
 | `ui_theme` | `system` | `system` \| `light` \| `dark` | web UI only |
 | `ui_home` | `auto` | `auto` \| `lessons` \| `knowledge` | web UI only |
 
-`devcoach set <key> <value>` and the `update_settings` MCP tool accept the first five. The two `ui_*`
+`devcoach set <key> <value>` and the `update_settings` operation of [`devcoach api`](./agent-api.md) accept the first five. The two `ui_*`
 settings belong to the dashboard and are changed from its Settings page: `ui_theme` is the colour
 scheme, `ui_home` is where `/` lands (`auto` = Lessons once a lesson exists, the knowledge map before).
 
@@ -49,7 +49,7 @@ devcoach set max_per_day 20
 devcoach set min_gap_minutes 0
 ```
 
-Via MCP tool:
+Via the agent API (`devcoach api update_settings '<json>'`):
 
 ```json
 { "key": "max_per_day", "value": "3" }
@@ -83,8 +83,8 @@ How the counter behaves:
   nor declines explicitly (`skip_lesson`), the next cue comes after
   `min(3, nudge_every)` further stops instead of the full threshold.
 - **The card is the final message**: `log_lesson` is a pure save whose result carries a
-  `reply_check` self-check reminding the model that tool arguments are invisible to you. The
-  skill calls the tool silently first and writes the lesson card as the last text of the turn.
+  `reply_check` self-check reminding the model that what it passed to the command is invisible to
+  you. The skill runs the command silently first and writes the lesson card as the last text of the turn.
 
 `devcoach doctor` prints the live counters and explains whether the next stop would cue.
 

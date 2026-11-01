@@ -45,16 +45,6 @@ function InstallTabs(): ReactNode {
           Beta. <Link to="/install/codex">Codex CLI guide →</Link>
         </p>
       </TabItem>
-      <TabItem value="desktop" label="Claude Desktop">
-        <p className={styles.desktop}>
-          Download <code>devcoach-&lt;version&gt;.mcpb</code> from the{" "}
-          <a href="https://github.com/UltimaPhoenix/dev-coach/releases/latest">latest release</a> and open
-          it. Claude Desktop installs it as an extension.
-        </p>
-        <p className={styles.hint}>
-          Beta. <Link to="/install/claude-desktop">Claude Desktop guide →</Link>
-        </p>
-      </TabItem>
     </Tabs>
   );
 }
@@ -63,7 +53,7 @@ export default function Hero(): ReactNode {
   return (
     <section className={`${styles.hero} dc-wide`}>
       <div className={styles.copy}>
-        <p className={styles.eyebrow}>Claude Code · Claude Desktop · Gemini CLI · Codex CLI · Cursor</p>
+        <p className={styles.eyebrow}>Claude Code · Gemini CLI · Codex CLI</p>
         <h1 className={styles.title}>
           Stay <span className={styles.accent}>sharp</span> while your AI does the work.
         </h1>

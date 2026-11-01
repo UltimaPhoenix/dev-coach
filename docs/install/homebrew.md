@@ -11,7 +11,7 @@ If you work in a terminal, this is the best fit: a single `brew install` sets up
 
 :::info[Homebrew and the Claude Code plugin go well together]
 Using Claude Code? The [plugin](./claude-code-plugin.md) is the better home for the **coaching wiring**
-(MCP server, hooks, skill): Claude Code updates all three automatically with each release, while a
+(hooks, skill): Claude Code updates both automatically with each release, while a
 Homebrew install refreshes only the binary — after every `brew upgrade devcoach` you must re-run
 `devcoach install` yourself to update the hooks and the skill. The nicest setup is therefore **plugin +
 Homebrew**: the plugin does the coaching and stays current on its own; Homebrew adds the bare
@@ -35,11 +35,13 @@ brew install devcoach
 devcoach install
 ```
 
-`devcoach install` registers the MCP server, the automatic-coaching hooks (Stop + UserPromptSubmit),
-and the coaching **skill** (`~/.claude/skills/devcoach/`) with Claude Code, plus the MCP server with
-Claude Desktop. Agents start it as `/opt/homebrew/bin/devcoach mcp` (`/usr/local/bin` on Intel Macs,
-`/home/linuxbrew/.linuxbrew/bin` on Linux): an absolute path that `brew upgrade` keeps valid, and that
-does not depend on the PATH an agent sees. `devcoach doctor` checks it.
+`devcoach install` registers the automatic-coaching hooks (Stop + UserPromptSubmit) and the coaching
+**skill** (`~/.claude/skills/devcoach/`) with Claude Code; the skill then runs `devcoach api …` in
+Claude's shell, where Homebrew's `devcoach` is on the PATH. The hooks are written with the absolute
+path (`/opt/homebrew/bin/devcoach`; `/usr/local/bin` on Intel Macs, `/home/linuxbrew/.linuxbrew/bin`
+on Linux), which `brew upgrade` keeps valid and which does not depend on the PATH an agent sees.
+`devcoach doctor` checks both. Upgrading from 2.x? `install` also removes the MCP server registration
+the old version wrote.
 
 `brew tap` registers the third-party repository; `brew trust --tap` marks it trusted so Homebrew loads its
 formulae when `HOMEBREW_REQUIRE_TAP_TRUST` is set. Both are one-time.
@@ -69,7 +71,7 @@ Homebrew formulae have no uninstall hook, so `brew uninstall` cannot undo what `
 into your agents' config files. Run devcoach's own uninstaller first, then remove the package:
 
 ```bash
-devcoach uninstall                 # MCP server + hooks + skill (Claude Code + Claude Desktop; --all for every agent)
+devcoach uninstall                 # hooks + skill (Claude Code; --all for every agent)
 devcoach uninstall --data          # optional: also delete ~/.devcoach (lessons, profile, notebook) — asks first
 brew uninstall devcoach
 brew untap UltimaPhoenix/tap       # optional: drop the tap too

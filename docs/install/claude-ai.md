@@ -5,19 +5,18 @@ sidebar_label: claude.ai web
 
 # claude.ai web (skill copy)
 
-Claude.ai web cannot run a **local** stdio MCP server like devcoach (it only supports hosted/remote
-connectors), so install the coaching **instructions** as a skill instead — a manual copy, not an
-integration:
+Claude.ai web cannot run anything on your machine — no hooks, no `devcoach` command — so install the
+coaching **instructions** as a skill instead — a manual copy, not an integration:
 
 1. Copy the content of [`assets/SKILL.md`](https://github.com/UltimaPhoenix/dev-coach/blob/main/assets/SKILL.md)
 2. Go to **claude.ai → Settings → Custom instructions** (or Skills, depending on your plan)
 3. Paste the content and save
 
-This gives claude.ai the coaching *behaviour* only — the MCP tools (lesson logging, profile tracking) won't
-work, because there's no local server. See [Privacy & security](../reference/privacy.md) for why a hosted
-connector isn't possible.
+This gives claude.ai the coaching *behaviour* only — the `devcoach api` commands (lesson logging, profile
+tracking) won't work, because there's no devcoach to run them. See [Privacy & security](../reference/privacy.md)
+for why a hosted connector isn't possible.
 
 :::note[Keep the skill current]
-For Claude Code / Claude Desktop the skill is served automatically and is always up to date. If you copied
+In Claude Code the plugin keeps the skill current automatically (`devcoach install` refreshes a manual copy). If you copied
 it manually to claude.ai, re-paste the latest `SKILL.md` after each devcoach update.
 :::

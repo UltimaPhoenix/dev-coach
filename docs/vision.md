@@ -9,7 +9,7 @@ keywords: [devcoach roadmap, open source AI coaching, learning paths, developer 
 
 ## The foundation — free, local, and always on
 
-devcoach today is a free, open-source MCP server: one lesson at a time, rate-limited, entirely
+devcoach today is a free, open-source coach inside your AI agent: one lesson at a time, rate-limited, entirely
 local, nothing to open or maintain. That foundation stays. The local-first model is not a
 limitation to eventually remove — it's a deliberate design that keeps your data on your machine
 and coaching genuinely unobtrusive.

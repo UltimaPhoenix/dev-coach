@@ -16,7 +16,7 @@
 
 **Stay sharp while your AI does the work.**
 
-devcoach connects to Claude Code, Claude Desktop, Gemini CLI *(beta)*, Codex CLI *(beta)*, Cursor, Windsurf, and other MCP-compatible tools. When your agent finishes a task, devcoach teaches you one thing from it **that you don't know yet**: it keeps a map of what you already know precisely so it can skip it, and pitches each lesson at your level — no generic tutorials, no repeated topics, nothing to open.
+devcoach plugs into Claude Code, Gemini CLI *(beta)* and Codex CLI *(beta)*. When your agent finishes a task, devcoach teaches you one thing from it **that you don't know yet**: it keeps a map of what you already know precisely so it can skip it, and pitches each lesson at your level — no generic tutorials, no repeated topics, nothing to open.
 
 <p align="center">
   <img src="docs/screenshots/lesson-loop.gif" alt="A Claude Code session: the agent adds a Redis cache, then devcoach appends a short lesson on cache stampedes and the developer answers with one key" width="720">
@@ -28,7 +28,7 @@ Everything runs **locally**. No data leaves your machine. One SQLite file at `~/
 
 ## Install
 
-Pick your agent. Each command wires up everything: the MCP server, the coaching hooks and the skill. Requires **Node.js ≥ 24**.
+Pick your agent. Each command wires up everything: the coaching hooks, the skill, and the `devcoach` command the skill runs. Requires **Node.js ≥ 24**.
 
 **Claude Code** — the plugin (recommended):
 
@@ -44,7 +44,7 @@ brew tap UltimaPhoenix/tap && brew trust --tap UltimaPhoenix/tap
 brew install devcoach && devcoach install
 ```
 
-**npx** — any OS, for Claude Code and Claude Desktop:
+**npx** — any OS, for Claude Code:
 
 ```bash
 npx -y devcoach install
@@ -52,11 +52,9 @@ npx -y devcoach install
 
 | Also on | How |
 |---|---|
-| **Claude Desktop** *(beta)* | Download `devcoach-<version>.mcpb` from the [latest release](https://github.com/UltimaPhoenix/dev-coach/releases/latest) → Settings → Extensions → Install Extension… |
 | **Gemini CLI** *(beta)* | `npx -y devcoach install --gemini` |
 | **Codex CLI** *(beta)* | `npx -y devcoach install --codex` (approve the hooks once on the next run) |
-| **Cursor, Windsurf, Cline, Continue, Zed** | Add `{ "mcpServers": { "devcoach": { "command": "npx", "args": ["-y", "devcoach", "mcp"] } } }` to the agent's MCP config, or install `io.github.UltimaPhoenix/devcoach` from the [MCP Registry](https://registry.modelcontextprotocol.io) |
-| **claude.ai web** | No MCP there: paste [`assets/SKILL.md`](assets/SKILL.md) as custom instructions (coaching only, nothing saved) |
+| **claude.ai web** | Nothing can run on your machine there: paste [`assets/SKILL.md`](assets/SKILL.md) as custom instructions (coaching only, nothing saved) |
 
 Two rules: with the plugin, **never also run `devcoach install`** (the hooks would count twice); after `brew upgrade` or an npm update, **re-run `devcoach install`** to refresh the hooks and the skill. Every method, step by step: **[Installation](docs/install/index.md)**.
 
@@ -96,7 +94,7 @@ The full guides live at **[ultimaphoenix.github.io/dev-coach](https://ultimaphoe
 - **[Configuration](docs/reference/configuration.md)** — rate limits, pacing, data location, schema
 - **[How it works](docs/how-it-works.md)** — session startup, coaching loop, lesson selection
 - **[Troubleshooting](docs/troubleshooting.md)** — `devcoach doctor`, common errors, known limitations, uninstalling
-- **[MCP server reference](docs/reference/mcp-server.md)** · **[Privacy & security](docs/reference/privacy.md)** · **[FAQ](docs/faq.mdx)**
+- **[Agent API reference](docs/reference/agent-api.md)** · **[Privacy & security](docs/reference/privacy.md)** · **[FAQ](docs/faq.mdx)**
 - **[Vision & roadmap](docs/vision.md)** — free, local, not commercialized; ideas we're exploring next
 
 ---
@@ -107,7 +105,7 @@ The full guides live at **[ultimaphoenix.github.io/dev-coach](https://ultimaphoe
 - **[GitHub Issues](https://github.com/UltimaPhoenix/dev-coach/issues)** — feature requests, feedback and questions
 - **[CONTRIBUTING.md](CONTRIBUTING.md)** — quick start, architecture rules, testing, branches & releases
 
-Built on the official [Model Context Protocol TypeScript SDK](https://github.com/modelcontextprotocol/typescript-sdk), Node's embedded `node:sqlite`, [Hono](https://hono.dev) (web dashboard), and [Commander](https://github.com/tj/commander.js) (CLI).
+Built on Node's embedded `node:sqlite`, [Hono](https://hono.dev) (web dashboard), [Commander](https://github.com/tj/commander.js) (CLI) and [Zod](https://zod.dev) (the agent API's schemas).
 
 ---
 
@@ -123,5 +121,5 @@ license on offer today**; if you need to embed devcoach in a closed-source produ
 
 > **devcoach is and stays 100% free** to download, install, and use — for everyone, forever, including
 > at work and on commercial projects. **Using devcoach does not put your code under the AGPL**: it runs
-> as a separate process over stdio/MCP, so your own projects keep whatever license you choose.
+> as a separate program your agent calls, so your own projects keep whatever license you choose.
 > Examples and the details: **[License & commercial use](docs/reference/license.md)**.

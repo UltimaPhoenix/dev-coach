@@ -89,7 +89,7 @@ who stay in control of the result.
 
 | Approach | Pros | Cons |
 |----------|------|------|
-| **devcoach** | On-demand, in-context, zero friction, local, calibrated to your stack | Requires AI agent with MCP support |
+| **devcoach** | On-demand, in-context, zero friction, local, calibrated to your stack | Requires an AI agent with hooks and a shell tool (Claude Code, Gemini CLI, Codex CLI) |
 | **Online courses** | Comprehensive, structured, often free | Deferred, generic, easy to procrastinate on |
 | **Reading docs / StackOverflow** | Fast lookup | Surface-level, no learning architecture, no retention |
 | **AI explanations (Copilot inline)** | Immediate, contextual | Often just answers the question, not the "why" or anti-patterns |
