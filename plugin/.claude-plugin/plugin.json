@@ -1,6 +1,6 @@
 {
   "name": "devcoach",
-  "description": "Progressive technical coach for Claude Code: one lesson at a time on what you don't know yet, drawn from what you actually build. Knowledge map, coaching notebook, web dashboard, all local. Bundles the devcoach MCP server, the Stop hooks and the coaching skill.",
+  "description": "Stay sharp while your AI does the work: learn what you don't know yet from the code Claude Code writes, one short lesson at a time. Knowledge map, coaching notebook, web dashboard, all local. Bundles the devcoach MCP server, the Stop hooks and the coaching skill.",
   "version": "2.7.1",
   "author": {
     "name": "UltimaPhoenix",

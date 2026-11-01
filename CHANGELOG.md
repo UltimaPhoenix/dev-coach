@@ -11,6 +11,13 @@ Notable changes to devcoach. Versions follow [Semantic Versioning](https://semve
   indigo, and in dark mode the dashboard's grey canvas and panels (`#1e1f22` / `#2b2d30`) instead
   of Docusaurus' defaults. The footer and the share page's TL;DR box follow. Both themes keep WCAG
   AA contrast for links and button text.
+- **One tagline everywhere.** devcoach introduced itself five different ways ("Progressive
+  technical coaching, right inside your AI agent", "Progressive in-context technical
+  coaching…", "Progressive technical coach for Claude Code…", …). Every surface now uses the same
+  two lines: *Stay sharp while your AI does the work* and *Learn what you don't know yet from the
+  code your AI agent writes*. This covers the npm, Claude Code plugin (+ self-marketplace), Gemini
+  extension, `.mcpb`, MCP Registry and Homebrew descriptions, `devcoach --help`, the docs site
+  tagline and description, `llms.txt`, and the social card.
 
 ## [2.7.1] — 2026-10-08
 

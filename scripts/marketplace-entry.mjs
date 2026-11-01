@@ -15,7 +15,7 @@ export const MARKETPLACE_CATEGORY = "learning";
 export const MARKETPLACE_TAGS = ["coaching", "learning", "mcp"];
 export const MARKETPLACE_OWNER = { name: "UltimaPhoenix", url: "https://github.com/UltimaPhoenix" };
 export const MARKETPLACE_DESCRIPTION =
-  "Plugins by UltimaPhoenix — devcoach, the progressive technical coach for Claude Code.";
+  "Plugins by UltimaPhoenix — devcoach: stay sharp while your AI does the work.";
 // The beta channel: a separate marketplace (its own repo), so the plugin keeps its name — the
 // beta installs as devcoach@ultimaphoenix-beta with the same tools, commands and skill as the
 // release, and users switch by enabling one of the two.
