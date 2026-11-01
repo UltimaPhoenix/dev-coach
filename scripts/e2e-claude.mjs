@@ -7,7 +7,7 @@
 //   npm run test:e2e                     the smoke set (see SMOKE below)
 //   npm run test:e2e -- --all            the whole grid
 //   npm run test:e2e -- --list           what exists, and how many claude calls each run makes
-//   npm run test:e2e -- --only plugin-tree:fresh-cue,mcp-entry:lesson
+//   npm run test:e2e -- --only plugin-tree:fresh-cue,cli-entry:lesson
 //   E2E_MODEL=haiku npm run test:e2e     a cheaper model (default: the CLI's own default)
 //   … --keep                             keep the sandboxes for inspection
 //
@@ -18,11 +18,21 @@
 // CLAUDE_CODE_OAUTH_TOKEN is set, in which case HOME is sandboxed too ("hermetic"). The user's
 // real ~/.devcoach is never touched. The marketplace devcoach plugins are switched off for the
 // run through --settings, except in the `plugin-market` method, which tests exactly that install.
+// The model reaches devcoach the way it does in production: the hooks cue the turn, the skill runs
+// `devcoach api …` with the Bash tool — the only tool rule every scenario allows is `Bash(devcoach *)`.
 import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  cpSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { createRequire } from "node:module";
 import { homedir, tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { delimiter, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const { DatabaseSync } = createRequire(import.meta.url)("node:sqlite");
@@ -42,7 +52,7 @@ const fatal = (msg) => {
 };
 
 // ── Installation methods ──────────────────────────────────────────────────────
-// Each returns what a `claude -p` call needs: extra args, extra env, the tool-name prefix.
+// Each returns what a `claude -p` call needs: extra args and extra env.
 const MARKET_PLUGINS = [
   "devcoach@ultimaphoenix",
   "devcoach@ultimaphoenix-beta",
@@ -85,12 +95,10 @@ const METHODS = {
   "plugin-tree": {
     about:
       "--plugin-dir plugin/, the launcher installing a tarball of the working tree (real first-run install)",
-    prefix: "mcp__plugin_devcoach_devcoach__",
     setup(sb) {
       const settings = join(sb.dir, "settings.json");
       writeFileSync(settings, JSON.stringify({ enabledPlugins: pluginsOff }));
       return {
-        // No --strict-mcp-config here: it would drop the plugin's own server too.
         args: ["--plugin-dir", join(root, "plugin"), "--settings", settings],
         env: {
           DEVCOACH_RUNTIME_DIR: join(sb.dir, "runtime"),
@@ -104,7 +112,6 @@ const METHODS = {
   "plugin-market": {
     about:
       "the plugin as installed on this PC from the marketplace (the released artifact; --channel stable|beta)",
-    prefix: "mcp__plugin_devcoach_devcoach__",
     available: () =>
       installedMarketPlugin()
         ? null
@@ -117,16 +124,24 @@ const METHODS = {
     },
     cli: () => ["node", [bin]],
   },
-  "mcp-entry": {
-    about: "a plain MCP entry + hooks in settings (the shape `devcoach install` writes for npx)",
-    prefix: "mcp__devcoach__",
+  "cli-entry": {
+    about:
+      "hooks in settings + the skill copied next to the sandbox + a `devcoach` shim on PATH (the shape `devcoach install` writes)",
     setup(sb) {
-      const mcp = join(sb.dir, "mcp.json");
+      // The skill as `devcoach install` copies it to ~/.claude/skills — here as the sandbox cwd's
+      // project skills (Claude Code reads .claude/skills there too), so the user's real home is
+      // never written in attached mode.
+      const skillDir = join(sb.cwd, ".claude", "skills", "devcoach");
+      mkdirSync(skillDir, { recursive: true });
+      cpSync(join(root, "assets", "SKILL.md"), join(skillDir, "SKILL.md"));
+      cpSync(join(root, "assets", "references"), join(skillDir, "references"), { recursive: true });
+      // `devcoach` on the PATH, pointing at the working tree's build: what the skill runs.
+      const shimDir = join(sb.dir, "bin");
+      mkdirSync(shimDir, { recursive: true });
       writeFileSync(
-        mcp,
-        JSON.stringify({
-          mcpServers: { devcoach: { command: "node", args: [bin, "mcp"] } },
-        }),
+        join(shimDir, "devcoach"),
+        `#!/bin/sh\nexec "${process.execPath}" "${bin}" "$@"\n`,
+        { mode: 0o755 },
       );
       const settings = join(sb.dir, "settings.json");
       writeFileSync(
@@ -140,27 +155,21 @@ const METHODS = {
         }),
       );
       return {
-        args: ["--mcp-config", mcp, "--strict-mcp-config", "--settings", settings],
-        env: {},
+        args: ["--settings", settings],
+        env: { PATH: `${shimDir}${delimiter}${process.env.PATH ?? ""}` },
       };
     },
     cli: () => ["node", [bin]],
   },
   homebrew: {
     about:
-      "the Homebrew-installed `devcoach` binary as server and hooks (skipped when not installed)",
-    prefix: "mcp__devcoach__",
+      "the Homebrew-installed `devcoach` binary for the hooks and the skill's commands (skipped when not installed)",
     available: () =>
       existsSync("/opt/homebrew/bin/devcoach")
         ? null
         : "/opt/homebrew/bin/devcoach is not installed",
     setup(sb) {
       const brew = "/opt/homebrew/bin/devcoach";
-      const mcp = join(sb.dir, "mcp.json");
-      writeFileSync(
-        mcp,
-        JSON.stringify({ mcpServers: { devcoach: { command: brew, args: ["mcp"] } } }),
-      );
       const settings = join(sb.dir, "settings.json");
       writeFileSync(
         settings,
@@ -172,32 +181,16 @@ const METHODS = {
           },
         }),
       );
-      return {
-        args: ["--mcp-config", mcp, "--strict-mcp-config", "--settings", settings],
-        env: {},
-      };
+      return { args: ["--settings", settings], env: {} };
     },
     cli: () => ["/opt/homebrew/bin/devcoach", []],
   },
 };
 
 // ── Sandbox + a claude call ───────────────────────────────────────────────────
-const TOOLS = [
-  "get_onboarding",
-  "complete_onboarding",
-  "preview_deep_scan",
-  "get_briefing",
-  "get_profile",
-  "log_lesson",
-  "skip_lesson",
-  "get_lessons",
-  "submit_feedback",
-  "star_lesson",
-  "update_knowledge",
-  "add_topic",
-  "add_group",
-  "update_settings",
-]; // prettier-ignore
+// What a session may run without asking: the skill, the file tools, and `devcoach api …` —
+// the one Bash rule the skill's own frontmatter pre-approves (`Bash(devcoach *)`).
+const ALLOWED_TOOLS = ["Skill", "Read", "Write", "Edit", "Glob", "Bash(devcoach *)"];
 
 function makeSandbox(methodId, kindId) {
   const dir = mkdtempSync(join(tmpdir(), `dc-e2e-${methodId}-${kindId}-`));
@@ -222,15 +215,12 @@ function makeSandbox(methodId, kindId) {
     writeFileSync(join(home, ".claude.json"), JSON.stringify({ hasCompletedOnboarding: true }));
     sb.env.HOME = home;
   }
-  const allowed = [
-    "Skill",
-    "Read",
-    "Write",
-    "Edit",
-    "Glob",
-    ...TOOLS.map((t) => method.prefix + t),
+  sb.args = [
+    ...args,
+    "--allowedTools",
+    ALLOWED_TOOLS.join(","),
+    ...(model ? ["--model", model] : []),
   ];
-  sb.args = [...args, "--allowedTools", allowed.join(","), ...(model ? ["--model", model] : [])];
   sb.cli = (...a) => {
     const [cmd, pre] = method.cli(sb);
     return execFileSync(cmd, [...pre, ...a], { env: sb.env, encoding: "utf8" });
@@ -239,7 +229,7 @@ function makeSandbox(methodId, kindId) {
   return sb;
 }
 
-/** One `claude -p` turn. Returns every assistant text block, the session id and the MCP status. */
+/** One `claude -p` turn. Returns every assistant text block, the session id and the commands run. */
 function claude(sb, prompt, { resume, planMode } = {}) {
   sb.calls += 1;
   const res = spawnSync(
@@ -261,7 +251,7 @@ function claude(sb, prompt, { resume, planMode } = {}) {
   // BEFORE the log_lesson call — collect every assistant text block of the turn.
   let out = "";
   let session = null;
-  let servers = [];
+  // Every tool use, a Bash one as `Bash: <command>` — the devcoach operations show up there.
   const toolCalls = [];
   for (const line of (res.stdout ?? "").split("\n")) {
     if (!line.trim()) continue;
@@ -269,11 +259,14 @@ function claude(sb, prompt, { resume, planMode } = {}) {
       const evt = JSON.parse(line);
       if (evt.type === "system" && evt.subtype === "init") {
         session = evt.session_id ?? session;
-        servers = evt.mcp_servers ?? servers;
       } else if (evt.type === "assistant") {
         for (const block of evt.message?.content ?? []) {
           if (block.type === "text" && block.text) out += `${block.text}\n`;
-          if (block.type === "tool_use") toolCalls.push(block.name);
+          if (block.type === "tool_use") {
+            toolCalls.push(
+              block.name === "Bash" ? `Bash: ${block.input?.command ?? ""}` : block.name,
+            );
+          }
         }
       } else if (evt.type === "result") {
         session = evt.session_id ?? session;
@@ -283,7 +276,7 @@ function claude(sb, prompt, { resume, planMode } = {}) {
       out += `${line}\n`; // a non-JSON line (e.g. "Not logged in") — keep it visible
     }
   }
-  return { out, session, servers, toolCalls, status: res.status, err: res.stderr ?? "" };
+  return { out, session, toolCalls, status: res.status, err: res.stderr ?? "" };
 }
 
 const query = (sb, sql) => {
@@ -326,12 +319,6 @@ const KINDS = {
     calls: 2,
     run(sb, check) {
       const t1 = claude(sb, TECH_PROMPT);
-      const server = t1.servers.find((s) => /devcoach/.test(s.name));
-      check(
-        "the devcoach server is connected in the very first session",
-        server?.status === "connected",
-        JSON.stringify(t1.servers.map((s) => `${s.name}:${s.status}`)),
-      );
       check(
         "the first turn ends by offering setup, leading with Automatic",
         /automatic/i.test(t1.out),
@@ -343,8 +330,8 @@ const KINDS = {
       // get_onboarding's `next_step` (an empty scan starts from default_topics).
       const t2 = claude(sb, "Automatic", { resume: t1.session });
       check(
-        "complete_onboarding was called",
-        t2.toolCalls.some((n) => n.endsWith("complete_onboarding")),
+        "complete_onboarding was run",
+        t2.toolCalls.some((n) => n.includes("complete_onboarding")),
         t2.toolCalls.join(", "),
       );
       check(
@@ -370,8 +357,8 @@ const KINDS = {
         "Set up devcoach for me. I choose Automatic mode: do not ask me to pick, I confirm Automatic.",
       );
       check(
-        "complete_onboarding was called",
-        t.toolCalls.some((n) => n.endsWith("complete_onboarding")),
+        "complete_onboarding was run",
+        t.toolCalls.some((n) => n.includes("complete_onboarding")),
         t.toolCalls.join(", "),
       );
       check(
@@ -474,7 +461,7 @@ const KINDS = {
   },
 };
 
-const SMOKE = ["plugin-tree:fresh-cue", "plugin-tree:lesson", "mcp-entry:fresh-explicit"];
+const SMOKE = ["plugin-tree:fresh-cue", "plugin-tree:lesson", "cli-entry:fresh-explicit"];
 const grid = Object.keys(METHODS).flatMap((m) =>
   Object.entries(KINDS)
     .filter(([, k]) => !k.only || k.only.includes(m))
@@ -512,7 +499,7 @@ console.log(
 );
 
 console.log("preflight: checking claude auth…");
-const probe = makeSandbox("mcp-entry", "preflight");
+const probe = makeSandbox("cli-entry", "preflight");
 probe.cli("knowledge-add", "typescript", "--confidence", "4"); // a profile: the auth check must not onboard
 probe.cli("set", "nudge_every", "99");
 const smoke = claude(probe, "Reply with exactly: ok");

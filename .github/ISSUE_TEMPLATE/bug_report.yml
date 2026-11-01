@@ -38,10 +38,9 @@ body:
     attributes:
       label: Where did it happen?
       options:
-        - MCP server (Claude Code / Desktop / other agent)
+        - The coaching in your agent (Claude Code / Gemini CLI / Codex CLI)
         - CLI
         - Web dashboard (UI)
-        - Claude Desktop extension (.mcpb)
         - Other / not sure
     validations:
       required: true

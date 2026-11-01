@@ -20,9 +20,9 @@ run-name: >-
 # UltimaPhoenix/dev-coach`) clones the default branch. Four scenarios:
 #  1. Push to develop / pull request → lint + typecheck + test + build + sonar; a green push to
 #     develop also publishes a canary (npm dist-tag `next` + rolling GitHub prerelease `next`)
-#  2. Tag push (v*)                  → … + publish (npm) + GitHub Release (.mcpb) + Homebrew + marketplace + registry
+#  2. Tag push (v*)                  → … + publish (npm) + GitHub Release (plugin + Gemini zips, SBOM) + Homebrew + marketplace
 #  3. workflow_dispatch (Release) on develop → bump version on develop → tag → fast-forward main
-#     → publish + Release + Homebrew + marketplace + registry
+#     → publish + Release + Homebrew + marketplace
 #  4. workflow_dispatch (Release) on main    → hotfix release: bump on main only (merge main into develop after)
 on:
   push:
@@ -65,11 +65,6 @@ jobs:
       # The docs site's browser-side logic (share-link decoder, dashboard probe) has its own tiny
       # node --test suite — no install needed, it only imports Node built-ins.
       - run: npm test --prefix website
-      # The Claude Desktop extension is a separate self-contained bundle (tsup.mcpb.config.ts); its
-      # build script proves it resolves with no node_modules and answers an MCP initialize.
-      - name: Build + smoke the Claude Desktop extension (.mcpb)
-        if: matrix.node == '24'
-        run: node scripts/build-mcpb.mjs
       # Claude Code's own manifest validator — the same check `claude plugin install` runs.
       # v1.0.1 shipped a plugin.json it rejects (repository as an object) and every marketplace
       # install failed; running it here, strict and against the current Claude Code, turns the
@@ -166,11 +161,19 @@ jobs:
         run: |
           set -euo pipefail
           npm version "${{ steps.ver.outputs.version }}" --no-git-tag-version
-          NEW="${{ steps.ver.outputs.version }}" node -e 'const fs=require("fs"),f="mcpb/manifest.json";fs.writeFileSync(f,fs.readFileSync(f,"utf8").replace(/"version": "[^"]+"/,`"version": "${process.env.NEW}"`))'
           node scripts/sync-plugin.mjs
       - run: npm run build
       - run: npm publish --access public --tag next
-      - run: npm run mcpb:sign && npm run plugin:zip && npm run gemini:zip
+      - run: npm run plugin:zip && npm run gemini:zip
+      - name: Stage the release assets (plugin + Gemini zips, SBOM, checksums)
+        run: |
+          set -euo pipefail
+          mkdir -p dist-release
+          cp dist-plugin/devcoach-plugin-*.zip dist-gemini/devcoach-gemini-extension-*.zip dist-release/
+          # CycloneDX SBOM of production deps (npm sbom is built into npm >= 10.7 — no extra dep).
+          npm sbom --sbom-format cyclonedx --omit dev > dist-release/devcoach.cdx.json
+          # Checksums over every release asset; run inside the dir so paths are bare.
+          (cd dist-release && shasum -a 256 *.zip *.cdx.json > SHASUMS256.txt)
       - name: Publish the rolling GitHub prerelease `next`
         env:
           GH_TOKEN: ${{ github.token }}
@@ -185,7 +188,7 @@ jobs:
           git push --delete origin refs/tags/next 2>/dev/null || true
           NOTES="$(printf 'Canary build **%s** from `develop` @ %s — unreleased, may break.\n\nInstall: `npx -y devcoach@next` · docs: https://ultimaphoenix.github.io/dev-coach/next/' "$VERSION" "$GITHUB_SHA")"
           gh release create next --target "$GITHUB_SHA" --prerelease --title "next (canary)" --notes "$NOTES" \
-            dist-mcpb/*.mcpb dist-plugin/*.zip dist-gemini/*.zip
+            dist-release/*
 
   # ── Beta channel: pin the canary in UltimaPhoenix/claude-plugins-marketplace-beta ──
   # A separate marketplace, so the plugin keeps its name: it installs as
@@ -300,13 +303,11 @@ jobs:
             echo "::error::Tag v${NEW} already exists — delete it first: git push origin :refs/tags/v${NEW}"
             exit 1
           fi
-          # keep the .mcpb manifest version in sync (the build also syncs it; commit it tidy)
-          NEW="$NEW" node -e 'const fs=require("fs"),f="mcpb/manifest.json";fs.writeFileSync(f,fs.readFileSync(f,"utf8").replace(/"version": "[^"]+"/,`"version": "${process.env.NEW}"`))'
           # keep the Claude Code plugin manifest + bundled SKILL.md in sync with package.json
           node scripts/sync-plugin.mjs
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add package.json package-lock.json mcpb/manifest.json server.json \
+          git add package.json package-lock.json \
             plugin/.claude-plugin/plugin.json plugin/skills/devcoach/SKILL.md plugin/package.json \
             gemini-extension/gemini-extension.json gemini-extension/package.json \
             gemini-extension/skills/devcoach/SKILL.md \
@@ -382,7 +383,7 @@ jobs:
               description: 'Published to npm',
             });
 
-  # ── GitHub Release with the signed .mcpb attached ──────────────────────────
+  # ── GitHub Release: the plugin + Gemini zips, a CycloneDX SBOM and checksums ──────────
   release:
     needs: [check, bump]
     if: >-
@@ -391,9 +392,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    env:
-      MCPB_CERT_PEM: ${{ secrets.MCPB_CERT }}
-      MCPB_KEY_PEM: ${{ secrets.MCPB_KEY }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -403,41 +401,27 @@ jobs:
           node-version-file: .node-version
           cache: npm
       - run: npm ci
-      - name: Configure signing certificate (real cert if secrets set, else self-signed)
-        run: |
-          if [ -n "$MCPB_CERT_PEM" ] && [ -n "$MCPB_KEY_PEM" ]; then
-            printf '%s' "$MCPB_CERT_PEM" > "$RUNNER_TEMP/mcpb-cert.pem"
-            printf '%s' "$MCPB_KEY_PEM"  > "$RUNNER_TEMP/mcpb-key.pem"
-            echo "MCPB_CERT=$RUNNER_TEMP/mcpb-cert.pem" >> "$GITHUB_ENV"
-            echo "MCPB_KEY=$RUNNER_TEMP/mcpb-key.pem"   >> "$GITHUB_ENV"
-          fi
-      - run: npm run mcpb:sign
-      # Claude Code plugin zip (offline-installable marketplace; vector C). build-mcpb already ran
-      # `npm run build`, and plugin:zip re-syncs the plugin before packing.
+      # Claude Code plugin zips (the offline-installable marketplace layout + the plugin-root
+      # archive); plugin:zip re-syncs the plugin before packing.
       - run: npm run plugin:zip
       # Gemini CLI extension zip (beta): manifest at the archive root, installable after
       # unzip via `gemini extensions install <dir>`.
       - run: npm run gemini:zip
-      - name: Generate SBOM + checksums for release assets
+      - name: Stage the release assets (plugin + Gemini zips, SBOM, checksums)
         run: |
           set -euo pipefail
+          mkdir -p dist-release
+          cp dist-plugin/devcoach-plugin-*.zip dist-gemini/devcoach-gemini-extension-*.zip dist-release/
           # CycloneDX SBOM of production deps (npm sbom is built into npm >= 10.7 — no extra dep).
-          npm sbom --sbom-format cyclonedx --omit dev > dist-mcpb/devcoach.cdx.json
-          # Stage the plugin + gemini-extension zips next to the .mcpb so one checksum file
-          # covers every release asset.
-          cp dist-plugin/devcoach-plugin-*.zip dist-mcpb/
-          cp dist-gemini/devcoach-gemini-extension-*.zip dist-mcpb/
-          # Checksums over every release asset (.mcpb + zip + SBOM); run inside the dir so paths are bare.
-          (cd dist-mcpb && shasum -a 256 *.mcpb *.zip *.cdx.json > SHASUMS256.txt)
+          npm sbom --sbom-format cyclonedx --omit dev > dist-release/devcoach.cdx.json
+          # Checksums over every release asset; run inside the dir so paths are bare.
+          (cd dist-release && shasum -a 256 *.zip *.cdx.json > SHASUMS256.txt)
       - uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ needs.bump.outputs.tag || github.ref_name }}
           generate_release_notes: true
           files: |
-            dist-mcpb/*.mcpb
-            dist-mcpb/*.zip
-            dist-mcpb/devcoach.cdx.json
-            dist-mcpb/SHASUMS256.txt
+            dist-release/*
 
   # ── Bump the Homebrew tap formula (skips when HOMEBREW_TAP_TOKEN unset) ─────
   homebrew:
@@ -507,41 +491,3 @@ jobs:
           git add .claude-plugin/marketplace.json
           git diff --staged --quiet || git commit -m "devcoach ${VERSION}"
           git push
-
-  # ── Publish server.json to the official MCP Registry (GitHub OIDC, tokenless) ──
-  # Ownership is proven two ways: the OIDC token binds the run to this repo (namespace
-  # io.github.UltimaPhoenix), and the registry reads `mcpName` from the freshly published npm
-  # tarball. scripts/sync-plugin.mjs pins server.json's versions in the bump commit.
-  mcp-registry:
-    needs: [publish, bump]
-    if: ${{ always() && needs.publish.result == 'success' }}
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      id-token: write # mcp-publisher login github-oidc
-    environment:
-      name: mcp-registry
-      url: https://registry.modelcontextprotocol.io/v0/servers?search=io.github.UltimaPhoenix/devcoach
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          ref: ${{ needs.bump.outputs.tag || github.ref }}
-      - uses: actions/setup-node@v7
-        with:
-          node-version-file: .node-version
-      - name: Install mcp-publisher
-        run: |
-          set -euo pipefail
-          curl -fsSL "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
-      - name: Publish devcoach to the MCP Registry
-        run: |
-          set -euo pipefail
-          VERSION="${{ needs.bump.outputs.version || github.ref_name }}"
-          VERSION="${VERSION#v}"
-          # Guard: the committed manifest must be the released version (sync-plugin.mjs pins it in the bump commit).
-          [ "$(node -p 'require("./server.json").version')" = "$VERSION" ] \
-            || { echo "::error::server.json version != ${VERSION} — run 'npm run plugin:sync' and commit."; exit 1; }
-          # The registry validates mcpName from the npm tarball; npm may take a moment to serve a fresh version.
-          for _ in $(seq 1 12); do npm view "devcoach@${VERSION}" mcpName >/dev/null 2>&1 && break || sleep 15; done
-          ./mcp-publisher login github-oidc
-          ./mcp-publisher publish
