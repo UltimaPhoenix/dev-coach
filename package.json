@@ -10,8 +10,7 @@
     "claude",
     "claude-code",
     "coaching",
-    "developer-tools",
-    "cli"
+    "developer-tools"
   ],
   "homepage": "https://ultimaphoenix.github.io/dev-coach/",
   "repository": {
@@ -52,13 +51,11 @@
     "mcpb:sign": "npm run build && node scripts/build-mcpb.mjs --sign",
     "plugin:sync": "node scripts/sync-plugin.mjs",
     "plugin:zip": "node scripts/sync-plugin.mjs && node scripts/build-plugin-zip.mjs",
-    "gemini:zip": "node scripts/sync-plugin.mjs && node scripts/build-gemini-extension.mjs",
     "prepack": "npm run build"
   },
   "dependencies": {
     "@hono/node-server": "^2.1.3",
     "@modelcontextprotocol/server": "^2.2.0",
-    "commander": "^15.0.0",
     "fflate": "^0.8.3",
     "hono": "^4.13.12",
     "zod": "^4.6.5"
