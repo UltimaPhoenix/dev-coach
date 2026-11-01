@@ -4,6 +4,14 @@ Notable changes to devcoach. Versions follow [Semantic Versioning](https://semve
 
 ---
 
+## [Unreleased]
+
+### Changed
+- **The docs site wears the product's colours**: teal links, buttons and highlights instead of
+  indigo, and in dark mode the dashboard's grey canvas and panels (`#1e1f22` / `#2b2d30`) instead
+  of Docusaurus' defaults. The footer and the share page's TL;DR box follow. Both themes keep WCAG
+  AA contrast for links and button text.
+
 ## [2.7.1] — 2026-10-08
 
 ### Fixed

@@ -171,7 +171,7 @@ const config: Config = {
           announcementBar: {
             id: "next-docs",
             content: `You are reading the docs for the unreleased <strong>develop</strong> branch (<code>npx -y devcoach@next</code>) — <a href="${SITE_URL}">released docs</a>`,
-            backgroundColor: "#4f46e5",
+            backgroundColor: "#0f766e",
             textColor: "#ffffff",
             isCloseable: false,
           },
