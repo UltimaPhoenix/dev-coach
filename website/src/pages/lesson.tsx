@@ -188,7 +188,9 @@ export default function LessonPage(): ReactNode {
 
         {status === "ready" && lesson && (
           <>
-            <p className={styles.eyebrow}>Someone shared a devcoach lesson with you</p>
+            <p className={styles.eyebrow}>
+              {lesson.shared_by ? `${lesson.shared_by} shared` : "Someone shared"} a devcoach lesson with you
+            </p>
             <div className={styles.layout}>
             <article className={styles.card}>
               <div className={styles.titleRow}>
@@ -225,6 +227,26 @@ export default function LessonPage(): ReactNode {
             </article>
 
             <aside className={styles.aside}>
+              {/* No dashboard answered (or the browser can't tell): this visitor may not have devcoach
+                  at all — a shared lesson is how many people first meet it. */}
+              {dashboard !== "up" && dashboard !== "checking" && (
+                <div className={`${styles.panel} ${styles.newcomer}`}>
+                  <p className={styles.panelTitle}>New to devcoach?</p>
+                  <p className={styles.newcomerText}>
+                    This lesson came from devcoach: when your AI agent finishes a task, it teaches you one
+                    thing from it that you don't know yet. Free and 100% local.
+                  </p>
+                  <div className={styles.buttons}>
+                    <Link className={`button button--primary button--block ${styles.mainButton}`} to="/install">
+                      Install devcoach
+                    </Link>
+                    <Link className="button button--secondary button--block" to="/">
+                      See how it works
+                    </Link>
+                  </div>
+                  <p className={styles.hint}>Then come back: this link keeps the lesson, ready to import.</p>
+                </div>
+              )}
               <div className={styles.panel}>
                 <p className={styles.panelTitle}>Add it to your devcoach</p>
                 <p className={`${styles.status} ${dashboard === "up" ? styles.up : ""}`}>
@@ -303,8 +325,8 @@ export default function LessonPage(): ReactNode {
                   </p>
                 )}
                 <p className={styles.hint}>
-                  No devcoach yet? <Link to="/install">Install it</Link> in a minute — or paste the code into
-                  your agent: <em>import this devcoach lesson:</em> <code>{SHARE_CODE_PREFIX}…</code>
+                  Or paste the code into your agent:{" "}
+                  <em>import this devcoach lesson:</em> <code>{SHARE_CODE_PREFIX}…</code>
                 </p>
                 <p className={styles.hint}>
                   <Link to="/usage/sharing">What is this?</Link> — how devcoach lessons are shared, what
