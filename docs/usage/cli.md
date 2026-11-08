@@ -138,7 +138,10 @@ with `devcoach set share_name`).
 |---|---|
 | `DEVCOACH_DIR` | Relocate the data directory (default `~/.devcoach`) — sandboxing, tests, a second profile |
 | `DEVCOACH_HOOK_DEBUG=1` | Trace every hook decision to `~/.devcoach/hook.log` |
-| `NO_COLOR` | Disable coloured terminal output |
+| `NO_COLOR` | Disable coloured terminal output (wins over `FORCE_COLOR`) |
+| `FORCE_COLOR` | Colour even on a pipe; `0` or `false` turns colour off. `TERM=dumb` turns it off unless forced |
+| `FORCE_HYPERLINK=1` | Make the dashboard URL a clickable OSC 8 link on terminals devcoach does not detect |
+| `COLUMNS` | Width for rules when stdout is not a terminal (default 80, rules stop at 100) |
 
 ## Examples
 
