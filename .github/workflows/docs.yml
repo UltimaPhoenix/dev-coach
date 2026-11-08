@@ -42,11 +42,13 @@ jobs:
       - name: Build the released docs (main)
         working-directory: release/website
         run: npm ci && npm run build
-      - name: Build the next docs (develop) under /next/
+      # The Docusaurus build only transpiles, so tsc is what type-checks the site's TS/TSX.
+      # develop only: main only ever receives release commits of develop, already checked here.
+      - name: Type-check + build the next docs (develop) under /next/
         working-directory: next/website
         env:
           DOCS_NEXT: "1"
-        run: npm ci && npm run build
+        run: npm ci && npm run typecheck && npm run build
       - run: cp -r next/website/build release/website/build/next
       - uses: actions/upload-pages-artifact@v5
         with:

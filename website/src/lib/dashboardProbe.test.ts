@@ -54,7 +54,7 @@ test("Safari: unsupported, and the probe is never sent", async () => {
   const fetch = (async () => {
     called = true;
     throw new Error("must not fetch");
-  }) as unknown as typeof fetch;
+  }) as unknown as typeof globalThis.fetch;
   assert.equal(
     await probeDashboard(7860, signal, { userAgent: SAFARI, permissions: undefined, fetch }),
     "unsupported",
@@ -67,7 +67,7 @@ test("Chrome with the permission denied: blocked-permission, no fetch", async ()
   const fetch = (async () => {
     called = true;
     throw new Error("must not fetch");
-  }) as unknown as typeof fetch;
+  }) as unknown as typeof globalThis.fetch;
   assert.equal(
     await probeDashboard(7860, signal, { userAgent: CHROME, permissions: perms(["denied"]), fetch }),
     "blocked-permission",
