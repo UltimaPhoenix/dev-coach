@@ -4,8 +4,14 @@
 {
   "extends": "@docusaurus/tsconfig",
   "compilerOptions": {
-    "baseUrl": ".",
-    "ignoreDeprecations": "6.0",
+    // TypeScript 7 removed `baseUrl`, which @docusaurus/tsconfig still sets: clear it and
+    // re-declare `@site/*` here (without baseUrl, paths resolve from the file that declares them).
+    "baseUrl": null,
+    "paths": {
+      "@site/*": ["./*"]
+    },
+    // `npm test` (node --test) needs the `.ts` extension on relative imports; tsc never emits here.
+    "allowImportingTsExtensions": true,
     "strict": true
   },
   "exclude": [".docusaurus", "build"]
