@@ -227,26 +227,6 @@ export default function LessonPage(): ReactNode {
             </article>
 
             <aside className={styles.aside}>
-              {/* No dashboard answered (or the browser can't tell): this visitor may not have devcoach
-                  at all — a shared lesson is how many people first meet it. */}
-              {dashboard !== "up" && dashboard !== "checking" && (
-                <div className={`${styles.panel} ${styles.newcomer}`}>
-                  <p className={styles.panelTitle}>New to devcoach?</p>
-                  <p className={styles.newcomerText}>
-                    This lesson came from devcoach: when your AI agent finishes a task, it teaches you one
-                    thing from it that you don't know yet. Free and 100% local.
-                  </p>
-                  <div className={styles.buttons}>
-                    <Link className={`button button--primary button--block ${styles.mainButton}`} to="/install">
-                      Install devcoach
-                    </Link>
-                    <Link className="button button--secondary button--block" to="/">
-                      See how it works
-                    </Link>
-                  </div>
-                  <p className={styles.hint}>Then come back: this link keeps the lesson, ready to import.</p>
-                </div>
-              )}
               <div className={styles.panel}>
                 <p className={styles.panelTitle}>Add it to your devcoach</p>
                 <p className={`${styles.status} ${dashboard === "up" ? styles.up : ""}`}>
@@ -333,6 +313,27 @@ export default function LessonPage(): ReactNode {
                   travels, and what never does.
                 </p>
               </div>
+              {/* No dashboard answered (or the browser can't tell): this visitor may not have devcoach
+                  at all — a shared lesson is how many people first meet it. It sits below the import panel:
+                  someone who already has devcoach came here for Import. */}
+              {dashboard !== "up" && dashboard !== "checking" && (
+                <div className={`${styles.panel} ${styles.newcomer}`}>
+                  <p className={styles.panelTitle}>New to devcoach?</p>
+                  <p className={styles.newcomerText}>
+                    This lesson came from devcoach: when your AI agent finishes a task, it teaches you one
+                    thing from it that you don't know yet. Free and 100% local.
+                  </p>
+                  <div className={styles.buttons}>
+                    <Link className={`button button--primary button--block ${styles.mainButton}`} to="/install">
+                      Install devcoach
+                    </Link>
+                    <Link className="button button--secondary button--block" to="/">
+                      See how it works
+                    </Link>
+                  </div>
+                  <p className={styles.hint}>Then come back: this link keeps the lesson, ready to import.</p>
+                </div>
+              )}
             </aside>
             </div>
             <p className={styles.footer}>
