@@ -295,6 +295,7 @@ function installInBackground(ctx) {
     detached: true,
     stdio: "ignore",
     env: process.env,
+    windowsHide: true, // a detached child would open a console window for the whole npm install
   });
   child.unref();
   return null;

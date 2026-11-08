@@ -21,7 +21,7 @@ function hook(cmd: string, home: string, payload: object | string): string {
     cwd: root,
     encoding: "utf8",
     input: typeof payload === "string" ? payload : JSON.stringify(payload),
-    env: { ...process.env, HOME: home, NO_COLOR: "1" },
+    env: { ...process.env, HOME: home, USERPROFILE: home, NO_COLOR: "1" },
   });
 }
 
@@ -154,7 +154,7 @@ describe("hooks via real child processes (piped stdin)", () => {
       new Promise((resolve, reject) => {
         const child = spawn(process.execPath, [...BIN, "stop-hook"], {
           cwd: root,
-          env: { ...process.env, HOME: home, NO_COLOR: "1" },
+          env: { ...process.env, HOME: home, USERPROFILE: home, NO_COLOR: "1" },
         });
         child.on("error", reject);
         child.on("close", (code) => resolve(code ?? -1));

@@ -18,9 +18,10 @@ run-name: >-
 # `main` only ever receives release commits, fast-forwarded by the bump job, so it is always the
 # last release — which matters because the self-marketplace (`/plugin marketplace add
 # UltimaPhoenix/dev-coach`) clones the default branch. Four scenarios:
-#  1. Push to develop / pull request → lint + typecheck + test + build + sonar; a green push to
-#     develop also publishes a canary (npm dist-tag `next` + rolling GitHub prerelease `next`)
-#  2. Tag push (v*)                  → … + publish (npm) + GitHub Release (.mcpb) + Homebrew + marketplace + registry
+#  1. Push to develop / pull request → lint + typecheck + test + build + sonar + the Windows job
+#     (install.ps1 end to end); a green push to develop also publishes a canary (npm dist-tag
+#     `next` + rolling GitHub prerelease `next`)
+#  2. Tag push (v*)                  → … + publish (npm) + GitHub Release (.mcpb, zips) + Homebrew + Scoop + marketplace + registry
 #  3. workflow_dispatch (Release) on develop → bump version on develop → tag → fast-forward main
 #     → publish + Release + Homebrew + marketplace + registry
 #  4. workflow_dispatch (Release) on main    → hotfix release: bump on main only (merge main into develop after)
@@ -70,6 +71,11 @@ jobs:
       - name: Build + smoke the Claude Desktop extension (.mcpb)
         if: matrix.node == '24'
         run: node scripts/build-mcpb.mjs
+      # The standalone zip behind the Windows channels (install.ps1, Scoop) shares that bundle and
+      # its guards; tests/windows-install.test.ts packs it too, this step keeps the script itself honest.
+      - name: Build + smoke the standalone zip
+        if: matrix.node == '24'
+        run: npm run standalone
       # Claude Code's own manifest validator — the same check `claude plugin install` runs.
       # v1.0.1 shipped a plugin.json it rejects (repository as an object) and every marketplace
       # install failed; running it here, strict and against the current Claude Code, turns the
@@ -86,6 +92,61 @@ jobs:
           name: coverage-lcov
           path: coverage/lcov.info
           retention-days: 1
+
+  # ── Windows: the unit suite + install.ps1 end to end ───────────────────────
+  # The installer is what Windows users run, so it is checked for real: a local standalone zip,
+  # a private Node from nodejs.org, `devcoach install` (exec-form hooks, user PATH), the hook on
+  # that Node, then the uninstaller. The unit suite is advisory here until it is green on
+  # Windows — it never ran there before this job existed; its failures are the to-do list.
+  windows:
+    needs: check
+    runs-on: windows-latest
+    timeout-minutes: 20 # the launcher tests spawn real children; a hang must not cost 6 hours
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24" # the floor install.ps1 enforces
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Unit tests (advisory until green on Windows)
+        continue-on-error: true
+        run: npm test
+      - run: npm run standalone
+      - name: install.ps1 — private Node, connect, run a hook, uninstall
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $zip = (Get-ChildItem dist-standalone/devcoach-*-standalone.zip | Select-Object -First 1).FullName
+          $dir = Join-Path $env:RUNNER_TEMP 'devcoach'
+          ./website/static/install.ps1 -Archive $zip -InstallDir $dir
+
+          $expected = node -p "require('./package.json').version"
+          $cmd = Join-Path $dir 'bin\devcoach.cmd'
+          $reported = (& $cmd --version | Out-String).Trim()
+          if ($reported -notlike "*$expected*") { throw "devcoach --version said '$reported', expected $expected" }
+          if (-not (Test-Path (Join-Path $dir 'node\node.exe'))) { throw 'no private node.exe' }
+
+          # devcoach install wrote Claude Code exec-form hooks: node.exe + the script, no shell
+          $settings = Get-Content "$env:USERPROFILE\.claude\settings.json" -Raw | ConvertFrom-Json
+          $stop = $settings.hooks.Stop[0].hooks[0]
+          if ($stop.command -notlike '*\node.exe' -or $stop.args[1] -ne 'stop-hook') {
+            throw "unexpected Stop hook: $($stop | ConvertTo-Json -Compress)"
+          }
+          $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
+          if ($userPath -notlike "*$dir\bin*") { throw "user PATH does not contain $dir\bin: $userPath" }
+
+          & $cmd doctor
+          # the Stop hook on the private Node: before onboarding it answers the onboarding cue and exits 0
+          '{}' | & $stop.command $stop.args[0] $stop.args[1]
+          if ($LASTEXITCODE -ne 0) { throw "stop-hook exited $LASTEXITCODE" }
+
+          ./website/static/install.ps1 -InstallDir $dir -Uninstall
+          if (Test-Path $dir) { throw "$dir still exists after uninstall" }
+          $after = [Environment]::GetEnvironmentVariable('Path', 'User')
+          if ($after -like "*$dir\bin*") { throw "user PATH still contains $dir\bin" }
+          if (Test-Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\devcoach') { throw 'Apps & Features entry still there' }
 
   # ── SonarQube Cloud: code quality + coverage (skips when SONAR_TOKEN unset) ──
   sonar:
@@ -170,7 +231,7 @@ jobs:
           node scripts/sync-plugin.mjs
       - run: npm run build
       - run: npm publish --access public --tag next
-      - run: npm run mcpb:sign && npm run plugin:zip && npm run gemini:zip
+      - run: npm run mcpb:sign && npm run plugin:zip && npm run gemini:zip && npm run standalone
       - name: Publish the rolling GitHub prerelease `next`
         env:
           GH_TOKEN: ${{ github.token }}
@@ -183,9 +244,12 @@ jobs:
           # but has not been pushed") and the step failed after npm had already published.
           gh release delete next --yes --cleanup-tag 2>/dev/null || true
           git push --delete origin refs/tags/next 2>/dev/null || true
-          NOTES="$(printf 'Canary build **%s** from `develop` @ %s — unreleased, may break.\n\nInstall: `npx -y devcoach@next` · docs: https://ultimaphoenix.github.io/dev-coach/next/' "$VERSION" "$GITHUB_SHA")"
-          gh release create next --target "$GITHUB_SHA" --prerelease --title "next (canary)" --notes "$NOTES" \
-            dist-mcpb/*.mcpb dist-plugin/*.zip dist-gemini/*.zip
+          NOTES="$(printf 'Canary build **%s** from `develop` @ %s — unreleased, may break.\n\nInstall: `npx -y devcoach@next` · Windows: `$env:DEVCOACH_CHANNEL=\"next\"; irm https://ultimaphoenix.github.io/dev-coach/install.ps1 | iex` · docs: https://ultimaphoenix.github.io/dev-coach/next/' "$VERSION" "$GITHUB_SHA")"
+          # One checksum file over every asset, like a release: install.ps1 -Channel next verifies against it.
+          mkdir -p dist-next
+          cp dist-mcpb/*.mcpb dist-plugin/*.zip dist-gemini/*.zip dist-standalone/*.zip dist-next/
+          (cd dist-next && shasum -a 256 * > SHASUMS256.txt)
+          gh release create next --target "$GITHUB_SHA" --prerelease --title "next (canary)" --notes "$NOTES" dist-next/*
 
   # ── Beta channel: pin the canary in UltimaPhoenix/claude-plugins-marketplace-beta ──
   # A separate marketplace, so the plugin keeps its name: it installs as
@@ -418,6 +482,8 @@ jobs:
       # Gemini CLI extension zip (beta): manifest at the archive root, installable after
       # unzip via `gemini extensions install <dir>`.
       - run: npm run gemini:zip
+      # Standalone zip: what install.ps1 downloads and the Scoop bucket points at.
+      - run: npm run standalone
       - name: Generate SBOM + checksums for release assets
         run: |
           set -euo pipefail
@@ -427,6 +493,7 @@ jobs:
           # covers every release asset.
           cp dist-plugin/devcoach-plugin-*.zip dist-mcpb/
           cp dist-gemini/devcoach-gemini-extension-*.zip dist-mcpb/
+          cp dist-standalone/devcoach-*-standalone.zip dist-mcpb/
           # Checksums over every release asset (.mcpb + zip + SBOM); run inside the dir so paths are bare.
           (cd dist-mcpb && shasum -a 256 *.mcpb *.zip *.cdx.json > SHASUMS256.txt)
       - uses: softprops/action-gh-release@v3
@@ -472,6 +539,47 @@ jobs:
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add Formula/devcoach.rb
+          git diff --staged --quiet || git commit -m "devcoach ${VERSION}"
+          git push
+
+  # ── Scoop bucket: pin the standalone zip in UltimaPhoenix/scoop-bucket (skips when token unset) ──
+  # The Windows twin of the Homebrew job: bucket/devcoach.json points at the release's standalone
+  # zip with the sha256 taken from the release's own SHASUMS256.txt; `scoop install devcoach`
+  # installs Scoop's nodejs-lts next to it and shims devcoach.cmd.
+  scoop:
+    needs: [release, bump]
+    if: ${{ always() && needs.release.result == 'success' }}
+    runs-on: ubuntu-latest
+    environment:
+      name: scoop-bucket
+      url: https://github.com/UltimaPhoenix/scoop-bucket/blob/main/bucket/devcoach.json
+    env:
+      BUCKET_TOKEN: ${{ secrets.SCOOP_BUCKET_TOKEN }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.bump.outputs.tag || github.ref }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+      - name: Update bucket/devcoach.json in UltimaPhoenix/scoop-bucket
+        if: ${{ env.BUCKET_TOKEN != '' }}
+        run: |
+          set -euo pipefail
+          VERSION="${{ needs.bump.outputs.version || github.ref_name }}"
+          VERSION="${VERSION#v}"
+          ASSET="devcoach-${VERSION}-standalone.zip"
+          gh release download "v${VERSION}" -p SHASUMS256.txt --dir dl
+          SHA="$(awk -v a="$ASSET" '$2 == a { print $1 }' dl/SHASUMS256.txt)"
+          [ -n "$SHA" ] || { echo "::error::${ASSET} is not listed in the release's SHASUMS256.txt"; exit 1; }
+          git clone --depth 1 "https://x-access-token:${BUCKET_TOKEN}@github.com/UltimaPhoenix/scoop-bucket.git" bucket
+          mkdir -p bucket/bucket
+          node scripts/scoop-manifest.mjs "$VERSION" "$SHA" > bucket/bucket/devcoach.json
+          cd bucket
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add bucket/devcoach.json
           git diff --staged --quiet || git commit -m "devcoach ${VERSION}"
           git push
 

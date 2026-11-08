@@ -839,6 +839,7 @@ export function createServer(): McpServer {
       const child = spawn(process.execPath, [process.argv[1] ?? "", "ui", "--port", String(port)], {
         detached: true,
         stdio: "ignore",
+        windowsHide: true, // a detached child would open its own console window on Windows
       });
       child.unref();
       return { content: [txt(`devcoach UI starting at http://localhost:${port}`)] };

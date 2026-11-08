@@ -12,7 +12,7 @@ machine where your agent runs. It works in **Claude Code**, **Claude Desktop**, 
 **Codex CLI** *(beta)*, and any other MCP client — including registry-aware ones, via the
 [MCP Registry](./other-agents.md#mcp-registry) — but **not** on claude.ai web (which only supports
 hosted/remote connectors — see [Privacy & security](../reference/privacy.md)); there you can paste the
-skill by hand. Requires **Node.js ≥ 24** (Windows is untested).
+skill by hand. Requires **Node.js ≥ 24** — on Windows the [one-line installer](./windows.md) brings its own.
 
 ## Which method is right for you?
 
@@ -21,7 +21,7 @@ devcoach works the same whichever way you install it — pick by how you like to
 - **Developer, comfortable in a terminal → [Homebrew](./homebrew.md)** (macOS / Linux). One
   `brew install` sets up devcoach **and** the `devcoach` CLI, so you also get the
   [command line](../usage/cli.md) and can launch the [dashboard](../usage/web-ui.md) with a bare
-  `devcoach ui`. *(On Windows, or if you prefer npm, [npx / npm](./npx.md) is the equivalent.)*
+  `devcoach ui`. *(On Windows, the [PowerShell one-liner or Scoop](./windows.md) is the equivalent.)*
   Mind one thing: `brew upgrade` updates only the binary — you re-run `devcoach install` to refresh the
   hooks and the skill. In Claude Code the best of both is **plugin + Homebrew**: the plugin keeps the
   coaching wiring current automatically, Homebrew adds the CLI.
@@ -36,11 +36,12 @@ devcoach works the same whichever way you install it — pick by how you like to
 | Method | Best for | Terminal? | Status |
 |---|---|---|---|
 | **[Homebrew](./homebrew.md)** | **Developers on macOS / Linux who use the CLI** | Yes | Stable |
+| **[Windows](./windows.md)** | **Developers on Windows — one PowerShell line, or Scoop** | Yes | Beta |
 | **[Claude Code plugin](./claude-code-plugin.md)** | **Non-expert Claude Code users — one-click setup** | No | Stable |
 | **[Claude Desktop (`.mcpb`)](./claude-desktop.md)** | **Non-expert Claude Desktop users — one-click setup** | No | Beta |
 | **[Gemini CLI](./gemini-cli.md)** | Google Gemini CLI — full loop (hooks + skill) | Yes | Beta |
 | **[Codex CLI](./codex.md)** | OpenAI Codex CLI — full loop (hooks + skill) | Yes | Beta |
-| **[npx / npm CLI](./npx.md)** | Any MCP agent · Windows · npm workflows | Yes | Stable |
+| **[npx / npm CLI](./npx.md)** | Any MCP agent · npm workflows | Yes | Stable |
 | **[Other MCP agents](./other-agents.md)** | Cursor, Windsurf, Cline, Continue, Zed | Yes | Beta |
 | **[MCP Registry](./other-agents.md#mcp-registry)** | Any registry-aware client — `io.github.UltimaPhoenix/devcoach` | Depends on the client | Beta |
 | **[claude.ai web](./claude-ai.md)** | claude.ai (manual skill paste, no MCP) | — | Skill only |
