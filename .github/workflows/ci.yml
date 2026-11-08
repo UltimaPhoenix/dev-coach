@@ -303,6 +303,10 @@ jobs:
     if: github.event_name == 'workflow_dispatch'
     needs: check
     runs-on: ubuntu-latest
+    # CI_DEVCOACH_TOKEN is a secret of the `publishing` environment (see the publishing jobs):
+    # the bump reads it from there, and the environment's branch policy admits exactly the refs a
+    # release is dispatched from (develop, main).
+    environment: publishing
     # Serialize releases: a second dispatch queues behind the first instead of racing it
     # (rapid re-triggers were stacking version bumps).
     concurrency:
@@ -507,13 +511,14 @@ jobs:
   # ── Publishing jobs: the jobs that write INTO other UltimaPhoenix repos ─────────────────────
   # The pipeline has ONE credential, CI_DEVCOACH_TOKEN: a fine-grained PAT with Contents RW on
   # dev-coach (the `bump` job's pushes past the branch protection) and on the destination repos
-  # homebrew-tap, scoop-bucket, claude-plugins-marketplace, claude-plugins-marketplace-beta.
-  # These jobs run in the `publishing` environment, whose deployment branch policy (develop,
-  # main, v* tags) refuses the job on any other ref before it starts. The token is read in the ONE
-  # step that pushes (`secrets` is not available in a step's `if`, hence the job-level HAS_TOKEN
-  # boolean), and scripts/ci/git-token-auth.sh hands it to git as a header: never in a URL,
-  # never on disk. Every action is pinned to a commit SHA (Dependabot bumps them, comment
-  # included): a moved tag is how CI secrets have actually been stolen (tj-actions, March 2025).
+  # homebrew-tap, scoop-bucket, claude-plugins-marketplace, claude-plugins-marketplace-beta. It is
+  # a secret of the `publishing` environment, and every job that uses it (`bump` included) runs
+  # in that environment, whose deployment branch policy (develop, main, v* tags) refuses the job
+  # on any other ref before it starts. In these jobs the token is read in the ONE step that pushes
+  # (`secrets` is not available in a step's `if`, hence the job-level HAS_TOKEN boolean), and
+  # scripts/ci/git-token-auth.sh hands it to git as a header: never in a URL, never on disk.
+  # Every action is pinned to a commit SHA (Dependabot bumps them, comment included): a moved
+  # tag is how CI secrets have actually been stolen (tj-actions, March 2025).
 
   # ── Bump the Homebrew tap formula (skips when CI_DEVCOACH_TOKEN unset) ─────
   homebrew:
