@@ -27,6 +27,15 @@ function InstallTabs(): ReactNode {
           macOS and Linux; adds the <code>devcoach</code> CLI. <Link to="/install/homebrew">Homebrew guide →</Link>
         </p>
       </TabItem>
+      <TabItem value="windows" label="Windows">
+        <CodeBlock language="powershell">
+          {"irm https://ultimaphoenix.github.io/dev-coach/install.ps1 | iex"}
+        </CodeBlock>
+        <p className={styles.hint}>
+          PowerShell, no admin, brings its own Node.js; or <code>scoop install devcoach</code> from the{" "}
+          <code>ultimaphoenix</code> bucket. <Link to="/install/windows">Windows guide →</Link>
+        </p>
+      </TabItem>
       <TabItem value="npx" label="npx">
         <CodeBlock language="bash">{"npx -y devcoach install"}</CodeBlock>
         <p className={styles.hint}>
