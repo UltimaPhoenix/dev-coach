@@ -10,7 +10,7 @@ if (!version || !sha) {
 const url = `https://registry.npmjs.org/devcoach/-/devcoach-${version}.tgz`;
 
 process.stdout.write(`class Devcoach < Formula
-  desc "Learn what you don't know yet from the code your AI agent writes"
+  desc "Learn from the code your AI writes, one short local lesson at a time"
   homepage "https://github.com/UltimaPhoenix/dev-coach"
   url "${url}"
   sha256 "${sha}"

@@ -65,7 +65,7 @@ export default function Hero(): ReactNode {
       <div className={styles.copy}>
         <p className={styles.eyebrow}>Claude Code · Claude Desktop · Gemini CLI · Codex CLI · Cursor</p>
         <h1 className={styles.title}>
-          Stay <span className={styles.accent}>sharp</span> while your AI does the work.
+          <span className={styles.accent}>Learn</span> from the code your AI writes.
         </h1>
         <p className={styles.lead}>
           When your agent finishes a task, devcoach teaches you one thing from it that you don't know yet: a

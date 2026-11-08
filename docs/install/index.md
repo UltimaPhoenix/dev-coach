@@ -1,7 +1,7 @@
 ---
 title: Installation
 sidebar_label: Choose your setup
-description: Install devcoach in about 30 seconds — Homebrew, the Claude Code plugin, npx, or Claude Desktop. A local MCP server that teaches you what you don't know yet from the code your AI agent writes.
+description: Install devcoach in about 30 seconds — Homebrew, the Claude Code plugin, npx, or Claude Desktop. A local MCP server that helps you learn from the code your AI writes.
 keywords: [install devcoach, devcoach npx, devcoach homebrew, Claude Code plugin, Claude Desktop MCP, MCP server install]
 ---
 

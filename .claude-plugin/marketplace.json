@@ -1,6 +1,6 @@
 {
   "name": "devcoach",
-  "description": "devcoach — stay sharp while your AI does the work. Straight from its repo.",
+  "description": "devcoach — learn from the code your AI writes. Straight from its repo.",
   "owner": {
     "name": "UltimaPhoenix",
     "url": "https://github.com/UltimaPhoenix"
@@ -9,7 +9,7 @@
     {
       "name": "devcoach",
       "version": "2.7.1",
-      "description": "Stay sharp while your AI does the work: learn what you don't know yet from the code Claude Code writes, one short lesson at a time. Knowledge map, coaching notebook, web dashboard, all local. Bundles the devcoach MCP server, the Stop hooks and the coaching skill.",
+      "description": "Learn from the code your AI writes: one short lesson at a time on what you don't know yet, drawn from what Claude Code just built. Knowledge map, coaching notebook, web dashboard, all local. Bundles the devcoach MCP server, the Stop hooks and the coaching skill.",
       "author": {
         "name": "UltimaPhoenix",
         "url": "https://github.com/UltimaPhoenix"
