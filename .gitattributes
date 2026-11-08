@@ -1,0 +1,5 @@
+# The standalone launchers must keep their line endings whatever core.autocrlf says on the
+# checkout (a windows-latest runner converts LF to CRLF): cmd.exe wants CRLF, Git Bash wants LF.
+scripts/standalone/devcoach.cmd text eol=crlf
+scripts/standalone/devcoach text eol=lf
+website/static/install.ps1 text eol=lf

@@ -103,6 +103,18 @@ export interface ServerCommand {
 export const NPX_COMMAND: ServerCommand = { command: "npx", args: ["-y", "devcoach", "mcp"] };
 
 /**
+ * Scoop installs every version in its own directory and points a `current` junction at the one
+ * in use; `realpathSync` resolves the junction, so a registered path would break at the next
+ * `scoop update`. Write the junction's path back — it is what Scoop keeps valid.
+ */
+export function scoopStablePath(path: string): string {
+  return path.replace(
+    /([\\/]scoop[\\/]apps[\\/][^\\/]+[\\/])(?!current(?=[\\/]))[^\\/]+(?=[\\/])/i,
+    "$1current",
+  );
+}
+
+/**
  * The command `devcoach install` writes for a host. Absolute, so it does not depend on the
  * host's PATH (Claude Desktop resolves a bare name on its own, shorter PATH):
  *  - macOS / Linux: the PATH hit itself, not its realpath — `/opt/homebrew/bin/devcoach` survives
@@ -118,15 +130,46 @@ export function chooseServerCommand(inputs: {
   platform: NodeJS.Platform;
 }): ServerCommand {
   const { hit, entry, execPath, platform } = inputs;
-  if (!hit) return NPX_COMMAND;
-  const where = classifyPath(isWin(platform) ? entry : hit, platform);
-  if (where.ephemeral || classifyPath(entry, platform).ephemeral) return NPX_COMMAND;
-  const note = where.boundTo
-    ? `bound to Node ${where.boundTo} (${where.manager}) — after removing or switching that ` +
+  // Windows needs no PATH hit: node.exe + the script are known from this very process.
+  if (!hit && !isWin(platform)) return NPX_COMMAND;
+  const where = classifyPath(isWin(platform) ? entry : (hit as string), platform);
+  const node = isWin(platform) ? classifyPath(execPath, platform) : null;
+  if (where.ephemeral || classifyPath(entry, platform).ephemeral || node?.ephemeral)
+    return NPX_COMMAND;
+  const bound = where.boundTo ? where : node?.boundTo ? node : null;
+  const note = bound?.boundTo
+    ? `bound to Node ${bound.boundTo} (${bound.manager}) — after removing or switching that ` +
       "version, run `devcoach install --force` again"
     : undefined;
-  if (isWin(platform)) return { command: execPath, args: [entry, "mcp"], note };
-  return { command: hit, args: ["mcp"], note };
+  if (isWin(platform))
+    return { command: scoopStablePath(execPath), args: [scoopStablePath(entry), "mcp"], note };
+  return { command: hit as string, args: ["mcp"], note };
+}
+
+/** The same launcher as `method`, running another subcommand (`stop-hook` instead of `mcp`). */
+export function withSubcommand(
+  method: ServerCommand,
+  subcommand: string,
+): { command: string; args: string[] } {
+  return { command: method.command, args: [...method.args.slice(0, -1), subcommand] };
+}
+
+/**
+ * A command hook's form. Shell form (`command` string) everywhere but Windows: there Claude Code
+ * hands the string to Git Bash, where unquoted backslashes vanish, or to PowerShell when Git Bash
+ * is missing, where `npx` resolves to `npx.ps1` and the execution policy refuses it. The exec
+ * form — `command` + `args`, spawned with no shell — needs a real executable, and `node.exe` +
+ * devcoach's script is one (the pair the MCP entry already uses); `npx` has only its `.cmd`
+ * shim, which cannot be spawned without a shell, so it stays shell form.
+ */
+export function hookCommandFor(
+  method: ServerCommand,
+  subcommand: string,
+  shellForm: string,
+  platform: NodeJS.Platform = process.platform,
+): { command: string; args?: string[] } {
+  if (!isWin(platform) || method.command === "npx") return { command: shellForm };
+  return withSubcommand(method, subcommand);
 }
 
 /** Where Claude Desktop keeps devcoach's MCP log on this OS. */

@@ -6,6 +6,33 @@ Notable changes to devcoach. Versions follow [Semantic Versioning](https://semve
 
 ## [Unreleased]
 
+### Added
+- **Windows, in one line.** `irm https://ultimaphoenix.github.io/dev-coach/install.ps1 | iex`
+  installs a private Node.js LTS (from nodejs.org, checksum-verified, Authenticode-signed) and the
+  devcoach bundle under `%LOCALAPPDATA%\devcoach`, puts `devcoach` on the user PATH, registers an
+  Apps & Features entry with an offline uninstaller, then runs `devcoach install`. Re-run to update;
+  `-Version`, `-Channel next`, `-UseSystemNode`, `-Archive` and more as parameters or
+  `DEVCOACH_*` variables. Your data in `~\.devcoach` is never touched.
+- **Scoop.** `scoop bucket add ultimaphoenix https://github.com/UltimaPhoenix/scoop-bucket` then
+  `scoop install devcoach` — the Windows twin of the Homebrew tap; CI pins the bucket at every
+  release and Scoop installs its `nodejs-lts` as the dependency.
+- Every release now ships `devcoach-<version>-standalone.zip`: the self-contained bundle (the one
+  inside the `.mcpb`) plus `devcoach.cmd` / `devcoach` launchers — what the installer and the Scoop
+  bucket download, and a plain unzip anywhere a Node ≥ 24 is.
+- CI runs the installer end to end on Windows (install, connect, run a hook, uninstall) and the
+  unit suite there.
+
+### Fixed
+- On Windows, `devcoach install` now registers the Claude Code hooks in the exec form Claude Code
+  recommends there — `node.exe` + devcoach's script, no shell — instead of a shell string that Git
+  Bash mangled (backslashes) and PowerShell refused (`npx.ps1` vs the execution policy).
+  `devcoach doctor` flags a shell-form hook on Windows. Scoop installs are registered through
+  Scoop's `current` junction, so `scoop update` keeps them valid.
+- No stray console windows on Windows: the dashboard started by `open_ui`, the browser opener and
+  the plugin launcher's background install are spawned hidden.
+- The test suite sandboxes `USERPROFILE` as well as `HOME`, so it never touches the real
+  `~/.devcoach` on Windows.
+
 ### Changed
 - **The docs site wears the product's colours**: teal links, buttons and highlights instead of
   indigo, and in dark mode the dashboard's grey canvas and panels (`#1e1f22` / `#2b2d30`) instead

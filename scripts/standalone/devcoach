@@ -1,0 +1,8 @@
+#!/bin/sh
+# devcoach launcher (standalone zip) for Git Bash / MSYS shells — the sh twin of devcoach.cmd:
+# a private node.exe next to this tree first (install.ps1 puts one in ../node), else `node`.
+dir=$(dirname "$0")
+node=node
+[ -x "$dir/node/node.exe" ] && node="$dir/node/node.exe"
+[ -x "$dir/../node/node.exe" ] && node="$dir/../node/node.exe"
+exec "$node" "$dir/dist/bin.js" "$@"

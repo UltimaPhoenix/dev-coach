@@ -44,6 +44,12 @@ brew tap UltimaPhoenix/tap && brew trust --tap UltimaPhoenix/tap
 brew install devcoach && devcoach install
 ```
 
+**Windows** *(beta)* — one PowerShell line, brings its own Node.js and adds the `devcoach` CLI:
+
+```powershell
+irm https://ultimaphoenix.github.io/dev-coach/install.ps1 | iex
+```
+
 **npx** — any OS, for Claude Code and Claude Desktop:
 
 ```bash
@@ -53,12 +59,13 @@ npx -y devcoach install
 | Also on | How |
 |---|---|
 | **Claude Desktop** *(beta)* | Download `devcoach-<version>.mcpb` from the [latest release](https://github.com/UltimaPhoenix/dev-coach/releases/latest) → Settings → Extensions → Install Extension… |
+| **Scoop** *(Windows, beta)* | `scoop bucket add ultimaphoenix https://github.com/UltimaPhoenix/scoop-bucket`, then `scoop install devcoach && devcoach install` |
 | **Gemini CLI** *(beta)* | `npx -y devcoach install --gemini` |
 | **Codex CLI** *(beta)* | `npx -y devcoach install --codex` (approve the hooks once on the next run) |
 | **Cursor, Windsurf, Cline, Continue, Zed** | Add `{ "mcpServers": { "devcoach": { "command": "npx", "args": ["-y", "devcoach", "mcp"] } } }` to the agent's MCP config, or install `io.github.UltimaPhoenix/devcoach` from the [MCP Registry](https://registry.modelcontextprotocol.io) |
 | **claude.ai web** | No MCP there: paste [`assets/SKILL.md`](assets/SKILL.md) as custom instructions (coaching only, nothing saved) |
 
-Two rules: with the plugin, **never also run `devcoach install`** (the hooks would count twice); after `brew upgrade` or an npm update, **re-run `devcoach install`** to refresh the hooks and the skill. Every method, step by step: **[Installation](docs/install/index.md)**.
+Two rules: with the plugin, **never also run `devcoach install`** (the hooks would count twice); after `brew upgrade`, `scoop update` or an npm update, **re-run `devcoach install`** to refresh the hooks and the skill (the Windows one-liner does it for you). Every method, step by step: **[Installation](docs/install/index.md)** · **[Windows](docs/install/windows.md)**.
 
 ---
 
