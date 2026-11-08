@@ -493,9 +493,9 @@ environment. `bump` (pushes past the branch protection) and the four publishing 
 (`marketplace-beta`, `homebrew`, `scoop`, `marketplace`) all run in that environment, whose
 deployment branch policy (develop, main, `v*`) refuses them on any other ref. In the publishing
 jobs the token lives in the `env` of the one step that pushes and reaches git as a header via
-`scripts/ci/git-token-auth.sh` (never in a URL, never on disk); every `uses:` is pinned to a
-commit SHA with the version as a comment (Dependabot's `github-actions` ecosystem bumps both).
-`npm` and `mcp-registry` stay tokenless (OIDC). The docs site
+`scripts/ci/git-token-auth.sh` (never in a URL, never on disk); actions are referenced by major
+tag (Dependabot's `github-actions` ecosystem bumps them). `npm` and `mcp-registry` stay tokenless
+(OIDC). The docs site
 deploys both branches from one Pages artifact:
 `main` at `/dev-coach/`, `develop` at `/dev-coach/next/` (`DOCS_NEXT=1` build: noindex, no sitemap,
 banner). Then `publish` (`npm publish`, OIDC

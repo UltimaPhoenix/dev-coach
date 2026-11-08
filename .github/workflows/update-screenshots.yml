@@ -10,14 +10,14 @@ jobs:
   screenshots:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@v7
         with:
           # Admin PAT so the screenshots commit can push to the protected branch it was
           # dispatched on — run it on develop (the default GITHUB_TOKEN bot is blocked by the
           # required CLA check). The commit message already carries [skip ci], so this push
           # doesn't re-trigger CI (nor a canary).
           token: ${{ secrets.RELEASE_TOKEN }}
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      - uses: actions/setup-node@v7
         with:
           node-version-file: .node-version
           cache: npm

@@ -53,8 +53,8 @@ jobs:
       matrix:
         node: ["24", "26"] # 24 = current LTS floor (node:sqlite); 26 = latest stable
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ matrix.node }}
           cache: npm
@@ -86,7 +86,7 @@ jobs:
           npx -y @anthropic-ai/claude-code@latest plugin validate plugin --strict
           npx -y @anthropic-ai/claude-code@latest plugin validate .claude-plugin/marketplace.json --strict
       # Hand the lcov report to the sonar job so it doesn't re-install + re-test.
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      - uses: actions/upload-artifact@v7
         if: matrix.node == '24'
         with:
           name: coverage-lcov
@@ -103,8 +103,8 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 20 # the launcher tests spawn real children; a hang must not cost 6 hours
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: "24" # the floor install.ps1 enforces
           cache: npm
@@ -155,22 +155,22 @@ jobs:
     env:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0 # full history for accurate blame / new-code detection
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      - uses: actions/setup-node@v7
         with:
           node-version-file: .node-version
           cache: npm
       - run: npm ci # node_modules → type-aware analysis (resolves dependency types)
       # Reuse the check job's coverage instead of re-running the whole test suite.
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+      - uses: actions/download-artifact@v8
         with:
           name: coverage-lcov
           path: coverage
       # Cache the scanner CLI + analyzer/JRE so it isn't re-downloaded each run.
       - name: Cache SonarQube scanner
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        uses: actions/cache@v6
         with:
           path: ~/.sonar/cache
           key: ${{ runner.os }}-sonar
@@ -181,7 +181,7 @@ jobs:
         run: echo "PKG_VERSION=$(node -p "require('./package.json').version")" >> "$GITHUB_ENV"
       - name: SonarQube Cloud scan
         if: ${{ env.SONAR_TOKEN != '' }}
-        uses: SonarSource/sonarqube-scan-action@e805d875275f728fac1885b413934be6d7c63f65 # v8.4.1
+        uses: SonarSource/sonarqube-scan-action@v8
         with:
           args: -Dsonar.projectVersion=${{ env.PKG_VERSION }}
 
@@ -205,10 +205,10 @@ jobs:
       contents: write # rolling `next` tag + prerelease
       id-token: write # npm provenance / OIDC trusted publishing (tokenless)
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0 # tags → last release → canary base version
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      - uses: actions/setup-node@v7
         with:
           node-version-file: .node-version
           registry-url: https://registry.npmjs.org
@@ -269,8 +269,8 @@ jobs:
       HAS_TOKEN: ${{ secrets.CI_DEVCOACH_TOKEN != '' }}
       GH_TOKEN: ${{ github.token }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version-file: .node-version
       - name: Pin the canary in UltimaPhoenix/claude-plugins-marketplace-beta
@@ -319,7 +319,7 @@ jobs:
       tag: ${{ steps.bump.outputs.tag }}
       version: ${{ steps.bump.outputs.version }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@v7
         with:
           # Full history + tags so the preflight guards (last tag, "nothing to release") work.
           fetch-depth: 0
@@ -328,7 +328,7 @@ jobs:
           # The default GITHUB_TOKEN runs as github-actions[bot], which is not an admin
           # and would be rejected by the required CLA check.
           token: ${{ secrets.CI_DEVCOACH_TOKEN }}
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      - uses: actions/setup-node@v7
         with:
           node-version-file: .node-version
       - name: Preflight — release from develop (or main for a hotfix)
@@ -413,10 +413,10 @@ jobs:
       id-token: write # npm provenance / OIDC trusted publishing (tokenless)
       deployments: write # record an "npm" deployment for the Deployments dashboard
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@v7
         with:
           ref: ${{ needs.bump.outputs.tag || github.ref }}
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      - uses: actions/setup-node@v7
         with:
           node-version-file: .node-version
           registry-url: https://registry.npmjs.org
@@ -432,7 +432,7 @@ jobs:
       # `environment:` key on purpose: an environment would change the OIDC subject claim and break
       # trusted publishing unless mirrored in npmjs.com's trusted-publisher settings.
       - name: Record npm deployment
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        uses: actions/github-script@v9
         with:
           script: |
             const { version } = require(`${process.env.GITHUB_WORKSPACE}/package.json`);
@@ -461,10 +461,10 @@ jobs:
       MCPB_CERT_PEM: ${{ secrets.MCPB_CERT }}
       MCPB_KEY_PEM: ${{ secrets.MCPB_KEY }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@v7
         with:
           ref: ${{ needs.bump.outputs.tag || github.ref }}
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      - uses: actions/setup-node@v7
         with:
           node-version-file: .node-version
           cache: npm
@@ -498,7 +498,7 @@ jobs:
           cp dist-standalone/devcoach-*-standalone.zip dist-mcpb/
           # Checksums over every release asset (.mcpb + zip + SBOM); run inside the dir so paths are bare.
           (cd dist-mcpb && shasum -a 256 *.mcpb *.zip *.cdx.json > SHASUMS256.txt)
-      - uses: softprops/action-gh-release@8a0cd651e5b2365bd640854a3fa5dfc70e4875f3 # v3.0.4
+      - uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ needs.bump.outputs.tag || github.ref_name }}
           generate_release_notes: true
@@ -517,8 +517,8 @@ jobs:
   # on any other ref before it starts. In these jobs the token is read in the ONE step that pushes
   # (`secrets` is not available in a step's `if`, hence the job-level HAS_TOKEN boolean), and
   # scripts/ci/git-token-auth.sh hands it to git as a header: never in a URL, never on disk.
-  # Every action is pinned to a commit SHA (Dependabot bumps them, comment included): a moved
-  # tag is how CI secrets have actually been stolen (tj-actions, March 2025).
+  # Actions are referenced by their major tag (Dependabot bumps the majors); the tags are
+  # GitHub's own and a handful of verified publishers.
 
   # ── Bump the Homebrew tap formula (skips when CI_DEVCOACH_TOKEN unset) ─────
   homebrew:
@@ -531,7 +531,7 @@ jobs:
     env:
       HAS_TOKEN: ${{ secrets.CI_DEVCOACH_TOKEN != '' }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@v7
         with:
           ref: ${{ needs.bump.outputs.tag || github.ref }}
       - name: Update devcoach.rb in UltimaPhoenix/homebrew-tap
@@ -575,10 +575,10 @@ jobs:
       HAS_TOKEN: ${{ secrets.CI_DEVCOACH_TOKEN != '' }}
       GH_TOKEN: ${{ github.token }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@v7
         with:
           ref: ${{ needs.bump.outputs.tag || github.ref }}
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      - uses: actions/setup-node@v7
         with:
           node-version-file: .node-version
       - name: Update bucket/devcoach.json in UltimaPhoenix/scoop-bucket
@@ -615,10 +615,10 @@ jobs:
     env:
       HAS_TOKEN: ${{ secrets.CI_DEVCOACH_TOKEN != '' }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@v7
         with:
           ref: ${{ needs.bump.outputs.tag || github.ref }}
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      - uses: actions/setup-node@v7
         with:
           node-version-file: .node-version
       - name: Pin devcoach in UltimaPhoenix/claude-plugins-marketplace
@@ -655,10 +655,10 @@ jobs:
       name: mcp-registry
       url: https://registry.modelcontextprotocol.io/v0/servers?search=io.github.UltimaPhoenix/devcoach
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@v7
         with:
           ref: ${{ needs.bump.outputs.tag || github.ref }}
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      - uses: actions/setup-node@v7
         with:
           node-version-file: .node-version
       - name: Install mcp-publisher
