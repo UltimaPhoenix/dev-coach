@@ -1,0 +1,67 @@
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: 0.9rem;
+  margin: 1.25rem 0 1.75rem;
+}
+@media (min-width: 997px) {
+  .cols2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .cols3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .cols4 {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+.card {
+  display: grid;
+  align-content: start;
+  gap: 0.3rem;
+  min-width: 0;
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--ifm-color-emphasis-200);
+  border-radius: 12px;
+  background: var(--ifm-background-surface-color);
+  color: var(--ifm-font-color-base);
+}
+.link,
+.link:hover {
+  color: var(--ifm-font-color-base);
+  text-decoration: none;
+}
+.link:hover {
+  border-color: var(--devcoach-accent);
+}
+.link:focus-visible {
+  outline: 2px solid var(--devcoach-accent);
+  outline-offset: 2px;
+}
+.link .title::after {
+  content: " →";
+  color: var(--devcoach-accent);
+}
+.label {
+  font-family: var(--ifm-font-family-monospace);
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--devcoach-accent);
+}
+.title {
+  font-weight: 700;
+  line-height: 1.3;
+}
+.body {
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: var(--ifm-color-emphasis-800);
+}
+/* Markdown inside a card arrives as paragraphs: no outer margins. */
+.body > p {
+  margin: 0;
+}
+.body > p + p {
+  margin-top: 0.4rem;
+}

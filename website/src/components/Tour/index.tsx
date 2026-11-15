@@ -10,10 +10,10 @@ import { usePluginData } from "@docusaurus/useGlobalData";
 import clsx from "clsx";
 import type { KeyboardEvent, ReactNode } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { DemoCourse } from "../../../docusaurus.config";
+import type { DemoCourse as DemoCourseData } from "../../../docusaurus.config";
 import styles from "./styles.module.css";
 
-interface Shot {
+export interface Shot {
   light: string;
   dark: string;
 }
@@ -108,7 +108,8 @@ function DesktopLesson(): ReactNode {
   );
 }
 
-function AgentPanel(): ReactNode {
+/** The lesson card in both hosts, with a switch. The guides reuse it (`caption={false}`). */
+export function LessonHosts({ caption = true }: { caption?: boolean }): ReactNode {
   const [host, setHost] = useState<"terminal" | "desktop">("terminal");
   return (
     <>
@@ -121,13 +122,15 @@ function AgentPanel(): ReactNode {
         </button>
       </div>
       {host === "terminal" ? <TerminalLesson /> : <DesktopLesson />}
-      <p className={styles.caption}>
-        <span>
-          The same card wherever your agent runs: one when a lesson is due, at most twice a day. Answer with one
-          key, or just keep working.
-        </span>
-        <Link to="/usage/coaching#your-first-lesson">Your first lesson →</Link>
-      </p>
+      {caption && (
+        <p className={styles.caption}>
+          <span>
+            The same card wherever your agent runs: one when a lesson is due, at most twice a day. Answer with
+            one key, or just keep working.
+          </span>
+          <Link to="/usage/coaching#your-first-lesson">Your first lesson →</Link>
+        </p>
+      )}
     </>
   );
 }
@@ -145,8 +148,9 @@ function Capture({ shot, label, alt }: { shot: Shot; label: string; alt: string 
 
 const HANDSHAKE_MS = 5000;
 
-function CoursePanel({ shot }: { shot: Shot }): ReactNode {
-  const course = usePluginData("devcoach-demo-course") as DemoCourse;
+/** The demo course: its capture, and a button that runs the real document in place. */
+export function DemoCourse({ shot }: { shot: Shot }): ReactNode {
+  const course = usePluginData("devcoach-demo-course") as DemoCourseData;
   const src = useBaseUrl(course.file);
   const { colorMode } = useColorMode();
   const frame = useRef<HTMLIFrameElement>(null);
@@ -329,7 +333,7 @@ export default function Tour({ shots }: Props): ReactNode {
       </div>
       <div className={styles.panels}>
         <div role="tabpanel" id="tour-panel-agent" aria-labelledby="tour-tab-agent" hidden={active !== "agent"}>
-          <AgentPanel />
+          <LessonHosts />
         </div>
         <div role="tabpanel" id="tour-panel-lessons" aria-labelledby="tour-tab-lessons" hidden={active !== "lessons"}>
           <Capture
@@ -359,7 +363,7 @@ export default function Tour({ shots }: Props): ReactNode {
           </p>
         </div>
         <div role="tabpanel" id="tour-panel-courses" aria-labelledby="tour-tab-courses" hidden={active !== "courses"}>
-          <CoursePanel shot={shots.course} />
+          <DemoCourse shot={shots.course} />
         </div>
       </div>
     </section>
