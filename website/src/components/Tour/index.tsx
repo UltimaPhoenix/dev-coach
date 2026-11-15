@@ -125,8 +125,8 @@ export function LessonHosts({ caption = true }: { caption?: boolean }): ReactNod
       {caption && (
         <p className={styles.caption}>
           <span>
-            The same card wherever your agent runs: one when a lesson is due, at most twice a day. Answer with
-            one key, or just keep working.
+            The same card wherever your agent runs. It appears only when a lesson is due, and you set how
+            often. Answer with one key, or just keep working.
           </span>
           <Link to="/usage/coaching#your-first-lesson">Your first lesson →</Link>
         </p>
