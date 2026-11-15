@@ -148,8 +148,8 @@ function Capture({ shot, label, alt }: { shot: Shot; label: string; alt: string 
 
 const HANDSHAKE_MS = 5000;
 
-/** The demo course: its capture, and a button that runs the real document in place. */
-export function DemoCourse({ shot }: { shot: Shot }): ReactNode {
+/** The demo course: its capture, and a button that runs the real document in place. `caption` replaces the home's sentence. */
+export function DemoCourse({ shot, caption }: { shot: Shot; caption?: ReactNode }): ReactNode {
   const course = usePluginData("devcoach-demo-course") as DemoCourseData;
   const src = useBaseUrl(course.file);
   const { colorMode } = useColorMode();
@@ -222,8 +222,12 @@ export function DemoCourse({ shot }: { shot: Shot }): ReactNode {
         />
         <p className={styles.caption}>
           <span>
-            A lesson you couldn't follow is kept as the seed of a course: one step at a time, with charts and
-            checks. This one is real, and it runs here.
+            {caption ?? (
+              <>
+                A lesson you couldn't follow is kept as the seed of a course: one step at a time, with charts
+                and checks. This one is real, and it runs here.
+              </>
+            )}
           </span>
           <button type="button" className="button button--primary button--sm" onClick={() => setState("running")}>
             ▶ Run this course

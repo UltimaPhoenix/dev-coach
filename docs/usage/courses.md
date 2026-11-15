@@ -8,71 +8,134 @@ sidebar_label: Courses
 import ThemedShot from "@site/src/components/ThemedShot";
 import Tabs from "@theme/Tabs";
 import TabItem from "@theme/TabItem";
+import { Chat, Say, Choices } from "@site/src/components/Chat";
+import { DemoCourse } from "@site/src/components/Tour";
 
-**What it's for:** when a lesson is too much for one session, a course is the way out. Instead of
-another card at the same height, devcoach builds a step-by-step path that starts where you actually
-stand — and it finds that starting point by asking.
+**Couldn't follow a lesson? devcoach makes you a course.** When a lesson is too much for one
+session, another card at the same height doesn't help. A course is a step-by-step path that starts
+where you actually stand, and devcoach finds that starting point by asking.
 
-## How a course starts
+## From ❌ to a course
 
-Under every lesson card you answer with one letter:
+This is one course from start to finish. The lesson, the chain of concepts and the course are the
+documentation's demo data; the questions are worded as an example.
 
-```
-Did that land? ✅ knew it (y) · 💡 understood (u) · ❌ couldn't follow (n)
-```
+### 1 · You say you couldn't follow
 
-Answer `n` and the coach offers, once: *"Want a step-by-step course on this? 🎓"*. Say yes and it
-begins right there. You can also start one on any lesson or any concept at all:
+Under every lesson card you answer with one letter. Answer `n` and the coach offers a course, once.
 
-```
+<Chat label="After a lesson on cache stampedes">
+  <Say who="coach">Did that land? ✅ knew it (y) · 💡 understood (u) · ❌ couldn't follow (n)</Say>
+  <Say who="you">n</Say>
+  <Say who="coach">Want a step-by-step course on this? 🎓</Say>
+  <Say who="you">yes</Say>
+</Chat>
+
+Say yes and it begins right there. Say nothing and nothing happens: the lesson is kept as a seed,
+and you can start the course whenever you like ([other ways to start](#other-ways-to-start)).
+
+### 2 · It asks what you already know
+
+One question per message, from the target concept down to the ground you stand on. A *no* goes one
+level down; a *yes* is the floor the course starts from.
+
+<Chat label="Finding where to start">
+  <Say who="coach">To explain a **cache stampede** I first need **single-flight rebuilds**. Do you know what it means to let one request rebuild a key while the others wait?</Say>
+  <Choices options={["Yes", "Roughly", "No"]} picked="No" />
+  <Say who="coach">Under that sits **the thundering herd**. Do you know what happens when many readers miss the cache at the same moment?</Say>
+  <Choices options={["Yes", "Roughly", "No"]} picked="No" />
+  <Say who="coach">And under that, **cache keys with a TTL**. Do you know what a TTL does to a cached value?</Say>
+  <Choices options={["Yes", "Roughly", "No"]} picked="Yes" />
+  <Say who="coach">So: cache keys with a TTL ✓ → the thundering herd ✗ → single-flight rebuilds ✗. I'll start from one key and its readers.</Say>
+</Chat>
+
+In Claude Code the three answers come as selectable choices, so you click rather than type; Gemini
+and Codex get the same question as text. *Roughly* counts as known, with a short refresher as the
+first step. The chain stops at something you know, at a topic your profile already rates well, or
+after five levels.
+
+### 3 · It writes your course
+
+It plans bottom-up from that floor to the target: three to seven short steps, one idea each. Then
+it writes the course as **one rich, self-contained HTML document** on your machine, which shows one
+step at a time, with the step menu at the side and *Previous / Next* at the bottom. This is the course that conversation produced. It is the real document, and it runs
+here:
+
+<DemoCourse
+  caption="The course in the dashboard, on its third step. Run it to move through the steps yourself."
+  shot={{
+    light: require("../screenshots/course-cache-stampede-light.png").default,
+    dark: require("../screenshots/course-cache-stampede-dark.png").default,
+  }}
+/>
+
+Every step has the idea, a worked example (drawn from the work that triggered the lesson when it
+can), a *Try it* box and a *Check yourself* question with a reveal.
+
+### 4 · It teaches one step per message
+
+Back in the chat, each step gets one message: the idea in a few lines, a pointer to the step in the
+dashboard, then the check question.
+
+<Chat label="Step 1 of 5">
+  <Say who="coach">**One key, many readers.** A cache key with a TTL is a promise with a deadline: until the deadline every reader gets the copy; after it, the first reader finds nothing and goes to the origin. With a hot key the first reader is not alone. The step is open in your dashboard.</Say>
+  <Say who="coach">A hot key expires and the rebuild takes 300 ms. Who calls the origin?</Say>
+  <Choices
+    stacked
+    options={[
+      "The first reader only, the others wait for its result",
+      "Every reader that arrives during those 300 ms",
+      "Nobody: the cache keeps serving the old value",
+    ]}
+    picked="Every reader that arrives during those 300 ms"
+  />
+  <Say who="coach">Right. Step 1 is done: 1 of 5.</Say>
+</Chat>
+
+A correct answer marks the step done and moves on. A wrong one gets a fresh angle, never a silent
+skip; after two misses the coach offers to split the step in two, right there in the document.
+Check questions come as choices when the answer is a pick (an order, a yes/no, one of a few
+candidates) and as free text when you have to write an output or an explanation.
+
+- Say *skip* to skip a step, *later* to pause; `/devcoach:course continue` resumes.
+- While a course is active, the usual lesson cues pause, so nothing interrupts the conversation.
+- At the end, if the course grew from a lesson you couldn't follow, it offers once to mark that
+  lesson as understood.
+
+## Other ways to start
+
+You don't have to wait for a ❌. Start a course on any lesson, or on any concept at all:
+
+```bash
 /devcoach:course                       # from the newest lesson you couldn't follow
 /devcoach:course node error event      # from the lesson those words describe
 /devcoach:course logarithms            # from a concept, when no lesson matches
 /devcoach:course continue              # pick up the active course
 ```
 
-or just ask — *"explain this properly"*, *"teach me X from the basics"*, *"start a course on the
-HTMX redirect lesson"*. You never need a lesson's id: a few words of its title are enough (every
-word has to match somewhere, in any order), and when several lessons match you pick one from a
-list (or choose *none* for a free concept). If that lesson already has a course, the coach asks
-first: continue it, redo it, or keep both.
+Or just ask: *"explain this properly"*, *"teach me X from the basics"*, *"start a course on the
+HTMX redirect lesson"*.
 
-## What happens next
+- **You never need a lesson's id.** A few words of its title are enough (every word has to match
+  somewhere, in any order). When several lessons match, you pick one from a list, or choose *none*
+  for a free concept.
+- **If that lesson already has a course**, the coach asks first: continue it, redo it, or keep both.
 
-1. **It asks what you know — one question at a time.** *"To explain logarithms I first need
-   powers. Do you know what 2³ means?"* In Claude Code the three answers — **Yes**, **Roughly**,
-   **No** — come as selectable choices, so you click rather than type (Gemini and Codex get the
-   same question as text). A *no* goes one level down (powers → multiplication → sums…); a
-   *yes* is the floor the course will start from. The chain stops at something you know, at a
-   topic your profile already rates well, or after five levels.
-2. **It plans bottom-up** from that floor to the target — three to seven short steps, one idea
-   each — and writes the course as **one rich, self-contained HTML document** that shows **one
-   step at a time**, with the step menu at the side and *Previous / Next* at the bottom. Every
-   step has the idea, a worked example (drawn from the work that triggered the lesson when it
-   can), a *Try it* box and a *Check yourself* question with a reveal. The code is in the
-   lesson's own language: JavaScript examples are editable and really run in the page; a Java,
-   Rust, Go, Python or Swift course keeps its snippets read-only and makes you predict the
-   output, fill a blank, spot the bug, or drive a simulation of the concept instead.
-3. **It teaches one step per message** in the chat: the idea in a few lines, a pointer to the
-   step in the dashboard, then the check question — as choices when the answer is a pick (an
-   order, a yes/no, one of a few candidates), as free text when you have to write an output or
-   an explanation. A correct answer marks the step done and moves on; a wrong one gets a fresh
-   angle, never a silent skip; two misses and the coach offers to split the step in two, right
-   there in the document. Say *skip* to skip a step, *later* to pause —
-   `/devcoach:course continue` resumes.
-4. **At the end**, if the course grew from a lesson you couldn't follow, it offers once to mark that
-   lesson as understood.
+## What is in a course
 
-Right after writing the document, and only in a client that has the Artifact tool, the coach
-offers once to publish the same file as a Claude artifact — a copy you can share by link.
+**Code in the lesson's own language.** JavaScript examples are editable and really run in the
+page. A Java, Rust, Go, Python or Swift course keeps its snippets read-only and makes you predict
+the output, fill a blank, spot the bug, or drive a simulation of the concept instead.
+
+**An optional copy as a Claude artifact.** Right after writing the document, and only in a client
+that has the Artifact tool, the coach offers once to publish the same file as a Claude artifact — a
+copy you can share by link.
 **Saying yes uploads that copy to claude.ai: it is the one case where course content leaves your
 machine.** The link is private until you share it, but the file then lives on Anthropic's
 servers under your account, and a course often quotes your own work (project names, paths,
 snippets from the task that started it) — the coach tells you what this one contains when it
 asks. Say no and nothing is uploaded. The local file stays the course either way; devcoach
 records nothing about the artifact, so you manage or delete it from your artifacts on claude.ai.
-
-While a course is active, the usual lesson cues pause so nothing interrupts the conversation.
 
 ## Where it lives
 
@@ -128,6 +191,18 @@ plain SVG that the document draws from a function, so they follow the theme like
 ```bash
 devcoach courses          # list, with progress
 devcoach course <id>      # chain, steps, document path
+```
+
+On the demo data:
+
+```text title="$ devcoach courses"
+                                                           Courses
+╭───────────────────────────────────────────┬───────────────────────────────────────────┬──────────┬───────────┬────────────╮
+│ ID                                        │ Title                                     │ Progress │ Status    │ Updated    │
+├───────────────────────────────────────────┼───────────────────────────────────────────┼──────────┼───────────┼────────────┤
+│ from-a-cache-miss-to-a-stampede           │ From a cache miss to a stampede           │   2/5    │ active    │ 2026-09-20 │
+│ retry-with-exponential-backoff-and-jitter │ Retry with exponential backoff and jitter │   4/4    │ completed │ 2026-09-20 │
+╰───────────────────────────────────────────┴───────────────────────────────────────────┴──────────┴───────────┴────────────╯
 ```
 
 ## Writing courses by hand

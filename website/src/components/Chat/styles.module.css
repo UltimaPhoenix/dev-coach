@@ -77,6 +77,13 @@
 :global([data-theme="dark"]) .choices li.picked {
   color: #1e1f22;
 }
+.stacked {
+  display: grid;
+  justify-items: start;
+}
+.stacked li {
+  border-radius: 10px;
+}
 .srOnly {
   position: absolute;
   width: 1px;
