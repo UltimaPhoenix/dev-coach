@@ -57,6 +57,14 @@ Notable changes to devcoach. Versions follow [Semantic Versioning](https://semve
   page drops the sidebar and breadcrumbs; the navbar gains **Docs**, **Install** and **Why
   devcoach**. The demo shows its last frame at rest (no JS, or reduced motion) and has a Pause
   button.
+- **The docs home is two and a half screens, and shows the product.** Everything under the install
+  picker is now one section, **See it**: four tabs with one real screen and one sentence each —
+  the lesson card in your agent (in the terminal and in the desktop app), the lessons log, the
+  knowledge map, and a course. The Courses tab runs the real demo course in place: its steps, its
+  charts and its checks, in a sandboxed frame that follows the site's theme. *Private by design*
+  now comes before *Why it exists*, each in two sentences, and the footer lists every guide in four
+  columns. Nothing left the docs: the notebook paragraph moved to *Coaching in your agent*, and
+  the rest was already in the guides.
 - **The README fits on a few screens** (615 → 127 lines): what devcoach does, the coaching loop as
   a GIF, install per agent, what happens next, screenshots, and links into the docs. Nothing was
   dropped: troubleshooting, known limitations and uninstalling moved to a new

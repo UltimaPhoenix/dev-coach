@@ -68,9 +68,10 @@ html[data-theme="dark"] {
   color: var(--devcoach-accent);
 }
 
-/* Docs home = the landing page: no breadcrumbs, and the prose under the hero keeps a readable
+/* Docs home = the landing page: no breadcrumbs, no "Edit this page" row, and the prose under the hero keeps a readable
    measure while the hero and the steps (.dc-wide) use the full width. */
-.docs-doc-id-index .theme-doc-breadcrumbs {
+.docs-doc-id-index .theme-doc-breadcrumbs,
+.docs-doc-id-index .theme-doc-footer {
   display: none;
 }
 .docs-doc-id-index .theme-doc-markdown > :not(.dc-wide) {
