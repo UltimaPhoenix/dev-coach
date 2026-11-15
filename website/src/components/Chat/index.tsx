@@ -25,12 +25,23 @@ export function Say({ who, children }: { who: keyof typeof WHO; children: ReactN
   );
 }
 
-/** The options a question offered, with the one that was picked. Illustration only, not a control. */
-export function Choices({ options, picked }: { options: string[]; picked?: string }): ReactNode {
+/**
+ * The options a question offered, with the one that was picked. Illustration only, not a control.
+ * `stacked` puts one option per line, for options that are whole sentences.
+ */
+export function Choices({
+  options,
+  picked,
+  stacked,
+}: {
+  options: string[];
+  picked?: string;
+  stacked?: boolean;
+}): ReactNode {
   return (
     <div className={clsx(styles.row, styles.you)}>
       <span className={styles.who}>{WHO.you}</span>
-      <ul className={styles.choices}>
+      <ul className={clsx(styles.choices, stacked && styles.stacked)}>
         {options.map((option) => (
           <li key={option} className={clsx(option === picked && styles.picked)}>
             {option}
