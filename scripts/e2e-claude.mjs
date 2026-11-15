@@ -299,7 +299,8 @@ const query = (sb, sql) => {
 };
 const count = (sb, table) => Number(query(sb, `SELECT COUNT(*) AS n FROM ${table}`)?.n ?? 0);
 const notebookText = (sb) => (existsSync(sb.notebook) ? readFileSync(sb.notebook, "utf8") : "");
-const BAND = /### ─+ 🎓 devcoach ─+/g;
+// The card's first line: one blockquote opened by the `🎓 devcoach` label (backticks optional).
+const BAND = /^ {0,3}>\s*`?🎓 devcoach`?\s*·/gm;
 const TECH_PROMPT =
   "Review this TypeScript function and point out the bug, briefly:\n\n" +
   "```ts\nfunction sum(xs: number[]): number {\n  let total = 0;\n  for (let i = 0; i <= xs.length; i++) total += xs[i];\n  return total;\n}\n```";

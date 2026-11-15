@@ -26,7 +26,7 @@ import {
   stripHighlighter,
 } from "../src/core/highlighter";
 import { normalizeTimestamp, parseLesson } from "../src/core/models";
-import { buildPromptForLevel, formatLessonForDisplay } from "../src/core/prompts";
+import { buildPromptForLevel, formatLessonForDisplay, stripCardChrome } from "../src/core/prompts";
 import { buildSharePayload, renderShareText, ShareInputError } from "../src/core/share";
 import { stripControlCharsDeep } from "../src/core/text";
 import { VERSION } from "../src/version";
@@ -354,16 +354,84 @@ describe("coach", () => {
 describe("prompts", () => {
   it("formats a lesson card and level prompts", () => {
     const out = formatLessonForDisplay(lesson({ body: "Lazy evaluation defers work.\n\n💡 tip" }));
-    expect(out).toContain("🎓 devcoach");
-    expect(out).toContain("**Generators**");
-    expect(out).toContain("Lazy evaluation defers work.");
-    expect(out).not.toContain("> ");
+    // One blockquote: every line behind ">", blank lines as a bare ">" so the rail never breaks.
+    expect(out).toBe(
+      [
+        "> `🎓 devcoach` · python · mid",
+        ">",
+        "> **Generators**",
+        ">",
+        "> Lazy evaluation defers work.",
+        ">",
+        "> 💡 tip",
+      ].join("\n"),
+    );
     // body missing → summary is the card text
-    expect(formatLessonForDisplay(lesson({ body: null }))).toContain("lazy");
+    expect(formatLessonForDisplay(lesson({ body: null }))).toContain("> lazy");
     expect(buildPromptForLevel("docker", "ctx", 2)).toContain("beginner");
     expect(buildPromptForLevel("docker", "ctx", 5)).toContain("intermediate");
     expect(buildPromptForLevel("docker", "ctx", 8)).toContain("senior-level");
     expect(buildPromptForLevel("docker", "ctx", 10)).toBe("");
+  });
+});
+
+describe("stripCardChrome: the stored lesson is the body, never the chat card", () => {
+  const body = [
+    "Two writers met: the second one failed at once.",
+    "",
+    "```ts",
+    'db.exec("PRAGMA busy_timeout = 5000");',
+    "",
+    "await write(); // a blank line inside the code survives",
+    "```",
+    "",
+    "- a list item",
+    "",
+    "💡 **Senior tip:** keep write transactions short.",
+  ].join("\n");
+  const title = "busy_timeout is a ceiling, not a queue";
+  const card = formatLessonForDisplay(lesson({ topic_id: "sqlite", level: "mid", title, body }));
+  const ask = "Did that land? ✅ knew it (y) · 💡 understood (u) · ❌ couldn't follow (n)";
+
+  it("a clean body is left exactly as it is", () => {
+    expect(stripCardChrome(body, title)).toBe(body);
+  });
+
+  it("the whole card (as written in the chat, feedback line too) comes back to the body", () => {
+    expect(stripCardChrome(card, title)).toBe(body);
+    expect(stripCardChrome(`${card}\n\n${ask}\n`, title)).toBe(body);
+    expect(stripCardChrome(card.replace(/\n/g, "\r\n"), title)).toBe(body);
+  });
+
+  it("a card with lines the model forgot to quote still loses its chrome", () => {
+    // the code lines without "> ": the quoted header says it is a card all the same
+    const sloppy = card.replace(/^> (```|db\.exec|await)/gm, "$1");
+    expect(sloppy).not.toBe(card);
+    expect(stripCardChrome(sloppy, title)).toBe(body);
+  });
+
+  it("the card of earlier versions (bands, a title line with category · level) comes off too", () => {
+    const old = [
+      "### ──────── 🎓 devcoach ────────",
+      `**${title}** · SQLite · Mid`,
+      "",
+      body,
+      "### ──────── sqlite · mid ────────",
+      "",
+      ask,
+    ].join("\n");
+    expect(stripCardChrome(old, title)).toBe(body);
+  });
+
+  it("a passage the lesson quotes on purpose stays, and so does a bold line that is not the title", () => {
+    const own = "**Why it matters**\n\nThe docs say:\n\n> one writer at a time\n\nSo retry.";
+    expect(stripCardChrome(own, title)).toBe(own);
+  });
+
+  it("nothing but chrome → the input is kept rather than storing an empty lesson", () => {
+    expect(stripCardChrome("> `🎓 devcoach` · sqlite · mid\n>", title)).toBe(
+      "> `🎓 devcoach` · sqlite · mid\n>",
+    );
   });
 });
 
