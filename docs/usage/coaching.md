@@ -81,23 +81,24 @@ topics → optional groups → daily limit and minimum gap — that you can run 
 ## Your first lesson
 
 You work on a task as normal. After your agent responds, devcoach appends a lesson card as the final text
-of the reply:
+of the reply: one quote, from the `🎓 devcoach` label to the tip.
 
-```
-### ──────── 🎓 devcoach ────────
-
-**Promise.allSettled vs Promise.all** · TypeScript · Mid
-
-Promise.all rejects the moment any promise rejects, and you lose the results of the ones that
-already succeeded. For independent work, reach for Promise.allSettled… [3–6 short paragraphs]
-
-💡 *Senior tip:* map each task to a `{ ok, value }` / `{ ok, error }` result up front so callers
-never have to branch on `status` strings.
-
-### ──────── typescript · mid ────────
+> `🎓 devcoach` · typescript · mid
+>
+> **Promise.allSettled vs Promise.all**
+>
+> Promise.all rejects the moment any promise rejects, and you lose the results of the ones that
+> already succeeded. For independent work, reach for Promise.allSettled… [3–6 short paragraphs,
+> code blocks included]
+>
+> 💡 **Senior tip:** map each task to a `{ ok, value }` / `{ ok, error }` result up front so callers
+> never have to branch on `status` strings.
 
 Did that land? ✅ knew it (y) · 💡 understood (u) · ❌ couldn't follow (n)
-```
+
+The quote is only how the lesson looks in the chat. What devcoach saves, and what the dashboard,
+`devcoach lessons` and a shared lesson show, is the lesson itself: the label, the title line and the
+feedback line are never part of it.
 
 ## The feedback loop
 

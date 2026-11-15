@@ -1,5 +1,5 @@
 // The docs home's demo: a terminal that plays the coaching loop — a task, the agent's reply, the
-// lesson card devcoach adds, a one-key answer. Every line is laid out from the first frame
+// lesson card devcoach adds (one quote: a rail from the label to the tip), a one-key answer. Every line is laid out from the first frame
 // (unrevealed ones are only hidden), so playback never shifts the page. The server-rendered
 // frame is the last one: without JS, or with reduced motion, the whole loop is there at rest.
 import clsx from "clsx";
@@ -7,7 +7,7 @@ import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import styles from "./styles.module.css";
 
-type Kind = "prompt" | "tool" | "agent" | "band" | "title" | "text" | "ask" | "blank";
+type Kind = "prompt" | "tool" | "agent" | "label" | "title" | "text" | "ask" | "blank";
 type Line = { at: number; kind: Kind; text: string; typed?: boolean };
 
 const TYPE_MS = 38;
@@ -24,11 +24,11 @@ const SCRIPT: Line[] = [
     text: "Done. Product lookups now read Redis first (TTL 60 s) and fall back to Postgres on a miss.",
   },
   { at: 5300, kind: "blank", text: "" },
-  { at: 5300, kind: "band", text: "──────── 🎓 devcoach ────────" },
+  { at: 5300, kind: "label", text: "🎓 devcoach · redis · senior" },
   {
     at: 5700,
     kind: "title",
-    text: "Cache stampede — when every server hits the DB at the same moment · redis · Senior",
+    text: "Cache stampede — when every server hits the DB at the same moment",
   },
   {
     at: 6300,
@@ -40,7 +40,11 @@ const SCRIPT: Line[] = [
     kind: "text",
     text: "Add jitter to the TTL, or let one request rebuild the key while the others keep serving the old value.",
   },
-  { at: 7600, kind: "band", text: "──────── redis_cache_stampede · senior ────────" },
+  {
+    at: 7600,
+    kind: "text",
+    text: "💡 Senior tip: jitter when a few seconds of stale data is fine, a rebuild lock when it never is.",
+  },
   { at: 8300, kind: "blank", text: "" },
   {
     at: 8300,

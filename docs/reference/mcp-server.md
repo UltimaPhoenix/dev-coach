@@ -31,7 +31,7 @@ local server.
 
 | Tool | Purpose | Annotation |
 |---|---|---|
-| `log_lesson` | Save a delivered lesson — a **pure save** that never elicits feedback. Auto-fills git context, stamps the timestamp server-side, resets the pacing counters, and returns the saved lesson plus a `reply_check` self-check reminding the model that tool arguments are invisible to the user and the card must be written as the final text of the turn | write |
+| `log_lesson` | Save a delivered lesson — a **pure save** that never elicits feedback. The body is stored without the chat card: quote markers, the `🎓 devcoach` header, the title line and the feedback line come off. Auto-fills git context, stamps the timestamp server-side, resets the pacing counters, and returns the saved lesson plus a `reply_check` self-check reminding the model that tool arguments are invisible to the user and the card must be written as the final text of the turn | write |
 | `skip_lesson` | Decline a lesson cue with a one-line reason; re-arms the pacing counter | write |
 | `preview_deep_scan` | Metadata-only pre-check for Automatic (Deep) onboarding: `months` (1–24, default 3) sets a rolling window; returns `window_months`, `cutoff`, `candidate_count`, `over_soft_limit` (more than 8 candidates — ask the user to narrow the window) and `candidates[]` (`name`, `path`, `last_activity`, `prompt_count`). Reads no conversation text | read-only |
 | `get_briefing` | Everything needed before a lesson in one call: onboarding status, rate limit, taught topics, profile, notebook text and `notebook_path` (same data as `devcoach://briefing`) | read |
