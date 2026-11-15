@@ -83,7 +83,7 @@ export default function Hero(): ReactNode {
         <InstallTabs />
         <ul className={styles.facts}>
           <li>No account, no telemetry</li>
-          <li>At most 2 lessons a day</li>
+          <li>Unobtrusive · you set the pace</li>
           <li>Open source · AGPL-3.0</li>
         </ul>
       </div>
