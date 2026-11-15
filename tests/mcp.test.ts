@@ -297,6 +297,49 @@ describe("mcp server", () => {
     await server.close();
   });
 
+  it("log_lesson stores the lesson, not the card: a quoted card passed as body comes off", async () => {
+    const { client } = await connect();
+    const card = [
+      "> `🎓 devcoach` · sqlite · mid",
+      ">",
+      "> **busy_timeout is a ceiling, not a queue**",
+      ">",
+      "> Two writers met: the second one failed at once.",
+      ">",
+      "> ```ts",
+      '> db.exec("PRAGMA busy_timeout = 5000");',
+      "> ```",
+      ">",
+      "> 💡 **Senior tip:** keep write transactions short.",
+      "",
+      "Did that land? ✅ knew it (y) · 💡 understood (u) · ❌ couldn't follow (n)",
+    ].join("\n");
+    const log: any = await client.callTool({
+      name: "log_lesson",
+      arguments: {
+        id: "quoted-card",
+        topic_id: "sqlite",
+        categories: ["sqlite"],
+        title: "busy_timeout is a ceiling, not a queue",
+        level: "mid",
+        summary: "s",
+        body: card,
+      },
+    });
+    const clean = [
+      "Two writers met: the second one failed at once.",
+      "",
+      "```ts",
+      'db.exec("PRAGMA busy_timeout = 5000");',
+      "```",
+      "",
+      "💡 **Senior tip:** keep write transactions short.",
+    ].join("\n");
+    expect(log.structuredContent.body).toBe(clean);
+    // …and that is what the database (hence the dashboard and every share) holds.
+    expect(db.withConnection((c) => db.getLessonById(c, "quoted-card"))?.body).toBe(clean);
+  });
+
   it("log_lesson never elicits, even when the client declares the capability", async () => {
     // Regression: in the card-last flow log_lesson runs BEFORE the card is visible,
     // so an inline "Did that land?" dialog asked about an unseen lesson (observed

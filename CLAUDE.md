@@ -58,7 +58,7 @@ dev-coach/
 │   │   ├── models.ts       # Zod: Lesson, KnowledgeEntry/Group, Profile, Settings, RateLimitResult
 │   │   ├── db.ts           # node:sqlite schema + migrations + query helpers + DEFAULT_PROFILE
 │   │   ├── coach.ts        # rate limit, cue engine (evaluateCue/explainCue), profile, stats
-│   │   ├── git.ts  detect.ts  prompts.ts   # prompts.ts renders the lesson card (formatLessonForDisplay)
+│   │   ├── git.ts  detect.ts  prompts.ts   # prompts.ts: the lesson card (formatLessonForDisplay) + stripCardChrome
 │   │   ├── share.ts  share-fetch.ts   # lesson sharing: payload, code/link/.devcoach.md codecs, parseSharedInput; URL fetch
 │   │   ├── claude-history.ts   # cross-project stack scan of ~/.claude (projects map, manifests, activity, memories)
 │   │   ├── courses.ts      # courses: directory + document validation over the db.ts rows (see Courses below)
@@ -118,6 +118,13 @@ writer (one transaction, idempotent) for MCP, CLI and the dashboard. Schema v4 r
 Every tool registers a `title` + read-only/destructive annotations, a tight Zod `inputSchema` with
 `.describe()` on each param, `outputSchema`/`structuredContent` for model-shaped returns
 (`Lesson`/`Profile`/`Settings`), and returns `{ isError: true, … }` with a recovery hint on failure.
+**The card** is ONE markdown blockquote — `` > `🎓 devcoach` · topic · level ``, the bold title,
+the body, the `💡 **Senior tip:**`, every line behind `>` (blank and code lines too) — so a rail
+runs along the whole lesson in Claude Code and in the GFM chats; the feedback line sits under
+it, outside the quote (`formatLessonForDisplay` = the same shape for shares). `log_lesson`
+stores `stripCardChrome(body, title)`: the quote markers, the header, the title line, the
+feedback line and the `###` dash bands of the pre-2.8 card come off, so the database, the
+dashboard and every share hold the lesson only (a body that quotes a passage on purpose keeps it).
 `log_lesson` is a **pure save** — it never elicits — and resets the pacing counters. Inline
 elicitation was removed: in the card-last flow the tool runs before the card is visible, so the
 "Did that land?" dialog asked about an unseen lesson (observed live in Claude Code, which DOES
