@@ -137,3 +137,26 @@
   font-size: 0.9rem;
   color: var(--ifm-color-emphasis-800);
 }
+
+/* Closing band: privacy first, then the why. Two columns, one under 768px. */
+.closing {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1.5rem 3rem;
+  margin: 0 0 1rem;
+  padding: 2rem 0 0;
+  border-top: 1px solid var(--ifm-color-emphasis-200);
+}
+@media (min-width: 768px) {
+  .closing {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+.closingTitle {
+  margin: 0 0 0.4rem;
+  font-size: 1.25rem;
+}
+.closing p {
+  margin: 0 0 0.5rem;
+  color: var(--ifm-color-emphasis-800);
+}

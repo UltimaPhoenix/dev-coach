@@ -7,7 +7,15 @@ name: Docs
 on:
   push:
     branches: [main, develop]
-    paths: ["docs/**", "website/**", ".github/workflows/docs.yml"]
+    # The last four feed the home page's demo course (website/docusaurus.config.ts).
+    paths:
+      - "docs/**"
+      - "website/**"
+      - ".github/workflows/docs.yml"
+      - "scripts/screenshots/fixture.zip"
+      - "src/core/highlighter.ts"
+      - "assets/static/course-frame.js"
+      - "assets/static/vendor/highlight.min.js"
   workflow_dispatch:
 
 permissions:

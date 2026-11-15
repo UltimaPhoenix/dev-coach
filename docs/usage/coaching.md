@@ -112,6 +112,10 @@ coaching:
   the lesson is kept as a seed for a step-by-step course you can start whenever you like.
 - **Anything else, or no reply** — no change; the question is dropped silently and you carry on.
 
+## The coaching notebook
+
+Every lesson is tied to **where it happened** — project folder, repository, branch, commit — and your agent keeps a **coaching notebook** at `~/.devcoach/learning-state.md`: written at onboarding, refreshed every 10 lessons, and yours to annotate. Flag what didn't click or mark what has sunk in, and the next lessons follow your notes. It stays local and it's optional.
+
 ## Sharing a lesson with a teammate
 
 A lesson that landed for you is worth handing over. Ask your agent in plain words:
