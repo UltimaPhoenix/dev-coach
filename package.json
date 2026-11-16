@@ -57,15 +57,15 @@
     "prepack": "npm run build"
   },
   "dependencies": {
-    "@hono/node-server": "^2.1.6",
+    "@hono/node-server": "^2.1.8",
     "@modelcontextprotocol/server": "^2.4.0",
-    "commander": "^15.0.0",
+    "commander": "^15.1.0",
     "fflate": "^0.8.3",
-    "hono": "^4.13.16",
+    "hono": "^4.13.18",
     "zod": "^4.6.7"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.6.5",
+    "@biomejs/biome": "^2.6.7",
     "@modelcontextprotocol/client": "^2.4.0",
     "@types/node": "^26.6.6",
     "@vitest/coverage-v8": "^5.1.0",
