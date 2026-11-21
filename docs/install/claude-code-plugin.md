@@ -5,6 +5,10 @@ description: Install devcoach in Claude Code as a plugin — MCP server, Stop/Us
 keywords: [devcoach claude code plugin, claude code marketplace, claude code mcp server, claude code hooks, claude code skills]
 ---
 
+import { Card, Cards } from "@site/src/components/Cards";
+import Tabs from "@theme/Tabs";
+import TabItem from "@theme/TabItem";
+
 # Claude Code plugin
 
 :::tip[Recommended if you'd rather not use a terminal]
@@ -14,24 +18,32 @@ terminal and want the `devcoach` CLI too? Use [Homebrew](./homebrew.md) instead.
 
 devcoach ships as a **Claude Code plugin** that bundles everything in one install:
 
-- the **MCP server** (25 tools, 11 resources, the `devcoach_instructions` prompt),
-- the two automatic-coaching **hooks** (`stop-hook` on Stop, `prompt-hook` on UserPromptSubmit), and
-- the coaching **skill** (`SKILL.md` + its reference files).
+<Cards columns={3}>
+  <Card title="The MCP server">
 
-With the plugin you do **not** need to run `devcoach install` — registering the hooks twice would
-double-count interactions. `devcoach install` detects an enabled plugin and skips the hooks
-automatically, and `devcoach doctor` flags a double registration.
+25 tools, 11 resources and the `devcoach_instructions` prompt.
 
-## Before you install
+  </Card>
+  <Card title="Two coaching hooks">
 
-The plugin runs devcoach with **your** Node, so the machine needs:
+`stop-hook` on Stop and `prompt-hook` on UserPromptSubmit.
+
+  </Card>
+  <Card title="The coaching skill">
+
+`SKILL.md` and its reference files.
+
+  </Card>
+</Cards>
+
+## Install
+
+<a id="before-you-install"></a>**Before you install:** the plugin runs devcoach with **your** Node, so the machine needs:
 
 - **Node.js 24 or newer** on the `PATH` Claude Code uses (`node --version`). devcoach uses Node's
   built-in SQLite; Node 20 and 22 cannot run it.
 - **npm** next to it (it comes with Node), and a network connection **the first time** — the plugin
   installs the pinned devcoach version once, then works offline.
-
-## Install
 
 Add the UltimaPhoenix marketplace once, then install devcoach from it:
 
@@ -43,6 +55,10 @@ Add the UltimaPhoenix marketplace once, then install devcoach from it:
 The marketplace is pinned to each devcoach release by CI and carries every UltimaPhoenix plugin, so a
 new one is a single `/plugin install` away. The MCP server, hooks and skill activate on install — no
 restart needed.
+
+With the plugin you do **not** need to run `devcoach install` — registering the hooks twice would
+double-count interactions. `devcoach install` detects an enabled plugin and skips the hooks
+automatically, and `devcoach doctor` flags a double registration.
 
 ## Set it up
 
@@ -63,9 +79,12 @@ from scratch.
 ```
 
 This refreshes your local copy of the marketplace so it points at the latest releases; Claude Code then
-offers the update for the plugins you have installed. **Install fails with "invalid manifest …
-repository: expected string"?** Plugin releases up to 1.0.1 shipped a manifest that current Claude Code
-rejects — run the update above, then `/plugin install devcoach@ultimaphoenix` again.
+offers the update for the plugins you have installed.
+
+:::note[Install fails with "invalid manifest … repository: expected string"?]
+Plugin releases up to 1.0.1 shipped a manifest that current Claude Code rejects — run the update above,
+then `/plugin install devcoach@ultimaphoenix` again.
+:::
 
 ### Installed it straight from the repo earlier?
 
@@ -91,18 +110,24 @@ plugin without touching the release:
 /plugin install devcoach@ultimaphoenix-beta
 ```
 
-The beta keeps the plugin name, so its tools, commands and skill are exactly the release's. Two
-copies of the hooks would count every interaction twice, so **enable one at a time**: turn
-`devcoach@ultimaphoenix` off while the beta is on (`/plugin`, or `enabledPlugins` in your settings),
-and `devcoach doctor` warns if both are enabled. `/plugin marketplace update ultimaphoenix-beta`
-picks up the newest canary; the [`next` prerelease](https://github.com/UltimaPhoenix/dev-coach/releases/tag/next)
-notes say which commit it is (the beta pulls the prerelease's `devcoach-plugin-archive-<version>.zip`,
-a plugin-root layout; nothing to do on your side). Canaries are unreleased and may break.
+The beta keeps the plugin name, so its tools, commands and skill are exactly the release's.
+`/plugin marketplace update ultimaphoenix-beta` picks up the newest canary; the
+[`next` prerelease](https://github.com/UltimaPhoenix/dev-coach/releases/tag/next) notes say which
+commit it is (the beta pulls the prerelease's `devcoach-plugin-archive-<version>.zip`, a plugin-root
+layout; nothing to do on your side). Canaries are unreleased and may break.
 
-A canary may upgrade the shared database schema. An **older** devcoach (the release plugin, a
-Homebrew or npm CLI behind the canary) then opens it read-only: `stats`, `lessons` and the
-dashboard keep working, writes are refused with a message naming both versions, and
-`devcoach doctor` says so. Keep the CLI you use for writes on the same channel as the plugin.
+:::warning[Enable one channel at a time]
+Two copies of the hooks would count every interaction twice, so **enable one at a time**: turn
+`devcoach@ultimaphoenix` off while the beta is on (`/plugin`, or `enabledPlugins` in your settings),
+and `devcoach doctor` warns if both are enabled.
+:::
+
+:::note[A canary may upgrade the shared database schema]
+An **older** devcoach (the release plugin, a Homebrew or npm CLI behind the canary) then opens it
+read-only: `stats`, `lessons` and the dashboard keep working, writes are refused with a message naming
+both versions, and `devcoach doctor` says so. Keep the CLI you use for writes on the same channel as
+the plugin.
+:::
 
 ### Offline install
 
@@ -123,6 +148,20 @@ launcher installs the *pinned* `devcoach` version (from `plugin/package.json`) *
 persistent data dir, then runs it directly with `node`; later calls (every hook fire, every server start)
 skip straight to `node` — and it only re-installs when a plugin update bumps the pinned version.
 
+```mermaid
+%%{init: {"flowchart": {"nodeSpacing": 20, "rankSpacing": 34, "padding": 10}}}%%
+flowchart TD
+    CC(["Claude Code wires in<br/>the plugin's files"])
+    CC --> M["1 · .mcp.json"]
+    CC --> H["2 · hooks/<br/>hooks.json"]
+    CC --> S["3 · skills/<br/>devcoach/<br/>SKILL.md"]
+    M -->|"MCP server"| L["the launcher<br/>scripts/<br/>launch.mjs"]
+    H -->|"Stop ·<br/>UserPromptSubmit"| L
+    S -->|"auto-loaded"| A(["the agent<br/>knows how<br/>to teach"])
+    L -->|"first use: install once<br/>later: run with node"| D["devcoach,<br/>the pinned version,<br/>in the plugin's data dir"]
+    D --> DB[("~/.devcoach/<br/>coaching.db")]
+```
+
 1. **`.mcp.json`** → Claude Code launches the MCP server as a local stdio process
    (`node ${CLAUDE_PLUGIN_ROOT}/scripts/launch.mjs mcp`). It opens `~/.devcoach/coaching.db` (SQLite),
    derived from your home directory.
@@ -139,48 +178,73 @@ The plugin does the coaching on its own and keeps devcoach inside its own data d
 put the `devcoach` **CLI** on your `PATH`. The CLI stays a useful companion whenever you want the
 dashboard or your data *without going through Claude*:
 
-```bash
-devcoach ui                    # the web dashboard, from a terminal — no Claude session needed
-devcoach stats                 # counts, weakest and strongest topics
-devcoach lessons --period week # browse the log; devcoach lesson <id> shows one in full
-devcoach share --last          # hand a lesson to a teammate; devcoach import adds theirs
-devcoach backup ~/dc.zip       # profile + lessons + notebook in one file (devcoach restore to load it)
-devcoach doctor                # check the wiring and why the next stop would (not) cue a lesson
-```
+| Command | What it does |
+|---|---|
+| `devcoach ui` | the web dashboard, from a terminal — no Claude session needed |
+| `devcoach stats` | counts, weakest and strongest topics |
+| `devcoach lessons --period week` | browse the log; `devcoach lesson <id>` shows one lesson's details and summary |
+| `devcoach share --last` | hand a lesson to a teammate; `devcoach import` adds theirs |
+| `devcoach backup ~/dc.zip` | profile + lessons + notebook in one file (`devcoach restore` to load it) |
+| `devcoach doctor` | check the wiring and why the next stop would (not) cue a lesson |
 
 Three ways to reach it, from zero-install to a bare command:
 
-1. **From inside Claude Code — nothing to install.** Type `/devcoach:ui` (optionally with a port,
-   e.g. `/devcoach:ui 8080`), or just ask — *"open the devcoach dashboard"*. The plugin also ships
-   `/devcoach:share [last | <id> | about <topic>] [as link|file]` and `/devcoach:import <code or link>`
-   for [sharing lessons](../usage/sharing.md), and `/devcoach:course [last | a few words of the lesson's
-   title | a concept] [continue]` for a [step-by-step course](../usage/courses.md). Either way Claude calls the `open_ui` / sharing tools
-   from the plugin's own copy and reports the URL (default http://localhost:7860).
-2. **From a terminal, without installing** — prefix any [CLI command](../usage/cli.md) with `npx -y`:
-   `npx -y devcoach ui`, `npx -y devcoach stats`, …
-3. **A bare `devcoach` command** — install the npm package globally (`npm install -g devcoach`) or via
-   [Homebrew](./homebrew.md). Running it alongside the plugin is fine — recommended, even: both read the
-   same `~/.devcoach/coaching.db`, the plugin keeps the hooks and the skill current with every release
-   (a Homebrew-only install needs a manual `devcoach install` after each `brew upgrade` for that), and
-   Homebrew gives you the CLI.
+<Tabs>
+<TabItem value="claude-code" label="In Claude Code" default>
 
-One rule: with the plugin, **never run `devcoach install`** — the plugin already owns the coaching hooks
-and the skill, and a second registration would double-count interactions (`install` detects an enabled
-plugin and skips the hooks; `devcoach doctor` flags a double registration). Likewise there is nothing
-for `devcoach uninstall` to undo: removing the plugin is `/plugin uninstall devcoach@ultimaphoenix`.
+**From inside Claude Code — nothing to install.** Type `/devcoach:ui` (optionally with a port, e.g.
+`/devcoach:ui 8080`), or just ask — *"open the devcoach dashboard"*. The plugin also ships:
+
+- `/devcoach:share [last | <id> | about <topic>] [as link|file]` and `/devcoach:import <code or link>`
+  for [sharing lessons](../usage/sharing.md),
+- `/devcoach:course [last | a few words of the lesson's title | a concept] [continue]` for a
+  [step-by-step course](../usage/courses.md).
+
+Either way Claude calls the `open_ui` / sharing tools from the plugin's own copy and reports the URL
+(default http://localhost:7860).
+
+</TabItem>
+<TabItem value="npx" label="npx, no install">
+
+**From a terminal, without installing** — prefix any [CLI command](../usage/cli.md) with `npx -y`:
+
+```bash
+npx -y devcoach ui
+npx -y devcoach stats
+# … and so on for every other command
+```
+
+</TabItem>
+<TabItem value="global" label="Bare command">
+
+**A bare `devcoach` command** — install the npm package globally (`npm install -g devcoach`) or via
+[Homebrew](./homebrew.md). Running it alongside the plugin is fine — recommended, even:
+
+- both read the same `~/.devcoach/coaching.db`,
+- the plugin keeps the hooks and the skill current with every release (a Homebrew-only install needs
+  a manual `devcoach install` after each `brew upgrade` for that),
+- and Homebrew gives you the CLI.
+
+</TabItem>
+</Tabs>
+
+:::warning[With the plugin, never run `devcoach install`]
+The plugin already owns the coaching hooks and the skill, and a second registration would
+double-count interactions (`install` detects an enabled plugin and skips the hooks; `devcoach doctor`
+flags a double registration). Likewise there is nothing for `devcoach uninstall` to undo: removing
+the plugin is `/plugin uninstall devcoach@ultimaphoenix`.
+:::
 
 ## Runs locally only
 
 devcoach is a single-user, local-first tool. All three pieces are local processes that share one
 machine's home directory:
 
-- ✅ **Claude Code** (local, or running on a remote box where the CLI process itself runs) and
-  **Claude Desktop** (bundled Node). The database lives on whatever machine the agent runs on.
-- ❌ **claude.ai web / hosted "remote MCP" connectors** — those require an HTTP/OAuth multi-tenant
-  server. devcoach writes to a local home directory, so it cannot be a remote connector.
-- ⚠️ **Ephemeral / cloud sandboxes** — coaching works while the session runs, but `~/.devcoach` is not
-  persisted across runs. Use [`devcoach backup`](../usage/cli.md#backup-export--import) / `restore` to
-  carry your profile between machines.
+| Where the agent runs | What to know |
+|---|---|
+| ✅ **Claude Code** (local, or running on a remote box where the CLI process itself runs) and **Claude Desktop** (bundled Node) | The database lives on whatever machine the agent runs on. |
+| ❌ **claude.ai web / hosted "remote MCP" connectors** | Those require an HTTP/OAuth multi-tenant server. devcoach writes to a local home directory, so it cannot be a remote connector. |
+| ⚠️ **Ephemeral / cloud sandboxes** | Coaching works while the session runs, but `~/.devcoach` is not persisted across runs. Use [`devcoach backup`](../usage/cli.md#backup-export--import) / `restore` to carry your profile between machines. |
 
 It needs **Node.js ≥ 24** (for Node's embedded `node:sqlite`) and a one-time network connection on first
 use (to install the pinned `devcoach` package into the plugin's data dir); after that it runs offline.
@@ -215,8 +279,10 @@ rm -rf ~/.claude/plugins/data/devcoach-ultimaphoenix     # the plugin's installe
 then `/mcp` → *Reconnect*. For the full story of one failed start, run `claude --debug` and read
 `~/.claude/debug/<session-id>.txt`: the server's own error line is in there.
 
+:::warning
 Do **not** run `devcoach install` to fix a plugin: that command wires devcoach *without* the plugin,
 and the two together count every interaction twice.
+:::
 
 ### A notice says "devcoach is not running"
 
