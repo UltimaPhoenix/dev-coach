@@ -1,0 +1,6 @@
+/* The description column keeps a readable width; on a narrow screen the rest of the row
+   scrolls inside the table's own box (Infima's `table { display: block; overflow: auto }`). */
+.wide2 :is(th, td):nth-child(2),
+.wide3 :is(th, td):nth-child(3) {
+  min-width: 15rem;
+}
