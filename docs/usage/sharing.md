@@ -5,6 +5,7 @@ description: Hand a devcoach lesson to a teammate as copyable text, a server-les
 keywords: [devcoach share lesson, share coaching lesson, devcoach import, devcoach.md, team learning, MCP coaching share]
 ---
 
+import { Card, Cards } from "@site/src/components/Cards";
 import ThemedShot from "@site/src/components/ThemedShot";
 import Tabs from "@theme/Tabs";
 import TabItem from "@theme/TabItem";
@@ -15,31 +16,65 @@ A lesson that landed for you is often exactly what a teammate is missing. devcoa
 over without any account or server: the lesson itself travels, in a form the receiver can paste, click
 or drop wherever they use devcoach — and it joins their coaching log as a lesson shared by you.
 
+```mermaid
+flowchart TD
+    subgraph you ["You"]
+        A["Pick a lesson"] --> B["Share it as text, a link<br/>or a .devcoach.md file"]
+    end
+    subgraph mate ["Your teammate"]
+        C["Opens the link<br/>in a browser"] -->|"Import into my devcoach"| D["Preview in<br/>their dashboard"]
+        E["Imports it:<br/>dashboard, CLI<br/>or their agent"]
+        F(["🤝 A shared lesson<br/>in their log"])
+    end
+    B --> C
+    B --> E
+    D -->|"Add to my lessons"| F
+    E --> F
+```
+
 ## Three ways to hand a lesson over
 
 Every transport carries the same payload; the receiver never has to know which one you used.
 
-| Transport | What you get | Best for |
-|---|---|---|
-| **Copyable text** | The lesson card as markdown, then one `devcoach:lesson:1:…` line | Chat, issues, email — paste the whole thing; devcoach finds the code |
-| **Link** | `https://ultimaphoenix.github.io/dev-coach/lesson#devcoach:lesson:1:…` | Messaging — the receiver reads the lesson in the browser and imports it with one click |
-| **`.devcoach.md` file** | `<lesson-id>.devcoach.md`, YAML front matter + the markdown body | Pull requests, wikis, repos — renders on GitHub, opens in any editor |
+<Cards columns={3}>
+  <Card label="Paste" title="Copyable text">
+
+The lesson card as markdown, then one `devcoach:lesson:1:…` line.
+
+**Best for** chat, issues, email: paste the whole thing; devcoach finds the code.
+
+  </Card>
+  <Card label="Click" title="Link">
+
+<p><code>https://<wbr />ultimaphoenix.github.io/<wbr />dev-coach/<wbr />lesson#<wbr />devcoach:lesson:1:…</code></p>
+
+**Best for** messaging: the receiver reads the lesson in the browser and imports it with one click.
+
+  </Card>
+  <Card label="Drop" title=".devcoach.md file">
+
+`<lesson-id>.devcoach.md`, YAML front matter + the markdown body.
+
+**Best for** pull requests, wikis, repos: renders on GitHub, opens in any editor.
+
+  </Card>
+</Cards>
 
 The code is the lesson's JSON, compressed (raw DEFLATE) and base64url-encoded: about 1 000 characters
 for a typical lesson, one line, safe in URLs. A share is a plain string — nothing is uploaded anywhere.
 
 ## From the dashboard
 
-Open a lesson and click **↗ Share** (or `↗` at the end of its row on the Lessons page — that one
-opens the same panel in a popover next to the row, so you never leave the list). The popover
-shows your name, an *Include where it happened* checkbox (off by default) and three actions: **Copy
-text**, **Copy link**, **Download .md**.
-
 <ThemedShot
   alt="Share popover"
   light={require("../screenshots/lesson-share-light.png").default}
   dark={require("../screenshots/lesson-share-dark.png").default}
 />
+
+Open a lesson and click **↗ Share** (or `↗` at the end of its row on the Lessons page — that one
+opens the same panel in a popover next to the row, so you never leave the list). The popover
+shows your name, an *Include where it happened* checkbox (off by default) and three actions: **Copy
+text**, **Copy link**, **Download .md**.
 
 ## From the terminal
 
@@ -82,17 +117,6 @@ it asks once whether you want to hand it to a teammate.
 
 Every way in leads to the same place: the lesson joins your log, attributed to the sender.
 
-- **Dashboard** — **＋ Import** on the Lessons page: paste the code, the link, a URL whose body is a
-  shared lesson (a raw gist, a file in a repo), or the whole copied card; pick a `.devcoach.md`; or
-  **drop the file anywhere** on the page.
-- **Link** — the share page shows the lesson and, when your dashboard is running, **Import into my
-  devcoach** opens a preview on `127.0.0.1` with a single **Add to my lessons** button. Nothing is
-  saved until you click it. The page also offers **Copy code** and **Download .devcoach.md**.
-- **Terminal** — `devcoach import` with no argument reads your clipboard; otherwise pass the code,
-  the link, a URL, a file path, or `-` for stdin.
-- **Agent** — hand it whatever you were given and say *"import this devcoach lesson"* (plugin:
-  `/devcoach:import <code or link>`). Then *"show me the lesson Ada shared"* renders it as a card.
-
 <Tabs>
   <TabItem value="link" label="1 · The link opens" default>
     <ThemedShot
@@ -124,38 +148,61 @@ Every way in leads to the same place: the lesson joins your log, attributed to t
   </TabItem>
 </Tabs>
 
-The same import from the terminal, twice — the second time devcoach recognises the share:
+- **Dashboard** — **＋ Import** on the Lessons page: paste the code, the link, a URL whose body is a
+  shared lesson (a raw gist, a file in a repo), or the whole copied card; pick a `.devcoach.md`; or
+  **drop the file anywhere** on the page.
+- **Link** — the share page shows the lesson and, when your dashboard is running, **Import into my
+  devcoach** opens a preview on `127.0.0.1` with a single **Add to my lessons** button. Nothing is
+  saved until you click it. The page also offers **Copy code** and **Download .devcoach.md**.
+- **Terminal** — `devcoach import` with no argument reads your clipboard; otherwise pass the code,
+  the link, a URL, a file path, or `-` for stdin. The same import from the terminal, twice — the
+  second time devcoach recognises the share:
 
-```text
-$ devcoach import ~/Downloads/lesson-docker-layer-cache-001.devcoach.md
-✓ Imported "Docker layer caching — why COPY order decides your build speed" (shared by Ada) as lesson-docker-layer-cache-001 — topic docker_layer_caching
-Topic 'docker_layer_caching' is not in your knowledge map — track it with: devcoach knowledge-add docker_layer_caching
+  ```text
+  $ devcoach import ~/Downloads/lesson-docker-layer-cache-001.devcoach.md
+  ✓ Imported "Docker layer caching — why COPY order decides your build speed" (shared by Ada) as lesson-docker-layer-cache-001 — topic docker_layer_caching
+  Topic 'docker_layer_caching' is not in your knowledge map — track it with: devcoach knowledge-add docker_layer_caching
 
-$ devcoach import ~/Downloads/lesson-docker-layer-cache-001.devcoach.md
-Already in your log as lesson-docker-layer-cache-001 (shared by Ada)
-```
+  $ devcoach import ~/Downloads/lesson-docker-layer-cache-001.devcoach.md
+  Already in your log as lesson-docker-layer-cache-001 (shared by Ada)
+  ```
+
+- **Agent** — hand it whatever you were given and say *"import this devcoach lesson"* (plugin:
+  `/devcoach:import <code or link>`). Then *"show me the lesson Ada shared"* renders it as a card.
 
 ## What travels — and what never does
 
-- **By default only the lesson**: title, TL;DR, body, topic, categories, level.
-- **On request** (*Include where it happened*, `--with-context`, "with context"): project name, branch,
-  commit and the task context. A repository name travels only for remote hosts (GitHub, GitLab,
-  Bitbucket); a **local folder path never leaves your machine**.
-- **Your name** is proposed from the `share_name` setting, then your git `user.name`; edit it in the
-  popover or share anonymously. The receiver sees *shared by …* with that name and the date.
-- **The link is server-less**: the lesson sits in the URL fragment (after `#`), which browsers never
-  send to the site. The page decodes it locally; the only request it makes is a best-effort
-  `GET /ping` to your own dashboard on `127.0.0.1` to say whether it is running. That check needs a
-  one-time *Local network access* permission in Chrome 142+ and is not possible at all in Safari (see
-  Troubleshooting) — the **Import** button works regardless.
+<Cards columns={2}>
+  <Card label="Travels" title="The lesson">
+    **By default only the lesson**: title, TL;DR, body, topic, categories, level.
+  </Card>
+  <Card label="Travels" title="Your name">
+    Proposed from the `share_name` setting, then your git `user.name`; edit it in the popover or
+    share anonymously. The receiver sees *shared by …* with that name and the date.
+  </Card>
+  <Card label="On request" title="Where it happened">
+    **On request** (*Include where it happened*, `--with-context`, "with context"): project name,
+    branch, commit and the task context. A repository name travels only for remote hosts (GitHub,
+    GitLab, Bitbucket).
+  </Card>
+  <Card label="Never" title="A local folder path">
+    A **local folder path never leaves your machine**.
+  </Card>
+</Cards>
+
+:::info[The link is server-less]
+
+The lesson sits in the URL fragment (after `#`), which browsers never send to the site. The page
+decodes it locally; the only request it makes is a best-effort `GET /ping` to your own dashboard on
+`127.0.0.1` to say whether it is running. That check needs a one-time *Local network access*
+permission in Chrome 142+ and is not possible at all in Safari (see [Troubleshooting](#troubleshooting)) — the
+**Import** button works regardless.
+
+:::
 
 See [Privacy & security](../reference/privacy.md#sharing-is-explicit) for the full statement.
 
 ## How an imported lesson behaves
-
-- It appears in your log with a **🤝 shared by** line and can be filtered with
-  `devcoach lessons --imported` / `--from <name>`, `get_lessons({imported: true})` /
-  `({shared_by: "<name>"})`, or the dashboard's **🤝 Shared** filter.
 
 <Tabs>
   <TabItem value="list" label="In the list" default>
@@ -174,17 +221,21 @@ See [Privacy & security](../reference/privacy.md#sharing-is-explicit) for the fu
   </TabItem>
 </Tabs>
 
-```text
-$ devcoach lessons --imported
-╭───┬────────────┬────────┬──────────────────────────────────────────┬───────┬──────────────┬───────────╮
-│   │ Date       │ Topic  │ Title                                    │ Level │ Categories   │ Shared by │
-├───┼────────────┼────────┼──────────────────────────────────────────┼───────┼──────────────┼───────────┤
-│ · │ 2026-04-20 │ sqlite │ WAL mode: readers never block writers 💡 │  mid  │ sqlite, node │ Ada       │
-╰───┴────────────┴────────┴──────────────────────────────────────────┴───────┴──────────────┴───────────╯
-```
+- It appears in your log with a **🤝 shared by** line and can be filtered with
+  `devcoach lessons --imported` / `--from <name>`, `get_lessons({imported: true})` /
+  `({shared_by: "<name>"})`, or the dashboard's **🤝 Shared** filter.
 
-- Its **topic counts as taught**, so the coach will not teach it again, and **✓/✗ feedback works**
-  as for your own lessons. If the topic is not in your knowledge map yet, you are offered to track it.
+  ```text
+  $ devcoach lessons --imported
+  ╭───┬────────────┬────────┬──────────────────────────────────────────┬───────┬──────────────┬───────────╮
+  │   │ Date       │ Topic  │ Title                                    │ Level │ Categories   │ Shared by │
+  ├───┼────────────┼────────┼──────────────────────────────────────────┼───────┼──────────────┼───────────┤
+  │ · │ 2026-04-20 │ sqlite │ WAL mode: readers never block writers 💡 │  mid  │ sqlite, node │ Ada       │
+  ╰───┴────────────┴────────┴──────────────────────────────────────────┴───────┴──────────────┴───────────╯
+  ```
+
+- Its **topic counts as taught**, so the coach will not teach it again, and **✓ / 💡 / ✗ feedback
+  works** as for your own lessons. If the topic is not in your knowledge map yet, you are offered to track it.
 - It **never counts against your daily limit** or the minimum gap, and never resets the pacing — a
   shared lesson is a gift, not a lesson delivered to you.
 - Importing the same share twice reports *already in your log*; the same lesson from a different
@@ -195,11 +246,7 @@ $ devcoach lessons --imported
 
 ## The `.devcoach.md` format
 
-A `.devcoach.md` is a markdown file with YAML front matter — readable by people, renderable on GitHub,
-and importable by any devcoach. Other tools can write it too; the parser accepts JSON-quoted strings,
-flow lists (`[a, b]`) and `null`:
-
-```markdown
+```markdown title="wal-mode-readers.devcoach.md"
 ---
 format: devcoach.lesson
 version: 1
@@ -219,6 +266,10 @@ SQLite's default rollback journal locks the whole database for a write…
 
 💡 *Senior tip:* enable WAL once per database file — it persists.
 ```
+
+A `.devcoach.md` is a markdown file with YAML front matter — readable by people, renderable on GitHub,
+and importable by any devcoach. Other tools can write it too; the parser accepts JSON-quoted strings,
+flow lists (`[a, b]`) and `null`.
 
 Optional keys, present only when context was included: `task_context`, `project`, `repository`,
 `branch`, `commit_hash`, `repository_platform`. `folder` is never written.
