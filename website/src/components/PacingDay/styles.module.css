@@ -1,0 +1,93 @@
+/* A day as one line: its columns are the stretches of time, sized in minutes, so the lessons sit
+   where the numbers put them. Four rows share those columns: lesson labels, the line, what each
+   stretch means, the clock. Same frame as the guides' cards. */
+.day {
+  margin: 1.25rem 0 1.75rem;
+  padding: 1.1rem 1.2rem 1rem;
+  border: 1px solid var(--ifm-color-emphasis-200);
+  border-radius: 12px;
+  background: var(--ifm-background-surface-color);
+}
+.plot {
+  display: grid;
+  row-gap: 0.35rem;
+  /* room for the first lesson's dot, which straddles a column edge */
+  padding: 0 0.4rem;
+}
+.label {
+  align-self: end;
+  min-width: 0;
+  /* the label starts at its lesson's dot */
+  margin-left: -0.4rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+.track {
+  position: relative;
+  height: 0;
+  margin: 0.45rem 0;
+  border-top: 3px solid var(--ifm-color-emphasis-300);
+}
+.gap {
+  border-top-color: var(--devcoach-accent);
+}
+.after {
+  border-top-style: dashed;
+}
+/* A lesson: a dot on the line, at the start of the stretch that follows it. */
+.lesson::before {
+  content: "";
+  position: absolute;
+  left: -0.4rem;
+  top: calc(-0.4rem - 1.5px);
+  width: 0.8rem;
+  height: 0.8rem;
+  border-radius: 50%;
+  background: var(--devcoach-accent);
+  box-shadow: 0 0 0 3px var(--ifm-background-surface-color);
+}
+.note {
+  min-width: 0;
+  padding-right: 0.4rem;
+  font-size: 0.8rem;
+  line-height: 1.3;
+  color: var(--ifm-color-emphasis-700);
+}
+/* Small text: the site's link colour, which clears WCAG AA in both themes (the accent does not in light). */
+.gapNote {
+  color: var(--ifm-color-primary);
+  font-weight: 600;
+}
+.time {
+  display: flex;
+  justify-content: space-between;
+  min-width: 0;
+  margin-left: -0.4rem;
+  font-family: var(--ifm-font-family-monospace);
+  font-size: 0.7rem;
+  /* emphasis-700, not 600: 600 is 3:1 on white, under WCAG AA for text this small */
+  color: var(--ifm-color-emphasis-700);
+  font-variant-numeric: tabular-nums;
+}
+.time:last-child {
+  margin-right: -0.4rem;
+}
+.caption {
+  margin-top: 0.9rem;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--ifm-color-emphasis-800);
+}
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}

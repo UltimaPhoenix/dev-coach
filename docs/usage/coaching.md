@@ -5,6 +5,11 @@ sidebar_label: Coaching in your agent
 
 # Coaching in your agent
 
+import ThemedShot from "@site/src/components/ThemedShot";
+import { Cards, Card } from "@site/src/components/Cards";
+import { Chat, Say } from "@site/src/components/Chat";
+import PacingDay from "@site/src/components/PacingDay";
+
 :::tip[Not installed yet?]
 Pick a method in **[Installation](../install/index.md)** — it takes about 30 seconds — then come back here.
 :::
@@ -26,29 +31,60 @@ plugin (it first checks that devcoach is running — see
 [troubleshooting](../install/claude-code-plugin.md#troubleshooting) if it isn't), or just say *"set up
 devcoach"* in any agent. You pick one of four options.
 
+<Cards columns={2}>
+  <Card label="Recommended" title="Automatic" to="#automatic-strongly-recommended">Builds your profile in one pass, with no questions, from the stack detected across your local Claude Code history. Conversation text is never read.</Card>
+  <Card label="Opt-in" title="Automatic (Deep)" to="#automatic-deep">Also reads real conversation text from your local session transcripts, in a separate subagent, for a finer-grained profile.</Card>
+  <Card label="By hand" title="Guided" to="#guided">devcoach asks about each technology you use and how confident you are with it.</Card>
+  <Card label="New machine" title="Import backup" to="#import-backup">Give it the path of your backup zip and your whole profile is imported instantly.</Card>
+</Cards>
+
 ### Automatic (strongly recommended)
 
 **If you already use Claude Code on real projects, choose automatic.** devcoach builds your profile in
-one pass, with no questions, from the stack detected across your whole local Claude Code history — the
-projects map, manifests and lockfiles (`package.json`, `requirements.txt`, `go.mod`, …), activity
-metadata, and auto-memory excerpts. Conversation text is never read. Topics, starting confidence scores,
-and groups (Languages, Frontend, DevOps, …) are saved right away; you review and adjust afterwards. It's
-the fastest path and gives the most accurate starting profile — which is why it's recommended for anyone
-already working in real codebases with Claude.
+one pass, with no questions, from the stack detected across your whole local Claude Code history:
+
+- the projects map;
+- manifests and lockfiles (`package.json`, `requirements.txt`, `go.mod`, …);
+- activity metadata;
+- auto-memory excerpts.
+
+Conversation text is never read. Topics, starting confidence scores, and groups (Languages, Frontend,
+DevOps, …) are saved right away; you review and adjust afterwards.
+
+It's the fastest path and gives the most accurate starting profile, which is why it's recommended for
+anyone already working in real codebases with Claude.
 
 ### Automatic (Deep)
 
-Opt-in variant for a finer-grained profile. A metadata-only pre-check first counts the projects active in
-the last three months; above eight, devcoach asks whether to narrow the window, proceed with the 25 most
-recent, or pick specific projects. A separate subagent then reads real conversation text from your local
-session transcripts (`~/.claude/projects/`, at most the 5 most recent sessions per project) and returns
-only the synthesized topics, groups, and notebook — the transcripts never enter your main conversation.
+Opt-in variant for a finer-grained profile. It works in three steps:
+
+```mermaid
+flowchart TD
+    P["1 · Pre-check<br/>(metadata only)"] -- "projects" --> S["2 · Separate subagent"]
+    T[("Session transcripts<br/>~/.claude/projects/")] -- "read here" --> S
+    S -- "3 · topics, groups,<br/>notebook only" --> M(["Your main conversation"])
+```
+
+1. **A metadata-only pre-check** counts the projects active in the last three months. Above eight,
+   devcoach asks whether to narrow the window, proceed with the 25 most recent, or pick specific
+   projects.
+2. **A separate subagent** reads real conversation text from your local session transcripts
+   (`~/.claude/projects/`, at most the 5 most recent sessions per project).
+3. **Only the result comes back:** the synthesized topics, groups, and notebook. The transcripts never
+   enter your main conversation.
+
 Your agent states this trade-off before you choose.
 
 ### Guided
 
-Prefer to describe your stack by hand? devcoach asks about each technology and your confidence
-(1–3 still learning · 4–6 comfortable · 7–9 strong · 10 expert).
+Prefer to describe your stack by hand? devcoach asks about each technology and your confidence:
+
+| Confidence | Meaning |
+|---|---|
+| 1–3 | still learning |
+| 4–6 | comfortable |
+| 7–9 | strong |
+| 10 | expert |
 
 ### Import backup
 
@@ -74,6 +110,15 @@ Whichever option you pick, devcoach saves the profile, writes the coaching noteb
 
 Change any of this later: tell me in chat, use the `devcoach` CLI, or open `devcoach ui`.
 ```
+
+That profile is your knowledge map. This is how the dashboard (`devcoach ui`) shows one, here with the
+documentation's demo data:
+
+<ThemedShot
+  alt="The Knowledge Map page of the dashboard: topics grouped by area, each with a confidence bar from 0 to 10"
+  light={require("../screenshots/knowledge-map-light.png").default}
+  dark={require("../screenshots/knowledge-map-dark.png").default}
+/>
 
 Prefer the terminal? `devcoach setup` is an interactive wizard — backup path → automatic or manual
 topics → optional groups → daily limit and minimum gap — that you can run any time.
@@ -101,16 +146,26 @@ Did that land? ✅ knew it (y) · 💡 understood (u) · ❌ couldn't follow (n)
 
 ## The feedback loop
 
-Answer on the line under the card — a bare `y`, `u` or `n` is enough — and your reply tunes future
+Answer on the line under the card. A bare `y`, `u` or `n` is enough, and your reply tunes future
 coaching:
 
-- **✅ knew it** (`y`, `yes`) — you already knew this: your confidence on that topic goes up by one,
-  and you'll see fewer, deeper lessons there.
-- **💡 understood** (`u`, `got it`) — it was new and it landed: the coach pitched the right level, so
-  nothing changes.
-- **❌ couldn't follow** (`n`, `no`) — too dense for this session: confidence stays where it is, and
-  the lesson is kept as a seed for a step-by-step course you can start whenever you like.
-- **Anything else, or no reply** — no change; the question is dropped silently and you carry on.
+<Cards columns={3}>
+  <Card label="y · yes" title="✅ knew it">You already knew this. Your confidence on that topic goes up by one, and you'll see fewer, deeper lessons there.</Card>
+  <Card label="u · got it" title="💡 understood">It was new and it landed. The coach pitched the right level, so nothing changes.</Card>
+  <Card label="n · no" title="❌ couldn't follow">Too dense for this session. Confidence stays where it is, and the lesson is kept as a seed for a step-by-step course you can start whenever you like.</Card>
+</Cards>
+
+**Anything else, or no reply:** no change. The question is dropped silently and you carry on.
+
+After a ❌ the coach offers that course, once:
+
+<Chat label="Under a lesson card">
+  <Say who="coach">Did that land? ✅ knew it (y) · 💡 understood (u) · ❌ couldn't follow (n)</Say>
+  <Say who="you">n</Say>
+  <Say who="coach">Want a step-by-step course on this? 🎓</Say>
+</Chat>
+
+Say yes and it begins right there. [Courses](./courses.md) has the rest.
 
 ## The coaching notebook
 
@@ -138,10 +193,18 @@ is in [Sharing lessons](./sharing.md).
 
 ## Staying unobtrusive
 
-Coaching is paced: a lesson is cued at most once every `nudge_every` interactions (default 10) per chat
-session, and only within the rate limit. Rate limits keep coaching from getting noisy — by default
-**≤ 2 lessons/day, ≥ 4 hours apart**. Not what you want? Customize immediately — more aggressive if you
-want to learn faster, looser if you prefer fewer interruptions.
+devcoach is built to stay out of your way, and the pace is yours to set. Two lessons a day is only the
+default. Three settings decide how often a lesson can come; this is a day with their defaults:
+
+<PacingDay />
+
+- **Coaching is paced.** A lesson is cued at most once every `nudge_every` interactions (default 10) per
+  chat session, and only within the rate limit.
+- **Rate limits keep coaching from getting noisy.** By default that is **≤ 2 lessons/day, ≥ 4 hours
+  apart** (`max_per_day`, `min_gap_minutes`).
+
+Not what you want? Customize immediately: more aggressive if you want to learn faster, looser if you
+prefer fewer interruptions.
 
 Adjust with the terminal:
 ```bash
