@@ -6,6 +6,22 @@ keywords: [why devcoach, AI and developer skills, skill erosion, validating AI c
 
 # Why devcoach
 
+import { Card, Cards } from "@site/src/components/Cards";
+
+**In short**
+
+<Cards columns={3}>
+<Card title="We're learning differently now" to="#were-learning-differently-now">
+We used to learn a thing *before* we used it. Increasingly we don't: if the agent can already do it, studying it up front feels like wasted effort.
+</Card>
+<Card title="The thing we quietly stand to lose" to="#the-thing-we-quietly-stand-to-lose">
+The headline worry about AI is that it will be *wrong*. The deeper worry is that we will gradually lose the ability to *tell when it is wrong*.
+</Card>
+<Card title="You can't cram competence" to="#you-cant-cram-competence">
+Real understanding is built slowly. That is the case for learning a little continuously now — so the depth is already there when the stakes are high.
+</Card>
+</Cards>
+
 AI agents now write a large share of the code we ship. They scaffold features, fix bugs, choose libraries,
 and explain themselves convincingly while doing it. The productivity is real — but so is a quieter cost:
 when the machine does the thinking, it is easy to accept the result and learn nothing from it. Velocity
@@ -34,7 +50,9 @@ problem is not any single skipped dive; it is what their accumulation quietly co
 ## The thing we quietly stand to lose
 
 The headline worry about AI is that it will be *wrong*. The deeper worry is that we will gradually lose the
-ability to *tell when it is wrong*. Validation — reading a diff and knowing it's subtly off, smelling a
+ability to *tell when it is wrong*.
+
+Validation — reading a diff and knowing it's subtly off, smelling a
 design that will not scale, recognizing the security hole the model didn't mention — is a skill, and skills
 decay when they go unused. As more work is delegated, fewer people exercise the judgment that catches the
 mistakes. The failure mode isn't a dramatic one; it's a slow erosion where the human in the loop is still
@@ -66,7 +84,9 @@ This is also why devcoach teaches more than the right answer. Knowing *what* to 
 It covers the wrong answers on purpose, too. One quiet effect of capable AI is that it spares you mistakes
 you never even see — it simply doesn't write the race condition, the N+1 query, the insecure default. That
 feels like a gift, but you also never learn why those are wrong, so you can't recognise them when one does
-slip through. Having understood a failure mode — ideally by having met it — is what lets you catch it
+slip through.
+
+Having understood a failure mode — ideally by having met it — is what lets you catch it
 later. devcoach surfaces the anti-patterns deliberately, because the mistakes you understand are the ones
 you can prevent.
 
