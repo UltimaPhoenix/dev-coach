@@ -99,6 +99,7 @@ dashboard, then the check question.
       "The first reader only, the others wait for its result",
       "Every reader that arrives during those 300 ms",
       "Nobody: the cache keeps serving the old value",
+      "Not sure",
     ]}
     picked="Every reader that arrives during those 300 ms"
   />
@@ -108,11 +109,13 @@ dashboard, then the check question.
 A correct answer marks the step done and moves on. A wrong one gets a fresh angle, never a silent
 skip; after two misses the coach offers to split the step in two, right there in the document.
 Check questions come as choices when the answer is a pick (an order, a yes/no, one of a few
-candidates) and as free text when you have to write an output or an explanation.
+candidates), with *Not sure* last, and as free text when you have to write an output or an
+explanation.
 
 <a id="what-happens-next" />
 
-- Say *skip* to skip a step, *later* to pause; `/devcoach:course continue` resumes.
+- Say *skip* to skip a step, *later* to pause; `/devcoach:course continue` resumes (or say
+  *continue the course*).
 - While a course is active, the usual lesson cues pause, so nothing interrupts the conversation.
 - At the end, if the course grew from a lesson you couldn't follow, it offers once to mark that
   lesson as understood.
@@ -147,8 +150,8 @@ page. A Java, Rust, Go, Python or Swift course keeps its snippets read-only and 
 the output, fill a blank, spot the bug, or drive a simulation of the concept instead.
 
 **An optional copy as a Claude artifact.** Right after writing the document, and only in a client
-that has the Artifact tool, the coach offers once to publish the same file as a Claude artifact — a
-copy you can share by link:
+that has the Artifact tool, the coach offers once to publish the same file as a Claude artifact: a
+copy you can share by link.
 
 <Chat label="The offer, in the devcoach skill's words">
   <Say who="coach">*Publish this course as a Claude artifact too? That **uploads a copy to claude.ai** — it leaves this machine. Only you can open it until you share the link.* *It mentions lolcoach and the hang you debugged.*</Say>
@@ -158,7 +161,7 @@ copy you can share by link:
 **Saying yes uploads that copy to claude.ai: it is the one case where course content leaves your
 machine.** The link is private until you share it, but the file then lives on Anthropic's
 servers under your account, and a course often quotes your own work (project names, paths,
-snippets from the task that started it) — the coach tells you what this one contains when it
+snippets from the task that started it). The coach tells you what this one contains when it
 asks. Say no and nothing is uploaded. The local file stays the course either way; devcoach
 records nothing about the artifact, so you manage or delete it from your artifacts on claude.ai.
 [Privacy & security](../reference/privacy.md#publishing-a-course-as-an-artifact) has the full
@@ -206,11 +209,15 @@ its rows and its folder; the lesson stays.
 The coach wrote the document, so the dashboard confines it. It shows the document in a sandboxed
 frame (`sandbox="allow-scripts allow-forms"`) and serves it with a Content-Security-Policy that
 applies the same sandbox when you open its dashboard address in a tab of its own (opened straight
-from disk, the file is an ordinary local page). The document cannot load anything from the network
-(no fetch, no scripts, images or fonts from the web), post a form, open a window, or read or change
-the dashboard. Scripts inside it do run, `eval` included, on purpose: that
-is what makes the editable JavaScript examples work, and the sandbox leaves them nothing of yours to
-reach. Like any page, it can still follow a link, which replaces the course in its frame.
+from disk, the file is an ordinary local page). Under that policy the document cannot request
+anything from the web (scripts, styles, images, fonts or a fetch), post a form, open a window or a
+dialog, or read or change the dashboard. Scripts inside it do run, `eval` included, on purpose: that
+is what makes the editable JavaScript examples work. The policy does not stop the document from
+loading another web address in its place, through a link or a script; the page that loads then is
+not under the course's network rules.
+
+A course your own agent wrote from your own work is yours. Treat a course file from someone else as
+you would any HTML file from someone else.
 
 :::
 
@@ -231,19 +238,10 @@ reach. Like any page, it can still follow a link, which replaces the course in i
   </TabItem>
 </Tabs>
 
-The two courses on this page are the documentation's own demo: charts and diagrams are plain SVG
-that the document draws from a function, so they follow the theme like everything else.
-
 ## CLI
 
-`devcoach courses` lists your courses with their progress; `devcoach course <id>` shows one: the
-chain, the steps and where the document is. On the demo data:
-
-<Terminal
-  command="devcoach courses"
-  output={cli.courses}
-  caption="The table is wider than this column: scroll it sideways for the status and the date."
-/>
+`devcoach courses` lists your courses with their progress, status and last update;
+`devcoach course <id>` shows one: the chain, the steps and where the document is. On the demo data:
 
 <Terminal command="devcoach course from-a-cache-miss-to-a-stampede" output={cli.course} />
 
@@ -255,7 +253,7 @@ next time you open the course. Keep it working in the dashboard:
 
 | Keep | Why |
 |---|---|
-| Inline styles and scripts only: no external URLs, no forms, no `alert` / `confirm` | The frame blocks all of those |
+| Inline styles and scripts only: nothing loaded from a URL, no forms, no `alert` / `confirm` | The frame blocks all of those |
 | The one-section-at-a-time script and the `nav.steps` menu | The dashboard hides the menu and switches steps from its own list |
 | Colours as CSS variables on `:root` | They follow the light and dark themes, in the dashboard and on their own |
 | A new section registered with the agent (`add_course_step`) | Only registered sections appear in the step list; any other stays as extra reading |
@@ -278,11 +276,12 @@ so a restored course is self-contained again. See
 dashboard's palette without copying it**: the neutrals are the dashboard's, the accent is the
 course's own. Opened on its own, the document follows your OS and has its own light/dark switch;
 inside the dashboard that switch is hidden, and the document follows the dashboard's theme toggle,
-with the dashboard's neutrals.
+with the dashboard's neutrals. The two demo courses on this page draw their charts and diagrams as
+plain SVG from a function, so they follow the theme like everything else.
 
-**What the dashboard adds, and the one thing devcoach writes.** The dashboard opens the file with
-`data-embedded` set, which hides the menu, and appends a small script that reports the frame's
-height and current step. Those additions are never written to the file. The one write devcoach makes
+**What the dashboard adds, and the one thing devcoach writes.** The dashboard appends a small script
+to the file it serves: it sets `data-embedded`, which hides the menu, and reports the frame's height
+and current step. Those additions are never written to the file. The one write devcoach makes
 to a course document is filling the highlighter placeholder, when a step is registered or its
 progress changes (the dashboard's *Mark done* included).
 
