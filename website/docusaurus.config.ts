@@ -304,7 +304,7 @@ const config: Config = {
           to: "/usage/coaching",
           label: "Docs",
           position: "left",
-          activeBaseRegex: `^${BASE_URL}(how-it-works|usage|reference|troubleshooting|faq|vision)(/|$)`,
+          activeBaseRegex: `^${BASE_URL}(how-it-works|usage|reference|troubleshooting|faq|glossary|vision)(/|$)`,
         },
         { to: "/install", label: "Install", position: "left", activeBaseRegex: `^${BASE_URL}install(/|$)` },
         { to: "/why", label: "Why devcoach", position: "left" },
@@ -365,6 +365,7 @@ const config: Config = {
           items: [
             { label: "Troubleshooting", to: "/troubleshooting" },
             { label: "FAQ", to: "/faq" },
+            { label: "Glossary", to: "/glossary" },
             { label: "Issues & feedback", href: "https://github.com/UltimaPhoenix/dev-coach/issues" },
           ],
         },
