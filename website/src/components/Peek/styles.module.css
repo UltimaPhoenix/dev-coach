@@ -1,40 +1,31 @@
-/* Folded: the screenshot's toolbar plus one screen of the capture (16:10, the dashboard captures'
-   viewport) at whatever width the column has, then a fade into the page with the button on it.
-   Open: the capture at its full height, the button under it. */
+/* Folded: the box is cut at the measured fold (an inline max-height set by the component), the
+   picture fades into the page and the button sits on the fade. Open, or never folded (no
+   JavaScript, not measured yet): the picture at its full height, the button under it if any. */
 .peek {
   position: relative;
-  container-type: inline-size;
   margin: 0 0 1.5rem;
 }
 .content {
-  max-height: calc(2.4rem + 62.5cqi);
-  border-radius: 12px;
-  overflow: hidden;
+  border-radius: var(--dc-radius);
 }
-.open .content {
-  max-height: none;
+.folded .content {
+  overflow: hidden;
 }
 /* The figure inside brings its own bottom margin; the wrapper carries it instead. */
 .content > figure {
   margin-bottom: 0;
 }
 .more {
-  position: absolute;
-  inset: auto 0 0;
   display: flex;
   justify-content: center;
-  padding: 4rem 1rem 1rem;
-  /* Infima's light page background is transparent over white, i.e. the surface colour. */
-  background: linear-gradient(to bottom, transparent, var(--ifm-background-surface-color) 75%);
-  pointer-events: none;
-}
-:global([data-theme="dark"]) .more {
-  background: linear-gradient(to bottom, transparent, var(--ifm-background-color) 75%);
-}
-.open .more {
-  position: static;
   padding: 0.6rem 0 0;
-  background: none;
+}
+.folded .more {
+  position: absolute;
+  inset: auto 0 0;
+  padding: 4rem 1rem 1rem;
+  background: linear-gradient(to bottom, transparent, var(--dc-page-bg) 75%);
+  pointer-events: none;
 }
 .more button {
   pointer-events: auto;
@@ -42,13 +33,4 @@
 .more button:focus-visible {
   outline: 2px solid var(--devcoach-accent);
   outline-offset: 2px;
-}
-/* Narrow screens (Docusaurus's mobile layout): a capture is short enough there to show whole. */
-@media (max-width: 996px) {
-  .content {
-    max-height: none;
-  }
-  .more {
-    display: none;
-  }
 }

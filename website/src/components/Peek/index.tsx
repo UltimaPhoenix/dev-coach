@@ -1,8 +1,19 @@
-// A tall screenshot, shown from its top: on a wide screen the first screen of the capture is
-// visible and a button shows the rest in place (and folds it again). The dashboard's lesson and
-// settings pages are two or three screens long; left at full height they push the text they
-// illustrate far down the guide. On a phone the capture is small enough to show whole, so nothing
-// is folded there, and a capture that already fits gets no button.
+// A tall screenshot shown from its top: the first part of the picture is visible and a button shows
+// the rest in place (and folds it again). The dashboard's Settings page is four screens of capture,
+// mostly the notebook; at full height it would push the text it illustrates far down the guide.
+//
+//   import Peek from "@site/src/components/Peek";
+//
+//   <Peek show={0.37} label="Show the coaching notebook">
+//     <ThemedShot alt="…" light={…} dark={…} />
+//   </Peek>
+//
+// - `show`: the share of the picture's height that stays visible when folded, from 0 to 1.
+// - `label`: the button's text; say what the rest shows.
+// The fold is measured on the picture itself (the first visible image inside), so whatever sits
+// above it (ThemedShot's theme buttons) and the picture's proportions are taken as they are. Until
+// that measurement, on the server and without JavaScript, nothing is folded: the whole picture shows
+// and there is no button. A picture whose hidden part would be a sliver is not folded either.
 import clsx from "clsx";
 import type { ReactNode } from "react";
 import { useEffect, useId, useRef, useState } from "react";
@@ -10,33 +21,46 @@ import styles from "./styles.module.css";
 
 interface Props {
   children: ReactNode;
+  /** Share of the picture's height shown while folded, from 0 to 1. */
+  show: number;
   /** The button's text; say what the rest shows when it is not obvious. */
   label?: string;
 }
 
-export default function Peek({ children, label = "Show the whole screen" }: Props): ReactNode {
+/** Folding must hide at least this much of the picture to be worth a button. */
+const MIN_HIDDEN_PX = 80;
+
+export default function Peek({ children, show, label = "Show the whole screen" }: Props): ReactNode {
   const id = useId();
   const content = useRef<HTMLDivElement>(null);
   const button = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
-  // Until measured (server render, first paint) assume the capture is taller than the fold.
-  const [folds, setFolds] = useState(true);
-  const openRef = useRef(open);
-  openRef.current = open;
+  // The fold, in pixels from the top of the box; null: not measured, or not worth folding.
+  const [fold, setFold] = useState<number | null>(null);
+  const share = Math.min(1, Math.max(0, show));
 
   useEffect(() => {
     const box = content.current;
     if (!box || typeof ResizeObserver === "undefined") return;
-    // Only a folded box can tell whether its content overflows; an open one keeps its button.
     const measure = () => {
-      if (!openRef.current) setFolds(box.scrollHeight > box.clientHeight + 1);
+      // ThemedShot keeps one image per theme and hides the other: measure the one on screen.
+      const picture = [...box.querySelectorAll("img")].find(
+        (img) => img.getClientRects().length > 0 && img.offsetHeight > 0,
+      );
+      if (!picture) return setFold(null);
+      const top = picture.getBoundingClientRect().top - box.getBoundingClientRect().top;
+      const at = Math.round(top + picture.offsetHeight * share);
+      setFold(box.scrollHeight - at >= MIN_HIDDEN_PX ? at : null);
     };
-    // The box resizes with the viewport; its children when a lazy image loads or a tab shows it.
+    // The box resizes with the column; its children when a lazy image loads or the theme changes.
     const observer = new ResizeObserver(measure);
     observer.observe(box);
     for (const child of Array.from(box.children)) observer.observe(child);
     return () => observer.disconnect();
-  }, []);
+  }, [share]);
+
+  const folds = fold !== null;
+  const folded = folds && !open;
 
   const toggle = () => {
     setOpen(!open);
@@ -45,8 +69,13 @@ export default function Peek({ children, label = "Show the whole screen" }: Prop
   };
 
   return (
-    <div className={clsx(styles.peek, open && styles.open)}>
-      <div id={id} ref={content} className={styles.content}>
+    <div className={clsx(styles.peek, folded && styles.folded)}>
+      <div
+        id={id}
+        ref={content}
+        className={styles.content}
+        style={folded ? { maxHeight: fold } : undefined}
+      >
         {children}
       </div>
       {folds && (

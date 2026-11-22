@@ -1,20 +1,22 @@
 ---
 title: Web dashboard
 sidebar_label: Web dashboard
+description: The devcoach dashboard shows your lessons, knowledge map, courses and settings in your browser, and lets you change them. How to open and stop it, and what each page shows.
 ---
 
 # Web dashboard
 
 import ThemedShot from "@site/src/components/ThemedShot";
+import Clip from "@site/src/components/Clip";
+import Scale from "@site/src/components/Scale";
+import Peek from "@site/src/components/Peek";
 import Tabs from "@theme/Tabs";
 import TabItem from "@theme/TabItem";
 import { Cards, Card } from "@site/src/components/Cards";
-import Peek from "@site/src/components/Peek";
 
-**What it's for:** a visual interface for everything the [CLI](./cli.md) does — browse and filter your
-lesson history at a glance, adjust your knowledge map by clicking, and import/export backups. It's a
-companion to the automatic [coaching in your agent](./coaching.md), reading and writing the same local
-database.
+The dashboard shows your lessons, knowledge map, courses and settings in your browser, and lets you
+change them. It is a companion to the [coaching in your agent](./coaching.md) and to the
+[CLI](./cli.md): all three read and write the same local database.
 
 <Cards columns={3}>
   <Card label="Nav: Profile" title="Knowledge map" to="#knowledge-map-knowledge">
@@ -45,490 +47,302 @@ npx -y devcoach ui --port 8080  # custom port
 npx -y devcoach ui --open       # also open it in your default browser
 ```
 
-Installed devcoach globally or via Homebrew? Drop the `npx -y` and just run `devcoach ui`.
+Installed devcoach globally or with Homebrew? Drop the `npx -y` and run `devcoach ui`.
 
-- **The URL is a link.** It is printed as a clickable link in terminals that support OSC 8 hyperlinks
-  (iTerm2, Ghostty, WezTerm, Kitty, VS Code, Windows Terminal, GNOME Terminal); elsewhere cmd/ctrl-click
-  the plain URL. `--open` launches your default browser as well.
-- **Local only.** The dashboard binds to `127.0.0.1` only, so it is never reachable from other machines.
+- **The URL is a link.** Most terminals open it on a click (or Cmd/Ctrl-click).
+- **Local only.** The dashboard listens on `127.0.0.1` only, so no other machine can reach it.
+- **Where it opens:** your lessons once you have one, the knowledge map before that.
+  Settings → *Home page* picks one for good.
 - **Port taken?** `devcoach ui` tells you whether a dashboard is already running there (open it, or
-  `--stop` it) or another process holds the port (pick `--port`).
+  `--stop` it) or another program holds the port (pick another with `--port`).
 
-Or let Claude open it for you via the MCP tool:
-
-```
-open_ui({ port: 7860 })
-```
-
-Using the [Claude Code plugin](../install/claude-code-plugin.md)? It ships a shortcut for exactly that —
-type `/devcoach:ui` (optionally with a port, e.g. `/devcoach:ui 8080`) and Claude starts the dashboard
-and hands you the URL. No install, no PATH needed.
+Or ask your agent to *open the devcoach dashboard* (it calls the `open_ui` tool). With the
+[Claude Code plugin](../install/claude-code-plugin.md), type `/devcoach:ui` (or `/devcoach:ui 8080`):
+Claude starts it and gives you the URL, with no install and nothing on your PATH.
 
 ## Stop
 
-```bash title="Stop a dashboard from any terminal"
-npx -y devcoach ui --stop              # the one on port 7860
-npx -y devcoach ui --stop --port 8080  # if you changed the port
-```
+- **In the terminal that runs `devcoach ui`:** press **Ctrl+C**. The dashboard stops taking new
+  requests, lets the ones in progress finish (up to 2 seconds) and exits. A second Ctrl+C exits at
+  once.
+- **From any terminal:** `npx -y devcoach ui --stop`, with `--port 8080` if you changed the port.
+- **Started by your agent** (`open_ui`, `/devcoach:ui`): it runs in the background, so Ctrl+C cannot
+  reach it. Ask the agent to close it (`/devcoach:ui stop`, or *stop the devcoach dashboard*, which
+  calls the `stop_ui` tool), or use `--stop` as above. Both stop any dashboard on that port.
 
-- In the terminal that runs `devcoach ui`: **Ctrl+C**. The shutdown is graceful — the server stops
-  accepting, lets requests in flight finish (up to 2 s), then exits; a second Ctrl+C exits at once.
-- A dashboard started by your agent (`open_ui`, `/devcoach:ui`) runs detached, so Ctrl+C cannot reach
-  it: ask the agent to close it (`/devcoach:ui stop`, or *"stop the devcoach dashboard"* → the
-  `stop_ui` tool), or run `devcoach ui --stop` (add `--port` if you changed it). Both work on any
-  dashboard listening on that port.
+## Profile: the knowledge map (`/knowledge`) {/* #knowledge-map-knowledge */}
 
----
-
-## Pages
-
-- **Top nav:** **Profile** (`/knowledge`), **Lessons** and **Courses**.
-- **Top right:** the ⚙️ **Settings** button, and the sun/moon button. It shows the **current** theme and
-  switches it for this browser. The choice holds until you save a theme in Settings; with *System* the
-  dashboard follows your OS live.
-- **The root URL** (`/`, what `devcoach ui` prints) opens **Lessons** once you have at least one lesson
-  and the **knowledge map** before that; pick one explicitly under Settings → Home page.
-
-### Knowledge map (`/knowledge`)
-
-<ThemedShot
-  alt="Knowledge map"
-  light={require("../screenshots/knowledge-map-light.png").default}
-  dark={require("../screenshots/knowledge-map-dark.png").default}
+<Clip
+  alt="The knowledge map: Edit is pressed, the plus beside django raises it from 3 (red) to 4 (yellow), and Done leaves edit mode"
+  mp4={require("../clips/knowledge-edit.mp4").default}
+  webm={require("../clips/knowledge-edit.webm").default}
+  poster={require("../clips/knowledge-edit.png").default}
+  width={1640}
+  height={1026}
 />
 
-Your full knowledge map, with a colour-coded confidence bar per topic:
+The map lists every topic you track, in its group, with a confidence bar from 0 to 10. The bar's
+colour is its band, and the band sets how deep the lessons on that topic go:
 
-| Colour | Confidence | Meaning |
-|---|---|---|
-| **Green** | ≥ 7 | strong |
-| **Yellow** | 4–6 | intermediate |
-| **Red** | ≤ 3 | learning |
+<Scale
+  bands={[
+    { from: 0, to: 3, label: "learning", tone: "low" },
+    { from: 4, to: 6, label: "intermediate", tone: "mid" },
+    { from: 7, to: 10, label: "strong", tone: "high" },
+  ]}
+  caption={
+    <>
+      Junior lessons (from scratch, no jargon) up to 3, mid (the why, the alternatives, the
+      trade-offs) from 4 to 6, senior (edge cases, production trade-offs) from 7 to 9. At 10, only
+      something new from the last six months or so.
+    </>
+  }
+/>
 
-**What you can do here:**
-
-- **Read where you stand.** The stats bar at the top of the page (once there is a lesson) shows
-  `N lessons total · N / max today · N this week`, then whether a lesson is available now — or why not.
-- **Jump to a topic's lessons.** In view mode, topic names are clickable links that filter the lessons
-  page to show only lessons for that topic.
-- **Personalize your profile.** Click `✎ Edit` to enter edit mode. Changes save immediately as you edit.
+- **Where you stand.** Once you have a lesson, the line under the title reads
+  `N lessons total · N / max today · N this week`, then *Available now* or why the next lesson has
+  to wait.
+- **A topic's lessons.** Click a topic name to search your lessons for it.
+- **Change your map.** Click **✎ Edit**. Every change saves as you make it; **✓ Done** leaves edit
+  mode.
 
 <details>
 <summary>What does each button do in edit mode?</summary>
 
 | Button | What it does |
 |---|---|
-| `+` / `−` beside each bar | **Adjust confidence** — tune your self-assessment by 1 point |
-| `⇄` | **Reorganise topics** — moves a topic to a different group |
-| `×` beside a topic | **Remove topics** — deletes a topic you no longer care about |
-| `+ topic` in a group header | **Add topics** — adds directly to that group |
-| `+ Add topic` at the top | **Add topics** — adds to Other |
-| `+ Add group` at the top | **Create groups** — organise new categories (Languages, DevOps, Frontend, etc.) |
-| `×` beside a group name | **Delete groups** — its topics move to Other |
+| `+` / `−` beside a bar | Raises or lowers that topic's confidence by 1 |
+| `⇄` | Moves a topic to another group |
+| `×` beside a topic | Removes the topic |
+| `+ topic` in a group's header | Adds a topic to that group |
+| `+ Add topic` at the top | Adds a topic to Other |
+| `+ Add group` at the top | Creates a group (Languages, DevOps, Frontend…) |
+| `×` beside a group's name | Deletes the group; its topics move to Other |
 
 </details>
 
 <details>
 <summary>What does the map show before the first lesson?</summary>
 
-The page says what to do next instead of showing a blank map:
-
-- **Not set up yet** (no topic at all): a *Set up devcoach* block — say *"set up devcoach"* to your
-  agent (with the Claude Code plugin, `/devcoach:setup`). It also gives the one command that checks
-  the wiring for the way you installed devcoach: `devcoach doctor` for Homebrew and global npm
-  installs, `/devcoach:setup` under the plugin, `npx -y devcoach doctor` otherwise.
-- **Set up, no lesson yet**: the map alone; the stats bar appears with the first lesson.
+- **Not set up yet** (no topic at all): a *Set up devcoach* block. Say *set up devcoach* to your
+  agent (with the Claude Code plugin, `/devcoach:setup`). The block also gives the command that
+  checks the wiring for the way you installed devcoach: `devcoach doctor` for Homebrew and global npm
+  installs, `/devcoach:setup` with the plugin, `npx -y devcoach doctor` otherwise.
+- **Set up, no lesson yet**: the map alone. The line with your numbers appears with the first lesson.
 
 </details>
 
----
+## Lessons (`/lessons`)
 
-### Lessons (`/lessons`)
-
-<ThemedShot
-  alt="Lessons"
-  light={require("../screenshots/lessons-light.png").default}
-  dark={require("../screenshots/lessons-dark.png").default}
+<Clip
+  alt="The Lessons page: typing cache in the search box, clicking a senior level pill to filter by it, then opening a lesson"
+  mp4={require("../clips/lessons-find.mp4").default}
+  webm={require("../clips/lessons-find.webm").default}
+  poster={require("../clips/lessons-find.png").default}
+  width={1640}
+  height={922}
 />
 
-Filterable, sortable table of all delivered lessons.
+Every lesson you received or imported, newest first, 25 to a page.
 
-**What you can do here:**
-
-- **Find a lesson.** Search in free text, filter by period, feedback, level, category, project and more,
-  and sort by a column. Active filters show as chips above the table.
-- **Star it.** `★` toggles starred.
-- **Share it.** `↗` appears when you hover the row and shares the lesson from a popover right next to
-  the icon, without leaving the list.
-- **Filter by what you see.** Click a level pill or category chip to filter the table by it.
-- **Open it.** Click anywhere else on the row to open the detail page; feedback is recorded there.
-- **Add a lesson someone shared with you.** **＋ Import** (toolbar, right): paste the code, the link, a
-  URL, or the whole copied card into the box, pick a `.devcoach.md` file, or simply **drop the file
-  anywhere on the page**. See [Sharing a lesson](#sharing-a-lesson).
+- **Find a lesson.** Type in the search box, use the filters (period, feedback, level, category,
+  project and more), or click a level pill or a category chip in a row. Each active filter shows as
+  a chip above the table; its `×` removes it.
+- **Open it** by clicking anywhere else on its row. **Star it** with `☆`.
+- **Share it** with `↗`, which appears at the end of the row when you point at it. **＋ Import**, at
+  the right of the toolbar, adds one someone sent you ([Sharing a lesson](#sharing-a-lesson)).
 
 <details>
 <summary>Which filters are there?</summary>
 
 | Filter | Options |
 |---|---|
-| Period | All time / Today / Last 7 days / Last 30 days / Last year / Custom range (the date range accepts an optional time: `2026-04-25T14:30`) |
+| Period | All time / Today / Last 7 days / Last 30 days / Last year / Custom range (the dates take an optional time: `2026-04-25T14:30`) |
 | Feedback | All feedback / ✓ Knew it / 💡 Understood / ✗ Couldn't follow / — No response |
 | Level | All levels / 🟢 Junior / 🟡 Mid / 🔴 Senior |
-| Filters popover | Category / Project / Repository / Branch / Commit |
+| Filters | Category / Project / Repository / Branch / Commit |
 | Starred | Starred only |
 | Shared | All lessons / 👤 My own / 🤝 Shared with me / 🤝 from `<name>` (one entry per sender) |
 | Search | Free text (also matches the sender of a shared lesson) |
 
-When the active filters hide every lesson, the page names them
-(*No lessons match 🔍 "kafka" in 🕐 Last 7 days.*) and offers **Search all time** (drops the period
-or date range, keeps the rest — shown only when one is set) and **Clear every filter**.
+When the filters hide every lesson, the page names them
+(*No lessons match 🔍 "kafka" in 🕐 Last 7 days.*) and offers **Clear every filter** and, when a
+period or a date range is set, **Search all time**, which drops only that.
 
 </details>
 
 <details>
 <summary>Which columns are there, and how do I sort and resize them?</summary>
 
-- **Table columns:** ★, Date, Topic, Title, Level, Categories, Feedback, ↗ — the title gets the width
-  (categories wrap onto a second line when needed); the feedback cell shows `✓ Knew it` / `💡 Understood` / `✗ Couldn't follow`
-  (or nothing yet); `↗` opens the Share panel right there; a shared lesson shows `🤝 <sender>`
-  under its topic.
-- **Sort:** click the Date, Topic, Title, Level or Feedback column header. Ascending or descending.
-- **Pagination:** 25 per page.
-
-**Resizable columns** — on desktop widths, drag the boundary between two column headers: the column
-on one side grows exactly as much as its neighbour shrinks, so the table never changes width and no
-column can be pushed out of view. The title column takes whatever its neighbours give or take and never
-drops below a readable width. Widths are remembered in this browser (and dropped if they no longer fit
-the window); double-click a boundary to reset the two columns beside it, or use **⋯ → Reset column
-widths**.
-
-When the Date column gets narrow, dates switch to a compact form: `17m`, `today`, `Mon 2` within the
-last week, then `Sep 10`. Lessons two months old or older show their date instead of a relative label:
-`July 3` within the current year, `July 3, 2025` for earlier years (compact: `Jul 2025`).
+- **Columns:** ★, Date, Topic, Title, Level, Categories, Feedback, ↗. A narrower window hides
+  Feedback first (under 1280 px), then Categories (under 1024 px), then Topic (under 640 px).
+- **Topic** carries `🤝 <sender>` under it for a lesson someone shared with you. **Feedback** shows
+  `✓ Knew it`, `💡 Understood` or `✗ Couldn't follow`, or nothing yet.
+- **Sort:** click the Date, Topic, Title, Level or Feedback header; click again to reverse.
+- **Resize:** in a wide window, drag the line between two headers. The column on one side grows as
+  much as the other shrinks, so the table keeps its width; the title never gets too narrow to read.
+  Widths are remembered in this browser, and dropped when they no longer fit the window. Double-click a line to reset the two columns beside it, or
+  use **⋯ → Reset column widths**.
 
 </details>
 
 <details>
-<summary>How do I delete lessons, and what else is under ⋯ More?</summary>
+<summary>How do I delete lessons, and what else is under ⋯?</summary>
 
-**⋯ More** (toolbar, right) — the rare actions live behind this button so the toolbar stays calm:
+**⋯** (at the right of the toolbar) holds two actions:
 
-- **Delete lessons…** — deleting is deliberately hidden until you ask for it. The star column turns
-  into checkboxes, clicking a row now ticks it instead of opening it (the header checkbox ticks the
-  whole page), and a bar at the bottom shows *N selected* with **Delete selected**. One
-  confirmation, then the list reloads with the same filters and page. Esc or **✕ Cancel** (toolbar
-  or bar) leaves the mode without deleting anything; it is never remembered across reloads. Deleting is permanent; a lesson
-  someone shared with you can be deleted too, and the same share is accepted again if you import it
-  later.
-- **Reset column widths** — see *Resizing columns* above.
+- **Delete lessons…** turns the star column into checkboxes. Clicking a row now ticks it instead of
+  opening it (the header checkbox ticks the whole page), and a bar at the bottom shows *N selected*
+  with **Delete selected**. After one confirmation the list reloads with the same filters and page.
+  Esc or **✕ Cancel** leaves this mode without deleting anything, and a reload always leaves it.
+  Deleting is permanent. You can delete a lesson someone shared with you too; importing the same share
+  later adds it again.
+- **Reset column widths**: see *Which columns are there* above.
 
 </details>
 
 <details>
 <summary>What does the list show before the first lesson?</summary>
 
-With no lesson at all and no filter, the page says when lessons come (the pacing from Settings), asks
-you to set up your profile if you haven't, and gives the diagnostic command for your install with a
+With no lesson and no filter, the page says when lessons come (the pacing from Settings), asks you to
+set up your profile if you haven't, and gives the diagnostic command for your install with a
 **Copy** button.
 
 </details>
 
----
+## Lesson detail (`/lessons/<id>`)
 
-### Lesson detail (`/lessons/<id>`)
+<div className="row">
+<div className="col col--5">
 
-<Tabs>
-  <TabItem value="docker" label="Docker layer caching (Junior)" default>
-    <Peek label="Show the whole lesson">
-      <ThemedShot
-        alt="Docker layer caching"
-        light={require("../screenshots/lesson-docker-layer-cache-light.png").default}
-        dark={require("../screenshots/lesson-docker-layer-cache-dark.png").default}
-      />
-    </Peek>
-  </TabItem>
-  <TabItem value="postgres" label="PostgreSQL EXPLAIN ANALYZE (Mid)">
-    <Peek label="Show the whole lesson">
-      <ThemedShot
-        alt="PostgreSQL EXPLAIN ANALYZE"
-        light={require("../screenshots/lesson-postgresql-explain-analyze-light.png").default}
-        dark={require("../screenshots/lesson-postgresql-explain-analyze-dark.png").default}
-      />
-    </Peek>
-  </TabItem>
-  <TabItem value="rebase" label="Git interactive rebase (Mid)">
-    <Peek label="Show the whole lesson">
-      <ThemedShot
-        alt="Git interactive rebase"
-        light={require("../screenshots/lesson-git-interactive-rebase-light.png").default}
-        dark={require("../screenshots/lesson-git-interactive-rebase-dark.png").default}
-      />
-    </Peek>
-  </TabItem>
-  <TabItem value="cicd" label="CI/CD pipeline stages (Senior)">
-    <Peek label="Show the whole lesson">
-      <ThemedShot
-        alt="CI/CD pipeline stages"
-        light={require("../screenshots/lesson-ci-cd-pipeline-stages-light.png").default}
-        dark={require("../screenshots/lesson-ci-cd-pipeline-stages-dark.png").default}
-      />
-    </Peek>
-  </TabItem>
-  <TabItem value="stampede" label="Cache stampede (Senior)">
-    <Peek label="Show the whole lesson">
-      <ThemedShot
-        alt="Cache stampede"
-        light={require("../screenshots/lesson-redis-cache-stampede-light.png").default}
-        dark={require("../screenshots/lesson-redis-cache-stampede-dark.png").default}
-      />
-    </Peek>
-  </TabItem>
-</Tabs>
+<ThemedShot
+  alt="A lesson's page: title row, metadata, TL;DR, the lesson with its code, context, where it happened, the feedback buttons and the ID"
+  light={require("../screenshots/lesson-docker-layer-cache-light.png").default}
+  dark={require("../screenshots/lesson-docker-layer-cache-dark.png").default}
+/>
 
-Full lesson content laid out in reading order.
+</div>
+<div className="col col--7">
 
-**What you can do here:**
+From top to bottom (click the picture to see it at full size):
 
-- **Read the lesson.** The TL;DR callout first, then the full body with syntax-highlighted code blocks.
-- **Answer it.** The feedback buttons sit below the lesson and disappear once feedback is recorded.
-- **Go back to the code.** The git metadata row links to the repository, the commit and the project
-  folder, so you can immediately review the code that triggered the lesson.
-- **Star, share or delete it.** All three are in the title row.
+1. **Title row:** star, title, level pill (click it to list that level), **⋯** (🗑 Delete lesson…)
+   and **↗ Share**. `← Back to lessons` is above the card.
+2. **Metadata:** date (point at it for the exact time), topic, categories and, once you answer, your
+   answer with **Clear**. A shared lesson adds `🤝 shared by <name>`, a lesson that seeded a course a
+   `🎓 Course · N/M` link.
+3. **TL;DR:** the lesson in one sentence.
+4. **The lesson,** with highlighted code.
+5. **Context:** the task you were doing, when it was recorded.
+6. **Where it happened:** project, repo, branch, commit, folder. The repository and the commit open
+   on GitHub, GitLab or Bitbucket; the folder and a local repository open in VS Code.
+7. **Feedback buttons,** gone once you answer. Only **✓ I knew this** changes something now: your
+   confidence on the topic goes up by one, and **Clear** takes it back
+   ([the three answers](./coaching.md#the-feedback-loop)).
+8. **ID,** for `devcoach lesson <id>` and the other commands that take one.
 
-<details>
-<summary>What is on a lesson's page, from top to bottom?</summary>
+</div>
+</div>
 
-| Part | What it shows |
-|---|---|
-| **Title row** | `← Back to lessons`, star toggle, title, level pill (Junior / Mid / Senior), **↗ Share**, and the same **⋯ More** button as the Lessons toolbar, holding the rare actions — today **🗑 Delete lesson…** (asks for confirmation, then returns to the list) |
-| **Metadata row** | relative date with tooltip, topic ID, category chips, feedback badge + Clear; a lesson someone shared with you also shows `🤝 shared by <name>` |
-| **TL;DR callout** | one-sentence summary in a highlighted box, always visible above the body |
-| **Lesson body** | full markdown content with syntax-highlighted code blocks |
-| **Task context** | a `Context:` line with the coding task that triggered the lesson (when available) |
-| **Git metadata** | a row of lowercase labels, `project · repo · branch · commit · folder`, linking back to where the lesson came from (next table) |
-| **Feedback buttons** | `✓ I knew this` / `💡 Understood` / `✗ Couldn't follow` (hidden once feedback is recorded) |
-| **ID line** | the full lesson ID, for `devcoach lesson <id>` and friends |
+## Courses (`/courses`)
 
-</details>
+<Clip
+  alt="A course page: the step list at the left, the document on its current step; clicking step 3 switches to it, and Mark done moves the progress to 3 of 5"
+  mp4={require("../clips/course-steps.mp4").default}
+  webm={require("../clips/course-steps.webm").default}
+  poster={require("../clips/course-steps.png").default}
+  width={1640}
+  height={1074}
+/>
 
-<details>
-<summary>Where do the git metadata labels lead?</summary>
+**Courses** lists every step-by-step [course](./courses.md) with its status, its progress and the
+lesson it grew from. A course page shows its document one step at a time, under a bar that stays in
+view: back, title, status, progress and **⋯ → Delete course…**, which removes the course and its
+folder and keeps the lesson.
 
-| Label | What it is |
-|---|---|
-| **project** | the folder name where you were working |
-| **repo** | link with a platform icon (GitHub, GitLab, Bitbucket, or local). Click to open the remote repository in your browser or view local details |
-| **branch** | the git branch you were on when the lesson was taught |
-| **commit** | the exact commit (clickable to view on GitHub/GitLab/Bitbucket or as a local hash) |
-| **folder** | a VS Code icon link that opens the project folder in VS Code, so you can immediately review the code that triggered the lesson |
+- **The step list:** **Mark done**, **Skip** or **Reopen** a step, or click one to show it without a
+  reload. *About this course* opens the goal, the lesson it grew from and the ✓/✗ prerequisites.
+- **The document** follows the dashboard's light or dark theme, and its frame takes the height of the
+  step, so the page scrolls, not the frame. It runs sandboxed, also when you open it on its own
+  ([what it can do](./courses.md#the-dashboard)).
 
-</details>
-
----
-
-### Courses (`/courses`)
+## Sharing a lesson
 
 <Tabs>
-  <TabItem value="courses" label="Courses" default>
-    <ThemedShot
-      alt="The Courses list"
-      light={require("../screenshots/courses-light.png").default}
-      dark={require("../screenshots/courses-dark.png").default}
+  <TabItem value="share" label="↗ Share" default>
+    <Clip
+      alt="Sharing from the Lessons page: the arrow at the end of a row opens the share popover with your name, Include where it happened, and Copy text, Copy link, Download .md; Copy link turns to Copied"
+      mp4={require("../clips/share-lesson.mp4").default}
+      webm={require("../clips/share-lesson.webm").default}
+      poster={require("../clips/share-lesson.png").default}
+      width={1640}
+      height={922}
     />
   </TabItem>
-  <TabItem value="course" label="A course page">
-    <Peek label="Show the whole step">
-      <ThemedShot
-        alt="A course page: sticky bar, pinned step list, the document on its current step"
-        light={require("../screenshots/course-cache-stampede-light.png").default}
-        dark={require("../screenshots/course-cache-stampede-dark.png").default}
-      />
-    </Peek>
+  <TabItem value="import" label="＋ Import">
+    <Clip
+      alt="Importing: Import opens a box, a lesson code is pasted, and the imported lesson opens with a confirmation and shared by Sam; back in the list it is first, with Sam under its topic"
+      mp4={require("../clips/import-lesson.mp4").default}
+      webm={require("../clips/import-lesson.webm").default}
+      poster={require("../clips/import-lesson.png").default}
+      width={1640}
+      height={922}
+    />
   </TabItem>
 </Tabs>
 
-Every step-by-step [course](./courses.md) with its progress, its status and the lesson it grew
-from.
+- **Share:** **↗ Share** on a lesson's page, or `↗` at the end of its row to stay on the list. The
+  panel holds your name (from the *Your name* setting, else your git `user.name`; edit it, or empty it
+  to share anonymously), *Include where it happened* (off by default), and **Copy text**,
+  **Copy link**, **Download .md**.
+- **Import:** **＋ Import** on the Lessons page takes a code, a link, a web address, the whole copied
+  card or a lessons JSON export, or a `.devcoach.md` file you pick or drop anywhere on the page. A share link's
+  **Import** button opens a preview here instead; nothing is saved until you click
+  **Add to my lessons**.
+- **A shared lesson** shows its sender under the topic and a `🤝 shared by` line on its page. The
+  **🤝 Shared** filter lists them, per sender too. It never counts against your daily limit.
 
-**What you can do here:**
+What each way carries, what travels with a lesson and how an imported lesson behaves:
+[Sharing lessons](./sharing.md).
 
-- **Open a course.** A course page is the document itself, one step at a time, with a slim sticky bar
-  on top (back · title · status · progress · **⋯**) and a pinned step list at the side.
-- **Move through its steps.** **Mark done** / **Skip** / **Reopen** in the step list; clicking a step
-  switches the document to that section without a reload. *About this course* folds away the goal, the
-  seed lesson and the ✓/✗ prerequisite chain.
-- **Delete it.** The **⋯** menu holds **Delete course…** — rows and folder go, the seed lesson stays.
-- **Reach it from its lesson.** A lesson that seeded a course shows a `🎓 Course · N/M` link in its
-  metadata row.
+## Settings (`/settings`)
 
-:::note[The course document's frame]
-
-The document sits in a sandboxed frame (`sandbox="allow-scripts allow-forms"` plus a
-`Content-Security-Policy` that also sandboxes it when opened on its own: no network, no form posts,
-no navigation out — `eval` is allowed so editable JS examples can run). The frame grows to the height
-of the step it shows, so the page scrolls, never the frame, and the document follows the dashboard's
-light/dark toggle.
-
-:::
-
----
-
-### Sharing a lesson
-
-<Peek label="Show the whole lesson page">
+<Peek show={0.37} label="Show the coaching notebook">
   <ThemedShot
-    alt="Share popover"
-    light={require("../screenshots/lesson-share-light.png").default}
-    dark={require("../screenshots/lesson-share-dark.png").default}
-  />
-</Peek>
-
-A lesson that landed for you is worth handing to a teammate. **↗ Share** on a lesson (or `↗` in the
-table, which opens the same panel in a popover next to the row) shows your name (prefilled from `share_name`, then git), an *Include where it
-happened* checkbox (project, branch, commit and task context — **off by default**, and a local folder
-path is never exported), and three ways to hand it over — all carrying the same lesson:
-
-| Transport | What you get | Best for |
-|---|---|---|
-| **Copy text** | The lesson card as markdown, then one `devcoach:lesson:1:…` line | Chat, issues, email — the receiver pastes the whole thing anywhere devcoach accepts input |
-| **Copy link** | `https://ultimaphoenix.github.io/dev-coach/lesson#devcoach:lesson:1:…` | Messaging: the receiver sees the lesson in the browser and imports it with one click |
-| **Download .md** | `<lesson-id>.devcoach.md` — YAML front matter + the markdown body | Files, pull requests, wikis — renders on GitHub, opens in any editor |
-
-What travels, how the link works and what an imported lesson does to your pacing are in the
-[Sharing lessons](./sharing.md) guide.
-
-**Receiving** — every way in leads to the same place:
-
-- **＋ Import** on the Lessons page: paste the code, the link, a URL whose body is a shared lesson
-  (a raw gist, a file in a repo), the whole copied card, or a lessons JSON export; pick a
-  `.devcoach.md`; or **drop the file anywhere** on the page.
-- The share link's **Import** button opens `/lessons/import?code=…` on your dashboard — a preview
-  with a single **Add to my lessons** button. **Nothing is saved until you click.**
-- The [CLI](./cli.md#sharing-a-lesson) (`devcoach import`, no argument = clipboard) and your
-  [agent](./coaching.md#sharing-a-lesson-with-a-teammate) (`import_lesson`) do the same.
-
-<Tabs>
-  <TabItem value="import-box" label="＋ Import" default>
-    <ThemedShot
-      alt="Import a shared lesson"
-      light={require("../screenshots/lessons-import-light.png").default}
-      dark={require("../screenshots/lessons-import-dark.png").default}
-    />
-  </TabItem>
-  <TabItem value="import-preview" label="A share link's preview">
-    <Peek label="Show the whole preview">
-      <ThemedShot
-        alt="Shared lesson preview"
-        light={require("../screenshots/lesson-import-preview-light.png").default}
-        dark={require("../screenshots/lesson-import-preview-dark.png").default}
-      />
-    </Peek>
-  </TabItem>
-  <TabItem value="shared-list" label="Shared lessons">
-    <ThemedShot
-      alt="The Lessons page filtered to shared lessons"
-      light={require("../screenshots/lessons-shared-light.png").default}
-      dark={require("../screenshots/lessons-shared-dark.png").default}
-    />
-  </TabItem>
-  <TabItem value="shared-lesson" label="A shared lesson">
-    <Peek label="Show the whole lesson">
-      <ThemedShot
-        alt="A shared lesson's page"
-        light={require("../screenshots/lesson-shared-light.png").default}
-        dark={require("../screenshots/lesson-shared-dark.png").default}
-      />
-    </Peek>
-  </TabItem>
-</Tabs>
-
-A shared lesson sits in the log like your own, with the sender's name under the topic and a
-**🤝 shared by** line on its page; the **🤝 Shared** filter lists them (per sender, too). It carries
-no project, branch or folder unless the sender chose to include them.
-
-An imported lesson shows a **🤝 shared by** line in its metadata and never counts against your daily
-limit — see [How an imported lesson behaves](./sharing.md#how-an-imported-lesson-behaves).
-
----
-
-### Settings (`/settings`)
-
-<Peek label="Show all three panels">
-  <ThemedShot
-    alt="Settings"
+    alt="Settings: the Coaching form and the Backup & Restore panel, then the coaching notebook"
     light={require("../screenshots/settings-light.png").default}
     dark={require("../screenshots/settings-dark.png").default}
   />
 </Peek>
 
-**What you can do here:**
+⚙️ **Settings**, at the top right of every page, opens it. The theme button beside it shows the theme
+you see now and switches it in this browser only, until you save a theme here; *System* follows your
+OS as it changes. The page has three panels.
 
-- **Set the pacing.** How many lessons a day, the gap between them, and how many interactions pass
-  before one is cued.
-- **Pick the theme and the home page**, and the name proposed when you share a lesson.
-- **Back up and restore.** One zip with everything, or the lessons alone as JSON.
-- **Read your coaching notebook**, the notes devcoach keeps on how you learn.
+**Coaching** holds the seven settings, applied with *Save settings*: *Max lessons per day*
+(`max_per_day`), *Minimum gap between lessons* (`min_gap_minutes`), *Interactions between lessons*
+(`nudge_every`), *Count interactions* (`nudge_scope`), *Your name (for sharing)* (`share_name`),
+*UI theme* (`ui_theme`) and *Home page* (`ui_home`). What each one does, its range and its default:
+[Configuration](../reference/configuration.md#settings).
 
-The page has three panels: **Coaching**, **Backup & Restore** and the **Coaching Notebook**.
+:::warning[The gap is a list of 12 choices]
 
-**Coaching** — the settings below, applied with *Save settings*:
+*No cooldown*, 15 or 30 minutes, 1 hour, 1 hour 30 min, and 2, 3, 4, 6, 8, 12 or 24 hours. A gap
+set elsewhere to another value (say 100 minutes) shows as *No cooldown*, and saving the form then
+stores 0. Pick the gap again before you save.
 
-| Setting | What it sets |
-|---|---|
-| **Max lessons per day**<br/>`max_per_day` | maximum lessons in a 24-hour window (1–20) |
-| **Minimum gap between lessons**<br/>`min_gap_minutes` | a dropdown: No cooldown, 15 minutes, 30 minutes, 1 hour, 1 hour 30 min, 2 hours, 3 hours, 4 hours, 6 hours, 8 hours, 12 hours, 24 hours |
-| **Interactions between lessons**<br/>`nudge_every` | how many interactions pass before a lesson is cued (0–1000; 0 = every turn) |
-| **Count interactions**<br/>`nudge_scope` | *Per chat session* or *Globally* |
-| **Your name (for sharing)**<br/>`share_name` | the sender name proposed when you share a lesson; empty means your git `user.name` |
-| **UI theme**<br/>`ui_theme` | 🌓 System / ☀️ Light / 🌙 Dark |
-| **Home page**<br/>`ui_home` | 🏠 Auto / 📚 Lessons / 🧭 Knowledge map: where `/` lands. Auto opens Lessons once you have one, the knowledge map before |
+:::
 
-**Backup & Restore** is the dashboard equivalent of the CLI's
-[`devcoach backup` / `restore`](./cli.md#backup-export--import) — use it to move your profile to another
-machine or take a snapshot before a big change. (The smaller *Download/Import lessons* buttons handle just
-the lesson history as JSON.)
+**Backup & Restore** does what [`devcoach backup` and `restore`](./cli.md#backup-export--import) do:
+move your profile to another machine, or keep a copy before a big change.
 
-| Button | What it does |
-|---|---|
-| **Download backup** | a full zip (settings + knowledge map + lessons + notebook) |
-| **Restore backup** | restore everything from a backup zip |
-| **Download lessons** | all lessons as JSON |
-| **Import lessons** | upload a previously exported JSON file |
+- **Download backup:** a zip with your settings, knowledge map, lessons, notebook and courses. It
+  is not encrypted.
+- **Restore backup:** adds what you are missing from a backup zip, and never removes a lesson, a
+  topic or a course. Your settings, your notebook and the confidence of topics you both have take
+  the backup's values ([details](../reference/configuration.md#backup-strategy)).
+- **Download lessons** and **Import lessons:** your lessons alone, as JSON, and back. An import skips
+  the lessons you already have.
 
-**Coaching Notebook** — a read-only view of `~/.devcoach/learning-state.md`, the notes devcoach keeps on
-how you learn, with a Preview / Source toggle, `↓ Download`, and *Open in VS Code*.
-
----
-
-## How personalization works
-
-The dashboard is where you actively shape your coaching:
-
-<Cards columns={3}>
-  <Card title="Adjust confidence on the Knowledge map" to="#knowledge-map-knowledge">
-    If you feel stronger in TypeScript than you rated yourself, bump it up. This tunes which topics devcoach prioritises.
-  </Card>
-  <Card title="Edit groups and topics" to="#knowledge-map-knowledge">
-    Add topics you care about, delete ones you don't. Your knowledge map is your learning intent statement.
-  </Card>
-  <Card title="Record feedback on lessons" to="#lesson-detail-lessonsid">
-    Your answer tells devcoach whether that angle landed. Only **✓ I knew this** moves your confidence on that topic (+1), so the next lessons there go deeper; **✗ Couldn't follow** keeps the lesson as the seed of a course.
-  </Card>
-  <Card title="Star lessons to revisit" to="#lessons-lessons">
-    Use the `★` button to mark lessons worth reading again. You can filter by "starred only" on the Lessons page.
-  </Card>
-  <Card title="Jump to context" to="#lesson-detail-lessonsid">
-    Click repository, commit, or folder links on lesson details to immediately review the code that triggered the lesson. This helps you understand *why* the lesson was taught and *where* to apply it.
-  </Card>
-  <Card title="Share what landed" to="#sharing-a-lesson">
-    Hand a lesson to a teammate with **↗ Share**, and import theirs with **＋ Import**. Shared lessons enrich your log without touching your pacing.
-  </Card>
-</Cards>
-
-The knowledge map, feedback history, and git context together create a feedback loop: your edits guide lesson selection, lesson feedback adjusts your confidence, and the ability to jump back to context lets you learn in the exact place it happened.
-
----
-
-## Keyboard shortcuts
-
-The web UI has no keyboard shortcuts. Use the CLI for faster access to individual commands.
+**Coaching Notebook** shows `~/.devcoach/learning-state.md`, the notes devcoach keeps on how you
+learn, read-only, with *Preview* / *Source*, **↓ Download** and *Open in VS Code*.
