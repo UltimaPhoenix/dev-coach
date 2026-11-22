@@ -1,0 +1,36 @@
+/* Folded: the box is cut at the measured fold (an inline max-height set by the component), the
+   picture fades into the page and the button sits on the fade. Open, or never folded (no
+   JavaScript, not measured yet): the picture at its full height, the button under it if any. */
+.peek {
+  position: relative;
+  margin: 0 0 1.5rem;
+}
+.content {
+  border-radius: var(--dc-radius);
+}
+.folded .content {
+  overflow: hidden;
+}
+/* The figure inside brings its own bottom margin; the wrapper carries it instead. */
+.content > figure {
+  margin-bottom: 0;
+}
+.more {
+  display: flex;
+  justify-content: center;
+  padding: 0.6rem 0 0;
+}
+.folded .more {
+  position: absolute;
+  inset: auto 0 0;
+  padding: 4rem 1rem 1rem;
+  background: linear-gradient(to bottom, transparent, var(--dc-page-bg) 75%);
+  pointer-events: none;
+}
+.more button {
+  pointer-events: auto;
+}
+.more button:focus-visible {
+  outline: 2px solid var(--devcoach-accent);
+  outline-offset: 2px;
+}
