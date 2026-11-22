@@ -5,7 +5,6 @@ description: Install devcoach with Homebrew on macOS or Linux. Homebrew brings N
 keywords: [devcoach homebrew, brew install devcoach, homebrew tap, devcoach macOS, devcoach linux, claude code mcp server, claude desktop mcp server]
 ---
 
-import cli from "@site/src/data/cli-output.json";
 import { Card, Cards } from "@site/src/components/Cards";
 import FileTree from "@site/src/components/FileTree";
 import Terminal from "@site/src/components/Terminal";
@@ -44,15 +43,12 @@ Code and Claude Desktop:
 
 ## Install
 
-Using Claude Code? The [plugin](./claude-code-plugin.md) can do the coaching while Homebrew only adds
-the `devcoach` command: then skip step 4 ([why](#with-the-claude-code-plugin)).
-
 ```bash
 # 1. Add the tap (github.com/UltimaPhoenix/homebrew-tap)
 brew tap UltimaPhoenix/tap
 
-# 2. Trust it: Homebrew 6 and later load nothing from an untrusted tap
-brew trust --tap UltimaPhoenix/tap
+# 2. Trust the devcoach formula: Homebrew 6 and later load nothing untrusted from a tap
+brew trust --formula UltimaPhoenix/tap/devcoach
 
 # 3. Install devcoach, and Homebrew's Node with it
 brew install devcoach
@@ -63,9 +59,15 @@ devcoach install
 
 Then restart Claude Desktop and start a new Claude Code session: both load devcoach when they start.
 
+Using Claude Code? The [plugin](./claude-code-plugin.md) can do the coaching while Homebrew only adds
+the `devcoach` command: then skip step 4 ([why](#with-the-claude-code-plugin)). Claude Desktop is then
+not connected either: `devcoach install --claude-desktop` afterwards.
+
 `brew tap` and `brew trust` are one-time. Since Homebrew 6.0.0, a tap outside Homebrew's own needs
-that trust by default. In one command instead, `brew install UltimaPhoenix/tap/devcoach` taps, trusts
-this formula only and installs it; then run `devcoach install`.
+that trust by default. Homebrew advises trusting only the formula you install;
+`brew trust --tap UltimaPhoenix/tap` would also let it load every future formula of that tap. In one
+command instead, `brew install UltimaPhoenix/tap/devcoach` taps, trusts this formula only and
+installs it; then run `devcoach install`.
 
 ## What it set up
 
@@ -74,7 +76,7 @@ this formula only and installs it; then run `devcoach install`.
 <Terminal
   command="devcoach install"
   output={brewInstall}
-  caption="Captured on Linux in a test home, with devcoach laid out as the formula installs it (Homebrew under ~/.linuxbrew). On a Mac the path is /opt/homebrew/bin/devcoach."
+  caption="Captured on Linux in a test home (home shown as ~), with devcoach laid out as the formula installs it (Homebrew under ~/.linuxbrew). On a Mac the path is /opt/homebrew/bin/devcoach."
 />
 
 Agents start it as `/opt/homebrew/bin/devcoach mcp` (`/usr/local/bin` on Intel Macs,
@@ -105,7 +107,7 @@ Run `devcoach doctor`. It checks each part of the wiring:
 <Terminal
   command="devcoach doctor"
   output={brewDoctor}
-  caption="Right after install, same test home. Every line is a check; a ✗ line says what to run."
+  caption="Right after install, same test home. Your Node line shows the version Homebrew installed. Every line is a check; a ✗ line says what to run."
 />
 
 What to look for: a ✓ on the two hooks, the skill and the server, and under each agent **command
@@ -148,9 +150,7 @@ brew uninstall devcoach
 brew untap UltimaPhoenix/tap
 ```
 
-<Terminal command="devcoach uninstall" output={cli.uninstall} />
-
-Your lessons, profile, notebook and courses stay in `~/.devcoach/`. Two options of `devcoach uninstall`:
+Then restart Claude Desktop to drop the server. Your lessons, profile, notebook and courses stay in `~/.devcoach/`. Two options of `devcoach uninstall`:
 
 - `--data` deletes them too, after asking. Back up first with `devcoach backup` if you might come back.
 - `--all` also removes devcoach from Gemini CLI and Codex CLI.
@@ -160,18 +160,23 @@ Your lessons, profile, notebook and courses stay in `~/.devcoach/`. Two options 
 **`brew install devcoach` fails on an untrusted tap.** Homebrew 6 and later load no formula from a tap
 you have not trusted: run step 2, or install with the full name `UltimaPhoenix/tap/devcoach`.
 
-**A hook error on every turn, after `brew uninstall devcoach`.** The hooks still call the removed
-program: Claude Code shows `Failed with non-blocking status code:` and your shell's message, such as
-`/bin/sh: 1: …/bin/devcoach: not found` on Linux. Put devcoach back and remove it in the right order:
+<details>
+<summary>A hook error on every turn, after <code>brew uninstall devcoach</code>?</summary>
+
+The hooks still call the removed program: Claude Code shows `Failed with non-blocking status code:`
+and your shell's message, such as `/bin/sh: 1: …/bin/devcoach: not found` on Linux. Put devcoach back
+and remove it in the right order:
 
 ```bash
-brew install devcoach
+brew install UltimaPhoenix/tap/devcoach
 devcoach uninstall
 brew uninstall devcoach
 ```
 
 (`brew uninstall` also removes Homebrew's `node` when nothing else needs it. With another Node.js 24
 or newer, `npx -y devcoach uninstall` alone removes the leftover entries.)
+
+</details>
 
 **`devcoach doctor` shows a ✗.** Run the command it names. Anything else:
 [Troubleshooting](../troubleshooting.md).
@@ -181,7 +186,8 @@ or newer, `npx -y devcoach uninstall` alone removes the leftover entries.)
 The [plugin](./claude-code-plugin.md) can bring the coaching to Claude Code while Homebrew brings only
 the `devcoach` command. Both read the same `~/.devcoach/`. Skip step 4 then: next to the plugin,
 `devcoach install` skips the hooks but registers a second devcoach server and a second copy of the
-skill ([more](./claude-code-plugin.md#the-cli-next-to-the-plugin)).
+skill ([more](./claude-code-plugin.md#the-cli-next-to-the-plugin)). Claude Desktop is then not
+connected either: `devcoach install --claude-desktop` afterwards.
 
 `brew upgrade devcoach` updates the command. Claude Code leaves auto-update off for the plugin's
 marketplace: turn it on in `/plugin` → **Marketplaces** → `ultimaphoenix`, or update the plugin
