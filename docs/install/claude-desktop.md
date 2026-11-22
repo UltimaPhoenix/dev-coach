@@ -1,6 +1,6 @@
 ---
 title: Claude Desktop
-sidebar_label: Claude Desktop (beta)
+sidebar_label: Claude Desktop
 description: Add devcoach to Claude Desktop with the .mcpb extension (no terminal) or with devcoach install. You get devcoach's tools; lessons come when you ask.
 keywords: [devcoach claude desktop, claude desktop extension, mcpb, claude desktop mcp server, claude_desktop_config.json, failed to spawn process]
 ---
@@ -12,16 +12,13 @@ import Terminal from "@site/src/components/Terminal";
 import Tabs from "@theme/Tabs";
 import TabItem from "@theme/TabItem";
 
-export const installDesktop = "\u001b[1mSetting up devcoach\u001b[22m\u001b[2m  (~/.nvm/versions/node/v24.22.3/bin/devcoach mcp)\u001b[22m\n\u001b[33m  bound to Node v24.22.3 (nvm) — after removing or switching that version, run `devcoach install --force` again\u001b[39m\n\n\u001b[1mClaude Desktop\u001b[22m\n  MCP server…  \u001b[32m✓\u001b[39m Installed into ~/.config/Claude/claude_desktop_config.json\n\n\u001b[33m→\u001b[39m Restart Claude Desktop to pick up the new server.\n\n\u001b[2mTip: run devcoach backup to export your profile, lessons and settings.\n     run devcoach restore <file> to import a backup on a new machine.\n     After upgrading devcoach (npm, Homebrew), re-run devcoach install to refresh the skill.\u001b[22m";
 export const doctorDesktop = "\n\u001b[1mdevcoach doctor\u001b[22m \u001b[2mv2.7.1\u001b[22m\n\n…\n\u001b[1m\nClaude Desktop\u001b[22m\n  \u001b[32m✓\u001b[39m registered: ~/.nvm/versions/node/v24.22.3/bin/devcoach mcp\n  \u001b[32m✓\u001b[39m command resolves to ~/.nvm/versions/node/v24.22.3/bin/devcoach\n  \u001b[33m→\u001b[39m bound to Node v24.22.3 (nvm) — removing or switching that version breaks it with `Failed to spawn process: No such file or directory`; run `devcoach install --force` after\n  \u001b[32m✓\u001b[39m runs on Node 24.22.3 (~/.nvm/versions/node/v24.22.3/bin/node)\n  \u001b[32m✓\u001b[39m it runs devcoach 2.7.1\n\n…";
 export const doctorFixture = "\n\u001b[1mdevcoach doctor\u001b[22m \u001b[2mv2.7.1\u001b[22m\n\n…\n\u001b[1m\nClaude Desktop\u001b[22m\n  \u001b[32m✓\u001b[39m registered: devcoach mcp\n  \u001b[31m✗\u001b[39m `devcoach` is not found on Claude Desktop's PATH (from its log) — the host fails with `Failed to spawn process: No such file or directory`. Reinstall devcoach, then run `devcoach install --force`\n    log: ~/.config/Claude/logs/mcp-server-devcoach.log\n    last error in it: Failed to spawn process: No such file or directory\n\n…";
 
 # Claude Desktop
 
-There are two ways to add devcoach to Claude Desktop. The **extension** *(beta)* is one file you
-install from Claude Desktop, with no terminal and no Node.js to set up. **`devcoach install`** writes
-an entry in Claude Desktop's config when you have the `devcoach` command (Homebrew, npm, Windows).
-Use one of the two.
+Two ways in: the **extension** *(beta)*, with no terminal, or **`devcoach install`**, which writes an
+entry in Claude Desktop's config ([side by side](#install)). Use one of the two.
 
 ## What you get here
 
@@ -56,25 +53,18 @@ this computer shares your profile and lessons (`~/.devcoach/`). Other agents:
 
 <Cards columns={2}>
   <Card label="No terminal · beta" title="The extension">
-    Installed from Claude Desktop, on its own Node.js. No `devcoach` command. To update, install the new file.
+    One file, installed from Claude Desktop, on its own Node.js. No `devcoach` command. To update, install the new file.
   </Card>
   <Card label="In a terminal" title="devcoach install">
-    With devcoach from Homebrew, npm or Windows. Adds the `devcoach` command. To update, update devcoach.
+    Needs the `devcoach` command, from Homebrew, npm or Windows. To update, update devcoach.
   </Card>
 </Cards>
 
 :::warning[Pick one]
 
-With both, Claude Desktop has devcoach twice.
-
-- **Ran `devcoach install` already** (Homebrew, npm, the Windows installer)? Claude Desktop has
-  devcoach: skip the extension, or [remove that entry](#remove) first.
-- **Have the extension, and want the command for Claude Code?** A bare `devcoach install` also adds
-  a Claude Desktop entry. Name Claude Code alone:
-
-  ```bash
-  devcoach install --claude-code
-  ```
+With both, Claude Desktop has devcoach twice. Ran `devcoach install` already (Homebrew, npm, the
+Windows installer)? Claude Desktop has devcoach: skip the extension, or [remove that
+entry](#remove) first.
 
 :::
 
@@ -83,17 +73,17 @@ With both, Claude Desktop has devcoach twice.
 
 1. Download `devcoach-<version>.mcpb` from the
    [latest release](https://github.com/UltimaPhoenix/dev-coach/releases/latest).
-2. **Double-click the file**, or drag it onto the Claude Desktop window. From the menus instead: open
-   **Settings → Desktop app** and click **Manage** next to **Extensions** (older layout: **Settings →
-   Extensions**), then **Advanced settings**, and under **Extension Developer** click **Install
-   Extension…** and pick the file.
+2. **Double-click the file**, or drag it onto Claude Desktop's Settings window. From the menus
+   instead: open **Settings → Desktop app** and click **Manage** next to **Extensions** (older layout:
+   **Settings → Extensions**), then **Advanced settings**, and under **Extension Developer** click
+   **Install Extension…** and pick the file.
 3. Review the details and install. **Unverified publisher** is expected: the file is self-signed,
    as no code-signing certificate is configured.
 
 Menu names as in
 [Anthropic's guide](https://support.claude.com/en/articles/10949351-getting-started-with-local-mcp-servers-on-claude-desktop);
-if they move, look for **Extensions** in the settings. No Extensions there? Your organization has
-turned extensions off.
+if they move, look for **Extensions** in the settings. No Extensions there? Update Claude Desktop; if
+it is still missing, your organization may have turned extensions off.
 
 <details>
 <summary>Check the download</summary>
@@ -132,6 +122,21 @@ Install the result as in step 2.
 
 </details>
 
+<details>
+<summary>Want the `devcoach` command for Claude Code too?</summary>
+
+A bare `devcoach install` also adds a Claude Desktop entry, next to the extension. Name Claude Code
+alone:
+
+```bash
+devcoach install --claude-code
+```
+
+Not with the [Claude Code plugin](./claude-code-plugin.md), the recommended way: next to it,
+`devcoach install` adds a second devcoach server and a second copy of the devcoach skill.
+
+</details>
+
 </TabItem>
 <TabItem value="install-command" label="devcoach install">
 
@@ -165,13 +170,8 @@ Then restart Claude Desktop: it reads its list of servers when it starts.
 />
 
 `devcoach install` writes an absolute command, so Claude Desktop does not have to find devcoach on
-its own PATH (on Windows: `node.exe` and devcoach's script), and says what it wrote:
-
-<Terminal
-  command="devcoach install --claude-desktop"
-  output={installDesktop}
-  caption="devcoach 2.7.1 installed with npm under nvm, captured on Linux in a test home (there the config is in ~/.config/Claude/). The yellow line: see the version-manager note at the end of this page."
-/>
+its own PATH (on Windows: `node.exe` and devcoach's script). `devcoach doctor`, below, shows the
+entry it wrote.
 
 ## Check it worked
 
@@ -184,27 +184,12 @@ With `devcoach install`, run `devcoach doctor` and read its **Claude Desktop** s
 <Terminal
   command="devcoach doctor"
   output={doctorDesktop}
-  caption="Right after the install above, the other sections cut (…). Claude Desktop starts this exact command."
+  caption="devcoach 2.7.1 installed with npm under nvm, captured on Linux in a test home (home shown as ~), the other sections cut (…). Claude Desktop starts this exact command."
 />
 
 What matters: **command resolves to** your devcoach, **runs on Node** 24 or newer, **it runs
-devcoach** at your version. Not using Claude Code? Ignore doctor's ✗ lines about it.
-
-### devcoach's line in the log
-
-Each time it starts, devcoach writes this line to Claude Desktop's log. If it is there, devcoach ran:
-
-<LogLine
-  parts={[
-    { text: "devcoach 2.7.1 mcp", label: "Version", note: <>which devcoach ran; <code>mcp</code> is the server.</> },
-    { text: "node 24.22.3 via nvm (~/.nvm/versions/node/v24.22.3/bin/node)", label: "Node.js", note: "the version it runs on, and what provides it: Homebrew, nvm, fnm, volta, asdf, mise, n or the system." },
-    { text: "npm-global, bound to Node v24.22.3 (nvm) (~/.nvm/versions/node/v24.22.3/lib/node_modules/devcoach)", label: "Install channel", note: <>how devcoach was installed (<code>homebrew</code>, <code>npm-global</code>, <code>npx</code>; the extension is <code>claude-desktop-extension</code>) and what it depends on, here one Node version.</> },
-    { text: "data ~/.devcoach (schema 6)", label: "Data", note: <>your data folder and its database version. <code>(no database yet)</code> on the first start is normal.</> },
-  ]}
-  caption={<>A real start of devcoach 2.7.1, captured on Linux in a test home. devcoach writes your home folder as <code>~</code> (<code>%USERPROFILE%</code> on Windows); Claude Desktop's own lines in the log may still show it.</>}
-/>
-
-Once Claude Desktop connects, a second line names the client: `devcoach 2.7.1 mcp · client …`.
+devcoach** at your version. The yellow **bound to Node** line: see [Update](#update). Not using
+Claude Code? Ignore doctor's ✗ lines about it.
 
 ## First run
 
@@ -212,12 +197,19 @@ Open a new conversation and say *set up devcoach*. Claude asks how to build your
 recommends Automatic: it starts from your Claude Code projects if you have some, else from devcoach's
 general topic map.
 
-Then ask for a lesson when you want one: *teach me something from what we just did*. Claude Desktop
-adds no MCP prompt to a conversation by itself; add **devcoach_instructions** for devcoach's full
-coaching rules.
+Then ask for a lesson when you want one: *teach me something from what we just did*.
 
-Web dashboard: ask *open the devcoach dashboard*, or run `devcoach ui` if you have the command. From the extension, asking is
-untested on Claude Desktop's built-in Node; `npx -y devcoach ui` works with Node.js 24.
+:::tip[The full coaching rules]
+
+Claude Desktop adds no MCP prompt to a conversation by itself. Add the **devcoach_instructions**
+prompt, titled *devcoach coaching instructions*, where your Claude Desktop lists MCP prompts. It hands
+Claude the devcoach skill and its reference files.
+
+:::
+
+Web dashboard: ask *open the devcoach dashboard*, or run `devcoach ui` if you have the command. From
+the extension, asking is untested on Claude Desktop's built-in Node; `npx -y devcoach ui` works with
+Node.js 24.
 
 ## Update
 
@@ -225,12 +217,12 @@ untested on Claude Desktop's built-in Node; `npx -y devcoach ui` works with Node
 from its directory on its own, not one installed from a file.
 
 **`devcoach install`:** update devcoach as you installed it (Homebrew, npm, Windows), then restart
-Claude Desktop. The entry keeps its path. Only after switching Node versions under nvm or a similar
-manager:
+Claude Desktop. The entry keeps its path.
 
-```bash
-devcoach install --claude-desktop --force
-```
+Under nvm, fnm, volta, asdf or mise, `npm i -g` puts devcoach inside one Node version's folder
+(`~/.nvm/versions/node/v24.22.3/…`); `devcoach install` and `devcoach doctor` name the version.
+Remove or switch that version and Claude Desktop can no longer start devcoach: after you change Node,
+write the entry again ([how](#write-an-absolute-command)). More on the [npx / npm page](./npx.md).
 
 ## Remove
 
@@ -245,9 +237,13 @@ devcoach uninstall --claude-desktop
 It leaves Claude Code alone (a bare `devcoach uninstall` removes both). Then remove devcoach itself:
 [Homebrew](./homebrew.md), [npm](./npx.md), [Windows](./windows.md).
 
-**Your data** stays in `~/.devcoach/`, which every agent on this computer uses. To delete it, back up
-first if you might come back (`devcoach backup`, or **Download backup** in the dashboard's Settings),
-then run this; it asks first:
+**Your data** stays in `~/.devcoach/`, which every agent on this computer uses.
+
+<details>
+<summary>Delete your data too?</summary>
+
+Back up first if you might come back (`devcoach backup`, or **Download backup** in the dashboard's
+Settings), then run this; it asks first:
 
 ```bash
 devcoach uninstall --claude-desktop --data
@@ -255,6 +251,8 @@ devcoach uninstall --claude-desktop --data
 
 With only the extension, put `npx -y` in front (needs Node.js 24), or delete the `.devcoach` folder
 in your home folder.
+
+</details>
 
 ## If it doesn't work {/* #when-devcoach-does-not-start */}
 
@@ -271,30 +269,37 @@ flowchart TD
     D --> E("Starts via npx?")
     E -->|no| F("Command found?")
     E -->|yes| E1["Install devcoach,<br/>then --force"]
-    F -->|no| F1["--force"]
+    F -->|no| F1["Reinstall devcoach<br/>if gone,<br/>then --force"]
     F -->|yes| G("In a temporary<br/>place?")
     G -->|no| H("Its Node exists?")
     G -->|yes| G1["Install devcoach,<br/>then --force"]
     H -->|no| H1["Reinstall that<br/>Node or devcoach"]
     H -->|yes| I("Node 24<br/>or newer?")
-    I -->|no| I1["Upgrade Node,<br/>then --force"]
+    I -->|no| I1["Upgrade that<br/>Node, then restart"]
+    I -->|yes| J["All ✓: restart<br/>Claude Desktop"]
 ```
 
-**--force** is `devcoach install --claude-desktop --force`. Below doctor are its own checks, in its
-order; its ✗ line says which one failed.
+**--force** is [`devcoach install --claude-desktop --force`](#write-an-absolute-command); "restart" means
+Claude Desktop. Below doctor are its own checks, in its order; its ✗ or → line says which one
+failed.
 
 ### Installed as the extension
 
 | What you see | What to do |
 |---|---|
-| No **Extensions** in Settings | Your organization has turned extensions off |
+| No **Extensions** in Settings | Update Claude Desktop; if it is still missing, your organization may have turned extensions off |
 | Claude Desktop refuses the file, or asks for a newer Node.js | Update Claude Desktop, or use `devcoach install` instead |
 | devcoach stops at once; its log says `needs Node 24 or newer` | The same |
 | Installed, but no devcoach tools | Restart Claude Desktop, then look in **+** → **Connectors** |
 
+<details>
+<summary>What does the log say on an older Node?</summary>
+
 The extension declares Node.js 24 or newer, for devcoach's built-in database. Started on Node 22, the
 released 2.7.1 extension logged one line: `devcoach 2.7.1 needs Node 24 or newer (it uses the
 built-in node:sqlite); this is Node 22.22.0 at /opt/node22/bin/node. Upgrade Node, then restart.`
+
+</details>
 
 `npx -y devcoach doctor` (Node.js 24) checks your database, but its Claude Desktop section reads only
 `claude_desktop_config.json` and says `not registered — add it with devcoach install
@@ -310,6 +315,26 @@ Desktop gets devcoach twice.
 | macOS | `~/Library/Logs/Claude/mcp-server-devcoach.log` |
 | Windows | `%APPDATA%\Claude\logs\mcp-server-devcoach.log` |
 
+Each time it starts, devcoach writes one line to this log. If it is there, devcoach ran, and the
+lines after it say why it stopped.
+
+<details>
+<summary>What does devcoach's line say?</summary>
+
+<LogLine
+  parts={[
+    { text: "devcoach 2.7.1 mcp", label: "Version", note: <>which devcoach ran; <code>mcp</code> is the server.</> },
+    { text: "node 24.22.3 via nvm (~/.nvm/versions/node/v24.22.3/bin/node)", label: "Node.js", note: <>the version it runs on, and what provides it: <code>homebrew</code>, <code>nvm</code>, <code>fnm</code>, <code>volta</code>, <code>asdf</code>, <code>mise</code>, <code>n</code> or <code>system</code>; on Windows also <code>nvm-windows</code>, <code>scoop</code> or <code>bundled</code> (the Windows installer's own Node). <code>unknown</code> when devcoach cannot tell.</> },
+    { text: "npm-global, bound to Node v24.22.3 (nvm) (~/.nvm/versions/node/v24.22.3/lib/node_modules/devcoach)", label: "Install channel", note: <>how devcoach was installed (<code>homebrew</code>, <code>npm-global</code>, <code>npx</code>; the extension is <code>claude-desktop-extension</code>) and what it depends on, here one Node version.</> },
+    { text: "data ~/.devcoach (schema 6)", label: "Data", note: <>your data folder and its database version. <code>(no database yet)</code> on the first start is normal.</> },
+  ]}
+  caption={<>A real start of devcoach 2.7.1, captured on Linux in a test home. devcoach writes your home folder as <code>~</code> (<code>%USERPROFILE%</code> on Windows); Claude Desktop's own lines in the log may still show it.</>}
+/>
+
+Once Claude Desktop connects, a second line names the client: `devcoach 2.7.1 mcp · client …`.
+
+</details>
+
 **`Failed to spawn process: No such file or directory`** with no devcoach line after it means
 devcoach never ran. Run **`devcoach doctor`**: it looks the command up on the PATH from Claude
 Desktop's log and checks the Node behind it. Here, on a real log of a failed start and the bare
@@ -318,38 +343,28 @@ Desktop's log and checks the Node behind it. Here, on a real log of a failed sta
 <Terminal
   command="devcoach doctor"
   output={doctorFixture}
-  caption="The log is the real one kept in devcoach's tests (tests/fixtures/claude-desktop-mcp-devcoach.log); captured on Linux, where the log is in ~/.config/Claude/logs/. Other sections cut (…)."
+  caption="The log is the real one kept in devcoach's tests (tests/fixtures/claude-desktop-mcp-devcoach.log); captured on Linux in a test home (home shown as ~), where the log is in ~/.config/Claude/logs/. Other sections cut (…)."
 />
 
 It tells apart the two reasons the system could not run the command in Claude Desktop's config:
 
-- the command is not there: devcoach was uninstalled, or a bare `devcoach` is not on the PATH
-  *Claude Desktop* uses (it prints that PATH in the log, next to `Using MCP server command`);
-- the command is there, but the Node it names in its first line is not, for example Homebrew's Node
-  was removed while Homebrew's devcoach still points at it.
+- **The command is not there:** devcoach was uninstalled, or a bare `devcoach` is not on the PATH
+  *Claude Desktop* uses (it prints that PATH in the log, next to `Using MCP server command`).
+  Reinstall devcoach if it is gone, then write an absolute command (below).
+- **The command is there, but the Node it names in its first line is not**, for example Homebrew's
+  Node was removed while Homebrew's devcoach still points at it. Reinstall that Node (doctor's
+  example: `brew install node`) or devcoach; writing the command again changes nothing here.
 
-Then write an absolute command and restart Claude Desktop:
-
-```bash
-devcoach install --claude-desktop --force
-```
-
-It rewrites only the Claude Desktop entry; doctor's own hint, `devcoach install --force`, also sets
-up Claude Code. While reading the log, ignore `Server started and connected successfully`: Claude
-Desktop writes it before the process starts, so it also appears right before a failure.
-
-:::note[nvm, fnm, volta, asdf, mise]
-
-`npm i -g` under a Node version manager puts devcoach inside one Node version's folder
-(`~/.nvm/versions/node/v24.22.3/…`). Remove or switch that version and Claude Desktop fails as above.
-`devcoach install` and `devcoach doctor` name the version. More on the [npx / npm page](./npx.md).
-After changing Node:
+#### Write an absolute command
 
 ```bash
 devcoach install --claude-desktop --force
 ```
 
-:::
+Then restart Claude Desktop. This rewrites only the Claude Desktop entry; doctor's own hint,
+`devcoach install --force`, also sets up Claude Code. While reading the log, ignore `Server started
+and connected successfully`: Claude Desktop writes it before the process starts, so it also appears
+right before a failure.
 
 Anything else: [Troubleshooting](../troubleshooting.md).
 
