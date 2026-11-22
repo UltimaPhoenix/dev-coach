@@ -1,7 +1,7 @@
 ---
 title: Sharing lessons
 sidebar_label: Sharing lessons
-description: Hand a devcoach lesson to a teammate as copyable text, a server-less link or a .devcoach.md file — and import theirs from the dashboard, the CLI or your agent. What travels, what never does, and how an imported lesson behaves.
+description: Hand a devcoach lesson to a teammate as text, a link or a .devcoach.md file, import theirs, and see exactly what a share carries and what never travels.
 keywords: [devcoach share lesson, share coaching lesson, devcoach import, devcoach.md, team learning, MCP coaching share]
 ---
 
