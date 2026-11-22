@@ -20,7 +20,7 @@
   font-size: 0.72rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--devcoach-accent);
+  color: var(--dc-accent-text, var(--devcoach-accent));
   text-decoration: none;
 }
 .list {
@@ -41,7 +41,7 @@
   color: var(--ifm-font-color-base);
 }
 .list a:hover {
-  color: var(--devcoach-accent);
+  color: var(--dc-accent-text, var(--devcoach-accent));
 }
 
 /* One question: the answer, then one quiet line to the page that owns the topic. */
