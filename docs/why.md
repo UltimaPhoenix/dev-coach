@@ -7,18 +7,30 @@ keywords: [why devcoach, AI and developer skills, skill erosion, validating AI c
 # Why devcoach
 
 import { Card, Cards } from "@site/src/components/Cards";
+import ValidationGap from "@site/src/components/ValidationGap";
 
 **In short**
 
 <Cards columns={3}>
-<Card title="We're learning differently now" to="#were-learning-differently-now">
-We used to learn a thing *before* we used it. Increasingly we don't: if the agent can already do it, studying it up front feels like wasted effort.
+<Card title="The risk" to="#the-thing-we-quietly-stand-to-lose">
+
+AI writes more and more of our code. Lean on it without learning, and you slowly lose the judgment to
+check what it ships.
+
 </Card>
-<Card title="The thing we quietly stand to lose" to="#the-thing-we-quietly-stand-to-lose">
-The headline worry about AI is that it will be *wrong*. The deeper worry is that we will gradually lose the ability to *tell when it is wrong*.
+<Card title="Why now" to="#you-cant-cram-competence">
+
+Competence is built slowly. You can't cram it the night of the outage.
+
 </Card>
-<Card title="You can't cram competence" to="#you-cant-cram-competence">
-Real understanding is built slowly. That is the case for learning a little continuously now — so the depth is already there when the stakes are high.
+<Card title="What devcoach does">
+
+Short lessons drawn from your agent's own tasks, on what you don't know yet, at your level. The pace
+is yours to set.
+
+[How it works →](./how-it-works.md)<br />
+[How it compares ↓](#devcoach-vs-other-approaches)
+
 </Card>
 </Cards>
 
@@ -30,8 +42,9 @@ other side knowing less about your own stack than when you started.
 
 devcoach exists to break that trade-off. Instead of sending you off to "find time" for a course you will
 never take, it treats the work you are *already doing* as the curriculum. After your agent completes a
-real task, devcoach delivers one short, targeted lesson about something that task touched and you don't
-know yet — pitched at your level, in the context where it actually matters. It is learning on the job,
+real task, and when a lesson is due, devcoach delivers one short, targeted lesson about something that
+task touched and you don't know yet — pitched at your level, in the context where it actually matters.
+It is learning on the job,
 automated: the lesson arrives at the exact moment the concept is concrete, then gets out of your way.
 
 That is the everyday value. But there is a larger reason the project exists, and it gets more important
@@ -52,17 +65,18 @@ problem is not any single skipped dive; it is what their accumulation quietly co
 The headline worry about AI is that it will be *wrong*. The deeper worry is that we will gradually lose the
 ability to *tell when it is wrong*.
 
+<ValidationGap />
+
 Validation — reading a diff and knowing it's subtly off, smelling a
 design that will not scale, recognizing the security hole the model didn't mention — is a skill, and skills
 decay when they go unused. As more work is delegated, fewer people exercise the judgment that catches the
 mistakes. The failure mode isn't a dramatic one; it's a slow erosion where the human in the loop is still
 *present* but no longer actually *able* to evaluate what they're approving.
 
-The expertise we stop maintaining is exactly the safety net that catches what the machine gets wrong. The
-thing that makes AI-assisted development safe is not
-the model's confidence — it's a human who still understands the fundamentals well enough to review, push
-back, and override. Keeping that human sharp is not nostalgia for doing things by hand; it is the control
-that makes delegation trustworthy in the first place.
+The expertise we stop maintaining is exactly the safety net that catches what the machine gets wrong. What
+makes AI-assisted development safe is a human who still understands the fundamentals well enough to
+review, push back, and override. Keeping that human sharp is not nostalgia for doing things by hand; it
+is the control that makes delegation trustworthy in the first place.
 
 ## You can't cram competence
 
@@ -75,6 +89,9 @@ Real understanding is built slowly: time spent on the problem, mistakes made and
 out *why* they were mistakes, and the small growth that follows. You can't compress that into the hour you
 suddenly need it. That is the case for learning a little continuously now — so the depth is already there
 when the stakes are high, instead of missing exactly when it counts most.
+
+When a lesson is more than one session can carry, answer ❌ *couldn't follow* and devcoach offers to
+turn it into a step-by-step [course](./usage/courses.md) that starts from what you already know.
 
 ## The why, and the wrong answers too
 
@@ -92,8 +109,8 @@ you can prevent.
 
 ## Teacher today, hedge for tomorrow
 
-devcoach plays both roles at once. Day to day it is a teacher — a patient maestro that grows your
-competence a little with every task, the *why* behind the fix and the failure modes to watch for, so you
+devcoach plays both roles at once. Day to day it is a teacher — a patient mentor that grows your
+competence a little at a time, the *why* behind the fix and the failure modes to watch for, so you
 understand more of what you ship rather than less. Over the long run it is a hedge: a steady, low-friction
 way to keep developers fluent enough to validate AI output, precisely as that ability becomes harder to
 maintain and more valuable to have.
@@ -107,14 +124,14 @@ who stay in control of the result.
 
 ## devcoach vs. other approaches
 
-| Approach | Pros | Cons |
-|----------|------|------|
-| **devcoach** | On-demand, in-context, zero friction, local, calibrated to your stack | Requires AI agent with MCP support |
-| **Online courses** | Comprehensive, structured, often free | Deferred, generic, easy to procrastinate on |
-| **Reading docs / StackOverflow** | Fast lookup | Surface-level, no learning architecture, no retention |
-| **AI explanations (Copilot inline)** | Immediate, contextual | Often just answers the question, not the "why" or anti-patterns |
-| **Books & deep dives** | Deep, thorough, timeless | Require sustained time you don't have; easy to skip |
-| **Doing nothing** | No friction | Skill erosion; can't validate what ships |
+| Approach | Pros and cons |
+|----------|---------------|
+| **devcoach** | **Pros:** in context, after real work (or when you ask); skips what you already know; paced, and calibrated to your stack and level; runs on your machine.<br />**Cons:** needs an AI agent with MCP support; automatic lessons only in Claude Code, Gemini CLI and Codex CLI (elsewhere you ask); a lesson only when one is due, at most 2 a day by default; written by your agent's model, so a lesson can be wrong too. |
+| **Online courses** | **Pros:** comprehensive, structured, often free.<br />**Cons:** deferred, generic, easy to procrastinate on. |
+| **Reading docs / StackOverflow** | **Pros:** fast lookup; official docs are the authoritative source.<br />**Cons:** you only read what you think to look up; nothing tracks what you learned. |
+| **Asking your agent to explain** | **Pros:** immediate, in context.<br />**Cons:** only when you think to ask; often just the answer, without the "why" or the anti-patterns; no memory of what you already know. |
+| **Books & deep dives** | **Pros:** deep, thorough, timeless.<br />**Cons:** require sustained time you don't have; easy to skip. |
+| **Doing nothing** | **Pros:** no friction.<br />**Cons:** skill erosion; can't validate what ships. |
 
 devcoach targets the gap: sustained learning at low friction, spaced and calibrated, without opening another tab.
 
