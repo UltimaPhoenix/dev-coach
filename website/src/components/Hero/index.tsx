@@ -107,7 +107,7 @@ export default function Hero(): ReactNode {
         </p>
         <ul className={styles.facts}>
           <li>No account, no telemetry</li>
-          <li>Unobtrusive · you set the pace</li>
+          <li>After the task, at your pace</li>
           <li>Open source · AGPL-3.0</li>
         </ul>
       </div>
