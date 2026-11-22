@@ -1,0 +1,196 @@
+/* The layout follows the figure's own width (a container query), as the validation-gap sketch
+   does: four columns from 600 px, and below that the situation on its own line above its cells. */
+.figure {
+  container-type: inline-size;
+  margin: 1.75rem 0 2rem;
+}
+.table {
+  max-width: 760px;
+  border: 1px solid var(--dc-border);
+  border-radius: var(--dc-radius);
+  background: var(--ifm-background-surface-color);
+  padding: 0.35rem 1rem;
+}
+
+/* Narrow first: situation above, then slow | arrow | fast. */
+.row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 1.75rem minmax(0, 1fr);
+  grid-template-areas:
+    "situation situation situation"
+    "slow link fast";
+  column-gap: 0.5rem;
+  row-gap: 0.4rem;
+  align-items: start;
+  padding: 0.8rem 0;
+}
+.row + .row {
+  border-top: 1px solid var(--dc-border);
+}
+.situation {
+  grid-area: situation;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+/* The header's first cell is only a name for screen readers: it takes no line of its own. */
+.headRow .situation {
+  height: 0;
+  overflow: hidden;
+}
+.headRow {
+  row-gap: 0;
+}
+
+.head {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  line-height: 1.35;
+}
+.head strong {
+  font-size: 1rem;
+}
+.head span {
+  font-size: 0.82rem;
+  color: var(--dc-text-muted);
+}
+
+.cell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.35rem;
+  min-width: 0;
+}
+.chip {
+  display: inline-block;
+  max-width: 100%;
+  padding: 0.2rem 0.65rem;
+  border: 1px solid var(--dc-border);
+  /* a pill on one line, a rounded box when the words wrap (a phone) */
+  border-radius: 1rem;
+  background: var(--ifm-color-emphasis-100);
+  font-size: 0.86rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+/* The reader's own part, in the brand colour. */
+.you {
+  border-color: color-mix(in srgb, var(--devcoach-accent) 55%, transparent);
+  background: color-mix(in srgb, var(--devcoach-accent) 10%, transparent);
+  color: var(--dc-accent-text);
+}
+.note {
+  font-size: 0.82rem;
+  line-height: 1.4;
+  color: var(--dc-text-muted);
+}
+
+/* The arrow from slow to fast: a line and a chevron head, drawn with borders. --line is its
+   colour, --weight its thickness. */
+.link {
+  grid-area: link;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  /* level with the first chip (or the header's first line) */
+  padding-top: 0.55rem;
+  min-width: 0;
+}
+.headRow .link {
+  padding-top: 0.4rem;
+}
+.arrow {
+  --line: var(--ifm-color-emphasis-700);
+  --weight: 2px;
+  position: relative;
+  display: block;
+  height: 12px;
+}
+.arrow::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 2px;
+  top: 50%;
+  border-top: var(--weight) solid var(--line);
+  transform: translateY(-50%);
+}
+.arrow::after {
+  content: "";
+  position: absolute;
+  right: 1px;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  border: solid var(--line);
+  border-width: var(--weight) var(--weight) 0 0;
+  transform: translateY(-50%) rotate(45deg);
+}
+.full {
+  --line: var(--devcoach-accent);
+  --weight: 3.5px;
+}
+.some {
+  --line: var(--devcoach-accent);
+  --weight: 2px;
+}
+.none {
+  --line: var(--ifm-color-emphasis-600);
+}
+.none::before {
+  border-top-style: dashed;
+}
+/* Narrow: the arrow's words are for screen readers only (the notes on the right say the same). */
+.arrowText {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@container (min-width: 600px) {
+  .table {
+    padding: 0.35rem 1.25rem;
+  }
+  .row {
+    grid-template-columns: 9.5rem minmax(0, 1fr) 7.5rem minmax(0, 1.15fr);
+    grid-template-areas: "situation slow link fast";
+    column-gap: 1rem;
+    align-items: start;
+    padding: 0.9rem 0;
+  }
+  .situation {
+    padding-top: 0.2rem;
+  }
+  .headRow .situation {
+    height: auto;
+  }
+  .link,
+  .headRow .link {
+    padding-top: 0;
+  }
+  .arrowText {
+    position: static;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    clip: auto;
+    clip-path: none;
+    white-space: normal;
+    font-size: 0.74rem;
+    line-height: 1.25;
+    text-align: center;
+    color: var(--dc-text-muted);
+    margin-bottom: 0.1rem;
+  }
+}
+
+.caption {
+  margin-top: 0.6rem;
+  font-size: 0.85rem;
+  color: var(--ifm-color-emphasis-700);
+}

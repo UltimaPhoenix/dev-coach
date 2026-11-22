@@ -122,6 +122,36 @@ html[data-theme="dark"] {
   border: 0;
 }
 
+/* References: a page's footnotes (the list docusaurus.config.ts heads "References"), set like the
+   reference list of a paper. Smaller than the text, under a thin rule, with a small heading. */
+.footnotes {
+  margin-top: 3rem;
+  padding-top: 1.1rem;
+  border-top: 1px solid var(--dc-border);
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: var(--dc-text-muted);
+}
+.footnotes h2 {
+  margin: 0 0 0.7rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ifm-font-color-base);
+}
+.footnotes ol {
+  margin: 0;
+  padding-left: 1.6rem;
+  font-variant-numeric: tabular-nums;
+}
+.footnotes li + li {
+  margin-top: 0.4rem;
+}
+.footnotes li p {
+  margin: 0;
+}
+
 /*
  * Brand wordmark: "dev" in the theme foreground, "coach" in the teal. The real "devcoach" title
  * text stays in the DOM (font-size: 0) and is the link's whole accessible name: the two-tone copy
