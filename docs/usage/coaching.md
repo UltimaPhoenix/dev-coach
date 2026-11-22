@@ -1,64 +1,61 @@
 ---
 title: Coaching in your agent
 sidebar_label: Coaching in your agent
+description: Where devcoach lessons appear in your agent, how onboarding builds your knowledge map, what the three answers under a lesson do, and how often lessons come.
 ---
 
 # Coaching in your agent
 
+import { Cards, Card } from "@site/src/components/Cards";
+import Clip from "@site/src/components/Clip";
+import PacingDay from "@site/src/components/PacingDay";
+import Scale from "@site/src/components/Scale";
+
 :::tip[Not installed yet?]
-Pick a method in **[Installation](../install/index.md)** — it takes about 30 seconds — then come back here.
+Pick a method in **[Installation](../install/index.md)**, then come back here.
 :::
 
-This is devcoach's main job: **automatic, in-context coaching** while you work with your AI agent. After
-your agent finishes a technical task, devcoach appends one short lesson about something that task touched
-and you don't know yet — what your knowledge map says you already know is skipped, the rest is pitched at
-your level. There's nothing to open and no command to run; it happens in the background.
+When your agent finishes a task and a lesson is due, devcoach teaches one short lesson on something
+that task touched and you don't know yet, pitched at [your level on that topic](../how-it-works.md#depth-calibration).
+Whether it comes on its own depends on your agent:
 
-> The [CLI](./cli.md) and [web dashboard](./web-ui.md) are *secondary* ways to review and manage your
-> data — this page is the core experience. See [How it works](../how-it-works.md) for the decision flow
-> behind lesson selection.
+<Cards columns={2}>
+  <Card label="On its own" title="Claude Code, Gemini CLI, Codex CLI">
+    devcoach's hooks offer setup, then lessons, after a task: nothing to open, no command to run. Gemini CLI and Codex CLI are in beta, and Codex runs the hooks once you trust them.
+  </Card>
+  <Card label="When you ask" title="Claude Desktop and other MCP agents">
+    In Claude Desktop, Cursor, Windsurf, Cline, Continue or Zed, nothing prompts a lesson. Say *set up devcoach* once, then ask after a task.
+  </Card>
+</Cards>
+
+**In any agent you can ask at any time:** say *coach me* or *teach me something*. Where the devcoach
+skill runs (the first three agents), a lesson you ask for comes even when the
+[pace](#staying-unobtrusive) would make you wait, and it counts like any other. What each agent gets:
+[Installation](../install/index.md).
+
+Want to see a lesson card and what your answer does first? Jump to [Your first lesson](#your-first-lesson).
 
 ## Onboarding
 
-The first time your agent connects, devcoach notices your profile isn't set up and walks you through it
-inline, after your first task. You can also start it yourself: **`/devcoach:setup`** in the Claude Code
-plugin (it first checks that devcoach is running — see
-[troubleshooting](../install/claude-code-plugin.md#troubleshooting) if it isn't), or just say *"set up
-devcoach"* in any agent. You pick one of four options.
+Lessons are pitched from your **knowledge map**: the technologies you use, each rated from 0 to 10.
+Where lessons come on their own, devcoach offers to build it after your first task and asks you how.
+In any agent you can start it yourself: say *set up devcoach*, or run **`/devcoach:setup`** in the
+Claude Code plugin, which first checks that devcoach is running
+([if it isn't](../install/claude-code-plugin.md#troubleshooting)). The devcoach skill offers four ways:
 
-### Automatic (strongly recommended)
+<Cards columns={2}>
+  <Card label="Recommended" title="Automatic" to="#automatic-strongly-recommended">Builds your map in one pass from your recent Claude Code projects, then asks nothing more. You review it afterwards.</Card>
+  <Card label="Opt-in" title="Automatic (Deep)" to="#automatic-deep">Also has your agent read your recent Claude Code conversations, in a separate subagent, for a finer map.</Card>
+  <Card label="By hand" title="Guided" to="#guided">A short conversation about each technology you use and how confident you are with it.</Card>
+  <Card label="New machine" title="Import backup" to="#import-backup">Give the path of a devcoach backup zip, and your map, lessons and the rest come back.</Card>
+</Cards>
 
-**If you already use Claude Code on real projects, choose automatic.** devcoach builds your profile in
-one pass, with no questions, from the stack detected across your whole local Claude Code history — the
-projects map, manifests and lockfiles (`package.json`, `requirements.txt`, `go.mod`, …), activity
-metadata, and auto-memory excerpts. Conversation text is never read. Topics, starting confidence scores,
-and groups (Languages, Frontend, DevOps, …) are saved right away; you review and adjust afterwards. It's
-the fastest path and gives the most accurate starting profile — which is why it's recommended for anyone
-already working in real codebases with Claude.
+Whichever way you pick, your agent saves the map, writes the coaching notebook
+(`~/.devcoach/learning-state.md`) and shows a summary grouped by area, with ungrouped topics under
+`Other`.
 
-### Automatic (Deep)
-
-Opt-in variant for a finer-grained profile. A metadata-only pre-check first counts the projects active in
-the last three months; above eight, devcoach asks whether to narrow the window, proceed with the 25 most
-recent, or pick specific projects. A separate subagent then reads real conversation text from your local
-session transcripts (`~/.claude/projects/`, at most the 5 most recent sessions per project) and returns
-only the synthesized topics, groups, and notebook — the transcripts never enter your main conversation.
-Your agent states this trade-off before you choose.
-
-### Guided
-
-Prefer to describe your stack by hand? devcoach asks about each technology and your confidence
-(1–3 still learning · 4–6 comfortable · 7–9 strong · 10 expert).
-
-### Import backup
-
-On a new machine? Provide your backup zip path and your whole profile (knowledge map, lessons, settings,
-notebook) is imported instantly. See [Backup, export & import](./cli.md#backup-export--import).
-
-### After onboarding
-
-Whichever option you pick, devcoach saves the profile, writes the coaching notebook
-(`~/.devcoach/learning-state.md`), and shows a summary grouped by area — ungrouped topics under `Other`:
+<details>
+<summary>What the summary looks like</summary>
 
 ```
 ### Languages
@@ -72,16 +69,71 @@ Whichever option you pick, devcoach saves the profile, writes the coaching noteb
 ### Other
 - **redis** — 3/10
 
-Change any of this later: tell me in chat, use the `devcoach` CLI, or open `devcoach ui`.
+Change any of this later: tell me in chat, use the `devcoach` CLI,
+or open `devcoach ui`.
 ```
 
-Prefer the terminal? `devcoach setup` is an interactive wizard — backup path → automatic or manual
-topics → optional groups → daily limit and minimum gap — that you can run any time.
+</details>
+
+To adjust it, tell your agent (*set my Python confidence to 7*), use the [CLI](./cli.md), or press
+**Edit** on the Knowledge Map page of the [web dashboard](./web-ui.md):
+
+<Clip
+  alt="The dashboard's Knowledge Map: Edit is pressed, the plus beside django raises it from 3 (red) to 4 (yellow), and Done leaves edit mode"
+  mp4={require("../clips/knowledge-edit.mp4").default}
+  webm={require("../clips/knowledge-edit.webm").default}
+  poster={require("../clips/knowledge-edit.png").default}
+  width={1640}
+  height={1026}
+  caption="Each topic's bar runs from 0 to 10. In edit mode, − and + move it one point."
+/>
+
+Prefer the terminal? `devcoach setup` is an interactive wizard (backup path, automatic or manual
+topics, optional groups, daily limit and minimum gap) that you can run any time.
+
+### Automatic (strongly recommended)
+
+**If you already use Claude Code on real projects, choose this.** devcoach scans your 15 most recently
+active Claude Code projects: their dependency lists (`package.json`, `requirements*.txt`,
+`pyproject.toml`) and file names, how much you work in each, and Claude Code's auto-memory notes. It
+counts your prompts and keeps none of their text. Your agent saves the topics, their starting
+confidence and groups (Languages, Frontend, DevOps, …) right away; you review them afterwards.
+
+No Claude Code history on this machine (a new computer, or you only use Gemini CLI or Codex CLI)? It
+starts from the current project and devcoach's general map, which adjusts as you work. What the scan
+reads, exactly: [Privacy & security](../reference/privacy.md#what-devcoach-reads).
+
+### Automatic (Deep)
+
+For a finer map, your agent also reads what you discussed with Claude Code. It states this trade-off
+before you choose:
+
+```mermaid
+flowchart TD
+    P["1 · Pre-check<br/>paths and dates only"] -- "the projects" --> S["2 · Separate subagent<br/>at most 5 recent sessions<br/>per project"]
+    T[("Session transcripts<br/>~/.claude/projects/")] -- "read here" --> S
+    S -- "3 · topics, groups,<br/>notebook notes" --> M(["Your main conversation"])
+```
+
+If more than eight projects were active in the last three months, the pre-check asks whether to narrow
+the window, take the 25 most recent, or pick projects. The devcoach skill tells the subagent to send back
+only what step 3 shows; what it reads goes to your agent's model
+([Privacy & security](../reference/privacy.md#what-devcoach-reads)).
+
+### Guided
+
+Your agent asks about each technology you use and how confident you are with it: 1–3 *still
+learning*, 4–6 *comfortable*, 7–9 *strong*, 10 *expert*. Once the list is complete it proposes groups.
+
+### Import backup
+
+On a new machine? Give the path of your devcoach backup zip: your settings, knowledge map, lessons,
+notebook and courses are restored. What a restore keeps and replaces is in
+[Configuration](../reference/configuration.md#backup-strategy).
 
 ## Your first lesson
 
-You work on a task as normal. After your agent responds, devcoach appends a lesson card as the final text
-of the reply:
+You work on a task as normal. When a lesson is due, your agent ends its reply with a lesson card:
 
 ```
 ### ──────── 🎓 devcoach ────────
@@ -99,66 +151,100 @@ never have to branch on `status` strings.
 Did that land? ✅ knew it (y) · 💡 understood (u) · ❌ couldn't follow (n)
 ```
 
+Each lesson is saved with where it happened: project folder, repository, branch and commit. Now and
+then Claude Code also shows *🎓 devcoach: checking whether a lesson is due…* next to a generic *Stop
+hook error occurred*: that is devcoach asking for the lesson, and it is harmless
+([Troubleshooting](../troubleshooting.md)).
+
 ## The feedback loop
 
-Answer on the line under the card — a bare `y`, `u` or `n` is enough — and your reply tunes future
-coaching:
+Answer on the line under the card. A bare `y`, `u` or `n` is enough:
 
-- **✅ knew it** (`y`, `yes`) — you already knew this: your confidence on that topic goes up by one,
-  and you'll see fewer, deeper lessons there.
-- **💡 understood** (`u`, `got it`) — it was new and it landed: the coach pitched the right level, so
-  nothing changes.
-- **❌ couldn't follow** (`n`, `no`) — too dense for this session: confidence stays where it is, and
-  the lesson is kept as a seed for a step-by-step course you can start whenever you like.
-- **Anything else, or no reply** — no change; the question is dropped silently and you carry on.
+<Cards columns={3}>
+  <Card label="y · yes" title="✅ knew it">You already knew this. If the topic is rated below the lesson's level, it goes up one point, so its next lessons go deeper.</Card>
+  <Card label="u · got it" title="💡 understood">It was new and it landed: the level was right. Nothing changes now.</Card>
+  <Card label="n · no" title="❌ couldn't follow">Too dense for this session. Nothing changes now; the lesson is kept as the seed of a step-by-step course.</Card>
+</Cards>
+
+**Anything else, or no reply:** nothing is recorded, and you carry on.
+
+<Scale
+  bands={[
+    { from: 0, to: 3, label: "junior", tone: "low" },
+    { from: 4, to: 6, label: "mid", tone: "mid" },
+    { from: 7, to: 9, label: "senior", tone: "high" },
+  ]}
+  marks={[
+    { at: 6, label: "docker today: mid lessons" },
+    { at: 7, label: "after ✅ on a senior one: senior lessons" },
+  ]}
+  caption="Your confidence in a topic sets the level of its lessons (at 10, only cutting-edge ones). ✅ on a lesson above your rating moves the topic up one point."
+/>
+
+**Later, at a notebook checkpoint,** the coach looks at your last ten lessons and may move a topic one
+point: up when its answers were all ✅ or 💡, down when it had two or more lessons and a ❌.
+
+**After a ❌** the coach offers that course, once: say yes and it begins right there
+([Courses](./courses.md)). To change an answer, use the lesson's page in the
+[web dashboard](./web-ui.md) (✓ / 💡 / ✗) or `devcoach feedback <id> know|understood|dont_know`;
+moving off ✅ takes its point back.
 
 ## The coaching notebook
 
-Every lesson is tied to **where it happened** — project folder, repository, branch, commit — and your agent keeps a **coaching notebook** at `~/.devcoach/learning-state.md`: written at onboarding, refreshed every 10 lessons, and yours to annotate. Flag what didn't click or mark what has sunk in, and the next lessons follow your notes. It stays local and it's optional.
+Your agent keeps notes on how you learn in `~/.devcoach/learning-state.md`. It writes them at onboarding
+and updates them at notebook checkpoints. The file is yours to edit, in any editor or on the
+dashboard's Settings page: note what didn't click or what has sunk in, and later lessons take it into
+account.
 
 ## Sharing a lesson with a teammate
 
-A lesson that landed for you is worth handing over. Ask your agent in plain words:
+Ask your agent to *share the last lesson*: you get text, a link or a `.devcoach.md` file to pass on, with
+your name unless you share anonymously. For a lesson you were given, say *import this devcoach lesson*;
+it never counts against your daily limit. The rest is in [Sharing lessons](./sharing.md).
 
-> share the last lesson · share the lesson about WAL mode as a link · share it as a file
+## How often lessons come {/* #staying-unobtrusive */}
 
-The agent calls `share_lesson` and replies with the card plus a single `devcoach:lesson:1:…` line
-(or the link, or writes the `.devcoach.md` file). Paste that anywhere. Only the lesson travels —
-project, branch and commit are included only if you ask ("with context"), and a local folder path never
-leaves your machine. Your name comes from the `share_name` setting, then git; say "anonymously" to
-drop it.
+devcoach is built to stay out of your way, and the pace is yours to set. This is a day with the
+defaults:
 
-On the receiving end, hand the agent what you were given — the code, the whole card, the link, a URL
-or the file's contents — and say **"import this devcoach lesson"**. It joins your log like your own
-lessons (feedback works as usual) but never counts against your daily limit; *"show me the lesson Ada
-shared"* renders it as a card. With the Claude Code plugin the same flows are one command away:
-`/devcoach:share last as link`, `/devcoach:import <code>`. The coach never brings sharing up itself,
-except once, right after you star a lesson. Everything else — transports, privacy, the file format —
-is in [Sharing lessons](./sharing.md).
+<PacingDay />
 
-## Staying unobtrusive
+- **Each reply your agent finishes is one interaction.** In Claude Code and Codex CLI, plan-mode
+  replies don't count. A cue comes after a set number of them in one chat, so a short chat can end
+  without a lesson.
+- **The daily cap counts any 24 hours**, not the calendar day, and the gap keeps two cued lessons
+  apart.
+- **While a course is in progress,** lesson cues pause.
 
-Coaching is paced: a lesson is cued at most once every `nudge_every` interactions (default 10) per chat
-session, and only within the rate limit. Rate limits keep coaching from getting noisy — by default
-**≤ 2 lessons/day, ≥ 4 hours apart**. Not what you want? Customize immediately — more aggressive if you
-want to learn faster, looser if you prefer fewer interruptions.
+To change the pace from a terminal:
 
-Adjust with the terminal:
 ```bash
-devcoach set max_per_day 5           # up to 5 lessons per day
-devcoach set min_gap_minutes 60      # as little as 1 hour between lessons
-devcoach set nudge_every 5           # cue a lesson every 5 interactions instead of 10
+# Fewer: one in any 24 h (the least)
+devcoach set max_per_day 1
+# Sooner: a cue after 5 interactions
+devcoach set nudge_every 5
+# Many short chats: add them up
+devcoach set nudge_scope global
 ```
 
-Or use the [web dashboard](./web-ui.md) Settings page. Full reference: [Configuration](../reference/configuration.md).
+Or ask your agent (*set my max lessons per day to 3*), or use the Settings page of the
+[web dashboard](./web-ui.md). Every setting, its range and the exact rules are in
+[Configuration](../reference/configuration.md#rate-limits).
 
-## What to expect
+**Fewer still, or none?** The fewest the settings allow is `nudge_every` 1000 with `max_per_day` 1.
+`nudge_every` 0 is not *off*: it cues on every reply. To stop lessons (your data stays in
+`~/.devcoach`):
 
-Over a typical work week with 1–2 tasks per day, you'll receive **2–4 lessons aligned to your stack and confidence level.** Each lesson takes 30 seconds to read. After a month of normal AI-assisted development, you'll have built a coaching notebook specific to your gaps — exact patterns you struggle with, edge cases you tend to miss, the reasoning behind tools you reach for instinctively.
+```bash
+# Plugin: pause (enable resumes)
+claude plugin disable devcoach@ultimaphoenix
+# devcoach install: remove it
+devcoach uninstall
+# …then keep tools, ask for lessons
+devcoach install --skip-hook
+```
 
-**Too intense?** Dial back the frequency: `devcoach set max_per_day 1`. **Want more coaching?** Crank it up: `devcoach set max_per_day 5`. Everything is tunable.
+Another install method? Its page in [Installation](../install/index.md) shows how to remove it.
 
-The compounding effect: developers who keep learning while tools get stronger stay in control of the result.
-
-→ Review your progress in the **[CLI](./cli.md)** or the **[web dashboard](./web-ui.md)** — they show the
-same data.
+Review your lessons and your map in the [CLI](./cli.md) or the [web dashboard](./web-ui.md): they show
+the same data.
