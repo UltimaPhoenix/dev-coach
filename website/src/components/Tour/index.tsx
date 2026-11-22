@@ -7,13 +7,14 @@ import Link from "@docusaurus/Link";
 import { useColorMode } from "@docusaurus/theme-common";
 import useBaseUrl from "@docusaurus/useBaseUrl";
 import { usePluginData } from "@docusaurus/useGlobalData";
+import ThemedImage from "@theme/ThemedImage";
 import clsx from "clsx";
 import type { KeyboardEvent, ReactNode } from "react";
-import { useCallback, useEffect, useRef, useState } from "react";
-import type { DemoCourse } from "../../../docusaurus.config";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
+import type { DemoCourse as DemoCourseData } from "../../../docusaurus.config";
 import styles from "./styles.module.css";
 
-interface Shot {
+export interface Shot {
   light: string;
   dark: string;
 }
@@ -42,10 +43,21 @@ const LESSON = {
   after:
     "Use Promise.all when the tasks are genuinely all-or-nothing; reach for allSettled when partial success is meaningful and you want to report failures.",
   tip: "for work that should cancel its siblings on failure, a shared AbortController gives you all-or-nothing with prompt cancellation.",
-  band: "──────── 🎓 devcoach ────────",
-  foot: "──────── typescript · mid ────────",
+  band: "🎓 devcoach",
+  foot: "typescript · mid",
   ask: "Did that land? ✅ knew it (y) · 💡 understood (u) · ❌ couldn't follow (n)",
 };
+
+/** One of the card's rules: the line drawing is decoration, only its words are read. */
+function Band({ className, text }: { className: string; text: string }): ReactNode {
+  return (
+    <p className={className}>
+      <span aria-hidden="true">──────── </span>
+      {text}
+      <span aria-hidden="true"> ────────</span>
+    </p>
+  );
+}
 
 function TerminalLesson(): ReactNode {
   return (
@@ -57,19 +69,22 @@ function TerminalLesson(): ReactNode {
           {LESSON.reply}
         </p>
         <div className={styles.termCard}>
-          <p className={styles.termBand}>{LESSON.band}</p>
+          <Band className={styles.termBand} text={LESSON.band} />
           <p>
             <strong>{LESSON.title}</strong> · {LESSON.meta}
           </p>
           {LESSON.before.map((text) => (
             <p key={text}>{text}</p>
           ))}
-          <pre className={styles.termCode}>{LESSON.code}</pre>
+          {/* Focusable: on a phone the line scrolls sideways, and a keyboard must reach it. */}
+          <pre className={styles.termCode} tabIndex={0}>
+            {LESSON.code}
+          </pre>
           <p>{LESSON.after}</p>
           <p>
             💡 <em>Senior tip:</em> {LESSON.tip}
           </p>
-          <p className={styles.termBand}>{LESSON.foot}</p>
+          <Band className={styles.termBand} text={LESSON.foot} />
         </div>
         <p className={styles.termAsk}>{LESSON.ask}</p>
         <p className={styles.termPrompt}>
@@ -86,19 +101,21 @@ function DesktopLesson(): ReactNode {
       <div className={styles.bar}>Claude Code · desktop app</div>
       <div className={styles.appBody}>
         <p className={styles.appReply}>{LESSON.reply}</p>
-        <h3 className={styles.appBand}>{LESSON.band}</h3>
+        <Band className={styles.appBand} text={LESSON.band} />
         <p>
           <strong>{LESSON.title}</strong> · {LESSON.meta}
         </p>
         {LESSON.before.map((text) => (
           <p key={text}>{text}</p>
         ))}
-        <pre className={styles.appCode}>{LESSON.code}</pre>
+        <pre className={styles.appCode} tabIndex={0}>
+          {LESSON.code}
+        </pre>
         <p>{LESSON.after}</p>
         <p>
           💡 <em>Senior tip:</em> {LESSON.tip}
         </p>
-        <h3 className={styles.appBand}>{LESSON.foot}</h3>
+        <Band className={styles.appBand} text={LESSON.foot} />
         <p>{LESSON.ask}</p>
       </div>
       <div className={styles.appInput}>
@@ -108,7 +125,8 @@ function DesktopLesson(): ReactNode {
   );
 }
 
-function AgentPanel(): ReactNode {
+/** The lesson card in both hosts, with a switch. The guides reuse it (`caption={false}`). */
+export function LessonHosts({ caption = true }: { caption?: boolean }): ReactNode {
   const [host, setHost] = useState<"terminal" | "desktop">("terminal");
   return (
     <>
@@ -121,40 +139,45 @@ function AgentPanel(): ReactNode {
         </button>
       </div>
       {host === "terminal" ? <TerminalLesson /> : <DesktopLesson />}
-      <p className={styles.caption}>
-        <span>
-          The same card wherever your agent runs: one when a lesson is due, at most twice a day. Answer with one
-          key, or just keep working.
-        </span>
-        <Link to="/usage/coaching#your-first-lesson">Your first lesson →</Link>
-      </p>
+      {caption && (
+        <p className={styles.caption}>
+          <span>
+            The same card wherever your agent runs: one when a lesson is due, at most twice a day. Answer with
+            one key, or just keep working.
+          </span>
+          <Link to="/usage/coaching#your-first-lesson">Your first lesson →</Link>
+        </p>
+      )}
     </>
   );
 }
 
 function Capture({ shot, label, alt }: { shot: Shot; label: string; alt: string }): ReactNode {
   return (
-    <div className={styles.frame}>
+    <div className={clsx(styles.frame, styles.capture)}>
       <div className={styles.bar}>{label}</div>
-      {/* Both themes are rendered; CSS keyed off [data-theme] shows one (no hydration mismatch). */}
-      <img className={clsx(styles.shot, styles.light)} src={shot.light} alt={alt} loading="lazy" />
-      <img className={clsx(styles.shot, styles.dark)} src={shot.dark} alt={alt} loading="lazy" />
+      <ThemedImage className={styles.shot} sources={shot} alt={alt} loading="lazy" />
     </div>
   );
 }
 
 const HANDSHAKE_MS = 5000;
 
-function CoursePanel({ shot }: { shot: Shot }): ReactNode {
-  const course = usePluginData("devcoach-demo-course") as DemoCourse;
+/** The demo course: its capture, and a button that runs the real document in place. */
+export function DemoCourse({ shot }: { shot: Shot }): ReactNode {
+  const course = usePluginData("devcoach-demo-course") as DemoCourseData;
   const src = useBaseUrl(course.file);
   const { colorMode } = useColorMode();
   const frame = useRef<HTMLIFrameElement>(null);
+  const runButton = useRef<HTMLButtonElement>(null);
+  const stepList = useRef<HTMLOListElement>(null);
   const [state, setState] = useState<"still" | "running" | "failed">("still");
+  // The frame has loaded / the document has answered (its first report is the handshake).
+  const [loaded, setLoaded] = useState(false);
+  const [ready, setReady] = useState(false);
   const [height, setHeight] = useState(480);
   const [anchor, setAnchor] = useState<string | null>(null);
   const theme = useRef(colorMode);
-  theme.current = colorMode;
 
   // The frame's origin is opaque (sandbox without allow-same-origin): "*" is the only target that
   // reaches it, and the payload is one word.
@@ -162,28 +185,55 @@ function CoursePanel({ shot }: { shot: Shot }): ReactNode {
     frame.current?.contentWindow?.postMessage({ type: "devcoach:theme", theme: theme.current }, "*");
   }, []);
   // The site's toggle changes colorMode: tell the running course.
-  useEffect(sendTheme, [colorMode, sendTheme]);
+  useEffect(() => {
+    theme.current = colorMode;
+    sendTheme();
+  }, [colorMode, sendTheme]);
+
+  // Focus follows the control that went away: Run hands it to the first step of the list, Close
+  // (or a course that did not start) hands it back to Run. Leaving resets the run, so the next
+  // one starts on the document's first step.
+  const previous = useRef(state);
+  useEffect(() => {
+    const was = previous.current;
+    previous.current = state;
+    if (state === "running" && was !== "running") {
+      stepList.current?.querySelector("button")?.focus();
+    } else if (state !== "running" && was === "running") {
+      setAnchor(null);
+      setLoaded(false);
+      setReady(false);
+      setHeight(480);
+      runButton.current?.focus();
+    }
+  }, [state]);
 
   useEffect(() => {
     if (state !== "running") return;
-    let answered = false;
     const onMessage = (event: MessageEvent) => {
       const data = event.data as { type?: string; height?: unknown; anchor?: unknown } | null;
-      if (event.source !== frame.current?.contentWindow || data?.type !== "devcoach:course") return;
-      answered = true;
+      // The sandboxed frame posts from the opaque origin, which serialises as "null".
+      if (event.source !== frame.current?.contentWindow || event.origin !== "null") return;
+      if (data?.type !== "devcoach:course") return;
+      setReady(true);
       const h = Number(data.height);
       if (Number.isFinite(h)) setHeight(Math.min(50_000, Math.max(320, Math.ceil(h))));
-      if (typeof data.anchor === "string") setAnchor(data.anchor);
+      // No anchor: the document shows its first step (no fragment yet).
+      setAnchor(typeof data.anchor === "string" ? data.anchor : null);
       // Every report is answered with the theme: the first one is the handshake.
       sendTheme();
     };
     window.addEventListener("message", onMessage);
-    const timer = window.setTimeout(() => !answered && setState("failed"), HANDSHAKE_MS);
-    return () => {
-      window.removeEventListener("message", onMessage);
-      window.clearTimeout(timer);
-    };
+    return () => window.removeEventListener("message", onMessage);
   }, [state, sendTheme]);
+
+  // The handshake is timed from the frame's load, not from the click: on a slow link the
+  // download alone can take longer than the wait, and the bridge answers as soon as it runs.
+  useEffect(() => {
+    if (state !== "running" || !loaded || ready) return;
+    const timer = window.setTimeout(() => setState("failed"), HANDSHAKE_MS);
+    return () => window.clearTimeout(timer);
+  }, [state, loaded, ready]);
 
   // A new step starts at its top: bring the frame back into view when it has scrolled above.
   useEffect(() => {
@@ -221,7 +271,7 @@ function CoursePanel({ shot }: { shot: Shot }): ReactNode {
             A lesson you couldn't follow is kept as the seed of a course: one step at a time, with charts and
             checks. This one is real, and it runs here.
           </span>
-          <button type="button" className="button button--primary button--sm" onClick={() => setState("running")}>
+          <button ref={runButton} type="button" className="button button--primary button--sm" onClick={() => setState("running")}>
             ▶ Run this course
           </button>
         </p>
@@ -240,33 +290,40 @@ function CoursePanel({ shot }: { shot: Shot }): ReactNode {
           <span>{course.title} · the demo course, running in a sandboxed frame</span>
         </div>
         <div className={styles.courseGrid}>
-          <ol className={styles.steps} aria-label="Course steps">
+          {/* Buttons, not links: the document is meant to be read framed (a link could open it on
+              its own, outside the sandbox). */}
+          <ol ref={stepList} className={styles.steps} aria-label="Course steps">
             {course.steps.map((step, i) => (
               <li key={step.anchor}>
-                <a
-                  href={`${src}#${step.anchor}`}
+                <button
+                  type="button"
                   aria-current={step.anchor === current ? "step" : undefined}
-                  onClick={(event) => {
-                    event.preventDefault();
-                    go(step.anchor);
-                  }}
+                  onClick={() => go(step.anchor)}
                 >
                   <b>
                     {i + 1}. {step.title}
                   </b>
                   <span>{step.kind}</span>
-                </a>
+                </button>
               </li>
             ))}
           </ol>
-          <iframe
-            ref={frame}
-            className={styles.doc}
-            src={src}
-            title={`${course.title} (demo course)`}
-            sandbox="allow-scripts allow-forms"
-            style={{ height }}
-          />
+          <div className={styles.docArea}>
+            <p className={clsx(styles.loading, ready && "dc-sr-only")} role="status">
+              {ready ? "" : "Loading the course…"}
+            </p>
+            <iframe
+              ref={frame}
+              className={styles.doc}
+              src={src}
+              title={`${course.title} (demo course)`}
+              sandbox="allow-scripts allow-forms"
+              referrerPolicy="no-referrer"
+              scrolling="no"
+              style={{ height }}
+              onLoad={() => setLoaded(true)}
+            />
+          </div>
         </div>
       </div>
       <p className={styles.caption}>
@@ -286,26 +343,62 @@ function CoursePanel({ shot }: { shot: Shot }): ReactNode {
 }
 
 export default function Tour({ shots }: Props): ReactNode {
+  const id = useId();
   const [active, setActive] = useState<TabId>("agent");
+  const [vertical, setVertical] = useState(false);
   const tabs = useRef<Partial<Record<TabId, HTMLButtonElement | null>>>({});
+  const ids = (tab: TabId) => ({
+    tab: `${id}-tab-${tab}`,
+    title: `${id}-title-${tab}`,
+    blurb: `${id}-blurb-${tab}`,
+    panel: `${id}-panel-${tab}`,
+  });
+
+  // One column of tabs from 997px (the stylesheet's breakpoint), a 2 × 2 grid under it.
+  useEffect(() => {
+    const query = window.matchMedia("(min-width: 997px)");
+    const apply = () => setVertical(query.matches);
+    apply();
+    query.addEventListener("change", apply);
+    return () => query.removeEventListener("change", apply);
+  }, []);
 
   const onKeyDown = (event: KeyboardEvent, index: number) => {
-    const step =
-      event.key === "ArrowDown" || event.key === "ArrowRight"
-        ? 1
-        : event.key === "ArrowUp" || event.key === "ArrowLeft"
-          ? -1
-          : 0;
-    if (!step) return;
+    const moves: Record<string, number> = {
+      ArrowDown: index + 1,
+      ArrowRight: index + 1,
+      ArrowUp: index - 1,
+      ArrowLeft: index - 1,
+      Home: 0,
+      End: TABS.length - 1,
+    };
+    const to = moves[event.key];
+    if (to === undefined) return;
     event.preventDefault();
-    const next = TABS[(index + step + TABS.length) % TABS.length].id;
+    const next = TABS[(to + TABS.length) % TABS.length].id;
     setActive(next);
     tabs.current[next]?.focus();
   };
 
+  const panel = (tab: TabId) => ({
+    role: "tabpanel",
+    id: ids(tab).panel,
+    "aria-labelledby": ids(tab).title,
+    hidden: active !== tab,
+  });
+
   return (
-    <section className={clsx(styles.tour, "dc-wide")}>
-      <div className={styles.tabs} role="tablist" aria-label="devcoach, screen by screen">
+    <section className={clsx(styles.tour, "dc-wide")} data-dc-tour="">
+      {/* Without JavaScript the tabs and buttons do nothing: show every screen, one after another. */}
+      <noscript>
+        <style>{`[data-dc-tour] [role="tabpanel"][hidden]{display:block}[data-dc-tour] [role="tablist"],[data-dc-tour] [role="group"],[data-dc-tour] .button{display:none}`}</style>
+      </noscript>
+      <div
+        className={styles.tabs}
+        role="tablist"
+        aria-label="devcoach, screen by screen"
+        aria-orientation={vertical ? "vertical" : "horizontal"}
+      >
         {TABS.map((tab, index) => (
           <button
             key={tab.id}
@@ -314,24 +407,26 @@ export default function Tour({ shots }: Props): ReactNode {
             }}
             type="button"
             role="tab"
-            id={`tour-tab-${tab.id}`}
+            id={ids(tab.id).tab}
             className={styles.tab}
             aria-selected={active === tab.id}
-            aria-controls={`tour-panel-${tab.id}`}
+            aria-controls={ids(tab.id).panel}
+            aria-labelledby={ids(tab.id).title}
+            aria-describedby={ids(tab.id).blurb}
             tabIndex={active === tab.id ? 0 : -1}
             onClick={() => setActive(tab.id)}
             onKeyDown={(event) => onKeyDown(event, index)}
           >
-            <b>{tab.title}</b>
-            <span>{tab.blurb}</span>
+            <b id={ids(tab.id).title}>{tab.title}</b>
+            <span id={ids(tab.id).blurb}>{tab.blurb}</span>
           </button>
         ))}
       </div>
       <div className={styles.panels}>
-        <div role="tabpanel" id="tour-panel-agent" aria-labelledby="tour-tab-agent" hidden={active !== "agent"}>
-          <AgentPanel />
+        <div {...panel("agent")}>
+          <LessonHosts />
         </div>
-        <div role="tabpanel" id="tour-panel-lessons" aria-labelledby="tour-tab-lessons" hidden={active !== "lessons"}>
+        <div {...panel("lessons")}>
           <Capture
             shot={shots.lessons}
             label="devcoach ui · Lessons"
@@ -345,7 +440,7 @@ export default function Tour({ shots }: Props): ReactNode {
             <Link to="/usage/web-ui">Web dashboard →</Link>
           </p>
         </div>
-        <div role="tabpanel" id="tour-panel-map" aria-labelledby="tour-tab-map" hidden={active !== "map"}>
+        <div {...panel("map")}>
           <Capture
             shot={shots.map}
             label="devcoach ui · Knowledge map"
@@ -358,8 +453,8 @@ export default function Tour({ shots }: Props): ReactNode {
             <Link to="/usage/coaching#onboarding">How onboarding works →</Link>
           </p>
         </div>
-        <div role="tabpanel" id="tour-panel-courses" aria-labelledby="tour-tab-courses" hidden={active !== "courses"}>
-          <CoursePanel shot={shots.course} />
+        <div {...panel("courses")}>
+          <DemoCourse shot={shots.course} />
         </div>
       </div>
     </section>

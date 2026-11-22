@@ -1,0 +1,90 @@
+.chat {
+  margin: 1.25rem 0 1.75rem;
+  border: 1px solid var(--dc-border);
+  border-radius: var(--dc-radius);
+  background: var(--ifm-background-surface-color);
+  overflow: hidden;
+}
+.bar {
+  padding: 0.45rem 0.9rem;
+  border-bottom: 1px solid var(--dc-border);
+  color: var(--dc-text-muted);
+  font-family: var(--ifm-font-family-monospace);
+  font-size: 0.72rem;
+}
+.rows {
+  display: grid;
+  gap: 0.7rem;
+  padding: 1rem 1.1rem;
+}
+.row {
+  display: grid;
+  grid-template-columns: 4.6rem minmax(0, 1fr);
+  gap: 0.9rem;
+  align-items: baseline;
+}
+@media (max-width: 480px) {
+  .row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.1rem;
+  }
+}
+.who {
+  font-family: var(--ifm-font-family-monospace);
+  font-size: 0.72rem;
+  color: var(--dc-text-muted);
+}
+.coach .who {
+  color: var(--dc-accent-text);
+}
+.text {
+  min-width: 0;
+  line-height: 1.55;
+}
+.text > p {
+  margin: 0;
+}
+.text > p + p {
+  margin-top: 0.5rem;
+}
+.you .text {
+  font-family: var(--ifm-font-family-monospace);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+.choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.choices li {
+  margin: 0;
+  padding: 0.2rem 0.75rem;
+  border: 1px solid var(--dc-border);
+  border-radius: 999px;
+  font-size: 0.85rem;
+  color: var(--dc-text-muted);
+}
+.choices li.picked {
+  border-color: var(--ifm-color-primary);
+  background: var(--ifm-color-primary);
+  color: var(--dc-on-primary);
+  font-weight: 600;
+}
+:global([data-theme="dark"]) .choices li.picked {
+  color: #1e1f22;
+}
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
