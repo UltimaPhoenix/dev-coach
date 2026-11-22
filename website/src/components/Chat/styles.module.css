@@ -82,7 +82,7 @@
   justify-items: start;
 }
 .stacked li {
-  border-radius: 10px;
+  border-radius: var(--dc-radius);
 }
 .srOnly {
   position: absolute;
