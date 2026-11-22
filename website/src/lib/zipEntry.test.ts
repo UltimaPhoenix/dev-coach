@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { deflateRawSync } from "node:zlib";
+import { crc32, deflateRawSync } from "node:zlib";
 import { readZipEntry } from "./zipEntry.ts";
 
 const fixture = readFileSync(
@@ -12,15 +12,17 @@ const fixture = readFileSync(
 );
 
 /** A minimal archive: one local header + one central entry per file, then the end record. */
-function zipOf(files: Record<string, { data: Buffer; method: 0 | 8 }>): Buffer {
+function zipOf(files: Record<string, { data: Buffer; method: 0 | 8; flags?: number; crc?: number }>): Buffer {
   const locals: Buffer[] = [];
   const centrals: Buffer[] = [];
   let offset = 0;
-  for (const [name, { data, method }] of Object.entries(files)) {
+  for (const [name, { data, method, flags = 0, crc = crc32(data) }] of Object.entries(files)) {
     const packed = method === 8 ? deflateRawSync(data) : data;
     const local = Buffer.alloc(30 + name.length + 4); // + a 4-byte extra field the reader must skip
     local.writeUInt32LE(0x04034b50, 0);
+    local.writeUInt16LE(flags, 6);
     local.writeUInt16LE(method, 8);
+    local.writeUInt32LE(crc, 14);
     local.writeUInt32LE(packed.length, 18);
     local.writeUInt32LE(data.length, 22);
     local.writeUInt16LE(name.length, 26);
@@ -28,7 +30,9 @@ function zipOf(files: Record<string, { data: Buffer; method: 0 | 8 }>): Buffer {
     local.write(name, 30);
     const central = Buffer.alloc(46 + name.length);
     central.writeUInt32LE(0x02014b50, 0);
+    central.writeUInt16LE(flags, 8);
     central.writeUInt16LE(method, 10);
+    central.writeUInt32LE(crc, 16);
     central.writeUInt32LE(packed.length, 20);
     central.writeUInt32LE(data.length, 24);
     central.writeUInt16LE(name.length, 28);
@@ -67,4 +71,13 @@ test("reads stored and deflated entries, skipping the local extra field", () => 
 test("a missing entry is null; a file that is not an archive throws", () => {
   assert.equal(readZipEntry(fixture, "courses/nope/index.html"), null);
   assert.throws(() => readZipEntry(Buffer.from("definitely not a zip archive"), "x"), /Not a ZIP archive/);
+});
+
+test("refuses what it does not read: a corrupt entry, an encrypted one, a ZIP64 archive", () => {
+  const data = Buffer.from("devcoach");
+  assert.throws(() => readZipEntry(zipOf({ "x.txt": { data, method: 8, crc: 1 } }), "x.txt"), /fails its CRC check/);
+  assert.throws(() => readZipEntry(zipOf({ "x.txt": { data, method: 0, flags: 1 } }), "x.txt"), /encrypted/);
+  const zip64 = zipOf({ "x.txt": { data, method: 0 } });
+  zip64.writeUInt32LE(0xffffffff, zip64.length - 6); // the end record's directory offset
+  assert.throws(() => readZipEntry(zip64, "x.txt"), /ZIP64/);
 });

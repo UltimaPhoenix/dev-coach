@@ -70,7 +70,7 @@ function Entries({ items, depth }: { items: FileTreeItem[]; depth: number }): Re
               <span className={folder ? styles.folder : styles.file}>
                 <Icon folder={folder} />
                 <code className={styles.name}>{item.name}</code>
-                {folder && <span className={styles.srOnly}> folder</span>}
+                {folder && <span className="dc-sr-only"> folder</span>}
               </span>
               {item.note && <span className={styles.note}>{item.note}</span>}
             </div>
