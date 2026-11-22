@@ -65,7 +65,7 @@
     content: attr(data-label);
     display: block;
     margin-bottom: 0.1rem;
-    color: var(--ifm-color-emphasis-600);
+    color: var(--dc-text-muted);
     font-size: 0.72rem;
     font-weight: 600;
     letter-spacing: 0.05em;
