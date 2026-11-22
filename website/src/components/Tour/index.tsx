@@ -154,7 +154,7 @@ export function LessonHosts({ caption = true }: { caption?: boolean }): ReactNod
 
 function Capture({ shot, label, alt }: { shot: Shot; label: string; alt: string }): ReactNode {
   return (
-    <div className={styles.frame}>
+    <div className={clsx(styles.frame, styles.capture)}>
       <div className={styles.bar}>{label}</div>
       <ThemedImage className={styles.shot} sources={shot} alt={alt} loading="lazy" />
     </div>
