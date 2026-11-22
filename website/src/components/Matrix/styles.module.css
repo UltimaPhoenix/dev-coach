@@ -1,0 +1,165 @@
+/* The box scrolls, the table inside does not squeeze below --matrix-min, and the first column
+   stays pinned on an opaque tone (light: gray-100; dark: the site's surface grey) so the cells
+   sliding under it stay hidden. Symbol tones are the Scale component's: green-700 / amber-700 on
+   white, green-400 / yellow-400 on the dark greys, all above 3:1 as graphics; the words beside
+   them carry the meaning. */
+.matrix {
+  --matrix-pin: var(--ifm-color-emphasis-100);
+  /* Positioned, so the screen-reader-only spans inside are clipped with the box and never widen
+     the page. */
+  position: relative;
+  margin: 1rem 0 0.6rem;
+  overflow-x: auto;
+  border: 1px solid var(--ifm-color-emphasis-300);
+  border-radius: 12px;
+}
+:global([data-theme="dark"]) .matrix {
+  --matrix-pin: var(--ifm-background-surface-color);
+}
+.matrix:focus-visible {
+  outline: 2px solid var(--devcoach-accent);
+  outline-offset: 2px;
+}
+.matrix table {
+  display: table;
+  width: 100%;
+  min-width: var(--matrix-min, 0);
+  margin: 0;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+.matrix tr,
+.matrix tr:nth-child(2n) {
+  border: 0;
+  background: none;
+}
+.matrix th,
+.matrix td {
+  padding: 0.5rem 0.7rem;
+  border: 0;
+  border-bottom: 1px solid var(--ifm-color-emphasis-200);
+  text-align: left;
+  vertical-align: top;
+}
+.matrix tbody tr:last-child td {
+  border-bottom: 0;
+}
+.matrix thead th {
+  border-bottom-color: var(--ifm-color-emphasis-300);
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--ifm-color-emphasis-800);
+  vertical-align: bottom;
+}
+.matrix th:first-child,
+.matrix td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  min-width: 8.5rem;
+  border-right: 1px solid var(--ifm-color-emphasis-300);
+  background: var(--matrix-pin);
+}
+.matrix td:first-child {
+  line-height: 1.35;
+}
+/* On a phone the pinned column takes about a third of the width, so the first data column
+   still shows beside it. */
+@media (max-width: 600px) {
+  .matrix th:first-child,
+  .matrix td:first-child {
+    width: 8.5rem;
+    min-width: 8.5rem;
+    max-width: 8.5rem;
+  }
+}
+.matrix code {
+  font-size: 0.82em;
+  word-break: break-word;
+}
+
+.mark {
+  display: inline;
+}
+.icon {
+  width: 0.95em;
+  height: 0.95em;
+  margin-right: 0.35em;
+  vertical-align: -0.12em;
+  stroke: currentColor;
+  fill: currentColor;
+}
+.yes {
+  color: #15803d;
+}
+.partly {
+  color: #b45309;
+}
+.no {
+  color: var(--ifm-color-emphasis-600);
+}
+:global([data-theme="dark"]) .yes {
+  color: #4ade80;
+}
+:global([data-theme="dark"]) .partly {
+  color: #facc15;
+}
+
+.ref {
+  margin-left: 0.1em;
+  font-size: 0.72em;
+  line-height: 0;
+}
+.ref a {
+  padding: 0 0.15em;
+  font-weight: 600;
+}
+
+.notes {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0 0 1.75rem;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--ifm-color-emphasis-800);
+}
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem 1rem;
+  margin: 0 0 0.15rem;
+}
+.note {
+  display: grid;
+  grid-template-columns: 1.4rem minmax(0, 1fr);
+  align-items: baseline;
+  scroll-margin-top: calc(var(--ifm-navbar-height) + 1rem);
+}
+.note:target {
+  border-radius: 6px;
+  outline: 2px solid var(--devcoach-accent);
+  outline-offset: 3px;
+}
+.num {
+  font-weight: 700;
+  font-size: 0.8rem;
+  color: var(--ifm-color-primary);
+}
+.text > p {
+  margin: 0;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}

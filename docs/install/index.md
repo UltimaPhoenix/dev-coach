@@ -1,81 +1,114 @@
 ---
 title: Installation
 sidebar_label: Choose your setup
-description: Install devcoach in about 30 seconds — Homebrew, the Claude Code plugin, npx, or Claude Desktop. A local MCP server that helps you learn from the code your AI writes.
-keywords: [install devcoach, devcoach npx, devcoach homebrew, Claude Code plugin, Claude Desktop MCP, MCP server install]
+description: Choose how to install devcoach for your agent (the Claude Code plugin, Homebrew, Windows, npx / npm, the Claude Desktop extension, Gemini CLI, Codex CLI or another MCP agent) and see what each agent gets.
+keywords: [install devcoach, devcoach Claude Code plugin, devcoach homebrew, devcoach windows, devcoach npx, Claude Desktop MCP, Gemini CLI MCP, Codex CLI MCP, MCP server install]
 ---
 
 # Installation
 
 import { Card, Cards } from "@site/src/components/Cards";
+import Matrix, { Legend, No, Note, Notes, Partly, Ref, Yes } from "@site/src/components/Matrix";
 
-devcoach runs **locally**: a stdio MCP server that stores everything in `~/.devcoach/coaching.db` on the
-machine where your agent runs. It works in **Claude Code**, **Claude Desktop**, **Gemini CLI** *(beta)*,
-**Codex CLI** *(beta)* and any other MCP client, including registry-aware ones via the
-[MCP Registry](./other-agents.md#mcp-registry).
+devcoach is a local MCP server: it runs where your agent runs and keeps your coaching data in
+`~/.devcoach/`, shared by every agent on that computer. Pick your agent first; the `devcoach` command
+is optional.
 
-:::note[Before you pick]
+## Which agent do you use?
 
-- **Node.js ≥ 24** is required. On Windows the [one-line installer](./windows.md) brings its own.
-- **Not on claude.ai web**, which only supports hosted/remote connectors (see
-  [Privacy & security](../reference/privacy.md)). There you can paste the skill by hand.
-
-:::
-
-## Which method is right for you?
-
-devcoach works the same whichever way you install it. Pick by how you like to work:
-
-<Cards columns={2}>
-  <Card label="Terminal" title="Homebrew" to="/install/homebrew">
-    macOS / Linux. One `brew install` sets up devcoach and the `devcoach` CLI.
+<Cards columns={3}>
+  <Card label="Automatic lessons" title="Claude Code" to="/install/claude-code-plugin">
+    The **plugin**, two commands in Claude Code. Needs Node.js 24 on your PATH.
   </Card>
-  <Card label="Terminal · Windows" title="PowerShell or Scoop" to="/install/windows">
-    The Windows equivalent of Homebrew: one PowerShell line, or the Scoop bucket.
+  <Card label="Lessons on request · beta" title="Claude Desktop" to="/install/claude-desktop">
+    The **`.mcpb` extension**. No terminal; runs on Claude Desktop's own Node.
   </Card>
-  <Card label="No terminal" title="Claude Code plugin" to="/install/claude-code-plugin">
-    The simplest setup: one click from the marketplace. On Claude Desktop, the `.mcpb` extension *(Beta)*.
+  <Card label="Automatic lessons · beta" title="Gemini CLI" to="/install/gemini-cli">
+    One command in a terminal, or the Gemini extension.
   </Card>
-  <Card label="Best in Claude Code" title="Plugin + Homebrew" to="/install/claude-code-plugin#the-cli-next-to-the-plugin">
-    The coaching from the plugin, the CLI from Homebrew.
+  <Card label="Automatic lessons · beta" title="Codex CLI" to="/install/codex">
+    One command in a terminal, then trust devcoach's hooks.
+  </Card>
+  <Card label="Lessons on request" title="Cursor and other MCP agents" to="/install/other-agents">
+    Windsurf, Cline, Continue, Zed: one entry in the agent's MCP config.
+  </Card>
+  <Card label="Not supported" title="claude.ai web">
+    It cannot reach a local MCP server ([why](../reference/privacy.md#why-it-cant-be-a-hosted--remote-connector)). Use Claude Desktop instead.
   </Card>
 </Cards>
 
-:::info[With Homebrew]
+## Want the `devcoach` command too?
 
-- **The CLI**: you get the [command line](../usage/cli.md) and launch the [dashboard](../usage/web-ui.md)
-  with a bare `devcoach ui`.
-- **`brew upgrade`** updates only the binary: re-run `devcoach install` to refresh the hooks and the skill.
-- **Plugin + Homebrew** is the best of both in Claude Code: the plugin keeps the coaching wiring current
-  automatically, Homebrew adds the CLI.
+Homebrew, Windows and a global npm install add the [command line](../usage/cli.md) and `devcoach ui` for
+the [web dashboard](../usage/web-ui.md). `devcoach install` then connects your agents, in place of the
+plugin or the extension.
 
-:::
+<Cards columns={4}>
+  <Card label="macOS · Linux" title="Homebrew" to="/install/homebrew">
+    Installs Node for you.
+  </Card>
+  <Card label="Windows · beta" title="PowerShell or Scoop" to="/install/windows">
+    Installs Node for you. From devcoach 2.8.0.
+  </Card>
+  <Card label="Any system" title="npx / npm" to="/install/npx">
+    Uses your Node.js 24. npx adds no command.
+  </Card>
+  <Card label="Claude Code" title="Plugin + command" to="/install/claude-code-plugin#the-cli-next-to-the-plugin">
+    Skip `devcoach install` (also next to the Desktop extension): it would register devcoach twice.
+  </Card>
+</Cards>
 
-:::info[Without a terminal]
+## What each agent gets {/* #what-each-agent-gets */}
 
-- **The plugin and the [`.mcpb` extension](./claude-desktop.md)** need nothing to configure: install and go.
-- **No `devcoach` CLI** comes with them: open the [dashboard](../usage/web-ui.md) with `/devcoach:ui` or by
-  asking Claude, and run CLI commands with `npx -y devcoach …` if you ever need them.
-- **For the most stable experience**, use Homebrew or npm.
+devcoach wires automatic lessons only into Claude Code, Gemini CLI and Codex CLI: when a task ends and a
+lesson is due, the agent teaches it. In Claude Desktop and the other agents you ask for one.
 
-:::
+<Matrix label="What each agent gets" minWidth={32}>
 
-## All methods
-
-| Method | Best for | Terminal? | Status |
+| Agent | Lessons after a task | The devcoach skill | devcoach's tools |
 |---|---|---|---|
-| **[Homebrew](./homebrew.md)** | **Developers on macOS / Linux who use the CLI** | Yes | Stable |
-| **[Windows](./windows.md)** | **Developers on Windows — one PowerShell line, or Scoop** | Yes | Beta |
-| **[Claude Code plugin](./claude-code-plugin.md)** | **Non-expert Claude Code users — one-click setup** | No | Stable |
-| **[Claude Desktop (`.mcpb`)](./claude-desktop.md)** | **Non-expert Claude Desktop users — one-click setup** | No | Beta |
-| **[Gemini CLI](./gemini-cli.md)** | Google Gemini CLI — full loop (hooks + skill) | Yes | Beta |
-| **[Codex CLI](./codex.md)** | OpenAI Codex CLI — full loop (hooks + skill) | Yes | Beta |
-| **[npx / npm CLI](./npx.md)** | Any MCP agent · npm workflows | Yes | Stable |
-| **[Other MCP agents](./other-agents.md)** | Cursor, Windsurf, Cline, Continue, Zed | Yes | Beta |
-| **[MCP Registry](./other-agents.md#mcp-registry)** | Any registry-aware client — `io.github.UltimaPhoenix/devcoach` | Depends on the client | Beta |
-| **[claude.ai web](./claude-ai.md)** | claude.ai (manual skill paste, no MCP) | — | Skill only |
+| **Claude Code** · plugin | <Yes>Automatic</Yes> | <Yes>Bundled<Ref n={1} to="bundled" /></Yes> | <Yes>All 25</Yes> |
+| **Claude Code** · `devcoach install` | <Yes>Automatic</Yes> | <Partly>Copied<Ref n={2} to="copied" /></Partly> | <Yes>All 25</Yes> |
+| **Claude Desktop** · extension *(beta)* or `devcoach install` | <No>When you ask<Ref n={3} to="ask" /></No> | <No>A prompt only<Ref n={3} to="ask" /></No> | <Yes>All 25</Yes> |
+| **Gemini CLI** *(beta)* · `devcoach install` or extension | <Yes>Automatic</Yes> | <Partly>Copied<Ref n={2} to="copied" /> or bundled<Ref n={1} to="bundled" />; you allow it<Ref n={4} to="gemini" /></Partly> | <Yes>All 25</Yes> |
+| **Codex CLI** *(beta)* · `devcoach install` | <Yes>Automatic, once you trust its hooks<Ref n={5} to="codex-trust" /></Yes> | <Partly>Copied<Ref n={2} to="copied" /></Partly> | <Partly>All 25<Ref n={6} to="codex-toml" /></Partly> |
+| **Cursor, Windsurf, Cline, Continue, Zed** | <No>When you ask<Ref n={3} to="ask" /></No> | <No>A prompt only<Ref n={3} to="ask" /></No> | <Yes>All 25</Yes> |
+| **claude.ai web** | <No>Not supported ([why](../reference/privacy.md#why-it-cant-be-a-hosted--remote-connector))</No> | <No>None</No> | <No>None</No> |
 
-Each page in the table is self-contained: it covers **install *and* connect**.
+</Matrix>
+
+<Notes>
+<Legend />
+<Note n={1} id="bundled">**Bundled**: updated with the plugin or the extension. Claude Code leaves auto-update off for this marketplace: turn it on in `/plugin` → **Marketplaces** → `ultimaphoenix`, or update the plugin yourself.</Note>
+<Note n={2} id="copied">**Copied** by `devcoach install`: run it again after each upgrade (with `--gemini` or `--codex` for those agents). `devcoach doctor` says when the copy is out of date.</Note>
+<Note n={3} id="ask">No hooks there: say *set up devcoach* once, then ask for a lesson (*teach me something from what we just did*). The devcoach skill's rules reach the model only through the **devcoach_instructions** prompt, if you attach it where the agent lists MCP prompts.</Note>
+<Note n={4} id="gemini">Gemini CLI asks you to allow the devcoach skill when it loads it.</Note>
+<Note n={5} id="codex-trust">Codex runs new hooks only after you trust them (its *Hooks need review* screen, or `/hooks`), and again after they change.</Note>
+<Note n={6} id="codex-toml">Without `codex` on your PATH, `devcoach install --codex` prints a `[mcp_servers.devcoach]` block to add to `~/.codex/config.toml`; until then Codex has no devcoach tools.</Note>
+</Notes>
+
+## Compare the methods
+
+Each method's page covers install *and* connect.
+
+<Matrix label="Compare the install methods" minWidth={34}>
+
+| Method | Brings its own Node.js | Adds the `devcoach` command | Hooks and skill after an upgrade |
+|---|---|---|---|
+| [Claude Code plugin](./claude-code-plugin.md) | <No>Yours (24+) and npm</No> | <No>No</No> | Updated with the plugin<Ref n={1} to="bundled" /> |
+| [Homebrew](./homebrew.md) | <Yes>Installs it</Yes> | <Yes>Yes</Yes> | `devcoach install` again |
+| [Windows](./windows.md) *(beta, from 2.8.0)* | <Yes>Installs it</Yes> | <Yes>Yes</Yes> | Re-run the line; Scoop: `devcoach install` again |
+| [npx / npm](./npx.md) | <No>Yours (24+)</No> | <Partly>With npm, not npx</Partly> | `devcoach install` again |
+| [Claude Desktop extension](./claude-desktop.md) *(beta)* | <Yes>Claude Desktop's own</Yes> | <No>No</No> | No hooks or skill |
+| [Gemini CLI](./gemini-cli.md) *(beta)* | <No>Yours (24+)</No> | <No>No</No> | `devcoach install --gemini` again, or the new extension |
+| [Codex CLI](./codex.md) *(beta)* | <No>Yours (24+)</No> | <No>No</No> | `devcoach install --codex` again, then trust changed hooks<Ref n={5} to="codex-trust" /> |
+| [Other MCP agents](./other-agents.md), [MCP Registry](./other-agents.md#mcp-registry) *(beta)* | <No>Yours (24+)</No> | <No>No</No> | No hooks or skill |
+
+</Matrix>
+
+Without the command, ask your agent to open the web dashboard (`/devcoach:ui` with the plugin) and run
+CLI commands as `npx -y devcoach …`. The MCP Registry entry (`io.github.UltimaPhoenix/devcoach`, npm
+package `devcoach`, stdio) passes no arguments: your client's command must end in `mcp`.
 
 <Cards>
   <Card label="Next" title="Coaching in your agent" to="/usage/coaching">
