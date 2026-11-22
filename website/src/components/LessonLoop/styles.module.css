@@ -138,3 +138,20 @@
     animation: none;
   }
 }
+
+/* Start empty. The server sends the finished card (for readers without scripting or with reduced
+   motion). When scripting runs (Docusaurus sets data-theme on <html> before the first paint) and
+   motion is allowed, keep that card out of sight until the component takes over and plays from
+   the empty prompt, so the card never flashes first. If the script never arrives, show the card
+   after a few seconds rather than an empty terminal. */
+@media (prefers-reduced-motion: no-preference) {
+  :global(html[data-theme]) .term:not([data-live]) .body {
+    opacity: 0;
+    animation: lateReveal 0.01s linear 6s forwards;
+  }
+}
+@keyframes lateReveal {
+  to {
+    opacity: 1;
+  }
+}
