@@ -1,0 +1,11 @@
+/* "N min read": a quiet line that belongs to the title. It moves up into the title's bottom margin
+   and gives the same margin back below, so the text after it starts one line lower and nothing
+   else on the page moves. --dc-text-muted is the secondary text colour whose contrast
+   src/css/tokens.test.ts holds in both themes. */
+.readingTime {
+  --title-gap: calc(var(--ifm-h1-vertical-rhythm-bottom) * var(--ifm-leading));
+  margin: calc(0.4rem - var(--title-gap)) 0 var(--title-gap);
+  font-size: 0.875rem;
+  line-height: 1.4;
+  color: var(--dc-text-muted);
+}

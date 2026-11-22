@@ -441,6 +441,15 @@ hook (verified empirically) — hence priming-first design; blocks are the rare 
   the version and date once that heading becomes `## [x.y.z] — YYYY-MM-DD`, which is the only edit a
   release needs. A version in an example is written `<version>`; real captures keep the version they
   were captured with.
+- **Reading time and page budgets** (`website/src/lib/readingTime.ts`): the guides and the essays
+  show "N min read" under their title. `READING_TIME_PAGES` lists them; the minutes are measured
+  from each page's source when the site is built (plugin `devcoach-reading-time`, drawn by
+  `website/src/theme/MDXComponents/Heading`): words at 200 a minute, code by the line, 6 seconds a
+  figure, without what a `<details>` folds and the tabs not shown first. With the same measure,
+  `readingBudget.test.ts` (`npm test --prefix website`) fails when a guide or an essay passes
+  13 minutes, an install page 9 or a landing page 4: shorten the page (move what is looked up to a
+  reference page, fold, split) before raising a ceiling there. Reference and lookup pages have no
+  label and no budget.
 
 ---
 
