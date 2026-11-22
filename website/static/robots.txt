@@ -1,48 +1,19 @@
-# devcoach documentation — all crawlers welcome, AI/answer engines included.
-# We *want* LLMs and answer engines to read, index, and cite these docs.
-# Curated entry points for LLMs: /llms.txt and /llms-full.txt
+# robots.txt of the devcoach docs (https://ultimaphoenix.github.io/dev-coach/)
+#
+# What this file can do here: nothing. Crawlers read robots.txt only at the root of a host
+# (https://ultimaphoenix.github.io/robots.txt). This copy is served at /dev-coach/robots.txt, inside a
+# GitHub Pages project site, so no crawler applies it, and none reads its Sitemap line either.
+# It records the rules this site wants, written for the host root, where they would work as they are.
+#
+# What does the work instead: every page of the unreleased docs under /dev-coach/next/ carries a
+# noindex tag, and the sitemap reaches search engines when it is submitted to them (for example in
+# Google Search Console).
+#
+# Every crawler is welcome, AI and answer engines included, in one group: a group that names one
+# crawler would replace this group for it, the Disallow line included.
+# For language models: /dev-coach/llms.txt (an index) and /dev-coach/llms-full.txt (every page).
 
 User-agent: *
-Allow: /
-# Unreleased docs (the develop branch) — every page there is also noindex.
-Disallow: /next/
-
-# --- AI / answer-engine crawlers & training signals (explicit opt-in) ---
-
-User-agent: GPTBot
-Allow: /
-
-User-agent: OAI-SearchBot
-Allow: /
-
-User-agent: ChatGPT-User
-Allow: /
-
-User-agent: ClaudeBot
-Allow: /
-
-User-agent: anthropic-ai
-Allow: /
-
-User-agent: Claude-Web
-Allow: /
-
-User-agent: PerplexityBot
-Allow: /
-
-User-agent: Perplexity-User
-Allow: /
-
-User-agent: Google-Extended
-Allow: /
-
-User-agent: Applebot-Extended
-Allow: /
-
-User-agent: CCBot
-Allow: /
-
-User-agent: cohere-ai
-Allow: /
+Disallow: /dev-coach/next/
 
 Sitemap: https://ultimaphoenix.github.io/dev-coach/sitemap.xml

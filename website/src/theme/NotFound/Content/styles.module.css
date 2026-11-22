@@ -1,0 +1,13 @@
+.eyebrow {
+  margin-bottom: 0.35rem;
+  font-family: var(--ifm-font-family-monospace);
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  color: var(--dc-accent-text);
+}
+.lead {
+  font-size: 1.15rem;
+}
+.report {
+  color: var(--dc-text-muted);
+}

@@ -3,8 +3,10 @@ import * as path from "node:path";
 import type * as Preset from "@docusaurus/preset-classic";
 import type { Config } from "@docusaurus/types";
 import type { Compiler, Configuration } from "webpack";
+import sidebars from "./sidebars.ts";
 import { darkCodeTheme, lightCodeTheme } from "./src/lib/codeThemes.ts";
 import { type DemoCourse, loadDemoCourse } from "./src/lib/demoCourse.ts";
+import { docRoute, llmsIntro, mdxToMarkdown, pageTitle, sidebarDocIds } from "./src/lib/llmsFull.ts";
 
 // Runs in Node.js — no client-side code here.
 
@@ -16,12 +18,17 @@ const SITE_URL = "https://ultimaphoenix.github.io/dev-coach/";
 // deploys it under /next/ next to the released docs: noindex, no sitemap, no JSON-LD, a banner.
 const NEXT = process.env.DOCS_NEXT === "1";
 const NEXT_URL = `${SITE_URL}next/`;
+const BASE_URL = NEXT ? "/dev-coach/next/" : "/dev-coach/";
+/** Where this build is served: the released docs, or the /next/ copy. */
+const OWN_URL = NEXT ? NEXT_URL : SITE_URL;
 const DESCRIPTION =
   "devcoach is a free, local, open-source MCP server that helps you learn from the code your AI writes — one short, in-context lesson at a time on what you don't know yet, for Claude Code, Claude Desktop, Gemini CLI, Codex CLI, Cursor, and other MCP tools.";
 
-// Inline plugin (zero-dep): emit /llms-full.txt — the entire docs corpus concatenated into one
-// file for LLM / answer-engine retrieval. It is the companion to the curated static /llms.txt.
-// See https://llmstxt.org. The docs Markdown lives in the repo's top-level docs/ (../docs).
+// Inline plugin (zero-dep): emit /llms-full.txt, every docs page as Markdown in one file for LLM and
+// answer-engine retrieval, the companion of the curated static/llms.txt (https://llmstxt.org). The
+// pages come in the sidebar's order; src/lib/llmsFull.ts turns each one's MDX into Markdown. The
+// home page's text lives in its components (Hero, Tour), so its section is the summary at the top of
+// llms.txt: one hand-written text for both files.
 function llmsFullTxtPlugin() {
   return {
     name: "devcoach-llms-full-txt",
@@ -35,42 +42,31 @@ function llmsFullTxtPlugin() {
           if (entry.isDirectory()) {
             walk(full);
           } else if (/\.mdx?$/.test(entry.name) && !/\.local\.mdx?$/.test(entry.name)) {
-            files.push(full);
+            files.push(path.relative(docsDir, full).split(path.sep).join("/"));
           }
         }
       };
       walk(docsDir);
 
-      // index first, then alphabetical by path — a stable, sensible reading order.
-      files.sort((a, b) => {
-        const rank = (f: string) => (/(^|\/)index\.mdx?$/.test(f) ? 0 : 1);
-        return rank(a) - rank(b) || a.localeCompare(b);
-      });
-
-      const titleOf = (raw: string, file: string) => {
-        const fm = raw.match(/^---\n[\s\S]*?\btitle:\s*(.+?)\s*\n[\s\S]*?\n---/);
-        if (fm) return fm[1].replace(/^["']|["']$/g, "");
-        const h1 = raw.match(/^#\s+(.+)$/m);
-        return h1 ? h1[1] : path.basename(file).replace(/\.mdx?$/, "");
+      // The sidebar's order; a page it does not list (there should be none) comes last.
+      const order = sidebarDocIds(sidebars.docs as unknown[]);
+      const rank = (file: string) => {
+        const at = order.indexOf(file.replace(/\.mdx?$/, ""));
+        return at === -1 ? order.length : at;
       };
+      files.sort((a, b) => rank(a) - rank(b) || a.localeCompare(b));
 
-      const clean = (raw: string) =>
-        raw
-          .replace(/^---\n[\s\S]*?\n---\n/, "") // drop YAML frontmatter
-          .replace(/^import\s.+$/gm, "") // drop MDX import lines
-          .replace(/<Head>[\s\S]*?<\/Head>/g, "") // drop injected JSON-LD / <head> tags
-          .replace(/<[A-Z][\w-]*(?:\s[^>]*?)?\/>/g, "") // drop self-closing JSX components
-          .trim()
-          .replace(/^#\s+.+\n+/, "") // drop leading H1 (we prepend our own title)
-          .replace(/\n{3,}/g, "\n\n")
-          .trim();
-
-      const header = `# devcoach — full documentation\n\n> ${DESCRIPTION}\n>\n> Home: ${SITE_URL} · Index: ${SITE_URL}llms.txt · Source: https://github.com/UltimaPhoenix/dev-coach\n`;
+      const intro = llmsIntro(fs.readFileSync(path.join(siteDir, "static", "llms.txt"), "utf8"));
+      const header =
+        `# devcoach: the full documentation\n\n> Every page of ${OWN_URL} as Markdown, in the order of the ` +
+        `site's sidebar. The curated index is ${OWN_URL}llms.txt; the source is https://github.com/UltimaPhoenix/dev-coach.\n`;
 
       const body = files
         .map((file) => {
-          const raw = fs.readFileSync(file, "utf8");
-          return `\n\n---\n\n# ${titleOf(raw, file)}\n\n${clean(raw)}`;
+          const raw = fs.readFileSync(path.join(docsDir, file), "utf8");
+          const route = docRoute(file);
+          const text = route === "" ? intro : mdxToMarkdown(raw, file, OWN_URL);
+          return `\n\n---\n\n# ${pageTitle(raw, file)}\n\nPage: ${OWN_URL}${route}\n\n${text}`;
         })
         .join("");
 
@@ -150,7 +146,7 @@ const config: Config = {
   future: { v4: true },
 
   url: "https://ultimaphoenix.github.io",
-  baseUrl: NEXT ? "/dev-coach/next/" : "/dev-coach/",
+  baseUrl: BASE_URL,
   organizationName: "UltimaPhoenix",
   projectName: "dev-coach",
   trailingSlash: false,
@@ -172,7 +168,10 @@ const config: Config = {
           path: "../docs",
           routeBasePath: "/", // docs are the site root, like the old MkDocs "Home"
           sidebarPath: "./sidebars.ts",
-          editUrl: "https://github.com/UltimaPhoenix/dev-coach/edit/main/",
+          // "Edit this page" opens the page's source on `develop`, the branch pull requests target.
+          // (A plain string is joined with the docs path, which starts with "../" here: the browser
+          // then resolved .../edit/main/../docs/why.md to a branch called "docs".)
+          editUrl: ({ docPath }) => `https://github.com/UltimaPhoenix/dev-coach/edit/develop/docs/${docPath}`,
           // Keep internal *.local.md(x) runbooks/notes out of the public site & sitemap.
           exclude: ["**/*.local.md", "**/*.local.mdx"],
         },
@@ -275,22 +274,51 @@ const config: Config = {
       logo: { alt: "", src: "img/favicon.svg" },
       items: [
         // The home page has no sidebar (it's the landing page), so the way into the docs is here.
-        { to: "/usage/coaching", label: "Docs", position: "left", activeBaseRegex: "/(usage|reference|how-it-works|faq)" },
-        { to: "/install", label: "Install", position: "left", activeBaseRegex: "/install" },
+        // One item is lit on every docs page: Install on the install pages, Why devcoach on its
+        // page, Docs on all the others (sidebars.ts lists them).
+        {
+          to: "/usage/coaching",
+          label: "Docs",
+          position: "left",
+          activeBaseRegex: `^${BASE_URL}(how-it-works|usage|reference|troubleshooting|faq|vision)(/|$)`,
+        },
+        { to: "/install", label: "Install", position: "left", activeBaseRegex: `^${BASE_URL}install(/|$)` },
         { to: "/why", label: "Why devcoach", position: "left" },
-        NEXT
-          ? { href: SITE_URL, label: "stable docs", position: "right" }
-          : { href: NEXT_URL, label: "next", position: "right" },
         { href: "https://www.npmjs.com/package/devcoach", label: "npm", position: "right" },
         { href: "https://github.com/UltimaPhoenix/dev-coach", label: "GitHub", position: "right" },
       ],
     },
     footer: {
       style: "dark",
-      // The home page has no sidebar, so the footer is the site's map: every guide, four columns.
+      // The home page has no sidebar, so the footer is the site's map: every page, in the sidebar's
+      // groups and order (sidebars.ts), then the project's links. A page is named as the docs name
+      // it everywhere ("(beta)" in lower case, no two brackets in a row).
       links: [
         {
-          title: "Use it",
+          title: "Start here",
+          items: [
+            { label: "Home", to: "/" },
+            { label: "Why devcoach", to: "/why" },
+            { label: "How it works", to: "/how-it-works" },
+          ],
+        },
+        {
+          title: "Install",
+          items: [
+            { label: "Choose your setup", to: "/install" },
+            { label: "Claude Code plugin", to: "/install/claude-code-plugin" },
+            { label: "Homebrew", to: "/install/homebrew" },
+            { label: "Windows (beta)", to: "/install/windows" },
+            { label: "npx / npm", to: "/install/npx" },
+            { label: "Claude Desktop (beta)", to: "/install/claude-desktop" },
+            { label: "Gemini CLI (beta)", to: "/install/gemini-cli" },
+            { label: "Codex CLI (beta)", to: "/install/codex" },
+            { label: "Other MCP agents", to: "/install/other-agents" },
+            { label: "claude.ai web (not supported)", to: "/install/claude-ai" },
+          ],
+        },
+        {
+          title: "Use devcoach",
           items: [
             { label: "Coaching in your agent", to: "/usage/coaching" },
             { label: "Courses", to: "/usage/courses" },
@@ -300,35 +328,32 @@ const config: Config = {
           ],
         },
         {
-          title: "Install",
+          title: "Reference",
           items: [
-            { label: "Choose your setup", to: "/install" },
-            { label: "Claude Code plugin", to: "/install/claude-code-plugin" },
-            { label: "Homebrew", to: "/install/homebrew" },
-            { label: "Windows", to: "/install/windows" },
-            { label: "Claude Desktop", to: "/install/claude-desktop" },
+            { label: "Configuration", to: "/reference/configuration" },
+            { label: "Privacy & security", to: "/reference/privacy" },
+            { label: "MCP server reference", to: "/reference/mcp-server" },
+            { label: "License", to: "/reference/license" },
           ],
         },
         {
-          title: "Reference",
+          title: "Help",
           items: [
-            { label: "How it works", to: "/how-it-works" },
-            { label: "Configuration", to: "/reference/configuration" },
-            { label: "MCP server", to: "/reference/mcp-server" },
-            { label: "Privacy & security", to: "/reference/privacy" },
             { label: "Troubleshooting", to: "/troubleshooting" },
             { label: "FAQ", to: "/faq" },
+            { label: "Issues & feedback", href: "https://github.com/UltimaPhoenix/dev-coach/issues" },
           ],
         },
         {
           title: "Project",
           items: [
-            { label: "Why devcoach", to: "/why" },
             { label: "Vision & roadmap", to: "/vision" },
-            { label: "License", to: "/reference/license" },
             { label: "GitHub", href: "https://github.com/UltimaPhoenix/dev-coach" },
-            { label: "Issues & feedback", href: "https://github.com/UltimaPhoenix/dev-coach/issues" },
             { label: "npm", href: "https://www.npmjs.com/package/devcoach" },
+            // The other copy of these docs: the unreleased `develop` branch, or back to the release.
+            NEXT
+              ? { label: "Released docs", href: SITE_URL }
+              : { label: "Unreleased docs", href: NEXT_URL },
           ],
         },
       ],
