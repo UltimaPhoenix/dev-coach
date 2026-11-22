@@ -35,7 +35,8 @@ type TabId = (typeof TABS)[number]["id"];
 const LESSON = {
   reply: "Done. fetchUsers now returns the users it could load and lists the ones that failed.",
   title: "Promise.allSettled vs Promise.all — don't let one failure sink the batch",
-  meta: "TypeScript · Mid",
+  label: "🎓 devcoach",
+  meta: "typescript · mid",
   before: [
     "Promise.all rejects the moment any promise rejects, and you lose the results of the ones that already succeeded. For independent work (fan-out fetches, batch writes) that's usually the wrong default.",
     "Promise.allSettled always resolves, giving you a status for every promise:",
@@ -44,18 +45,17 @@ const LESSON = {
   after:
     "Use Promise.all when the tasks are genuinely all-or-nothing; reach for allSettled when partial success is meaningful and you want to report failures.",
   tip: "for work that should cancel its siblings on failure, a shared AbortController gives you all-or-nothing with prompt cancellation.",
-  band: "🎓 devcoach",
-  foot: "typescript · mid",
   ask: "Did that land? ✅ knew it (y) · 💡 understood (u) · ❌ couldn't follow (n)",
 };
 
-/** One of the card's rules: the line drawing is decoration, only its words are read. */
-function Band({ className, text }: { className: string; text: string }): ReactNode {
+/**
+ * The card is one quote, from its label to the tip. Its first line: the devcoach label, then the
+ * topic and the level.
+ */
+function CardLabel({ className }: { className?: string }): ReactNode {
   return (
     <p className={className}>
-      <span aria-hidden="true">──────── </span>
-      {text}
-      <span aria-hidden="true"> ────────</span>
+      <code>{LESSON.label}</code> · {LESSON.meta}
     </p>
   );
 }
@@ -69,10 +69,11 @@ function TerminalLesson(): ReactNode {
           <span className={styles.termDot}>⏺ </span>
           {LESSON.reply}
         </p>
+        {/* Claude Code draws a quote as a rail on every line, in italics. */}
         <div className={styles.termCard}>
-          <Band className={styles.termBand} text={LESSON.band} />
+          <CardLabel className={styles.termLabel} />
           <p>
-            <strong>{LESSON.title}</strong> · {LESSON.meta}
+            <strong>{LESSON.title}</strong>
           </p>
           {LESSON.before.map((text) => (
             <p key={text}>{text}</p>
@@ -83,9 +84,8 @@ function TerminalLesson(): ReactNode {
           </pre>
           <p>{LESSON.after}</p>
           <p>
-            💡 <em>Senior tip:</em> {LESSON.tip}
+            💡 <strong>Senior tip:</strong> {LESSON.tip}
           </p>
-          <Band className={styles.termBand} text={LESSON.foot} />
         </div>
         <p className={styles.termAsk}>{LESSON.ask}</p>
         <p className={styles.termPrompt}>
@@ -102,21 +102,23 @@ function DesktopLesson(): ReactNode {
       <div className={styles.bar}>Claude Code · desktop app</div>
       <div className={styles.appBody}>
         <p className={styles.appReply}>{LESSON.reply}</p>
-        <Band className={styles.appBand} text={LESSON.band} />
-        <p>
-          <strong>{LESSON.title}</strong> · {LESSON.meta}
-        </p>
-        {LESSON.before.map((text) => (
-          <p key={text}>{text}</p>
-        ))}
-        <pre className={styles.appCode} tabIndex={0}>
-          {LESSON.code}
-        </pre>
-        <p>{LESSON.after}</p>
-        <p>
-          💡 <em>Senior tip:</em> {LESSON.tip}
-        </p>
-        <Band className={styles.appBand} text={LESSON.foot} />
+        {/* The desktop app draws the same quote with a bar on its left. */}
+        <div className={styles.appCard}>
+          <CardLabel />
+          <p>
+            <strong>{LESSON.title}</strong>
+          </p>
+          {LESSON.before.map((text) => (
+            <p key={text}>{text}</p>
+          ))}
+          <pre className={styles.appCode} tabIndex={0}>
+            {LESSON.code}
+          </pre>
+          <p>{LESSON.after}</p>
+          <p>
+            💡 <strong>Senior tip:</strong> {LESSON.tip}
+          </p>
+        </div>
         <p>{LESSON.ask}</p>
       </div>
       <div className={styles.appInput}>
