@@ -33,6 +33,8 @@ skill runs (the first three agents), a lesson you ask for comes even when the
 [pace](#staying-unobtrusive) would make you wait, and it counts like any other. What each agent gets:
 [Installation](../install/index.md).
 
+Want to see a lesson card and what your answer does first? Jump to [Your first lesson](#your-first-lesson).
+
 ## Onboarding
 
 Lessons are pitched from your **knowledge map**: the technologies you use, each rated from 0 to 10.
@@ -50,7 +52,10 @@ Claude Code plugin, which first checks that devcoach is running
 
 Whichever way you pick, your agent saves the map, writes the coaching notebook
 (`~/.devcoach/learning-state.md`) and shows a summary grouped by area, with ungrouped topics under
-`Other`:
+`Other`.
+
+<details>
+<summary>What the summary looks like</summary>
 
 ```
 ### Languages
@@ -64,8 +69,11 @@ Whichever way you pick, your agent saves the map, writes the coaching notebook
 ### Other
 - **redis** — 3/10
 
-Change any of this later: tell me in chat, use the `devcoach` CLI, or open `devcoach ui`.
+Change any of this later: tell me in chat, use the `devcoach` CLI,
+or open `devcoach ui`.
 ```
+
+</details>
 
 To adjust it, tell your agent (*set my Python confidence to 7*), use the [CLI](./cli.md), or press
 **Edit** on the Knowledge Map page of the [web dashboard](./web-ui.md):
@@ -91,7 +99,7 @@ active Claude Code projects: their dependency lists (`package.json`, `requiremen
 counts your prompts and keeps none of their text. Your agent saves the topics, their starting
 confidence and groups (Languages, Frontend, DevOps, …) right away; you review them afterwards.
 
-No Claude Code history on this machine, say a new computer, or you work in Gemini CLI or Codex CLI? It
+No Claude Code history on this machine (a new computer, or you only use Gemini CLI or Codex CLI)? It
 starts from the current project and devcoach's general map, which adjusts as you work. What the scan
 reads, exactly: [Privacy & security](../reference/privacy.md#what-devcoach-reads).
 
@@ -222,6 +230,21 @@ devcoach set nudge_scope global
 Or ask your agent (*set my max lessons per day to 3*), or use the Settings page of the
 [web dashboard](./web-ui.md). Every setting, its range and the exact rules are in
 [Configuration](../reference/configuration.md#rate-limits).
+
+**Fewer still, or none?** The fewest the settings allow is `nudge_every` 1000 with `max_per_day` 1.
+`nudge_every` 0 is not *off*: it cues on every reply. To stop lessons (your data stays in
+`~/.devcoach`):
+
+```bash
+# Plugin: pause (enable resumes)
+claude plugin disable devcoach@ultimaphoenix
+# devcoach install: remove it
+devcoach uninstall
+# …then keep tools, ask for lessons
+devcoach install --skip-hook
+```
+
+Another install method? Its page in [Installation](../install/index.md) shows how to remove it.
 
 Review your lessons and your map in the [CLI](./cli.md) or the [web dashboard](./web-ui.md): they show
 the same data.
