@@ -1,16 +1,17 @@
 ---
 title: Vision & roadmap
 sidebar_label: Vision & roadmap
-description: "Free, local, open source and not for sale. Two ideas we're exploring: a learning path across topics, and a course offered when a topic keeps coming back."
+description: "Free, local, open source and not for sale. Shipped: lesson sharing and courses. Exploring: a learning path across topics, and a course offered when a topic keeps coming back."
 keywords: [devcoach roadmap, open source AI coaching, learning paths, developer knowledge map]
 ---
 
 # Vision & roadmap
 
 import { Card, Cards } from "@site/src/components/Cards";
+import { Stop, Timeline } from "@site/src/components/Timeline";
 
-Where devcoach is going, and what stays the same on the way: the promises first, then the ideas
-we're exploring.
+Where devcoach is going, and what stays the same on the way: the promises first, then what has
+shipped and what we're exploring next.
 
 ## What never changes
 
@@ -50,8 +51,23 @@ covered; if that is ever your case, open an issue and it will be considered case
 
 ## Roadmap
 
-Ideas we're exploring, written down to invite discussion. Nothing here is a commitment. What has
-already shipped is in the [changelog](https://github.com/UltimaPhoenix/dev-coach/blob/main/CHANGELOG.md).
+What has shipped, what comes next, and the ideas we're exploring. The ideas are not a commitment.
+
+<Timeline
+  label="devcoach releases with their dates, then what comes next"
+  caption={<>Release dates from the <a href="https://github.com/UltimaPhoenix/dev-coach/blob/main/CHANGELOG.md">changelog</a>.</>}
+>
+<Stop version="1.0" date="2026-08-27" title="First stable release" to="/install">Claude Code plugin; Gemini CLI and Codex CLI (beta).</Stop>
+<Stop version="2.1.0" date="2026-09-14" title="Lesson sharing" to="/usage/sharing">A lesson travels as text, a link or a file.</Stop>
+<Stop version="2.5.0" date="2026-09-28" title="Courses" to="/usage/courses">Step by step, from a lesson you couldn't follow.</Stop>
+<Stop version="2.7.0" date="2026-10-06" title="Guided setup" to="/install/claude-code-plugin">`/devcoach:setup`; `doctor` checks Claude Desktop.</Stop>
+<Stop version="2.8.0" when="next" status="next" title="Windows" to="/install/windows">A one-line installer, and Scoop (beta).</Stop>
+<Stop when="exploring" status="exploring" title="Ideas" to="#exploring">A learning path; a course when a topic keeps coming back.</Stop>
+</Timeline>
+
+### Exploring
+
+Two directions we find interesting, written down to invite discussion.
 
 <Cards columns={2}>
 <Card title="A learning path across topics">
