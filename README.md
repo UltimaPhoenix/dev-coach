@@ -30,16 +30,17 @@ Another agent, or the `devcoach` command line? See [Install](#install).
 
 ## Install
 
-The plugin, npx and npm need Node.js 24 or newer on your PATH; Homebrew, Scoop, the Windows
-installer and the Claude Desktop extension bring their own. Agents on one computer share the same
-profile and lessons.
+The plugin, npx and npm need Node.js 24 or newer on your PATH. Homebrew, Scoop and the Windows
+installer install Node.js for you; the Claude Desktop extension runs on Claude Desktop's own. Agents
+on one computer share the same profile and lessons.
 
 **[Claude Code plugin](https://ultimaphoenix.github.io/dev-coach/install/claude-code-plugin)** (recommended): the two lines above.
 
 **[Homebrew](https://ultimaphoenix.github.io/dev-coach/install/homebrew)** (macOS, Linux), with the `devcoach` command line:
 
 ```bash
-brew tap UltimaPhoenix/tap && brew trust --tap UltimaPhoenix/tap
+brew tap UltimaPhoenix/tap
+brew trust --tap UltimaPhoenix/tap
 brew install devcoach
 devcoach install   # skip this line if you use the Claude Code plugin
 ```
@@ -50,12 +51,15 @@ devcoach install   # skip this line if you use the Claude Code plugin
 irm https://ultimaphoenix.github.io/dev-coach/install.ps1 | iex
 ```
 
+With the Claude Code plugin, run `$env:DEVCOACH_SKIP_CONNECT = "1"` first, in the same window, so the
+line skips `devcoach install`; then `devcoach install --claude-desktop` connects Claude Desktop.
+
 | Also on | How |
 |---|---|
 | **[npx / npm](https://ultimaphoenix.github.io/dev-coach/install/npx)** (any OS) | `npx -y devcoach install` connects Claude Code and Claude Desktop |
 | **[Claude Desktop](https://ultimaphoenix.github.io/dev-coach/install/claude-desktop)** | The `.mcpb` extension *(beta)* from the [latest release](https://github.com/UltimaPhoenix/dev-coach/releases/latest), or any `devcoach install` above |
-| **[Gemini CLI](https://ultimaphoenix.github.io/dev-coach/install/gemini-cli)** *(beta)* | `npx -y devcoach install --gemini` |
-| **[Codex CLI](https://ultimaphoenix.github.io/dev-coach/install/codex)** *(beta)* | `npx -y devcoach install --codex`; its hooks run once you trust them in Codex |
+| **[Gemini CLI](https://ultimaphoenix.github.io/dev-coach/install/gemini-cli)** *(beta)* | `devcoach install --gemini`, with the `devcoach` command from above or `npm install -g devcoach` |
+| **[Codex CLI](https://ultimaphoenix.github.io/dev-coach/install/codex)** *(beta)* | `devcoach install --codex`, with the `devcoach` command; its hooks run once you trust them in Codex |
 | **[Cursor, Windsurf, Cline, Continue, Zed](https://ultimaphoenix.github.io/dev-coach/install/other-agents)** | `npx -y devcoach mcp` in the agent's MCP config (the guide has the file and key for each), or `io.github.UltimaPhoenix/devcoach` from the [MCP Registry](https://registry.modelcontextprotocol.io) |
 | **claude.ai web** | Not supported: claude.ai cannot run a local MCP server |
 
@@ -64,8 +68,8 @@ and the other agents, say *set up devcoach* once, then ask for a lesson when you
 something from what we just did*).
 
 With the plugin, don't run `devcoach install`: it would add a second devcoach server and skill next to
-the plugin's. After `brew upgrade`, `scoop update` or an npm update, run `devcoach install` again to
-refresh the hooks and the skill (the Windows one-liner does it for you).
+the plugin's. After `brew upgrade`, `scoop update devcoach` or an npm update, run `devcoach install`
+again to refresh the hooks and the skill (the Windows one-liner does it for you).
 
 ## What happens next
 
@@ -76,8 +80,8 @@ refresh the hooks and the skill (the Windows one-liner does it for you).
 2. **A lesson when one is due.** The pace is yours to set. By default devcoach looks for a lesson
    about every 10 interactions in a chat session and teaches at most 2 a day, at least 4 hours apart,
    never in plan mode. → [Configuration](https://ultimaphoenix.github.io/dev-coach/reference/configuration)
-3. **One key to answer.** `y` knew it (confidence on that topic +1) · `u` understood (no change) ·
-   `n` couldn't follow (the lesson becomes the seed of a step-by-step
+3. **One key to answer.** `y` knew it (on a lesson above your level, that topic goes up a point) ·
+   `u` understood (no change) · `n` couldn't follow (the lesson becomes the seed of a step-by-step
    [course](https://ultimaphoenix.github.io/dev-coach/usage/courses), which the coach offers once).
    → [The feedback loop](https://ultimaphoenix.github.io/dev-coach/usage/coaching#the-feedback-loop)
 
