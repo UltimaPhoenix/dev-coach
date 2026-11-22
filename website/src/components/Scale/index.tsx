@@ -88,7 +88,7 @@ export default function Scale({ bands, marks = [], caption }: Props): ReactNode 
             );
           })}
         </div>
-        <ul className={styles.srOnly}>
+        <ul className="dc-sr-only">
           {shown.map((band) => (
             <li key={`${band.from}-${band.label}`}>
               {band.from === band.to ? `${band.from}` : `${band.from} to ${band.to}`}: {band.label}

@@ -1,12 +1,12 @@
-/* The frame is ThemedShot's (border, radius); the buttons sit on the video itself, so they carry
-   their own dark backing and read the same in both themes. */
+/* The frame is ThemedShot's (the site's --dc-border and --dc-radius); the buttons sit on the video
+   itself, so they carry their own dark backing and read the same in both themes. */
 .clip {
   margin: 0 0 1.5rem;
 }
 .frame {
   position: relative;
-  border: 1px solid var(--ifm-toc-border-color);
-  border-radius: 12px;
+  border: 1px solid var(--dc-border);
+  border-radius: var(--dc-radius);
   overflow: hidden;
   background: var(--ifm-background-surface-color);
 }

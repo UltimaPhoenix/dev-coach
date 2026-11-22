@@ -2,12 +2,14 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import type * as Preset from "@docusaurus/preset-classic";
 import type { Config } from "@docusaurus/types";
-import { themes as prismThemes } from "prism-react-renderer";
-import type { Compiler } from "webpack";
-import { hasCode, hasHighlighter, highlighterBlock } from "../src/core/highlighter.ts";
-import { readZipEntry } from "./src/lib/zipEntry.ts";
+import type { Compiler, Configuration } from "webpack";
+import { darkCodeTheme, lightCodeTheme } from "./src/lib/codeThemes.ts";
+import { type DemoCourse, loadDemoCourse } from "./src/lib/demoCourse.ts";
 
 // Runs in Node.js — no client-side code here.
+
+/** The demo course's step list, as the tour reads it from the plugin's global data. */
+export type { DemoCourse };
 
 const SITE_URL = "https://ultimaphoenix.github.io/dev-coach/";
 // DOCS_NEXT=1 builds the same tree for the unreleased `develop` branch; .github/workflows/docs.yml
@@ -77,55 +79,38 @@ function llmsFullTxtPlugin() {
   };
 }
 
+// Inline plugin (zero-dep): keep Mermaid's parser off the pages that have no diagram. Docusaurus
+// puts every module shared by half the pages' chunks into one `common` chunk that every page
+// loads. Mermaid's diagram chunks all share @mermaid-js/parser (Langium + Chevrotain grammars for
+// pie, git graph, architecture…), so that chunk was 650 KB of parser next to 2 KB of MDX runtime,
+// on every page. Mermaid's own modules now stay out of `common`: they load with a diagram, only
+// on the pages that draw one, and the flowcharts the docs draw do not use that parser at all.
+const MERMAID_ONLY = /[\\/]node_modules[\\/](?:mermaid|@mermaid-js|langium|chevrotain[\w-]*|@chevrotain|vscode-[\w-]+|lodash-es)[\\/]/;
+
+function lazyMermaidPlugin() {
+  return {
+    name: "devcoach-lazy-mermaid",
+    configureWebpack(config: Configuration, isServer: boolean) {
+      const groups = config.optimization?.splitChunks ? config.optimization.splitChunks.cacheGroups : undefined;
+      const common = groups?.common;
+      if (isServer || !common || typeof common !== "object" || common instanceof RegExp) return {};
+      if (common.test !== undefined) throw new Error("devcoach-lazy-mermaid: Docusaurus' common chunk has a test now");
+      common.test = (module: { nameForCondition?: () => string | null | undefined }) =>
+        !MERMAID_ONLY.test(module.nameForCondition?.() ?? "");
+      return {};
+    },
+  };
+}
+
 // Inline plugin (zero-dep): the home page's tour can run a real course. This emits the demo course
 // of the screenshot fixture as its own file, /demo/course.html, which a sandboxed frame loads on
 // demand (website/src/components/Tour). The document is prepared the way the dashboard serves
 // one (src/web/app.ts): highlighted on the way out, then the frame bridge; the fixture is not
 // modified. GitHub Pages sends no headers of ours, so the policy the dashboard sends as a header
-// travels as a <meta> instead (minus `sandbox`, which the frame's own attribute provides).
-const DEMO_COURSE_ID = "from-a-cache-miss-to-a-stampede";
-const DEMO_COURSE_FILE = "demo/course.html";
-const DEMO_COURSE_HEAD =
-  '<meta http-equiv="Content-Security-Policy" content="default-src \'none\'; ' +
-  "script-src 'unsafe-inline' 'unsafe-eval'; style-src 'unsafe-inline'; img-src data:; " +
-  "font-src data:; form-action 'none'; base-uri 'none'\">\n" +
-  '<meta name="robots" content="noindex">';
-
-interface FixtureCourses {
-  courses: { id: string; title: string }[];
-  steps: { course_id: string; position: number; title: string; kind: string; anchor: string }[];
-}
-/** What the tour needs to draw the step list next to the frame (plugin global data). */
-export interface DemoCourse {
-  title: string;
-  file: string;
-  steps: { anchor: string; title: string; kind: string }[];
-}
-
-function loadDemoCourse(repoDir: string): { data: DemoCourse; html: string } {
-  const zip = fs.readFileSync(path.join(repoDir, "scripts", "screenshots", "fixture.zip"));
-  const entry = (name: string): string => {
-    const bytes = readZipEntry(zip, name);
-    if (!bytes) throw new Error(`Demo course: ${name} is missing from scripts/screenshots/fixture.zip`);
-    return bytes.toString("utf8");
-  };
-  const meta = JSON.parse(entry("courses.json")) as FixtureCourses;
-  const course = meta.courses.find((c) => c.id === DEMO_COURSE_ID);
-  if (!course) throw new Error(`Demo course: ${DEMO_COURSE_ID} is not in the fixture's courses.json`);
-  const steps = meta.steps
-    .filter((step) => step.course_id === DEMO_COURSE_ID)
-    .sort((a, b) => a.position - b.position)
-    .map(({ anchor, title, kind }) => ({ anchor, title, kind }));
-  const text = entry(`courses/${DEMO_COURSE_ID}/index.html`);
-  const head = /<head[^>]*>/i;
-  if (!head.test(text)) throw new Error("Demo course: the document has no <head> to carry its policy");
-  const bridge = fs.readFileSync(path.join(repoDir, "assets", "static", "course-frame.js"), "utf8");
-  const highlighter = !hasHighlighter(text) && hasCode(text) ? `\n${highlighterBlock() ?? ""}` : "";
-  const html =
-    text.replace(head, (tag) => `${tag}\n${DEMO_COURSE_HEAD}`) + `\n<script>${bridge}</script>\n` + highlighter;
-  return { data: { title: course.title, file: DEMO_COURSE_FILE, steps }, html };
-}
-
+// travels as a <meta> instead. A <meta> policy cannot carry `sandbox` or `frame-ancestors`: the
+// frame's own sandbox attribute confines the framed document, but opened on its own (by its URL)
+// it is not sandboxed as the dashboard's copy is. Nothing on the site links to it: the tour's
+// step list is made of buttons that move the frame.
 function demoCoursePlugin(context: { siteDir: string }) {
   const name = "devcoach-demo-course";
   const demo = loadDemoCourse(path.join(context.siteDir, ".."));
@@ -146,7 +131,7 @@ function demoCoursePlugin(context: { siteDir: string }) {
               compiler.hooks.thisCompilation.tap(name, (compilation) => {
                 compilation.hooks.processAssets.tap(
                   { name, stage: Compilation.PROCESS_ASSETS_STAGE_ADDITIONAL },
-                  () => compilation.emitAsset(DEMO_COURSE_FILE, new sources.RawSource(demo.html)),
+                  () => compilation.emitAsset(demo.data.file, new sources.RawSource(demo.html)),
                 );
               });
             },
@@ -199,7 +184,7 @@ const config: Config = {
     ],
   ],
 
-  plugins: [llmsFullTxtPlugin, demoCoursePlugin],
+  plugins: [llmsFullTxtPlugin, demoCoursePlugin, lazyMermaidPlugin],
 
   // Site-wide JSON-LD so search & answer engines model devcoach as a free developer tool
   // (released docs only — the /next/ copy must not duplicate the @ids).
@@ -286,7 +271,8 @@ const config: Config = {
     },
     navbar: {
       title: "devcoach",
-      logo: { alt: "devcoach", src: "img/favicon.svg" },
+      // The title next to it is the link's name: the logo is decoration (alt="").
+      logo: { alt: "", src: "img/favicon.svg" },
       items: [
         // The home page has no sidebar (it's the landing page), so the way into the docs is here.
         { to: "/usage/coaching", label: "Docs", position: "left", activeBaseRegex: "/(usage|reference|how-it-works|faq)" },
@@ -348,9 +334,10 @@ const config: Config = {
       ],
       copyright: `Copyright © ${new Date().getFullYear()} UltimaPhoenix · AGPL-3.0`,
     },
+    // prism-react-renderer's github / dracula, with the colours that fell under AA fixed.
     prism: {
-      theme: prismThemes.github,
-      darkTheme: prismThemes.dracula,
+      theme: lightCodeTheme,
+      darkTheme: darkCodeTheme,
       additionalLanguages: ["bash", "json", "powershell", "sql"],
     },
   } satisfies Preset.ThemeConfig,
