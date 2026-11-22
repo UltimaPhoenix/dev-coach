@@ -28,9 +28,9 @@ with [`devcoach doctor`](#doctor).
 | `🎓 devcoach is not running: …` | [Can't start](#mcp-server-not-connecting) |
 | `Failed to spawn process: No such file or directory` in Claude Desktop's log | [Can't start](#mcp-server-not-connecting) |
 | `Stop hook error occurred` next to a lesson | [Harmless](#stop-hook-error) |
-| `Failed with non-blocking status code:` on every turn, with `…/bin/devcoach: not found` | [After uninstalling](#uninstalling) |
+| `Failed with non-blocking status code:` on every turn, with `…/bin/devcoach: not found` | [After uninstall](#uninstalling) |
 | `The coaching database was upgraded by devcoach …` and `Reads work; writes need devcoach ≥ …` | [Newer database](#database-newer) |
-| `attempt to write a readonly database`, `unable to open database file` or `EACCES: permission denied` | [Permissions](#sqlite-permission-error) |
+| `attempt to write a readonly database`, `unable to open database file` or `EACCES: permission denied` | [Can't write](#sqlite-permission-error) |
 | `devcoach hooks are registered TWICE`, `2 devcoach plugins enabled` or `2 devcoach Stop entries` | [Counted twice](#hooks-twice) |
 | `Failed to install plugin devcoach@ultimaphoenix: … invalid manifest` | [Old manifest](#invalid-manifest) |
 | No message, and no lesson | [No lesson](#no-lessons) |
@@ -68,6 +68,7 @@ a terminal: [plugin page](./install/claude-code-plugin.md#troubleshooting)).
 <Terminal
   command="node …/scripts/launch.mjs doctor"
   output={doctorPlugin}
+  maxLines={11}
   caption="The Claude Code plugin, through its launcher. It adds a Runtime line; the hooks and the skill come from the plugin, and its server needs no entry of its own."
 />
 
@@ -81,10 +82,10 @@ a terminal: [plugin page](./install/claude-code-plugin.md#troubleshooting)).
 | **✗** | Broken: that part cannot work. The line says what to run |
 
 - **`bound to Node v24.22.3 (nvm)`**: devcoach lives inside that one Node version. After removing or
-  switching it, run `devcoach install --force`.
-- **Verdict**: `would NOT cue a lesson` with `pacing: next stop would be 1/10` is normal between
-  lessons. It checks your profile, the count and the limits; a course or plan mode shows only in the
-  [hook log](#hook-trace).
+  switching it, install devcoach again on the Node you use, then run `devcoach install --force`.
+- **Verdict** (the last lines): `→ the next eligible stop would NOT cue a lesson` with
+  `· pacing: next stop would be 1/10` is normal between lessons. It checks your profile, the count
+  and the limits; a course or plan mode shows only in the [hook log](#hook-trace).
 
 <details id="what-doctor-checks">
 <summary>What each section of <code>doctor</code> checks</summary>
@@ -176,8 +177,8 @@ Claude Desktop step by step, with its log: [When devcoach does not start](./inst
 ## "Stop hook error occurred" next to a lesson {/* #stop-hook-error */}
 
 **Nothing to fix: it's harmless.** That notice is Claude Code's current labeling of *any* Stop hook
-that blocks, including devcoach's lesson cue. The line that comes with it tells you it's coaching,
-not a failure:
+that blocks, including devcoach's lesson cue. The line that comes with it tells you devcoach is
+checking for a lesson:
 
 <Message where="Claude Code, with the notice" text="🎓 devcoach: checking whether a lesson is due…" />
 
@@ -192,58 +193,40 @@ the blocking fallback only fires when that didn't happen. In a [hook trace](#hoo
 
 The pace is yours to set. By default a lesson cue comes about every 10 interactions in a chat
 session, at most 2 lessons a day and at least 4 hours apart, so most turns end without one. When a
-task ends, the hooks decide in this order and stop at the first check that fails:
+task ends, the hooks run eight checks in this order and stop at the first one that fails:
+
+<div className="row">
+<div className="col col--2">
 
 ```mermaid
-%%{init: {"flowchart": {"nodeSpacing": 12, "rankSpacing": 16, "padding": 6, "wrappingWidth": 190}}}%%
+%%{init: {"flowchart": {"nodeSpacing": 10, "rankSpacing": 14, "padding": 6}}}%%
 flowchart TD
-    T(["Your agent ends a task"]) --> R1
-    subgraph R1 [" "]
-        direction LR
-        H("Hooks<br/>wired?") -->|no| H1["<code>✗ no devcoach hooks</code><br/>run devcoach install"]
-    end
-    R1 -->|yes| R2
-    subgraph R2 [" "]
-        direction LR
-        V("Database not<br/>from a newer<br/>devcoach?") -->|no| V1["<code>SchemaTooNewError</code><br/>update this install"]
-    end
-    R2 -->|yes| R3
-    subgraph R3 [" "]
-        direction LR
-        O("Profile<br/>set up?") -->|no| O1["<code>onboarding cue</code><br/>answer the<br/>setup question"]
-    end
-    R3 -->|yes| R4
-    subgraph R4 [" "]
-        direction LR
-        C("No course<br/>in progress?") -->|no| C1["<code>course in progress</code><br/>finish or abandon it"]
-    end
-    R4 -->|yes| R5
-    subgraph R5 [" "]
-        direction LR
-        P("Not in<br/>plan mode?") -->|no| P1["<code>plan mode</code><br/>leave plan mode"]
-    end
-    R5 -->|yes| R6
-    subgraph R6 [" "]
-        direction LR
-        N("10th turn<br/>counted?<br/>(3rd after an<br/>unanswered cue)") -->|no| N1["<code>paced (4/10)</code><br/>keep working, or<br/>lower nudge_every"]
-    end
-    R6 -->|yes| R7
-    subgraph R7 [" "]
-        direction LR
-        D("Under 2<br/>lessons in<br/>24 hours?") -->|no| D1["<code>Daily limit reached</code><br/>wait, or raise<br/>max_per_day"]
-    end
-    R7 -->|yes| R8
-    subgraph R8 [" "]
-        direction LR
-        G("4 hours<br/>since the<br/>last one?") -->|no| G1["<code>Too soon</code><br/>wait, or lower<br/>min_gap_minutes"]
-    end
-    R8 -->|yes| L("<code>cue (10/10)</code><br/>a lesson, or <code>skip_lesson</code><br/>when the task had<br/>nothing to teach"):::primary
+    T(["Task ends"]) --> W("1–2 · Wired") --> S("3 · Set up") --> F("4–5 · Free")
+    F --> N("6 · Your turn") --> A("7–8 · Allowed") --> L(["Lesson"]):::primary
 ```
 
-The first answer comes from `devcoach doctor`, the others from the [hook log](#hook-trace). doctor's
-**Verdict** shows the profile, count and limit checks for your next turn, and `last skip: "…"` after a
-skipped cue. A turn held back by a limit still counts, so the lesson comes at the first turn the
-limits allow. Why it works this way: [How it works](./how-it-works.md).
+</div>
+<div className="col col--10">
+
+| Check | Where it stops: what you see → what to do |
+|---|---|
+| 1 · Hooks wired | doctor: `✗ no devcoach hooks` → run `devcoach install` |
+| 2 · Database not from a newer devcoach | `error: SchemaTooNewError` → [update this install](#database-newer) |
+| 3 · Profile set up | `onboarding cue` → answer the setup question |
+| 4 · No course in progress | `course in progress` → finish or abandon the course |
+| 5 · Not in plan mode | `plan mode` → leave plan mode |
+| 6 · 10th counted turn (3rd after an unanswered cue) | `paced (4/10)` → keep working, or lower `nudge_every` |
+| 7 · Under 2 lessons in 24 hours | `rate limited: Daily limit reached` → wait, or raise `max_per_day` |
+| 8 · 4 hours since the last one | `rate limited: Too soon` → wait, or lower `min_gap_minutes` |
+| All passed | `cue (10/10)` → a lesson, or `skip_lesson` when the task had nothing to teach |
+
+</div>
+</div>
+
+Check 1 shows in `devcoach doctor`, the others in the [hook log](#hook-trace). doctor's **Verdict**
+shows the profile, count and limit checks for your next turn, and `last skip: "…"` after a skipped
+cue. A turn held back by a limit still counts, so the lesson comes at the first turn the limits
+allow. Why it works this way: [How it works](./how-it-works.md).
 
 :::note[Quiet on purpose]
 If the Verdict names the pacing or the rate limit, that is by design. Each number is a setting: to
@@ -286,6 +269,9 @@ One session on the demo data:
 2026-11-21T23:32:52.785Z stop-hook 0bfef42a rate limited: Too soon: last lesson 0m ago, minimum interval is 4h 0m (3h 59m remaining)
 ```
 
+<details>
+<summary>What does each decision mean?</summary>
+
 | Decision | What it means |
 |---|---|
 | `course in progress — cues paused` | A [course](./usage/courses.md#what-happens-next) is active. Cues pause, without counting, until it is completed or abandoned |
@@ -294,6 +280,8 @@ One session on the demo data:
 | `cue (10/10)` | The Stop hook asks for the lesson. With priming in place this is the fallback, for a turn that ended without one (see [above](#stop-hook-error)) |
 | `hook-forced continuation` | The extra turn a cue starts. It is never counted |
 | `rate limited: …` | The threshold is reached, but `max_per_day` or `min_gap_minutes` says not yet. Stops keep counting, so the lesson comes at the first allowed stop |
+
+</details>
 
 ## A newer devcoach upgraded the database {/* #database-newer */}
 
@@ -307,7 +295,7 @@ the beta channel. When a newer one upgrades the database, an older one can only 
 
 | Where | What happens |
 |---|---|
-| The CLI | Commands that read print the message at the end. A command that writes prints it and exits with status 3 |
+| The CLI | `stats`, `profile` and `lessons` (when it lists any) end with the message; other reads work without it. A command that writes prints it and exits with status 3 |
 | The web dashboard | A `⚠ Read-only:` banner with the message |
 | Your agent | devcoach's tools refuse to save, with the message |
 | `devcoach doctor` | A `✗` line with the message, then `this build is READ-ONLY on it: hooks cannot count interactions, lessons cannot be saved` |
@@ -320,15 +308,15 @@ plugin, keep the CLI you write with on the same channel.
 ## devcoach cannot write its folder {/* #sqlite-permission-error */}
 
 devcoach keeps your data in `~/.devcoach/`, so the folder must exist and be writable by you. When it
-is not, every command that writes fails with one of these errors:
+is not, you get one of these errors:
 
 | The error | What it means |
 |---|---|
-| `Error: attempt to write a readonly database` | `~/.devcoach` belongs to another user, for example root, after a devcoach command run with `sudo` |
-| `Error: unable to open database file` | The folder exists without a database, and you cannot write in it |
-| `Error: EACCES: permission denied, mkdir '…/.devcoach'` | devcoach cannot create the folder in your home |
+| `Error: attempt to write a readonly database` | `~/.devcoach` belongs to another user, for example root, after a devcoach command run with `sudo`. Commands that write fail; reads work, and `devcoach doctor` still says `✓ database opens` |
+| `Error: unable to open database file` | The folder exists without a database, and you cannot write in it. Every command fails, reads too, and doctor says `→ no database yet` |
+| `Error: EACCES: permission denied, mkdir '…/.devcoach'` | devcoach cannot create the folder in your home. Every command fails, reads too, and doctor says `→ no database yet` |
 
-`devcoach doctor` still says `✓ database opens`: it only reads. The hooks fail without a word.
+The hooks fail without a word.
 
 ```bash
 # the owner should be you
@@ -349,10 +337,10 @@ after half the turns. `devcoach doctor` names it:
 
 | `devcoach doctor` says | Fix |
 |---|---|
-| `devcoach hooks are registered TWICE (plugin + settings.json)` | `devcoach install` ran next to the plugin. `npx -y devcoach uninstall --claude-code` removes its entries and leaves the plugin alone |
+| `devcoach hooks are registered TWICE (plugin + settings.json)` | `devcoach install` ran before the plugin was enabled, or while it was disabled: it skips the hooks only while the plugin is on. `npx -y devcoach uninstall --claude-code` removes its entries and leaves the plugin alone |
 | `2 devcoach plugins enabled` | The release and the beta plugin are both on. Keep one enabled in `/plugin` |
 | `2 devcoach Stop entries` | Run `devcoach install`: it keeps only the current entry |
-| `devcoach hooks are registered TWICE (extension + settings.json)`, under Gemini CLI | Uninstall the Gemini extension, or remove the settings.json entries |
+| `devcoach hooks are registered TWICE (extension + settings.json)`, under Gemini CLI | `devcoach install --gemini` ran before the extension was installed. `npx -y devcoach uninstall --gemini` removes its entries and leaves the extension alone; or uninstall the extension |
 
 ## An error on every turn after uninstalling {/* #uninstalling */}
 
@@ -400,5 +388,5 @@ latest release, then install again:
 |---|---|
 | **claude.ai web** | Not supported: claude.ai cannot run a local (stdio) MCP server. Use Claude Desktop or Claude Code ([more](./install/claude-ai.md)) |
 | **A container rebuilt for each session** | In a CI runner or a rebuilt dev container, `~/.devcoach` starts empty, so lessons don't carry over. Set `DEVCOACH_DIR` to a folder that persists, in the environment your agent starts in ([Environment variables](./reference/configuration.md#environment-variables)) |
-| **Windows** | Announced for 2.8.0; the current release is 2.7.1. Gemini CLI and Codex CLI hooks on Windows are untested ([Windows](./install/windows.md)) |
+| **Windows** | Beta. Gemini CLI and Codex CLI hooks on Windows are untested ([Windows](./install/windows.md)) |
 | **Multi-user machines** | devcoach writes to `~/.devcoach/`, so each user gets their own coaching database. Profiles are not shared, and there is nothing to set up |
