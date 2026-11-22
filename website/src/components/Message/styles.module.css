@@ -1,0 +1,25 @@
+/* The site's frame (--dc-border, --dc-radius) with a warning-coloured edge: the reader is looking at
+   something that went wrong. The text wraps anywhere, so a long path never widens the page. */
+.message {
+  margin: 0 0 var(--ifm-leading);
+  border: 1px solid var(--dc-border);
+  border-left: 4px solid var(--dc-warn);
+  border-radius: var(--dc-radius);
+  background: var(--ifm-background-surface-color);
+  padding: 0.55rem 0.9rem 0.65rem;
+}
+.where {
+  margin: 0 0 0.25rem;
+  color: var(--dc-text-muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+.text {
+  display: block;
+  color: var(--ifm-font-color-base);
+  font-family: var(--ifm-font-family-monospace);
+  font-size: var(--ifm-code-font-size);
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
