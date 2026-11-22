@@ -178,10 +178,10 @@ Every variable devcoach reads, and who it is for.
 | Variable | What it does | For |
 |---|---|---|
 | `DEVCOACH_HOOK_DEBUG=1` | Each hook run adds one line with its decision to `hook.log` in the data folder. The file is emptied once it passes 256 KB. | *you* |
-| `NO_COLOR` | No colours and no clickable links in CLI output. | *you* |
+| `NO_COLOR` | No colours in CLI output, and no clickable links unless `FORCE_HYPERLINK` is set. | *you* |
 | `FORCE_COLOR` | Colours even when the output goes to a pipe or a file. `0` or `false` turn colours off. `NO_COLOR` wins over it. | *you* |
-| `FORCE_HYPERLINK=1` | Clickable links on a terminal devcoach does not recognise. | *you* |
-| `COLUMNS` | The width tables are laid out for when the output is not a terminal (otherwise 80). | *you* |
+| `FORCE_HYPERLINK=1` | Clickable links on a terminal devcoach does not recognise, even with `NO_COLOR` or a pipe. | *you* |
+| `COLUMNS` | When the output is not a terminal: the width of the `── title ──` lines in `devcoach lesson`, `course` and `setup` (otherwise 80, at most 100). Tables always fit their content. | *you* |
 | `DEVCOACH_DIR` | Moves the data folder (database, notebook, courses, `hook.log`) away from `~/.devcoach`. `DEVCOACH_DIR=$(mktemp -d) devcoach stats` leaves your real data untouched. | tests, sandboxes |
 | `DEVCOACH_CLAUDE_DIR` | Where the onboarding scan reads Claude Code's history: `~/.claude` and `~/.claude.json` by default, both inside this folder when it is set. Wins over `CLAUDE_CONFIG_DIR`. | tests |
 | `CLAUDE_CONFIG_DIR` | Claude Code's own variable, read the same way by the onboarding scan. `devcoach install` writes its hooks and skill to `~/.claude` either way. | Claude Code |
