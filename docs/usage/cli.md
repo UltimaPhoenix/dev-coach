@@ -221,8 +221,8 @@ These commands exist only in the CLI. Everything above is also in the [web dashb
 
 | Command | What it does |
 |---|---|
-| `install` `--claude-code` `--claude-desktop` `--gemini` `--codex` `--force` `--skip-hook` | Connect devcoach to your agents: the MCP server, the hooks and the devcoach skill. With no flag: Claude Code and Claude Desktop. The agent flags pick agents and combine; Gemini CLI and Codex CLI are beta. `--force` rewrites an existing entry; `--skip-hook` leaves out the hooks. |
-| `uninstall` `--all` `--data` `--yes` | Undo `install`, with the same agent flags or `--all` for every agent. Your data stays unless you add `--data`, which asks first unless you add `--yes`. Run it before `brew uninstall` or `npm uninstall -g`. |
+| `install` `--claude-code` `--claude-desktop` `--gemini` `--codex` `--force` `--skip-hook` | Connect devcoach to your agents: the MCP server (user scope: all your projects), the hooks and the devcoach skill. With no flag: Claude Code and Claude Desktop. The agent flags pick agents and combine; Gemini CLI and Codex CLI are beta. Running it again repairs older hook entries; `--force` rewrites an existing entry; `--skip-hook` leaves out the hooks. |
+| `uninstall` `--all` `--data` `--yes` | Undo `install`: the MCP server, devcoach's hook entries and the devcoach skill go, your own hooks stay. It takes the same agent flags, or `--all` for every agent. Your data stays unless you add `--data`, which asks first unless you add `--yes`. Run it before `brew uninstall` or `npm uninstall -g`. |
 | `doctor` | Check the wiring and the pacing, and say why the next reply would or would not bring a lesson. |
 | `setup` | The onboarding in your terminal, in four steps: a backup to restore, your topics (detected or typed), groups, and the two limits. A backup at step 1 is restored and ends the wizard; otherwise the wizard replaces your knowledge map and groups. |
 | `ui` `--port <n>` `-o, --open` `--stop` | Start the [web dashboard](./web-ui.md#launch) on `127.0.0.1:7860`, open it in your browser, or stop the one running on that port. |
