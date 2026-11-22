@@ -248,9 +248,9 @@ and legacy versions. Your agent's hooks run them on each turn; see
 |---|---|
 | `DEVCOACH_DIR` | Moves the data folder (database, notebook, courses, `hook.log`) away from `~/.devcoach`, where every command reads and writes. `DEVCOACH_DIR=$(mktemp -d) devcoach …` runs one on throwaway data. |
 | `DEVCOACH_HOOK_DEBUG=1` | Each hook run adds one line with its decision to `hook.log` in the data folder, emptied once it passes 256 KB. |
-| `NO_COLOR` | No colours and no clickable links. It wins over `FORCE_COLOR`. |
+| `NO_COLOR` | No colours, and no clickable links unless `FORCE_HYPERLINK` is set. It wins over `FORCE_COLOR`. |
 | `FORCE_COLOR` | Colours even when the output goes to a pipe or a file; `0` or `false` turn them off. `TERM=dumb` turns them off unless forced. |
-| `FORCE_HYPERLINK=1` | Clickable links on a terminal devcoach does not recognise. |
+| `FORCE_HYPERLINK=1` | Clickable links on a terminal devcoach does not recognise, even with `NO_COLOR` or a pipe. |
 | `COLUMNS` | When the output is not a terminal: the width of the `──` rules in `lesson`, `course` and `setup` (default 80, at most 100). |
 
 </RefTable>
