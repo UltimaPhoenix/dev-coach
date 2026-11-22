@@ -48,7 +48,8 @@ Every agent on this computer shares your profile and lessons in `~/.devcoach/`
 
 ## You need
 
-- **Node.js 24 or newer** on the PATH your agent uses (`node --version`).
+- **Node.js 24 or newer** on the PATH your agent uses (`node --version`). Homebrew, Scoop and the
+  Windows installer install it for you.
 - **devcoach installed** ([Homebrew](./homebrew.md), [npm](./npx.md), [Windows](./windows.md)), or npm
   and the network for npx.
 - **A Codex CLI with hooks.** This page was checked with Codex CLI 0.171.0, where hooks are on by
@@ -63,8 +64,10 @@ devcoach install --codex
 
 Most readers should take this route, with devcoach installed: the hooks call it directly, nothing
 downloads on a turn, and you get the `devcoach` command too. Without devcoach installed,
-`npx -y devcoach install --codex` works as well, but its hooks then start npx twice per turn and need
-npx's cache or the network.
+`npx -y devcoach install --codex` works as well, but its hooks then start npx twice per turn, and npx
+asks the npm registry at every start. Offline, each hook waits out npm's network retries (over a
+minute in our test), longer than the agent lets a devcoach hook run (60 seconds at most), so no lesson
+is cued.
 
 ### Add the server by hand
 
@@ -81,13 +84,14 @@ create the file if it does not exist:
 
 ```toml title="~/.codex/config.toml"
 [mcp_servers.devcoach]
-command = "/opt/homebrew/bin/devcoach"  # your path: `command -v devcoach` prints it
+command = "/opt/homebrew/bin/devcoach"
 args = ["mcp"]
 ```
 
-`command` takes the absolute path the install printed. Write it out in full: TOML does not expand `~`
-or `$HOME`. The example is Homebrew's path on Apple silicon; with npm on Node from nvm, devcoach sits
-in `~/.nvm/versions/node/<version>/bin/`, tied to that Node version.
+`command` takes the absolute path the install printed; `command -v devcoach` prints it too. Write it
+out in full: TOML does not expand `~` or `$HOME`. The example is Homebrew's path on Apple silicon;
+with npm on Node from nvm, devcoach sits in `~/.nvm/versions/node/<version>/bin/`, tied to that Node
+version.
 
 </TabItem>
 <TabItem value="npx" label="Through npx">
@@ -166,7 +170,7 @@ screen:
 | Choice | What happens |
 |---|---|
 | **Review hooks** | Codex opens its list of hooks, where you can read each command and trust it (`t`) |
-| **Trust all and continue** | Both hooks run from now on |
+| **Trust all and continue** | Both hooks run from now on (Codex asks you to confirm) |
 | **Continue without trusting** | The hooks stay off and no lesson arrives on its own; `/hooks` can trust them later |
 
 After your first task devcoach offers to set up your profile and asks how: **Automatic**
