@@ -158,7 +158,13 @@ const config: Config = {
 
   onBrokenLinks: "warn",
 
-  markdown: { mermaid: true, hooks: { onBrokenMarkdownLinks: "warn" } },
+  markdown: {
+    mermaid: true,
+    hooks: { onBrokenMarkdownLinks: "warn" },
+    // A page cites its sources as footnotes ([^key]). They are listed at the end of the page under
+    // a visible "References" heading (the default is a "Footnotes" heading meant to be hidden).
+    remarkRehypeOptions: { footnoteLabel: "References", footnoteLabelProperties: {} },
+  },
   themes: ["@docusaurus/theme-mermaid"],
 
   i18n: { defaultLocale: "en", locales: ["en"] },

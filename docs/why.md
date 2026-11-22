@@ -78,20 +78,19 @@ trustworthy in the first place.
 
 ## Fast judgment runs on slow thinking
 
-The psychologist Daniel Kahneman describes two ways we think, in
-[*Thinking, Fast and Slow*](https://en.wikipedia.org/wiki/Thinking,_Fast_and_Slow). **Fast thinking** is
-automatic and takes almost no effort: you glance at a diff and something looks off. **Slow thinking** is
-deliberate and takes effort: you trace the code path, hold the edge cases in your head and work out why.
-He calls the two ["fictitious characters"](https://www.apa.org/monitor/2012/02/conclusions): a way to
-talk about how the mind works.
+The psychologist Daniel Kahneman describes two ways we think, in *Thinking, Fast and Slow*.[^kahneman-2011]
+**Fast thinking** is automatic and takes almost no effort: you glance at a diff and something looks off.
+**Slow thinking** is deliberate and takes effort: you trace the code path, hold the edge cases in your
+head and work out why. He calls the two "fictitious characters":[^winerman-2012] a way to talk about how
+the mind works.
 
 <TwoSpeeds />
 
 The two are linked. Fast judgment in a field is what long, effortful practice leaves behind. Kahneman
-and Gary Klein, who studied expert intuition from opposite sides,
-[agreed on when a gut feeling deserves trust](https://pubmed.ncbi.nlm.nih.gov/19739881/): when the field
-is regular enough to learn from, and when you have had the chance to learn it. They also concluded that
-how sure a judgment feels says little about how accurate it is.
+and Gary Klein, who studied expert intuition from opposite sides, agreed on when a gut feeling deserves
+trust:[^kahneman-klein-2009] when the field is regular enough to learn from, and when you have had the
+chance to learn it. They also concluded that how sure a judgment feels says little about how accurate
+it is.[^kahneman-klein-2009]
 
 An agent changes who does which part. It does the slow work: it reads the code, weighs the options and
 finds the bug. You keep the fast part: a look at the diff, then "approve". Nothing warns you when this
@@ -161,3 +160,11 @@ devcoach targets the gap: sustained learning at low friction, spaced and calibra
 
 → See [How it works](./how-it-works.md) for the decision flow, or [install devcoach](./install/index.md)
 to connect it to your agent.
+
+{/* References: the site lists these notes, cited above as [^…], at the end of the page under "References". */}
+
+[^kahneman-2011]: Kahneman, D. (2011). [*Thinking, Fast and Slow*](https://en.wikipedia.org/wiki/Thinking,_Fast_and_Slow). Farrar, Straus and Giroux. ISBN 978-0-374-27563-1.
+
+[^winerman-2012]: Winerman, L. (2012). [A machine for jumping to conclusions](https://www.apa.org/monitor/2012/02/conclusions). *Monitor on Psychology*, 43(2). An interview with Kahneman, who says of the two systems: "They are expository fictions, and I write the book as a psychodrama between two fictitious characters."
+
+[^kahneman-klein-2009]: Kahneman, D., & Klein, G. (2009). [Conditions for intuitive expertise: A failure to disagree](https://pubmed.ncbi.nlm.nih.gov/19739881/). *American Psychologist*, 64(6), 515–526. [doi:10.1037/a0016755](https://doi.org/10.1037/a0016755)
