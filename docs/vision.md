@@ -1,89 +1,77 @@
 ---
 title: Vision & roadmap
 sidebar_label: Vision & roadmap
-description: "devcoach is free, local, and open-source — not commercialized. Where the project is headed: gap-driven learning paths, deeper course modules, and optional team-level visibility."
+description: "Free, local, open source and not for sale. Shipped: lesson sharing and courses. Exploring: short links, gap-driven learning paths, team visibility."
 keywords: [devcoach roadmap, open source AI coaching, learning paths, developer knowledge map, team learning]
 ---
 
 # Vision & roadmap
 
 import { Card, Cards } from "@site/src/components/Cards";
+import { Stop, Timeline } from "@site/src/components/Timeline";
 
-## The foundation — free, local, and always on
-
-devcoach today is a free, open-source MCP server: one lesson at a time, rate-limited, entirely
-local, nothing to open or maintain. That foundation stays. The local-first model is not a
-limitation to eventually remove — it's a deliberate design that keeps your data on your machine
-and coaching genuinely unobtrusive.
+Where devcoach is going, and what stays the same on the way: the promises first, then what has
+shipped and what we're exploring next.
 
 ## What never changes
 
 <Cards columns={3}>
 <Card title="Local-first for individuals">
 
-Your data stays on your machine, forever.
+Your coaching data lives on your machine, with no account and no telemetry. That is a deliberate
+design, and it stays.
 
 </Card>
-<Card title="Free for personal use">
+<Card title="Free for everyone">
 
-A single developer connecting devcoach to their agent will always be able to use it at no cost.
+Using devcoach costs nothing, at home or at work, and always will.
 
 </Card>
 <Card title="Unobtrusive by default">
 
-One lesson at a time, rate-limited, nothing to open.
+One short lesson when one is due, at a pace you set. Nothing to open or maintain.
 
 </Card>
 </Cards>
 
 ## Not commercialized
 
-devcoach is free and open-source under AGPL-3.0, and **it is not being commercialized**. There is
-no paid tier, no subscription, and **no plans to sell the core tool** — the thing you install and
-run stays free for everyone, forever.
+devcoach is free and open source under AGPL-3.0, and **it is not being commercialized**. There is
+no paid tier, no subscription, no commercial license on offer, and **no plans to sell the core
+tool**.
 
-If anything is ever sold, it would be a **separate, derivative product** built alongside devcoach —
-never a paywall bolted onto the tool you already use. There is nothing to buy today, and the
-roadmap below is a set of ideas we're exploring, not products with price tags.
+If anything is ever sold, it would be a **separate, derivative product** built alongside devcoach,
+never a paywall bolted onto the tool you already use.
 
-There is no paid path at all today — not even a commercial license.
+Using devcoach, at home or at work, never puts your own code under the AGPL. The AGPL's condition is
+about devcoach itself: if you distribute a modified devcoach, or run one as a network service, you
+release your changes under the AGPL too. Embedding devcoach in a **closed-source product** is not
+covered; if that is ever your case, open an issue and it will be considered case by case.
+[License & commercial use](./reference/license) has the details and examples.
 
-The only thing the AGPL rules out is embedding devcoach inside a **closed-source product**; if that
-is ever your case, ask by opening an issue and it will be considered case by case. See
-[License & commercial use](./reference/license) for the details — ordinary use, at home or at work,
-is always free.
+## Roadmap
 
-## Roadmap — ideas we're exploring
+What shipped from earlier ideas, and what we're exploring now. Nothing below is a commitment or a
+price list.
 
-These are directions we find interesting, written down to invite discussion — not a committed plan
-and not a price list.
-
-### Shipped
-
-<Cards columns={2}>
-<Card title="Lesson sharing" label="Shipped in 2.1.0" to="/usage/sharing">
-
-A lesson that landed for you can be handed to a teammate as copyable text, a server-less link or
-a `.devcoach.md` file. It can be imported from the dashboard, the CLI or the agent, where it joins
-the coaching log as a shared lesson: topic, level and feedback tracked as usual, pacing untouched.
-
-Sharing is always explicit — nothing leaves your machine unless you send it.
-
-</Card>
-<Card title="Courses" label="Shipped in 2.5.0" to="/usage/courses">
-
-Deeper course modules, shipped as courses: when a lesson is too much for one session, devcoach
-builds a step-by-step course that starts where you stand, in one self-contained HTML document.
-
-It stays on your machine unless you choose to publish it as a Claude artifact.
-
-</Card>
-</Cards>
+<Timeline
+  label="devcoach releases with their dates, then what comes next"
+  caption={<>Release dates from the <a href="https://github.com/UltimaPhoenix/dev-coach/blob/main/CHANGELOG.md">changelog</a>.</>}
+>
+<Stop version="1.0" date="2026-08-27" title="First stable release" to="/install">Claude Code plugin; Gemini CLI and Codex CLI (beta).</Stop>
+<Stop version="2.1.0" date="2026-09-14" title="Lesson sharing" to="/usage/sharing">A lesson travels as text, a link or a file.</Stop>
+<Stop version="2.5.0" date="2026-09-28" title="Courses" to="/usage/courses">Step by step, from a lesson you couldn't follow.</Stop>
+<Stop version="2.7.0" date="2026-10-06" title="Guided setup" to="/install/claude-code-plugin">`/devcoach:setup`; `doctor` checks Claude Desktop.</Stop>
+<Stop version="2.8.0" when="next" status="next" title="Windows" to="/install/windows">A one-line installer, and Scoop.</Stop>
+<Stop when="exploring" status="exploring" title="Ideas" to="#exploring">Short links, learning paths, team visibility.</Stop>
+</Timeline>
 
 ### Exploring
 
+Directions we find interesting, written down to invite discussion.
+
 <Cards columns={2}>
-<Card title="Lesson sharing, next" label="Exploring">
+<Card title="Lesson sharing, next">
 
 - **Short links**: a secret Gist behind the long link, revocable from the CLI.
 - **Ephemeral one-use links**: zero-knowledge. The key stays in the URL fragment; the server holds
@@ -91,30 +79,25 @@ It stays on your machine unless you choose to publish it as a Claude artifact.
 - **Curated collections of lessons per stack** that a team or a community can maintain.
 
 </Card>
-<Card title="Gap-driven learning paths" label="Exploring">
+<Card title="Gap-driven learning paths">
 
-devcoach already learns where you're weak: topics you score low on, concepts you keep marking ❌,
-patterns the notebook flags. Connecting those gaps to a structured progression, the next thing to
-learn in order, is a natural extension of that.
+devcoach already learns where you're weak: topics with low confidence on your knowledge map,
+lessons you marked ❌, patterns the notebook flags. Connecting those gaps to a structured
+progression, the next thing to learn in order, is a natural extension of that.
 
 </Card>
-<Card title="Courses from a wall you keep hitting" label="Exploring">
+<Card title="Courses from a wall you keep hitting">
 
 When you've hit the same wall three times, devcoach would offer a course on exactly that concept.
 Today the coach offers one when you answer *couldn't follow* under a card, or starts one when you
 ask.
 
 </Card>
-<Card title="Per-developer knowledge profiles" label="Exploring">
+<Card title="Team-level visibility">
 
-Each developer's knowledge map, calibrated to their actual stack and experience level.
-
-</Card>
-<Card title="Team-level visibility" label="Exploring">
-
-Which topics a team is collectively strong or weak on, where coverage is thin, and where skills are
-concentrated in one person. Enough signal to plan onboarding and spot gaps before they become
-incidents.
+Built from each developer's own knowledge map: which topics a team is collectively strong or weak
+on, where coverage is thin, and where skills are concentrated in one person. Enough signal to plan
+onboarding and spot gaps before they become incidents.
 
 </Card>
 </Cards>
@@ -124,11 +107,6 @@ opt-in layer on top, never a change to how the solo tool works.
 
 ## Shape the roadmap
 
-<Cards columns={2}>
-<Card title="GitHub Issues" label="Open an issue" href="https://github.com/UltimaPhoenix/dev-coach/issues">
-
 Have a feature request, a use case the current tool doesn't cover, or thoughts on any of the ideas
-above? Feature requests, feedback and questions all live there.
-
-</Card>
-</Cards>
+above? [Open an issue on GitHub](https://github.com/UltimaPhoenix/dev-coach/issues): feature
+requests, feedback and questions all live there.
