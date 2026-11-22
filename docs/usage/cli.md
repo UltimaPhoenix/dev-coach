@@ -20,7 +20,7 @@ CLI is for looking things up, scripting and moving your data.
 <Cards columns={3}>
   <Card title="How am I doing?" to="#stats--settings">`devcoach stats`</Card>
   <Card title="What did I learn?" to="#lessons">`devcoach lessons`</Card>
-  <Card title="Why no lesson?" to="/troubleshooting">`devcoach doctor`</Card>
+  <Card title="Why no lesson?" to="/troubleshooting#coaching-isnt-firing--no-lessons-appear">`devcoach doctor`</Card>
   <Card title="Open the dashboard" to="/usage/web-ui#launch">`devcoach ui`</Card>
   <Card title="Hand a lesson over" to="#sharing-a-lesson">`devcoach share`<br />`devcoach import`</Card>
   <Card title="Move to another machine" to="#backup-export--import">`devcoach backup`<br />`devcoach restore`</Card>
@@ -35,8 +35,8 @@ one command's options and `devcoach --version` prints the version.
 
 | You installed devcoach with | Type |
 |---|---|
-| Homebrew, the Windows installer, Scoop or `npm i -g devcoach` | `devcoach <command>` |
-| the Claude Code plugin | `npx -y devcoach <command>`, with Node.js 24 or newer: the plugin coaches without the CLI and puts nothing on your PATH. Skip `install` and `uninstall` here: `install` would register a second devcoach server and a second copy of the devcoach skill, and `/plugin uninstall devcoach@ultimaphoenix` removes the plugin's own parts. |
+| Homebrew, the installer or Scoop on [Windows (beta)](../install/windows.md), or `npm i -g devcoach` | `devcoach <command>` |
+| the Claude Code plugin | `npx -y devcoach <command>`, with Node.js 24 or newer: the plugin coaches without the CLI and puts nothing on your PATH. npx runs the newest release: when a release changes the database format, the plugin can only read your data until you [update it](../install/claude-code-plugin.md#updating), so keep the plugin up to date or run its version (`npx -y devcoach@<version> <command>`). Skip `install` and `uninstall` here: `install` would register a second devcoach server and a second copy of the devcoach skill, and `/plugin uninstall devcoach@ultimaphoenix` removes the plugin's own parts. |
 | nothing yet | `npx -y devcoach <command>`, with Node.js 24 or newer. |
 
 </RefTable>
@@ -160,9 +160,9 @@ They combine: `devcoach lessons --period week --level senior --starred`.
 </RefTable>
 
 :::warning[`devcoach set` does not check these ranges]
-It checks only that `nudge_scope` is `session` or `global`, that `nudge_every` is a whole number of 0
-or more, and the length of `share_name`. Anything else is stored as you type it, and a value out of
-range, or a word, can stop lessons or remove a limit. Your agent and the dashboard check the ranges.
+It checks only that `nudge_scope` is `session` or `global`, that `nudge_every` starts with a whole
+number of 0 or more, and the length of `share_name`. Anything else is stored as you type it, and a
+value out of range, or a word, can stop lessons or remove a limit. Your agent and the dashboard check the ranges.
 `devcoach settings` shows a `nudge_every` of 0 as `0 (off)`: it is not off. What each setting does:
 [Configuration](../reference/configuration.md#settings).
 :::
@@ -183,7 +183,7 @@ not encrypted.
 | Command | What it does |
 |---|---|
 | `backup [file.zip]` | Export everything to a zip; by default `devcoach-backup.zip` in the current folder. |
-| `restore <file.zip>` | Import a backup: settings are overwritten, topics added or updated, lessons you already have skipped. Courses come back too, and an existing one is never overwritten. |
+| `restore <file.zip>` | Import a backup: settings and the notebook are replaced, topics added or updated, lessons you already have skipped. Courses come back too, and an existing one is never overwritten. |
 
 </RefTable>
 
@@ -242,6 +242,9 @@ and legacy versions. Your agent's hooks run them on each turn; see
 
 ## Environment variables
 
+<details>
+<summary>Which variables change what the CLI does?</summary>
+
 <RefTable>
 
 | Variable | Effect |
@@ -254,5 +257,7 @@ and legacy versions. Your agent's hooks run them on each turn; see
 | `COLUMNS` | When the output is not a terminal: the width of the `──` rules in `lesson`, `course` and `setup` (default 80, at most 100). |
 
 </RefTable>
+
+</details>
 
 Every variable devcoach reads is on [Configuration](../reference/configuration.md#environment-variables).
