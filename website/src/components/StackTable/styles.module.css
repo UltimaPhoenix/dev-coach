@@ -1,0 +1,86 @@
+.stack {
+  margin: 1.25rem 0 1.5rem;
+}
+.stack table {
+  display: table;
+  width: 100%;
+  margin: 0;
+  table-layout: fixed;
+}
+.stack th,
+.stack td {
+  vertical-align: top;
+  text-align: left;
+}
+.stack th[scope="row"] {
+  font-weight: 600;
+}
+.stack th[scope="rowgroup"] {
+  background: var(--ifm-color-emphasis-100);
+  font-size: 0.85rem;
+  letter-spacing: 0.01em;
+}
+.stack td[data-label]::before {
+  display: none;
+}
+
+@media (max-width: 700px) {
+  .stack table,
+  .stack tbody,
+  .stack tr,
+  .stack th,
+  .stack td {
+    display: block;
+    width: auto;
+  }
+  .stack table {
+    border: 0;
+  }
+  /* Kept for screen readers; the labels on each cell replace it on screen. */
+  .stack thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .stack tr,
+  .stack tr:nth-child(2n) {
+    margin: 0 0 0.75rem;
+    padding: 0.35rem 0;
+    border: 1px solid var(--ifm-color-emphasis-200);
+    border-radius: 10px;
+    background: var(--ifm-background-surface-color);
+  }
+  .stack th,
+  .stack td {
+    border: 0;
+    padding: 0.3rem 0.85rem;
+  }
+  .stack th[scope="row"] {
+    font-size: 1rem;
+  }
+  .stack td[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: 0.1rem;
+    color: var(--dc-text-muted);
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+  /* A group heading sits between the cards, not inside one. */
+  .stack tr:has(> th[scope="rowgroup"]) {
+    margin: 1.25rem 0 0.5rem;
+    padding: 0;
+    border: 0;
+    background: none;
+  }
+  .stack th[scope="rowgroup"] {
+    padding: 0;
+    background: none;
+    font-size: 0.95rem;
+  }
+}
