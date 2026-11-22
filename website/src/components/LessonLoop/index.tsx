@@ -2,6 +2,9 @@
 // lesson card devcoach adds, a one-key answer. Every line is laid out from the first frame
 // (unrevealed ones are only hidden), so playback never shifts the page. The server-rendered
 // frame is the last one: without JS, or with reduced motion, the whole loop is there at rest.
+// With JS the loop picks up from that frame (the reader first sees the whole card), plays only
+// while it is on screen and the tab is visible, and renders only when a line or a typed letter
+// changes.
 import clsx from "clsx";
 import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
@@ -53,34 +56,78 @@ const SCRIPT: Line[] = [
 ];
 const LAST = SCRIPT[SCRIPT.length - 1].at;
 
+const lastShownAt = (t: number) => SCRIPT.reduce((n, l, i) => (t >= l.at ? i : n), -1);
+const typedAt = (line: Line, t: number) =>
+  line.typed ? Math.min(line.text.length, Math.max(0, Math.floor((t - line.at) / TYPE_MS))) : line.text.length;
+/** What the screen shows at `t`: the last line revealed and how much of each typed line. */
+const frameKey = (t: number) => `${lastShownAt(t)}:${SCRIPT.map((l) => (l.typed ? typedAt(l, t) : "")).join(",")}`;
+
 export default function LessonLoop(): ReactNode {
   const [t, setT] = useState(LAST);
   const [canAnimate, setCanAnimate] = useState(false);
   const [playing, setPlaying] = useState(false);
+  // The reader can't see it (scrolled away, another tab): it waits, wherever it was.
+  const [onScreen, setOnScreen] = useState(true);
   const tRef = useRef(LAST);
+  const figure = useRef<HTMLElement>(null);
 
+  // Reduced motion, read on mount and followed if the reader changes it: the whole loop at rest.
   useEffect(() => {
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    setCanAnimate(true);
-    tRef.current = 0;
-    setT(0);
-    setPlaying(true);
+    const query = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const apply = () => {
+      const still = query.matches;
+      setCanAnimate(!still);
+      setPlaying(!still);
+      if (still) {
+        tRef.current = LAST;
+        setT(LAST);
+      }
+    };
+    apply();
+    query.addEventListener("change", apply);
+    return () => query.removeEventListener("change", apply);
   }, []);
 
   useEffect(() => {
-    if (!playing) return;
+    const el = figure.current;
+    if (!el || typeof IntersectionObserver === "undefined") return;
+    let visible = true;
+    let intersecting = true;
+    const update = () => setOnScreen(visible && intersecting);
+    const observer = new IntersectionObserver(([entry]) => {
+      intersecting = entry.isIntersecting;
+      update();
+    });
+    const onVisibility = () => {
+      visible = document.visibilityState === "visible";
+      update();
+    };
+    observer.observe(el);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      observer.disconnect();
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!playing || !onScreen) return;
     const origin = performance.now() - tRef.current;
+    let shown = frameKey(tRef.current);
     const id = window.setInterval(() => {
       tRef.current = (performance.now() - origin) % LOOP_MS;
+      const key = frameKey(tRef.current);
+      if (key === shown) return;
+      shown = key;
       setT(tRef.current);
     }, 40);
     return () => window.clearInterval(id);
-  }, [playing]);
+  }, [playing, onScreen]);
 
-  const lastShown = SCRIPT.reduce((n, l, i) => (t >= l.at ? i : n), -1);
+  const lastShown = lastShownAt(t);
 
   return (
-    <figure className={styles.term}>
+    <figure ref={figure} className={styles.term}>
       <div className={styles.bar}>
         <span className={styles.dots} aria-hidden="true">
           <i />
@@ -95,7 +142,7 @@ export default function LessonLoop(): ReactNode {
             type="button"
             className={styles.toggle}
             onClick={() => setPlaying((p) => !p)}
-            aria-pressed={!playing}
+            aria-label={playing ? "Pause the demo" : "Play the demo"}
           >
             {playing ? "Pause" : "Play"}
           </button>
@@ -104,9 +151,7 @@ export default function LessonLoop(): ReactNode {
       <div className={styles.body} aria-hidden="true">
         {SCRIPT.map((line, i) => {
           const shown = t >= line.at;
-          const typedLen = line.typed
-            ? Math.min(line.text.length, Math.max(0, Math.floor((t - line.at) / TYPE_MS)))
-            : line.text.length;
+          const typedLen = typedAt(line, t);
           const typing = shown && line.kind === "prompt" && (typedLen < line.text.length || i === lastShown);
           return (
             <div
@@ -118,14 +163,12 @@ export default function LessonLoop(): ReactNode {
               {line.kind === "tool" && <span className={styles.bullet}>⏺ </span>}
               {line.text.slice(0, typedLen)}
               {typing && <span className={styles.cursor} />}
-              {typedLen < line.text.length && (
-                <span className={styles.ghost}>{line.text.slice(typedLen)}</span>
-              )}
+              {typedLen < line.text.length && <span className={styles.ghost}>{line.text.slice(typedLen)}</span>}
             </div>
           );
         })}
       </div>
-      <figcaption className={styles.srOnly}>
+      <figcaption className="dc-sr-only">
         Example session: asked to add a Redis cache, the agent finishes the task; devcoach then adds a
         short lesson on cache stampedes, and the developer answers "understood" with one key.
       </figcaption>
