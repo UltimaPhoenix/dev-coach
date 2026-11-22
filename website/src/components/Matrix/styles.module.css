@@ -99,7 +99,8 @@
   color: #b45309;
 }
 .no {
-  color: var(--ifm-color-emphasis-600);
+  /* The kit's muted-text token; emphasis-700 where a branch predates it. */
+  color: var(--dc-text-muted, var(--ifm-color-emphasis-700));
 }
 :global([data-theme="dark"]) .yes {
   color: #4ade80;
