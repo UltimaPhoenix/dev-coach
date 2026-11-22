@@ -73,7 +73,7 @@
 }
 .version {
   font-weight: 700;
-  color: var(--devcoach-accent);
+  color: var(--dc-accent-text, var(--devcoach-accent));
 }
 .exploring .meta {
   font-style: italic;
@@ -98,7 +98,7 @@
 /* A no-break space keeps the arrow on the last word's line. */
 .link::after {
   content: "\00a0→";
-  color: var(--devcoach-accent);
+  color: var(--dc-accent-text, var(--devcoach-accent));
 }
 .down::after {
   content: "\00a0↓";
