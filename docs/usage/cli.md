@@ -197,7 +197,7 @@ not encrypted.
 
 The onboarding your agent offers, `devcoach setup` and the
 [dashboard's Settings page](./web-ui.md#settings-settings) can restore a backup too. What is inside the
-zip, and a dated daily backup: [Configuration & data](../reference/configuration.md#backup-strategy).
+zip, and a dated daily backup: [Your data](../reference/data.md#backup-strategy).
 
 ## Sharing a lesson
 

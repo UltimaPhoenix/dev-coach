@@ -129,7 +129,7 @@ learning*, 4–6 *comfortable*, 7–9 *strong*, 10 *expert*. Once the list is co
 
 On a new machine? Give the path of your devcoach backup zip: your settings, knowledge map, lessons,
 notebook and courses are restored. What a restore keeps and replaces is in
-[Configuration](../reference/configuration.md#backup-strategy).
+[Your data](../reference/data.md#backup-strategy).
 
 ## Your first lesson
 

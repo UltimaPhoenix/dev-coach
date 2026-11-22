@@ -362,7 +362,7 @@ share page can also link to the import preview; only your click on *Add to my le
 settings, knowledge map, lessons, courses and the notebook. Unlike a shared lesson, it holds everything,
 task context and local folder paths included, and so does *Download lessons* (the lessons as JSON).
 Lessons can include snippets of your project context, so store these files somewhere you trust. What a
-backup holds and what a restore does: [Configuration](configuration.md#backup-strategy).
+backup holds and what a restore does: [Your data](data.md#backup-strategy).
 
 ## Why it can't be a hosted / remote connector
 
