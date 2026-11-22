@@ -1,11 +1,15 @@
 /* A day as one line: its columns are the stretches of time, sized in minutes, so the lessons sit
    where the numbers put them. Four rows share those columns: lesson labels, the line, what each
-   stretch means, the clock. Same frame as the guides' cards. */
+   stretch means, the clock. Same frame as the guides' cards and the Scale. One teal, the text
+   token (--dc-accent-text), for the gap, the dots and the gap's note: it clears AA as text in
+   both themes, so the line and its label match. The grey line is emphasis-500, the site's own
+   rule colour (1.8:1 on white, 7.8:1 on the dark surface): the words under it carry its meaning,
+   and the teal parts that matter clear 3:1 (WCAG 1.4.11) in both themes. */
 .day {
   margin: 1.25rem 0 1.75rem;
   padding: 1.1rem 1.2rem 1rem;
-  border: 1px solid var(--ifm-color-emphasis-200);
-  border-radius: 12px;
+  border: 1px solid var(--dc-border);
+  border-radius: var(--dc-radius);
   background: var(--ifm-background-surface-color);
 }
 .plot {
@@ -28,10 +32,10 @@
   position: relative;
   height: 0;
   margin: 0.45rem 0;
-  border-top: 3px solid var(--ifm-color-emphasis-300);
+  border-top: 3px solid var(--ifm-color-emphasis-500);
 }
 .gap {
-  border-top-color: var(--devcoach-accent);
+  border-top-color: var(--dc-accent-text);
 }
 .after {
   border-top-style: dashed;
@@ -45,7 +49,7 @@
   width: 0.8rem;
   height: 0.8rem;
   border-radius: 50%;
-  background: var(--devcoach-accent);
+  background: var(--dc-accent-text);
   box-shadow: 0 0 0 3px var(--ifm-background-surface-color);
 }
 .note {
@@ -53,11 +57,10 @@
   padding-right: 0.4rem;
   font-size: 0.8rem;
   line-height: 1.3;
-  color: var(--ifm-color-emphasis-700);
+  color: var(--dc-text-muted);
 }
-/* Small text: the site's link colour, which clears WCAG AA in both themes (the accent does not in light). */
 .gapNote {
-  color: var(--ifm-color-primary);
+  color: var(--dc-accent-text);
   font-weight: 600;
 }
 .time {
@@ -67,8 +70,7 @@
   margin-left: -0.4rem;
   font-family: var(--ifm-font-family-monospace);
   font-size: 0.7rem;
-  /* emphasis-700, not 600: 600 is 3:1 on white, under WCAG AA for text this small */
-  color: var(--ifm-color-emphasis-700);
+  color: var(--dc-text-muted);
   font-variant-numeric: tabular-nums;
 }
 .time:last-child {
@@ -79,15 +81,4 @@
   font-size: 0.85rem;
   line-height: 1.5;
   color: var(--ifm-color-emphasis-800);
-}
-.srOnly {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  margin: -1px;
-  padding: 0;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  white-space: nowrap;
-  border: 0;
 }
