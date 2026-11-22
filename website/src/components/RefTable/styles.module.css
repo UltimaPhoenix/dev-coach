@@ -1,6 +1,131 @@
-/* The description column keeps a readable width; on a narrow screen the rest of the row
-   scrolls inside the table's own box (Infima's `table { display: block; overflow: auto }`). */
-.wide2 :is(th, td):nth-child(2),
-.wide3 :is(th, td):nth-child(3) {
-  min-width: 15rem;
+/* A table read as a list: one rule between rows, no inner grid. Rows are grids with a fixed name
+   column (the same in every RefTable, so the tables of a page line up); the third cell, when there
+   is one, sits under the name as a tag. Below 600 px each row stacks instead of scrolling. */
+.ref {
+  --ref-name: 15rem;
+  --ref-pad: 0.6rem 0.85rem;
+  margin-bottom: var(--ifm-spacing-vertical);
+}
+.wideName {
+  --ref-name: 20rem;
+}
+.ref table {
+  display: block;
+  width: 100%;
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid var(--ifm-table-border-color);
+  border-radius: var(--ifm-global-radius);
+}
+.ref thead,
+.ref tbody {
+  display: block;
+}
+.ref tr {
+  display: grid;
+  grid-template-columns: var(--ref-name) minmax(0, 1fr);
+  grid-template-rows: auto 1fr;
+  border-top: 1px solid var(--ifm-table-border-color);
+}
+.ref thead tr {
+  border-top: 0;
+  border-bottom: 1px solid var(--ifm-table-border-color);
+}
+.ref tbody tr:first-child {
+  border-top: 0;
+}
+.ref :is(th, td) {
+  min-width: 0;
+  padding: var(--ref-pad);
+  border: 0;
+  text-align: left;
+}
+.ref :is(th, td):nth-child(1) {
+  grid-column: 1;
+  grid-row: 1;
+}
+.ref td:nth-child(1) code {
+  white-space: nowrap;
+}
+.ref :is(th, td):nth-child(2) {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  border-left: 1px solid var(--ifm-table-border-color);
+  overflow-wrap: break-word;
+}
+.ref th:nth-child(3) {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.ref td:nth-child(3) {
+  grid-column: 1;
+  grid-row: 2;
+  align-self: start;
+  justify-self: start;
+  margin: -0.2rem 0.85rem 0.7rem;
+}
+
+/* The tag: a table's third cell, or <Tag> in a legend. */
+.tag,
+.ref td:nth-child(3) {
+  display: inline-block;
+  padding: 0 0.5rem;
+  border: 1px solid var(--ifm-color-emphasis-300);
+  border-radius: 999px;
+  background: var(--ifm-color-emphasis-100);
+  color: var(--ifm-color-emphasis-800);
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.6;
+  white-space: nowrap;
+}
+.ref td:nth-child(3) :is(em, strong) {
+  font-style: normal;
+  font-weight: inherit;
+}
+.calm,
+.ref td:nth-child(3):has(em) {
+  border-color: var(--ifm-color-success-dark);
+  background: var(--ifm-color-success-contrast-background);
+  color: var(--ifm-color-success-contrast-foreground);
+}
+.warn,
+.ref td:nth-child(3):has(strong) {
+  border-color: var(--ifm-color-danger-dark);
+  background: var(--ifm-color-danger-contrast-background);
+  color: var(--ifm-color-danger-contrast-foreground);
+}
+
+@media (max-width: 600px) {
+  .ref thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .ref tr {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.3rem 0.5rem;
+    padding: var(--ref-pad);
+  }
+  .ref :is(th, td) {
+    padding: 0;
+  }
+  .ref td:nth-child(3) {
+    order: 2;
+    margin: 0;
+  }
+  .ref :is(th, td):nth-child(2) {
+    order: 3;
+    flex: 1 0 100%;
+    border-left: 0;
+  }
 }

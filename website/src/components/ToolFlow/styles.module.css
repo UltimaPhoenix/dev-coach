@@ -1,0 +1,112 @@
+/* Stacked with ↓ arrows by default; side by side with → arrows once the column has room (a
+   container query, so it follows the content width, not the window). In the row, a subgrid keeps
+   every tool name on one line even when only one step carries a "when" label. */
+.flow {
+  container-type: inline-size;
+  margin: 1.25rem 0 1.5rem;
+}
+.label {
+  margin-bottom: 0.6rem;
+  color: var(--ifm-color-emphasis-700);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.steps {
+  display: grid;
+  gap: 1.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.step {
+  position: relative;
+  display: grid;
+  align-content: start;
+  gap: 0.15rem;
+  margin: 0;
+  padding: 0.6rem 0.8rem 0.7rem;
+  border: 1px solid var(--ifm-color-emphasis-300);
+  border-radius: 10px;
+  background: var(--ifm-background-surface-color);
+}
+.step + .step::after {
+  content: "↓";
+  position: absolute;
+  top: -1.5rem;
+  left: 50%;
+  height: 1.5rem;
+  transform: translateX(-50%);
+  color: var(--ifm-color-emphasis-600);
+  line-height: 1.5rem;
+}
+.when {
+  color: var(--devcoach-accent);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.name {
+  font-weight: 600;
+}
+.name code {
+  font-size: 0.85rem;
+}
+.note {
+  color: var(--ifm-color-emphasis-800);
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+.or {
+  margin: 0.9rem 0 0;
+  padding: 0.55rem 0.8rem;
+  border: 1px dashed var(--ifm-color-emphasis-400);
+  border-radius: 10px;
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+.or code {
+  font-size: 0.85rem;
+}
+.orWord {
+  margin-right: 0.2rem;
+  color: var(--ifm-color-emphasis-700);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+@container (min-width: 40rem) {
+  .steps {
+    grid-auto-columns: minmax(0, 1fr);
+    grid-auto-flow: column;
+    grid-template-rows: auto auto 1fr;
+    gap: 0 1.6rem;
+  }
+  .step {
+    grid-row: span 3;
+    grid-template-rows: subgrid;
+    gap: 0.15rem;
+  }
+  .when {
+    grid-row: 1;
+  }
+  .name {
+    grid-row: 2;
+  }
+  .note {
+    grid-row: 3;
+  }
+  .step + .step::after {
+    content: "→";
+    top: 50%;
+    left: -1.6rem;
+    width: 1.6rem;
+    height: auto;
+    transform: translateY(-50%);
+    text-align: center;
+  }
+}
