@@ -1,0 +1,85 @@
+/* The frame is ThemedShot's (border, radius); the buttons sit on the video itself, so they carry
+   their own dark backing and read the same in both themes. */
+.clip {
+  margin: 0 0 1.5rem;
+}
+.frame {
+  position: relative;
+  border: 1px solid var(--ifm-toc-border-color);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--ifm-background-surface-color);
+}
+.video {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+/* With the browser's controls (reduced motion), focus lands in the video's own shadow tree, which
+   :focus-visible does not report on the element: ring the video whenever it holds focus. */
+.video:focus {
+  outline: 2px solid var(--devcoach-accent);
+  outline-offset: -2px;
+}
+
+.toggle,
+.big {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 999px;
+  background: rgba(23, 24, 27, 0.78);
+  color: #fff;
+  cursor: pointer;
+}
+.toggle svg,
+.big svg {
+  fill: currentColor;
+}
+.toggle {
+  right: 0.6rem;
+  bottom: 0.6rem;
+  width: 2.25rem;
+  height: 2.25rem;
+  opacity: 0.85;
+  transition: opacity 0.15s ease;
+}
+.toggle svg {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+.frame:hover .toggle,
+.toggle:focus-visible {
+  opacity: 1;
+}
+/* Reduced motion: a large play button on the poster; the browser's controls take over once it plays. */
+.big {
+  top: 50%;
+  left: 50%;
+  width: 4rem;
+  height: 4rem;
+  transform: translate(-50%, -50%);
+}
+.big svg {
+  width: 1.8rem;
+  height: 1.8rem;
+  margin-left: 0.15rem;
+}
+.big:hover {
+  background: rgba(23, 24, 27, 0.9);
+}
+.toggle:focus-visible,
+.big:focus-visible {
+  outline: 2px solid var(--devcoach-accent);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 2px #17181b;
+}
+
+.caption {
+  margin-top: 0.6rem;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: var(--ifm-color-emphasis-800);
+}
