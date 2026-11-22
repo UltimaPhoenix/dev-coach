@@ -223,7 +223,7 @@ that uses devcoach. To delete them too, back up first if you might come back
 | What you see | What to do |
 |---|---|
 | The agent cannot find `npx` or `node` (for example `spawn npx ENOENT`) | Give it [full paths](#npx-or-node-not-found), below |
-| `devcoach 2.7.1 needs Node 24 or newer`, then the Node it found and where | That Node is older. Make Node 24 or newer your default (check `node --version` in a new terminal), or put a Node 24 in the [full paths](#npx-or-node-not-found) |
+| `devcoach <version> needs Node 24 or newer`, then the Node it found and where | That Node is older. Make Node 24 or newer your default (check `node --version` in a new terminal), or put a Node 24 in the [full paths](#npx-or-node-not-found) |
 | devcoach starts and stops at once | The command does not end in `mcp`, so devcoach prints its list of commands and exits. Add `mcp` as the last argument |
 | Slow to start, or no devcoach offline | npx asks the npm registry at every start and waits out its retries without a network. The [full paths](#npx-or-node-not-found) run without npm |
 

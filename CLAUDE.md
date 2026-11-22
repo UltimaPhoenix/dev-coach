@@ -431,6 +431,16 @@ hook (verified empirically) — hence priming-first design; blocks are the rare 
   edit them, run `npm run plugin:sync` (it also pins every manifest version to `package.json`).
   Marketplace entries (public tap + self-marketplace) mirror `plugin.json`'s metadata — change it there.
 - Prefer a Node built-in over a dependency; pin deps at latest stable.
+- **The docs describe the version they ship with** (`docs/`, `website/`). The released site is built
+  from `main` at each release and `/next/` from `develop`, from the same sources, so a page never
+  names the release a feature arrives in ("from 2.8.0") and never shows an unreleased version number.
+  What must differ between the two sites goes in `<OnStable>` / `<OnNext>`
+  (`website/src/components/ReleaseChannel`). The roadmap's timeline (`docs/vision.md`) dates a stop
+  from `CHANGELOG.md` by its entry, `<Stop entry="Windows, in one line">` (`website/src/lib/changelog.ts`,
+  plugin `devcoach-changelog`): it reads "next" while the entry is under `## [Unreleased]` and takes
+  the version and date once that heading becomes `## [x.y.z] — YYYY-MM-DD`, which is the only edit a
+  release needs. A version in an example is written `<version>`; real captures keep the version they
+  were captured with.
 
 ---
 

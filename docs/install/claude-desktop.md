@@ -95,11 +95,11 @@ macOS:
 shasum -a 256 -c SHASUMS256.txt --ignore-missing
 ```
 
-It prints `devcoach-2.7.1.mcpb: OK` (with your version). In Windows PowerShell, print the file's hash
+It prints `devcoach-<version>.mcpb: OK`. In Windows PowerShell, print the file's hash
 and compare it with its line in `SHASUMS256.txt` (PowerShell prints it in capitals):
 
 ```powershell
-(Get-FileHash .\devcoach-2.7.1.mcpb -Algorithm SHA256).Hash
+(Get-FileHash .\devcoach-<version>.mcpb -Algorithm SHA256).Hash
 ```
 
 </details>
@@ -331,7 +331,7 @@ lines after it say why it stopped.
   caption={<>A real start of devcoach 2.7.1, captured on Linux in a test home. devcoach writes your home folder as <code>~</code> (<code>%USERPROFILE%</code> on Windows); Claude Desktop's own lines in the log may still show it.</>}
 />
 
-Once Claude Desktop connects, a second line names the client: `devcoach 2.7.1 mcp · client …`.
+Once Claude Desktop connects, a second line names the client: `devcoach <version> mcp · client …`.
 
 </details>
 

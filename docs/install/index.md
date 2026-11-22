@@ -48,7 +48,7 @@ plugin or the extension.
     Installs Node for you.
   </Card>
   <Card label="Windows · beta" title="PowerShell or Scoop" to="/install/windows">
-    Installs Node for you. From devcoach 2.8.0.
+    Installs Node for you.
   </Card>
   <Card label="Any system" title="npx / npm" to="/install/npx">
     Uses your Node.js 24. npx adds no command.
@@ -101,7 +101,7 @@ Each method's page covers install *and* connect.
 |---|---|---|---|
 | [Claude Code plugin](./claude-code-plugin.md) | <No>Yours (24+) and npm</No> | <No>No</No> | Updated with the plugin<Ref n={1} to="bundled" /> |
 | [Homebrew](./homebrew.md) | <Yes>Installs it</Yes> | <Yes>Yes</Yes> | `devcoach install` again |
-| [Windows](./windows.md) *(beta, from 2.8.0)* | <Yes>Installs it</Yes> | <Yes>Yes</Yes> | Re-run the line; Scoop: `devcoach install` again |
+| [Windows](./windows.md) *(beta)* | <Yes>Installs it</Yes> | <Yes>Yes</Yes> | Re-run the line; Scoop: `devcoach install` again |
 | [npx / npm](./npx.md) | <No>Yours (24+)</No> | <Partly>With npm, not npx</Partly> | `devcoach install` again |
 | [Claude Desktop extension](./claude-desktop.md) *(beta)* | <Yes>Claude Desktop's own</Yes> | <No>No</No> | No hooks or skill |
 | [Gemini CLI](./gemini-cli.md) *(beta)* | <Partly>With Homebrew or Windows; else yours (24+)</Partly> | <Partly>With Homebrew, npm or Windows</Partly> | `devcoach install --gemini` again, or the new extension |
