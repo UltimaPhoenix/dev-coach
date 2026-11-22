@@ -15,16 +15,16 @@ same license, with its source. If you change devcoach and let others use your ve
 you offer them your modified source too.
 
 :::tip[Free for everyone]
-Free to download, install and use, for everyone, forever, including at work and on commercial
-projects. There is nothing to pay for: no paid tier, no subscription. The AGPL's conditions only come
-into play when you distribute devcoach or host a modified version of it.
+Free to download, install and use, for everyone, including at work and on commercial projects. There
+is nothing to pay for: no paid tier, no subscription. The AGPL's conditions only come into play when you
+distribute devcoach or host a modified version of it.
 :::
 
 ## Does it put my code under the AGPL? \{#does-using-devcoach-put-my-code-under-the-agpl\}
 
 **No.** devcoach runs as a *separate process*: your agent starts it
 (<code style={{whiteSpace: "nowrap"}}>npx -y devcoach mcp</code>, for example) and talks to it over
-stdio (MCP). Talking to it at arm's length is not a derivative work, exactly like querying an
+stdio (MCP). Talking to it at arm's length is not a derivative work, much like querying an
 AGPL-licensed database. **Your own projects keep whatever license you choose.**
 
 The copyleft only reaches *devcoach's own source code*. You have changes of your own to release only
@@ -78,15 +78,13 @@ once, and a pull request cannot be merged before that (the maintainer's account 
 and GitHub Actions bots are exempt). On your first pull request the CLA Assistant bot asks you to
 sign by posting this exact comment:
 
-```text
-I have read the CLA Document and I hereby sign the CLA
-```
+> `I have read the CLA Document and I hereby sign the CLA`
 
 By signing, for all your current and future contributions:
 
 | You | Details |
 | --- | --- |
-| **confirm** | that the contribution is your original work and yours to give (with your employer's permission, if it has rights in what you create), and that you have marked any part that is not |
+| **confirm** | that the contribution is your original work and yours to give (with your employer's permission, if it has rights in what you create), that you have marked any part that is not, and that, as far as you know, it violates no one else's license, patent, copyright, trademark or other right |
 | **grant** | the maintainer, and everyone who receives software the maintainer distributes, a perpetual, worldwide, non-exclusive, royalty-free, irrevocable copyright license and a patent license on your contribution |
 | **agree** | that the maintainer may license your contribution under any terms: the AGPL-3.0, any other open-source license, or proprietary and commercial terms |
 
