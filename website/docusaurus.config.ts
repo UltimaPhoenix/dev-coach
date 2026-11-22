@@ -308,7 +308,7 @@ const config: Config = {
             { label: "Choose your setup", to: "/install" },
             { label: "Claude Code plugin", to: "/install/claude-code-plugin" },
             { label: "Homebrew", to: "/install/homebrew" },
-            { label: "Windows", to: "/install/windows" },
+            { label: "Windows (beta)", to: "/install/windows" },
             { label: "npx / npm", to: "/install/npx" },
             { label: "Claude Desktop (beta)", to: "/install/claude-desktop" },
             { label: "Gemini CLI (beta)", to: "/install/gemini-cli" },

@@ -3,7 +3,8 @@
 // (a screenshot, a terminal's output, a table given as data) cannot:
 // - a Card becomes its title in bold, then its text; a wrapper with a `label` or `title` (a tab, a
 //   chat, a matrix) gets it as a bold line; a chat line starts with its speaker; Choices lists its
-//   options with the one picked;
+//   options with the one picked; a timeline's Stop becomes a list item that starts with its version,
+//   its date (or "next", "exploring") and its title, linked;
 // - every other component tag is dropped and its children stay; MDX imports, exports and comments,
 //   <Head> blocks and images are dropped;
 // - links to other pages, to `#anchors` and to `/paths` become full URLs of the site.
@@ -103,6 +104,12 @@ function openingText(tag: Tag): string {
   if (tag.name === "Say") {
     const who = attr(tag.attrs, "who") ?? "";
     return `\n\n**${SPEAKER[who] ?? who}:** `;
+  }
+  if (tag.name === "Stop") {
+    const when = [attr(tag.attrs, "version"), attr(tag.attrs, "date") ?? attr(tag.attrs, "when")].filter(Boolean).join(" · ");
+    const title = attr(tag.attrs, "title") ?? "";
+    const to = attr(tag.attrs, "to");
+    return `\n- **${when ? `${when}: ` : ""}${to ? `[${title}](${to})` : title}** `;
   }
   if (tag.name === "Choices") {
     const list = tag.attrs.match(/options=\{\s*\[([\s\S]*?)\]\s*\}/)?.[1] ?? "";
@@ -252,6 +259,8 @@ export function mdxToMarkdown(raw: string, relPath: string, siteUrl: string): st
         continue;
       }
       i = tag.end;
+      // A timeline's stops are one list: no blank line between two of them.
+      if (tag.name === "Stop") prose = prose.replace(/\n[ \t]*$/, "");
       if (DROP_WITH_CONTENT.has(tag.name) && !tag.selfClosing) {
         const close = s.indexOf(`</${tag.name}>`, i);
         i = close === -1 ? s.length : close + tag.name.length + 3;

@@ -14,7 +14,7 @@ Node.js 24 or newer is needed by the Claude Code plugin, npx and a global npm in
 ## Start here
 
 - [Home](https://ultimaphoenix.github.io/dev-coach/): what devcoach does, what a lesson looks like in the terminal and in the desktop app, and a demo course that runs in the page.
-- [Why devcoach](https://ultimaphoenix.github.io/dev-coach/why): AI writes more of our code, so the scarce skill becomes validating what it produces; how short lessons on your own work keep it, compared with courses, docs and inline AI explanations.
+- [Why devcoach](https://ultimaphoenix.github.io/dev-coach/why): AI writes more of our code, so the scarce skill becomes validating what it produces; how short lessons on your own work keep it, compared with courses, docs, books and asking your agent to explain.
 - [How it works](https://ultimaphoenix.github.io/dev-coach/how-it-works): what happens around a turn of work with your agent: which agents get lessons on their own, what happens after your first task, when a lesson is due and why most turns end without one, and how its topic and depth are chosen.
 
 ## Install
@@ -23,13 +23,13 @@ The methods in the order the docs list them; the Claude Code plugin is the recom
 
 - [Choose your setup](https://ultimaphoenix.github.io/dev-coach/install): pick a method for your agent, and see what each agent gets (automatic lessons, the devcoach skill, the tools).
 - [Claude Code plugin](https://ultimaphoenix.github.io/dev-coach/install/claude-code-plugin): two commands typed in Claude Code, `/plugin marketplace add UltimaPhoenix/claude-plugins-marketplace` then `/plugin install devcoach@ultimaphoenix`. Bundles the MCP server, two hooks, the devcoach skill and five slash commands (`/devcoach:setup`, `:ui`, `:share`, `:import`, `:course`).
-- [Homebrew](https://ultimaphoenix.github.io/dev-coach/install/homebrew): macOS and Linux. `brew install devcoach` from the `UltimaPhoenix/tap` tap brings Node.js and the `devcoach` command; `devcoach install` then connects Claude Code and Claude Desktop.
-- [Windows](https://ultimaphoenix.github.io/dev-coach/install/windows): beta, from devcoach 2.8.0. One PowerShell line (`irm https://ultimaphoenix.github.io/dev-coach/install.ps1 | iex`) or Scoop; both bring Node.js and the `devcoach` command.
+- [Homebrew](https://ultimaphoenix.github.io/dev-coach/install/homebrew): macOS and Linux. `brew tap UltimaPhoenix/tap`, `brew trust --tap UltimaPhoenix/tap` (Homebrew 6 and later load nothing from an untrusted tap), then `brew install devcoach` brings Node.js and the `devcoach` command; `devcoach install` then connects Claude Code and Claude Desktop (skip it with the Claude Code plugin).
+- [Windows](https://ultimaphoenix.github.io/dev-coach/install/windows): beta, from devcoach 2.8.0. One PowerShell line (`irm https://ultimaphoenix.github.io/dev-coach/install.ps1 | iex`) or Scoop; both bring Node.js and the `devcoach` command and connect Claude Code and Claude Desktop. With the Claude Code plugin, run `$env:DEVCOACH_SKIP_CONNECT = "1"` first so the line skips `devcoach install`. Update with `scoop update devcoach`, or by running the line again.
 - [npx / npm](https://ultimaphoenix.github.io/dev-coach/install/npx): `npx -y devcoach install` with nothing installed globally, or `npm install -g devcoach` then `devcoach install`; connects Claude Code and Claude Desktop.
 - [Claude Desktop (beta)](https://ultimaphoenix.github.io/dev-coach/install/claude-desktop): the self-signed `.mcpb` extension attached to every release (no terminal), or `devcoach install`. devcoach's tools; lessons when you ask.
-- [Gemini CLI (beta)](https://ultimaphoenix.github.io/dev-coach/install/gemini-cli): `npx -y devcoach install --gemini`, or the Gemini extension. Two hooks cue a lesson when one is due.
-- [Codex CLI (beta)](https://ultimaphoenix.github.io/dev-coach/install/codex): `npx -y devcoach install --codex`. Its two hooks cue a lesson once you trust them.
-- [Other MCP agents](https://ultimaphoenix.github.io/dev-coach/install/other-agents): Cursor, Windsurf, Cline, Continue, Zed or any MCP client, with the entry `{ "mcpServers": { "devcoach": { "type": "stdio", "command": "npx", "args": ["-y", "devcoach", "mcp"] } } }`. devcoach's tools; lessons when you ask. MCP Registry name: `io.github.UltimaPhoenix/devcoach`.
+- [Gemini CLI (beta)](https://ultimaphoenix.github.io/dev-coach/install/gemini-cli): `devcoach install --gemini` with devcoach installed (Homebrew, Windows or npm), or `npx -y devcoach install --gemini` without it, or the Gemini extension. Two hooks cue a lesson when one is due.
+- [Codex CLI (beta)](https://ultimaphoenix.github.io/dev-coach/install/codex): `devcoach install --codex` with devcoach installed (Homebrew, Windows or npm), or `npx -y devcoach install --codex` without it. Its two hooks cue a lesson once you trust them.
+- [Other MCP agents](https://ultimaphoenix.github.io/dev-coach/install/other-agents): Cursor, Windsurf, Cline, Continue, Zed or any MCP client: an MCP server entry that runs `npx -y devcoach mcp`, in the file and key each agent expects (the page has one tab per agent). devcoach's tools; lessons when you ask. MCP Registry name: `io.github.UltimaPhoenix/devcoach`.
 - [claude.ai web (not supported)](https://ultimaphoenix.github.io/dev-coach/install/claude-ai): why devcoach does not work in claude.ai in the browser, and what to use instead.
 
 ## Use devcoach

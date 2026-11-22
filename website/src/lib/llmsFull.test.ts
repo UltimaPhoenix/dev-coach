@@ -67,6 +67,25 @@ Run it.
   assert.match(out, /\*\*you:\*\* \*\*Automatic \(recommended\)\*\* \(picked\) · Guided/);
 });
 
+test("a release timeline keeps each stop's version, date and title, as one list", () => {
+  const out = md(
+    `<Timeline label="Releases" caption={<>From the <a href="https://example.com/CHANGELOG.md">changelog</a>.</>}>
+<Stop version="2.1.0" date="2026-09-14" title="Lesson sharing" to="/usage/sharing">A lesson travels as text.</Stop>
+<Stop version="2.8.0" when="next" status="next" title="Windows">An installer.</Stop>
+<Stop when="exploring" status="exploring" title="Ideas" to="#exploring">Short links.</Stop>
+</Timeline>
+
+After it.`,
+    "vision.md",
+  );
+  assert.equal(
+    out,
+    `**Releases**\n\n- **2.1.0 · 2026-09-14: [Lesson sharing](${SITE}usage/sharing)** A lesson travels as text.\n` +
+      "- **2.8.0 · next: Windows** An installer.\n" +
+      `- **exploring: [Ideas](${SITE}vision#exploring)** Short links.\n\nAfter it.`,
+  );
+});
+
 test("code is copied as it is, tags and all, and a list item keeps its code block", () => {
   const out = md(
     "Use `--date-from <YYYY-MM-DD>` here.\n\n```tsx\n<Card title=\"x\" />\nimport a from \"b\";\n```\n\n1. Run:\n\n   ```bash\n   devcoach doctor\n   ```",
