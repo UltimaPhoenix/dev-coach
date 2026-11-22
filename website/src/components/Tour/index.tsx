@@ -180,8 +180,8 @@ const HOME_CAPTION: DemoCourseCaption = {
   ),
   running: (
     <>
-      This is the course document itself, the one file devcoach writes for you. In the dashboard your progress is
-      saved step by step.
+      This is the course document itself, the one file your agent writes for you. In the dashboard your progress
+      is saved step by step.
     </>
   ),
 };
