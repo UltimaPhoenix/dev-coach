@@ -48,7 +48,7 @@ Your agent asks you how, and recommends Automatic. The devcoach skill offers fou
 | Way | What happens |
 |---|---|
 | **Automatic** | Asks nothing more. It builds your topics from the stack it finds in your 15 most recently active Claude Code projects (their dependency lists and file names), saves them, writes the coaching notebook and shows you the result, which you can change |
-| **Automatic (Deep)** | The same, and it also reads conversation text from your recent local Claude Code sessions |
+| **Automatic (Deep)** | The same, and your agent also reads conversation text from your recent local Claude Code sessions ([what that means](./reference/privacy.md#what-devcoach-reads)) |
 | **Guided** | A short conversation about the technologies you use and how confident you are in each |
 | **Import backup** | Restores your profile from a devcoach backup |
 
@@ -144,7 +144,7 @@ this order and stops at the first one that fails:
 %%{init: {"flowchart": {"nodeSpacing": 18, "rankSpacing": 22, "padding": 8, "wrappingWidth": 320}}}%%
 flowchart TD
     T(["Your agent ends a turn"]) --> O
-    O["<b>1 · Is your profile set up?</b><br/>No: asks for setup<br/><code>onboarding cue</code>"] --> C
+    O["<b>1 · Is your profile set up?</b><br/>No: asks for setup (not in plan mode)<br/><code>onboarding cue</code>"] --> C
     C["<b>2 · No course in progress?</b><br/>One is: silent, not counted<br/><code>course in progress — cues paused</code>"] --> P
     P["<b>3 · Not in plan mode?</b><br/>It is: silent, not counted<br/><code>plan mode (not counted)</code>"] --> N
     N["<b>4 · Count the turn. 10 reached?</b><br/>(3 after an unanswered cue)<br/>No: silent<br/><code>paced (4/10)</code>"] --> D
