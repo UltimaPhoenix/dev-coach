@@ -1,0 +1,23 @@
+/* The box scrolls; the diagram inside keeps its own width. Docusaurus caps every Mermaid container
+   and its SVG at 100% of the column (.container > svg): lifted here, inside this box only. */
+.box {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  margin-bottom: var(--ifm-leading);
+}
+.box:focus-visible {
+  outline: 2px solid var(--ifm-color-primary);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+.box :global(.docusaurus-mermaid-container) {
+  width: max-content;
+  min-width: 100%;
+  max-width: none;
+  margin-bottom: 0;
+}
+.box :global(.docusaurus-mermaid-container) > svg {
+  display: block;
+  max-width: none;
+  margin: 0 auto;
+}

@@ -1,0 +1,6 @@
+/* Applied to the tab row (Docusaurus puts a Tabs className on its list of tabs). A wrapped row
+   keeps Infima's own tab styles: the selected tab stays underlined in the brand colour. */
+.wrap {
+  flex-wrap: wrap;
+  overflow-x: visible;
+}

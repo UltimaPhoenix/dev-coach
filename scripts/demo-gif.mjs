@@ -71,9 +71,7 @@ async function main() {
     await page.addStyleTag({ content: "figure button { visibility: hidden; }" });
     const terminal = page.locator("figure", { hasText: "claude — ~/shop-api" }).first();
     await terminal.scrollIntoViewIfNeeded();
-    // The loop picks up from its last frame (the server-rendered card, at 11.7 s) and starts over
-    // at 17 s: run up to that restart, so the GIF opens on the empty prompt.
-    await page.clock.runFor(17_000 - 11_700 + 50);
+    await page.clock.runFor(50);
     const step = Math.round(1000 / FPS);
     for (let i = 0; i * step < DURATION_MS; i++) {
       await terminal.screenshot({ path: join(frames, `f${String(i).padStart(4, "0")}.png`) });

@@ -1,73 +1,94 @@
 ---
 title: Vision & roadmap
 sidebar_label: Vision & roadmap
-description: "devcoach is free, local, and open-source — not commercialized. Where the project is headed: gap-driven learning paths, deeper course modules, and optional team-level visibility."
-keywords: [devcoach roadmap, open source AI coaching, learning paths, developer knowledge map, team learning]
+description: "Free, local, open source and not for sale. Shipped: lesson sharing and courses. Exploring: a learning path across topics, and a course offered when a topic keeps coming back."
+keywords: [devcoach roadmap, open source AI coaching, learning paths, developer knowledge map]
 ---
 
 # Vision & roadmap
 
-## The foundation — free, local, and always on
+import { Card, Cards } from "@site/src/components/Cards";
+import { Stop, Timeline } from "@site/src/components/Timeline";
 
-devcoach today is a free, open-source MCP server: one lesson at a time, rate-limited, entirely
-local, nothing to open or maintain. That foundation stays. The local-first model is not a
-limitation to eventually remove — it's a deliberate design that keeps your data on your machine
-and coaching genuinely unobtrusive.
-
-## Not commercialized
-
-devcoach is free and open-source under AGPL-3.0, and **it is not being commercialized**. There is
-no paid tier, no subscription, and **no plans to sell the core tool** — the thing you install and
-run stays free for everyone, forever.
-
-If anything is ever sold, it would be a **separate, derivative product** built alongside devcoach —
-never a paywall bolted onto the tool you already use. There is nothing to buy today, and the
-roadmap below is a set of ideas we're exploring, not products with price tags.
-
-There is no paid path at all today — not even a commercial license. The only thing the AGPL rules
-out is embedding devcoach inside a **closed-source product**; if that is ever your case, ask by
-opening an issue and it will be considered case by case. See
-[License & commercial use](./reference/license) for the details — ordinary use, at home or at work,
-is always free.
-
-## Roadmap — ideas we're exploring
-
-These are directions we find interesting, written down to invite discussion — not a committed plan
-and not a price list:
-
-- **Lesson sharing — shipped in 2.1.0.** A lesson that landed for you can be handed to a teammate
-  as copyable text, a server-less link or a `.devcoach.md` file, and imported from the dashboard,
-  the CLI or the agent, where it joins the coaching log as a shared lesson (topic, level and
-  feedback tracked as usual, pacing untouched). Sharing is always explicit — nothing leaves your
-  machine unless you send it. Next on this thread: **short links** (a secret Gist behind the long
-  link, revocable from the CLI), **ephemeral one-use links** (zero-knowledge — the key stays in the
-  URL fragment, the server holds only ciphertext that self-destructs on first read), and curated
-  **collections of lessons per stack** that a team or a community can maintain.
-- **Gap-driven learning paths** — devcoach already learns where you're weak (topics you score low
-  on, concepts you keep marking ❌, patterns the notebook flags). Connecting those gaps to a
-  structured progression — the next thing to learn, in order — is a natural extension of that.
-- **Deeper course modules** — when you've hit the same wall three times, a longer, sequenced deep
-  dive on exactly that concept could go beyond what a single lesson card can carry, while staying
-  local and private.
-- **Per-developer knowledge profiles** — each developer's knowledge map, calibrated to their actual
-  stack and experience level.
-- **Team-level visibility** — which topics a team is collectively strong or weak on, where coverage
-  is thin, and where skills are concentrated in one person — enough signal to plan onboarding and
-  spot gaps before they become incidents.
-
-The individual, local experience stays private by default; anything team-shaped would be an
-opt-in layer on top, never a change to how the solo tool works.
+Where devcoach is going, and what stays the same on the way: the promises first, then what has
+shipped and what we're exploring next.
 
 ## What never changes
 
-- **Local-first for individuals** — your data stays on your machine, forever
-- **Free for personal use** — a single developer connecting devcoach to their agent will always
-  be able to use it at no cost
-- **Unobtrusive by default** — one lesson at a time, rate-limited, nothing to open
+<Cards columns={3}>
+<Card title="Local-first for individuals">
+
+Your coaching data lives on your machine, with no account and no telemetry. That is a deliberate
+design, and it stays.
+
+</Card>
+<Card title="Free for everyone">
+
+Using devcoach costs nothing, at home or at work, and always will.
+
+</Card>
+<Card title="Unobtrusive by default">
+
+One short lesson when one is due, at a pace you set. Nothing to open or maintain.
+
+</Card>
+</Cards>
+
+## Not commercialized
+
+devcoach is free and open source under AGPL-3.0, and **it is not being commercialized**. There is
+no paid tier, no subscription, no commercial license on offer, and **no plans to sell the core
+tool**.
+
+If anything is ever sold, it would be a **separate, derivative product** built alongside devcoach,
+never a paywall bolted onto the tool you already use.
+
+Using devcoach, at home or at work, never puts your own code under the AGPL. The AGPL's conditions
+are about devcoach itself: a copy you pass on goes with its source, and if you distribute a modified
+devcoach, or run one as a network service, you release your changes under the AGPL too. Embedding devcoach in a **closed-source product** is not
+covered; if that is ever your case, open an issue and it will be considered case by case.
+[License & commercial use](./reference/license) has the details and examples.
+
+## Roadmap
+
+What has shipped, what comes next, and the ideas we're exploring. The ideas are not a commitment.
+
+<Timeline
+  label="devcoach releases with their dates, then what comes next"
+  caption={<>Release dates from the <a href="https://github.com/UltimaPhoenix/dev-coach/blob/main/CHANGELOG.md">changelog</a>.</>}
+>
+<Stop version="1.0" date="2026-08-27" title="First stable release" to="/install">Claude Code plugin; Gemini CLI and Codex CLI (beta).</Stop>
+<Stop version="2.1.0" date="2026-09-14" title="Lesson sharing" to="/usage/sharing">A lesson travels as text, a link or a file.</Stop>
+<Stop version="2.5.0" date="2026-09-28" title="Courses" to="/usage/courses">Step by step, from a lesson you couldn't follow.</Stop>
+<Stop version="2.7.0" date="2026-10-06" title="Guided setup" to="/install/claude-code-plugin">`/devcoach:setup`; `doctor` checks Claude Desktop.</Stop>
+<Stop version="2.8.0" when="next" status="next" title="Windows" to="/install/windows">A one-line installer, and Scoop (beta).</Stop>
+<Stop when="exploring" status="exploring" title="Ideas" to="#exploring">A learning path; a course when a topic keeps coming back.</Stop>
+</Timeline>
+
+### Exploring
+
+Two directions we find interesting, written down to invite discussion.
+
+<Cards columns={2}>
+<Card title="A learning path across topics">
+
+devcoach already knows where you're weak: topics with low confidence on your knowledge map, lessons
+you marked ❌, patterns the notebook flags. Today each lesson still starts from the task your agent
+just finished. The idea is to connect those gaps into an order: the next thing to learn, and the one
+after.
+
+</Card>
+<Card title="A course when a topic keeps coming back">
+
+Today the coach offers a [course](./usage/courses.md) once, when you answer *couldn't follow* under a
+lesson, or starts one when you ask. The idea is to offer one by itself when the same topic keeps
+getting ❌.
+
+</Card>
+</Cards>
 
 ## Shape the roadmap
 
 Have a feature request, a use case the current tool doesn't cover, or thoughts on any of the ideas
-above? Open an issue on
-[GitHub Issues](https://github.com/UltimaPhoenix/dev-coach/issues) — feature requests, feedback
-and questions all live there.
+above? [Open an issue on GitHub](https://github.com/UltimaPhoenix/dev-coach/issues): feature
+requests, feedback and questions all live there.
