@@ -18,9 +18,15 @@ import cli from "@site/src/data/cli-output.json";
 
 A lesson that landed for you is often exactly what a teammate is missing. devcoach lets you hand one
 over without any account or server: the lesson itself travels, in a form the receiver can paste, click
-or drop wherever they use devcoach — and it joins their coaching log as a lesson shared by you.
+or drop wherever they use devcoach, and it joins their coaching log as a lesson shared by you.
 
 ```mermaid
+---
+config:
+  flowchart:
+    rankSpacing: 24
+    padding: 8
+---
 flowchart TD
     A["You share a lesson:<br/>text, a link or a file"]:::primary
     A -->|"a link"| B["The lesson page<br/>in their browser"]
@@ -81,10 +87,10 @@ the ones beyond the lesson itself.
   },
   "origin": {
     "id": "lesson-redis-cache-stampede-001",
-    "timestamp": "2026-11-19T01:07:05Z"
+    "timestamp": "2026-04-28T10:00:00Z"
   },
   "shared_by": "Alex",
-  "shared_at": "2026-11-22T01:07:08Z",
+  "shared_at": "2026-11-22T04:19:33Z",
   "app_version": "2.7.1"
 }
 ```
@@ -174,8 +180,8 @@ devcoach share <id> --by "Ada"        # sender name (remembered as share_name if
 devcoach share <id> --anonymous       # no sender name
 ```
 
-What **Copy text** and `devcoach share` produce — the card people can read, then the one line
-devcoach reads (shortened here; a real code is one line of about 1 500 to 2 500 characters):
+What **Copy text** and `devcoach share` produce: the card people can read, then the one line
+devcoach reads (shortened here; a real code is one line of about 1,500 to 2,500 characters):
 
 ```text
 ### ─────────── 🎓 devcoach ───────────
@@ -189,16 +195,16 @@ devcoach:lesson:1:dVZdbhs3EL7KYAskgKBd_RhNEeXJqBugaBsXtougqQsvtaQk2rvkluRKWQQBeo
 ```
 
 Paste the whole thing anywhere: chat, an issue, an email. The receiver never has to find the code
-in it — every importer does.
+in it: every importer does.
 
 ## From your agent
 
-Ask in plain words — *"share the last lesson"*, *"share the lesson about WAL mode as a link"*, *"share it
+Ask in plain words: *"share the last lesson"*, *"share the lesson about WAL mode as a link"*, *"share it
 as a file, anonymously"*. The agent calls the `share_lesson` tool and replies with the card and the
 code in a fenced block (or the link, or writes the file). With the Claude Code plugin, `/devcoach:share`
 does the same: `/devcoach:share last as link`, `/devcoach:share about docker with context`.
 
-The coach never offers to share on its own — with one exception: right after you **star** a lesson,
+The coach never offers to share on its own, with one exception: right after you **star** a lesson,
 it asks once whether you want to hand it to a teammate.
 
 ## Receiving a lesson
@@ -247,13 +253,16 @@ it. The page also offers **Copy code** and **Download .devcoach.md**.
       light={require("../screenshots/lesson-imported-light.png").default}
       dark={require("../screenshots/lesson-imported-dark.png").default}
     />
+
+*This capture shows another shared lesson, WAL mode from Ada: the banner and the shared-by line are the same for every import.*
+
   </TabItem>
 </Tabs>
 
 ### In the terminal
 
 `devcoach import` with no argument reads your clipboard; otherwise pass the code, the link, a URL, a
-file path, or `-` for stdin. The same import from the terminal, twice — the second time devcoach
+file path, or `-` for stdin. The same import from the terminal, twice. The second time, devcoach
 recognises the share:
 
 ```text
@@ -298,8 +307,7 @@ It appears in your log with a **🤝 shared by** line and can be filtered with
 
 - Its **topic counts as taught**, so the coach will not teach it again, and **✓ / 💡 / ✗ feedback
   works** as for your own lessons. If the topic is not in your knowledge map yet, you are offered to track it.
-- It **never counts against your daily limit** or the minimum gap, and never resets the pacing — a
-  shared lesson is a gift, not a lesson delivered to you.
+- It **never counts against your daily limit** or the minimum gap, and never resets the pacing.
 - Importing the same share twice reports *already in your log*; the same lesson from a different
   sender is stored as a separate lesson.
 
@@ -334,7 +342,7 @@ SQLite's default rollback journal locks the whole database for a write…
 💡 *Senior tip:* enable WAL once per database file — it persists.
 ```
 
-A `.devcoach.md` is a markdown file with YAML front matter — readable by people, renderable on GitHub,
+A `.devcoach.md` is a markdown file with YAML front matter: readable by people, renderable on GitHub,
 and importable by any devcoach. Other tools can write it too; the parser accepts JSON-quoted strings,
 flow lists (`[a, b]`) and `null`.
 
@@ -345,12 +353,11 @@ Optional keys, present only when context was included: `task_context`, `project`
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| *This lesson code is damaged or incomplete* | A character of the code was changed — an email client wrapped it, a chat trimmed it, a model retyped it | Copy the whole text again; devcoach re-joins wrapped lines, but not edited characters |
-| *too large to be a lesson* | The code is bigger than a real lesson (64 000 characters / 256 KB decoded) | Ask the sender for the `.devcoach.md` file instead |
+| *This lesson code is damaged or incomplete* | A character of the code was changed: an email client wrapped it, a chat trimmed it, a model retyped it | Copy the whole text again; devcoach re-joins wrapped lines, but not edited characters |
+| *too large to be a lesson* | The code is bigger than a real lesson (64,000 characters / 256 KB decoded) | Ask the sender for the `.devcoach.md` file instead |
 | *shared by a newer devcoach* | The sender runs a newer share format | Update devcoach the way you installed it (see [Installation](../install/index.md)), for example `npm i -g devcoach@latest` or `brew upgrade devcoach` |
 | *Only public http(s) URLs can be imported* | The URL points at localhost, a private network or a link-local address | Copy the lesson text instead of the URL |
 | The link page says no dashboard answered | The dashboard is not running, or runs on another port | Start it (`devcoach ui`, `/devcoach:ui`) or set the port in the panel, then *retry the check*; the Import button works either way |
-| Safari says it can't check my dashboard | Safari (WebKit) blocks any request from an https page to `http://127.0.0.1`, so the page cannot probe your dashboard — the check is skipped, nothing is wrong | If the dashboard is running, **Import** works as usual (it is a plain navigation); otherwise use **Copy code** or **Download .devcoach.md** |
-| Safari 18.2–18.5 refuses to open the Import link ("HTTPS-Only") | Those versions block links to `http://localhost` with no way to proceed | Paste `http://127.0.0.1:7860/lessons/import?code=…` in the address bar, or use **Copy code**; fixed in Safari 26 |
+| Safari says it can't check my dashboard | Safari (WebKit) blocks the background request an https page would make to `http://127.0.0.1`, so the page skips the check. Nothing is wrong | If the dashboard is running, **Import** works as usual: it opens your dashboard as a normal link. Otherwise use **Copy code** or **Download .devcoach.md** |
 | Chrome asked to allow local network access, or the page says the browser blocks it | Chrome 142+ asks once before a website may reach `127.0.0.1` | Allow it (icon left of the address bar → *Local network access*), then *retry*; **Import** works whatever the answer |
-| The link page hides the Import button | The code is longer than a URL Node's dashboard accepts (~12 000 characters) | Use **Copy code** or **Download .devcoach.md** and import that |
+| The link page hides the Import button | The code is longer than a URL Node's dashboard accepts (~12,000 characters) | Use **Copy code** or **Download .devcoach.md** and import that |
