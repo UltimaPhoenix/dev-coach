@@ -21,8 +21,8 @@
   gap: 0.3rem;
   min-width: 0;
   padding: 1rem 1.1rem;
-  border: 1px solid var(--ifm-color-emphasis-200);
-  border-radius: 12px;
+  border: 1px solid var(--dc-border);
+  border-radius: var(--dc-radius);
   background: var(--ifm-background-surface-color);
   color: var(--ifm-font-color-base);
 }
@@ -38,16 +38,16 @@
   outline: 2px solid var(--devcoach-accent);
   outline-offset: 2px;
 }
-.link .title::after {
-  content: " →";
-  color: var(--devcoach-accent);
+.arrow,
+.title svg {
+  color: var(--dc-accent-text);
 }
 .label {
   font-family: var(--ifm-font-family-monospace);
   font-size: 0.7rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--devcoach-accent);
+  color: var(--dc-accent-text);
 }
 .title {
   font-weight: 700;
