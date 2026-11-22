@@ -42,18 +42,22 @@ const sidebars: SidebarsConfig = {
       type: "category",
       label: "Use devcoach",
       collapsed: false,
+      // Like Install: the label opens a page that sends the reader to the right guide.
+      link: { type: "doc", id: "usage/index" },
       items: ["usage/coaching", "usage/courses", "usage/sharing", "usage/web-ui", "usage/cli"],
     },
     {
       type: "category",
       label: "Reference",
       collapsed: false,
+      link: { type: "doc", id: "reference/index" },
       items: ["reference/configuration", "reference/privacy", "reference/mcp-server", "reference/license"],
     },
     {
       type: "category",
       label: "Help",
       collapsed: false,
+      link: { type: "doc", id: "help" },
       items: ["troubleshooting", "faq"],
     },
     "vision",
