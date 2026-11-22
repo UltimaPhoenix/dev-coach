@@ -7,10 +7,10 @@ import styles from "./styles.module.css";
 
 export function Chat({ label, children }: { label?: string; children: ReactNode }): ReactNode {
   return (
-    <div className={styles.chat}>
-      {label && <div className={styles.bar}>{label}</div>}
+    <figure className={styles.chat}>
+      {label && <figcaption className={styles.bar}>{label}</figcaption>}
       <div className={styles.rows}>{children}</div>
-    </div>
+    </figure>
   );
 }
 
