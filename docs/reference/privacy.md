@@ -78,6 +78,23 @@ includes whatever it reads from devcoach, as in any session.
 coaching data. Through the tool it is your agent that passes the URL; the devcoach skill tells it to
 use only one you pasted.
 
+<details>
+<summary>The other programs devcoach starts</summary>
+
+devcoach passes none of them your coaching data:
+
+- `git`, to read a lesson's project, branch and commit, and your git `user.name` for sharing.
+- Your clipboard tool, when you run `devcoach import` with nothing after it.
+- Your agents' own CLIs (`claude mcp add`, `gemini mcp add`, `codex mcp add`, and `remove`), during
+  `devcoach install` and `devcoach uninstall`.
+- Your browser, for `devcoach ui --open`, and the dashboard itself, when your agent calls `open_ui`.
+- The server command your agent is configured with, and its Node, which `devcoach doctor` runs with
+  `--version`.
+- `npm install` of the pinned devcoach version, once per version, for the Claude Code plugin and the
+  Gemini CLI extension. This is the install step, and it uses the network.
+
+</details>
+
 ## What devcoach reads
 
 devcoach only reads these sources; it never changes them. The setup scan suggests your first topics: it
