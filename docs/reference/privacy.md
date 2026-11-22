@@ -1,6 +1,7 @@
 ---
 title: Privacy & security
 sidebar_label: Privacy & security
+description: What devcoach reads, keeps and sends. Where your data lives, its one kind of network request, what a shared lesson carries, what the dashboard accepts.
 ---
 
 import { Cards, Card } from "@site/src/components/Cards";
@@ -30,8 +31,11 @@ agent runs.
 
 - **Your coaching data lives in `~/.devcoach/`**: the database `coaching.db`, the coaching notebook
   `learning-state.md`, your [courses](../usage/courses.md) under `courses/`, and `hook.log` if you turn
-  on hook tracing. devcoach writes elsewhere only when you ask: its entries in your agent's settings
-  (`devcoach install`; `devcoach uninstall` removes them), a backup, a shared `.devcoach.md` file.
+  on hook tracing. With the Gemini CLI extension, the folder also holds the extension's copy of
+  devcoach (`gemini-ext/`).
+- **devcoach writes elsewhere only when you ask:** its entries and the devcoach skill in your agents'
+  folders (`devcoach install`; `devcoach uninstall` removes them), the Claude Code plugin's copy of
+  devcoach in the plugin's data folder, a backup, a shared `.devcoach.md` file.
 - **No account, no telemetry, no update check.** Installing or updating devcoach uses the network like
   any install.
 - **Nothing listens on the network.** devcoach talks to your agent over stdio. The optional dashboard
@@ -97,10 +101,12 @@ devcoach passes none of them your coaching data:
 
 ## What devcoach reads
 
-devcoach only reads these sources; it never changes them. The setup scan suggests your first topics: it
-runs when onboarding starts, before you pick a mode, and when you ask the coach to review or rebuild your
-profile or notebook. Nothing from it is stored. Your agent gets the result and saves only the topics and
-notebook it builds.
+Reading changes none of these sources. Only `devcoach install` and `devcoach uninstall` touch one of
+them: they add and remove devcoach's server entry in `~/.claude.json`.
+
+The setup scan suggests your first topics: it runs when onboarding starts, before you pick a mode, and
+when you ask the coach to review or rebuild your profile or notebook. Nothing from it is stored. Your agent
+gets the result and saves only the topics and notebook it builds.
 
 <StackTable>
   <table>
@@ -113,7 +119,7 @@ notebook it builds.
     </thead>
     <tbody>
       <tr>
-        <th colSpan={3} scope="rowgroup">The setup scan, over your 15 most recently active projects</th>
+        <th colSpan={3} scope="rowgroup">The setup scan, over the folder your agent runs in and your 15 most recently active projects</th>
       </tr>
       <tr>
         <th scope="row">`~/.claude.json`</th>
@@ -172,10 +178,10 @@ notebook it builds.
 <details>
 <summary>One project, exactly as your agent receives it</summary>
 
-The real scan, run on a sample project: a folder with `package.json`, `tsconfig.json` and a `Dockerfile`,
-three lines in `history.jsonl` and a short `MEMORY.md`. This is its entry in `detected_projects`, the
-list `get_onboarding` returns (`path` is absolute: the sandbox home is shown as `~`, and the list is on
-one line):
+The real scan, run on a sample project: a git repository with `package.json` (express in its
+dependencies), `tsconfig.json` and a `Dockerfile`, three lines in `history.jsonl` and a short
+`MEMORY.md`. This is its entry in `detected_projects`, the list `get_onboarding` returns (`path` is
+absolute: the sandbox home is shown as `~`, and the list is on one line):
 
 ```json
 {
@@ -197,11 +203,13 @@ The three history lines held the prompt *"make the webhook retry idempotent"*; o
 
 devcoach's own code never opens your session transcripts. If you choose Deep:
 
-1. The skill calls `preview_deep_scan`, which reads only project paths and activity dates, never prompt
-   text, and lists the projects you worked on in the last 3 months so you can narrow the list.
-2. Your agent starts a subagent that reads conversation text from `~/.claude/projects/<project>/*.jsonl`.
-   The skill tells it to read at most 25 projects and the 5 most recent sessions of each, to prefer
-   observations over quotes, and to answer with only topics, groups and notebook notes.
+1. The skill calls `preview_deep_scan`, which keeps only project paths, activity dates and prompt
+   counts (each `history.jsonl` line is parsed and its prompt text dropped). It finds the projects you
+   worked on in the last 3 months; when there are more than 8, you can narrow the list.
+2. Your agent starts a subagent that reads conversation text from `~/.claude/projects/<project>/*.jsonl`,
+   and each project's `MEMORY.md`. The skill tells it to read at most 25 projects and the 5 most recent
+   sessions of each, to prefer observations over quotes, and to answer with only topics, groups, a short
+   evidence phrase per topic, and a notebook.
 
 These are instructions to a model, which devcoach cannot enforce, and what the subagent reads goes to
 your agent's model. Automatic and Guided do not ask your agent to read your conversations.
@@ -211,9 +219,25 @@ your agent's model. Automatic and Guided do not ask your agent to read your conv
 ## Sharing is explicit
 
 Your data leaves your machine when you hand it over: a [lesson you share](../usage/sharing.md) or a course
-you publish (next section). Here is a real share, decoded: `devcoach share --last` on the demo data, with
-the git name *Sam Rivera*. The highlighted lines describe you and your copy of the lesson, or, in the
-second tab, where it happened.
+you publish (next section). A shared lesson carries the lesson (title, summary, body, topic, categories
+and level), and:
+
+- **Your name goes with the lesson unless you remove it.** It comes from the `share_name` setting,
+  else your git `user.name`. The dashboard shows it in an editable field first; in a terminal use
+  `--anonymous` (or `--by <name>`); in chat, say *anonymously*.
+- **Always included:** the lesson's id and the date you learned it (`origin`), the date you shared it
+  and your devcoach version.
+- **Where it happened, only on request** (*Include where it happened*, `--with-context`): task,
+  project, branch and commit, plus the repository when it is on GitHub, GitLab or Bitbucket.
+  **Never a local folder path.**
+- **The share link is server-less.** The lesson rides in the URL fragment, which browsers never send to
+  the site; the docs page decodes it in your browser.
+
+<details>
+<summary>What a real share carries, decoded</summary>
+
+`devcoach share --last` on the demo data, with the git name *Sam Rivera*. The highlighted lines describe
+you and your copy of the lesson, or, in the second tab, where it happened.
 
 <Tabs>
 <TabItem value="default" label="Default">
@@ -274,16 +298,7 @@ second tab, where it happened.
 </TabItem>
 </Tabs>
 
-- **Your name goes with the lesson unless you remove it.** It comes from the `share_name` setting,
-  else your git `user.name`. The dashboard shows it in an editable field first; in a terminal use
-  `--anonymous` (or `--by <name>`); in chat, say *anonymously*.
-- **Always included:** the lesson's id and the date you learned it (`origin`), the date you shared it
-  and your devcoach version.
-- **Where it happened, only on request** (*Include where it happened*, `--with-context`): task,
-  project, branch and commit, plus the repository when it is on GitHub, GitLab or Bitbucket.
-  **Never a local folder path.**
-- **The share link is server-less.** The lesson rides in the URL fragment, which browsers never send to
-  the site; the docs page decodes it in your browser.
+</details>
 
 [Sharing lessons](../usage/sharing.md#what-travels--and-what-never-does) describes every field.
 
@@ -315,37 +330,43 @@ A shared lesson is text someone else wrote, and devcoach treats it that way:
 - **Escape sequences and control characters are stripped**, with invisible characters that reorder
   text, when the lesson is imported and again before the CLI prints it.
 - **Its markdown is sanitised** before the dashboard or the docs page shows it.
-- **A code is size-checked before it is unpacked:** at most 64,000 characters, and 256 KB decompressed.
+- **A code is size-checked:** at most 64,000 characters, checked before it is unpacked, and unpacking
+  stops as soon as the lesson passes 256 KB.
 - **A URL import reaches public addresses only**, checked after DNS resolution and on every redirect;
   devcoach connects to exactly the address it checked.
 
 Your agent still reads it as someone else's text; devcoach does not filter what it says.
 
-## The dashboard answers only itself
+## What the dashboard accepts
 
 `devcoach ui` listens on `127.0.0.1`, so no other machine can reach it. On your own machine, every
-request passes two checks first:
+request passes two checks before the dashboard acts on it:
 
-- **Another website cannot change anything.** Your browser tells the dashboard which site sent a
-  request, and every action that writes refuses other sites with *403 Forbidden*, the docs site's share
-  page included. Reads still work: that is how the share page sees that your dashboard is running (the
-  answer is only its status and version) and opens the import preview, where only your click on
-  *Add to my lessons* saves the lesson.
-- **Only its own address.** A request must be addressed to `127.0.0.1`, `localhost` or `[::1]`, so a
-  page served under another name that resolves to your machine (DNS rebinding) is refused, reads
-  included.
+- **Only its own address.** A request must be addressed to `127.0.0.1`, `localhost` or `[::1]`. A page
+  served under another name that resolves to your machine (DNS rebinding) is refused, reads included.
+- **In a browser, a change must come from one of its own pages.** Your browser tells the dashboard
+  whether a request comes from one of its pages or from another site. A request that would change
+  something (any method except GET, HEAD and OPTIONS) from another site is refused with
+  *403 Forbidden*: another website, the docs site's share page included, or another server on your
+  machine. Programs that are not a browser, such as `curl`, do not say where a request comes from, and
+  the dashboard lets them through.
+
+Your browser does not let another site read the dashboard's pages. The one exception is `/ping`, which
+answers the docs site only, so that its share page can tell whether a dashboard is running: the answer
+is its status and version (and, on a database a newer devcoach upgraded, the versions involved). The
+share page can also link to the import preview; only your click on *Add to my lessons* saves the lesson.
 
 ## Backups are plain files
 
 `devcoach backup` (or *Download backup* in the dashboard's settings) produces an **unencrypted** zip:
 settings, knowledge map, lessons, courses and the notebook. Unlike a shared lesson, it holds everything,
 task context and local folder paths included, and so does *Download lessons* (the lessons as JSON).
-Lessons can include snippets of your project context, so store these files somewhere you trust. See
-[Backup, export & import](../usage/cli.md#backup-export--import).
+Lessons can include snippets of your project context, so store these files somewhere you trust. What a
+backup holds and what a restore does: [Configuration](configuration.md#backup-strategy).
 
 ## Why it can't be a hosted / remote connector
 
 claude.ai web connects only to remote MCP servers that it reaches over the internet. devcoach keeps
 your data in your home directory, so it has to run on your computer: that local-only constraint is the
-whole point. claude.ai web is therefore not supported. You can paste the devcoach skill into it by hand
-([claude.ai web](../install/claude-ai.md)), which gives the coaching behaviour without any data storage.
+whole point. claude.ai web is therefore not supported:
+[use Claude Desktop or Claude Code instead](../install/claude-ai.md).
