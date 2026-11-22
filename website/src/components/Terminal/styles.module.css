@@ -1,0 +1,237 @@
+/* A terminal window: dark in both site themes, like the Tour's terminal (same canvas, bar and
+   line colours). The ANSI palette is our own, tuned for that canvas: every colour, dim included,
+   is at least 4.5:1 against #1e1f22 (WCAG AA for normal text); cyan is the brand teal. */
+.figure {
+  margin: 1.25rem 0 1.75rem;
+}
+.window {
+  --term-bg: #1e1f22;
+  --term-bar: #2b2d30;
+  --term-line: #393b40;
+  --term-fg: #c9ced3; /* 10.4:1 */
+  --term-strong: #ffffff; /* bold text without a colour: 16.5:1 */
+  --term-dim: #8e949a; /* 5.4:1 */
+  --ansi-black: #8e949a; /* black on a black canvas would vanish: drawn as the dim grey, 5.4:1 */
+  --ansi-red: #f8837b; /* 6.7:1 */
+  --ansi-green: #6fdc9c; /* 9.7:1 */
+  --ansi-yellow: #f2c661; /* 10.2:1 */
+  --ansi-blue: #7fb4ff; /* 7.8:1 */
+  --ansi-magenta: #d7a6ff; /* 8.5:1 */
+  --ansi-cyan: #5eead4; /* the brand teal, 11.1:1 */
+  --ansi-white: #d6dadf; /* 11.7:1 */
+  --ansi-bright-black: #a3a9af; /* 7.0:1 */
+  --ansi-bright-red: #ffaaa3; /* 9.1:1 */
+  --ansi-bright-green: #a6f0c3; /* 12.5:1 */
+  --ansi-bright-yellow: #fbe29a; /* 12.9:1 */
+  --ansi-bright-blue: #b0d0ff; /* 10.5:1 */
+  --ansi-bright-magenta: #e8cbff; /* 11.3:1 */
+  --ansi-bright-cyan: #a5f5e8; /* 13.2:1 */
+  --ansi-bright-white: #ffffff; /* 16.5:1 */
+  border: 1px solid var(--term-line);
+  border-radius: 12px;
+  background: var(--term-bg);
+  color: var(--term-fg);
+  overflow: hidden;
+}
+
+.bar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.45rem 0.9rem;
+  border-bottom: 1px solid var(--term-line);
+  background: var(--term-bar);
+  font-family: var(--ifm-font-family-monospace);
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+.dots {
+  display: inline-flex;
+  flex: none;
+  gap: 0.35rem;
+}
+.dots i {
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 50%;
+  background: #4a4d53;
+}
+.title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--term-fg); /* 8.8:1 on the bar */
+}
+.prompt {
+  color: var(--ansi-cyan);
+  font-weight: 700;
+}
+
+.scroll {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-color: #4a4d53 transparent;
+}
+.scroll:focus-visible {
+  outline: 2px solid var(--ansi-cyan);
+  outline-offset: -2px;
+  border-radius: 0 0 11px 11px;
+}
+.pre {
+  /* Infima styles every <pre>: reset it to a plain terminal screen. */
+  margin: 0;
+  padding: 0.85rem 1.1rem 1rem;
+  border-radius: 0;
+  background: none;
+  color: inherit;
+  font-family: var(--ifm-font-family-monospace);
+  font-size: 0.78rem;
+  /* Tight enough for box-drawing borders to meet from one line to the next, as in a terminal. */
+  line-height: 1.2;
+  white-space: pre;
+  overflow: visible;
+  tab-size: 8;
+}
+/* A phone: a little smaller, so more of a line fits before it scrolls. */
+@media (max-width: 480px) {
+  .pre {
+    padding-inline: 0.9rem;
+    font-size: 0.72rem;
+  }
+}
+.pre code {
+  display: block;
+  width: max-content;
+  min-width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font-size: inherit;
+  white-space: inherit;
+}
+/* Folded: the last visible lines fade into the button. */
+.folded .pre {
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 2.6rem), transparent);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 2.6rem), transparent);
+}
+
+/* A character the monospace font may not carry (✓ ★ 💡 日): exactly its terminal width. */
+.cell {
+  display: inline-block;
+  width: calc(var(--w) * 1ch);
+  overflow: visible;
+  text-align: center;
+  text-indent: 0;
+  white-space: nowrap;
+}
+
+.bold {
+  font-weight: 700;
+}
+.bold:not(.fg) {
+  color: var(--term-strong);
+}
+.underline {
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+}
+/* A foreground colour: its class sets --fg, .fg paints it (so dim can mix it). */
+.fg {
+  color: var(--fg);
+}
+.black {
+  --fg: var(--ansi-black);
+}
+.red {
+  --fg: var(--ansi-red);
+}
+.green {
+  --fg: var(--ansi-green);
+}
+.yellow {
+  --fg: var(--ansi-yellow);
+}
+.blue {
+  --fg: var(--ansi-blue);
+}
+.magenta {
+  --fg: var(--ansi-magenta);
+}
+.cyan {
+  --fg: var(--ansi-cyan);
+}
+.white {
+  --fg: var(--ansi-white);
+}
+.brightBlack {
+  --fg: var(--ansi-bright-black);
+}
+.brightRed {
+  --fg: var(--ansi-bright-red);
+}
+.brightGreen {
+  --fg: var(--ansi-bright-green);
+}
+.brightYellow {
+  --fg: var(--ansi-bright-yellow);
+}
+.brightBlue {
+  --fg: var(--ansi-bright-blue);
+}
+.brightMagenta {
+  --fg: var(--ansi-bright-magenta);
+}
+.brightCyan {
+  --fg: var(--ansi-bright-cyan);
+}
+.brightWhite {
+  --fg: var(--ansi-bright-white);
+}
+/* Dim: the dim grey on its own; a colour mixed 78% toward the canvas (red, the darkest, stays at
+   4.6:1). Black and bright black are already grey: they take the dim grey. */
+.dim {
+  color: var(--term-dim);
+}
+.dim.fg {
+  color: color-mix(in srgb, var(--fg) 78%, var(--term-bg));
+}
+.dim.black,
+.dim.brightBlack {
+  color: var(--term-dim);
+}
+
+.more {
+  display: block;
+  width: 100%;
+  padding: 0.5rem 1.1rem;
+  border: 0;
+  border-top: 1px solid var(--term-line);
+  background: var(--term-bar);
+  color: var(--ansi-cyan);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+.more:hover {
+  background: #313338;
+}
+.more:focus-visible {
+  outline: 2px solid var(--ansi-cyan);
+  outline-offset: -2px;
+  border-radius: 0 0 11px 11px;
+}
+.moreHint {
+  color: var(--term-dim);
+  font-weight: 400;
+}
+
+.caption {
+  margin-top: 0.6rem;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: var(--ifm-color-emphasis-800);
+}

@@ -274,8 +274,16 @@ const config: Config = {
       { name: "twitter:card", content: "summary_large_image" },
     ],
     colorMode: { defaultMode: "dark", respectPrefersColorScheme: true },
-    // Cleaner mermaid presets (closer to the old Material look) instead of the harsh default.
-    mermaid: { theme: { light: "neutral", dark: "dark" } },
+    // Cleaner mermaid presets (closer to the old Material look) instead of the harsh default; the
+    // colours are restyled in src/css/custom.css. The font is set here, not in CSS: Mermaid sizes
+    // every box to its text, so it has to measure with the font the page shows (Infima's base).
+    mermaid: {
+      theme: { light: "neutral", dark: "dark" },
+      options: {
+        fontFamily:
+          'system-ui, -apple-system, "Segoe UI", Roboto, Ubuntu, Cantarell, "Noto Sans", sans-serif, BlinkMacSystemFont, Helvetica, Arial',
+      },
+    },
     navbar: {
       title: "devcoach",
       logo: { alt: "devcoach", src: "img/favicon.svg" },
