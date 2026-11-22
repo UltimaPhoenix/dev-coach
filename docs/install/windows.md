@@ -1,19 +1,21 @@
 ---
 title: Windows
 sidebar_label: Windows
-description: Install devcoach on Windows with one PowerShell line or with Scoop. Both bring Node.js and the devcoach command and connect Claude Code and Claude Desktop.
+description: Install devcoach on Windows with one PowerShell line or with Scoop. Both bring Node.js and the devcoach command; devcoach install connects Claude Code and Claude Desktop.
 keywords: [devcoach windows, install devcoach powershell, scoop devcoach, claude code windows mcp server, claude code hooks windows]
 ---
 
 import { Card, Cards } from "@site/src/components/Cards";
 import FileTree from "@site/src/components/FileTree";
+import { OnNext, OnStable } from "@site/src/components/ReleaseChannel";
 
 # Windows
 
-One PowerShell line, or Scoop: both bring their own Node.js, put the `devcoach` command on your PATH
-and connect your agents, as Homebrew does on macOS. Windows support is in beta, from devcoach 2.8.0.
-
 ## What you get here
+
+One PowerShell line, or Scoop: both bring their own Node.js and put the `devcoach` command on your
+PATH, as Homebrew does on macOS. The line also connects your agents; with Scoop you run
+`devcoach install` yourself. Windows support is in beta, from devcoach 2.8.0.
 
 <Cards columns={3}>
   <Card label="Automatic lessons" title="Claude Code">
@@ -37,26 +39,33 @@ and connect your agents, as Homebrew does on macOS. Windows support is in beta, 
 - **No administrator rights, Git for Windows or Node.js.** The line installs a private Node, Scoop its
   `nodejs-lts`. The line runs in memory, so no execution policy applies.
 - **The network:** github.com for devcoach, nodejs.org for Node.js.
-- **devcoach 2.8.0 or newer.** The current release is 2.7.1:
 
-:::note[Before 2.8.0 is released]
+## Install
 
-2.8.0 is the first release with a Windows bundle. Until it is out, the release site does not serve
-the installer and the Scoop bucket has no devcoach. The canary built from `develop` works now; it is
-unreleased and may break:
+### One line (PowerShell)
+
+<OnStable>
+
+```powershell
+irm https://ultimaphoenix.github.io/dev-coach/install.ps1 | iex
+```
+
+</OnStable>
+<OnNext>
+
+This is the unreleased documentation: this line installs the canary built from `develop`, which may
+break.
 
 ```powershell
 $env:DEVCOACH_CHANNEL = "next"
 irm https://ultimaphoenix.github.io/dev-coach/next/install.ps1 | iex
 ```
 
-:::
-
-## Install
+</OnNext>
 
 **Using the [Claude Code plugin](./claude-code-plugin.md)?** The line ends with `devcoach install`,
 which next to the plugin adds a second devcoach server and a second copy of the skill. Skip it: run
-this first, in the same PowerShell window.
+this first, in the same PowerShell window, then the line.
 
 ```powershell
 $env:DEVCOACH_SKIP_CONNECT = "1"
@@ -64,16 +73,11 @@ $env:DEVCOACH_SKIP_CONNECT = "1"
 
 Claude Desktop is then not connected either: `devcoach install --claude-desktop` afterwards.
 
-### One line (PowerShell)
-
-```powershell
-irm https://ultimaphoenix.github.io/dev-coach/install.ps1 | iex
-```
-
-In order, it:
+In order, the line:
 
 1. Downloads `devcoach-<version>-standalone.zip` from the
-   [latest release](https://github.com/UltimaPhoenix/dev-coach/releases/latest) and checks its
+   [latest release](https://github.com/UltimaPhoenix/dev-coach/releases/latest) (the canary: the
+   [`next` prerelease](https://github.com/UltimaPhoenix/dev-coach/releases/tag/next)) and checks its
    SHA-256 against the release's `SHASUMS256.txt`.
 2. Downloads the current Node.js LTS from nodejs.org, checks it against Node's own `SHASUMS256.txt`
    and checks `node.exe`'s Authenticode signature (OpenJS Foundation). This Node is **private to
@@ -87,13 +91,25 @@ In order, it:
 
 Set a variable before the line, as above, or save the script and pass parameters:
 
+<OnStable>
+
 ```powershell
 irm https://ultimaphoenix.github.io/dev-coach/install.ps1 -OutFile install.ps1
 powershell -ExecutionPolicy Bypass -File .\install.ps1 -Version 2.8.0
 ```
 
+</OnStable>
+<OnNext>
+
+```powershell
+irm https://ultimaphoenix.github.io/dev-coach/next/install.ps1 -OutFile install.ps1
+powershell -ExecutionPolicy Bypass -File .\install.ps1 -Channel next
+```
+
+</OnNext>
+
 <details>
-<summary>All ten options</summary>
+<summary>All options</summary>
 
 Each as a parameter, or as a variable:
 
@@ -114,9 +130,10 @@ Parameters only:
   CLI only).
 - `-Archive path\to\devcoach-2.8.0-standalone.zip`: devcoach from a downloaded zip instead of
   GitHub. Node still comes from nodejs.org, unless you use the system Node.
+- `-Uninstall`: runs the uninstaller described in [Remove](#uninstall).
 
 An agent flag connects only that agent. For Claude Code, Claude Desktop and Gemini CLI, skip the
-connect step, then run this in the same window:
+connect step, then run this in the same window (after the saved script: in a new window):
 
 ```powershell
 devcoach install --claude-code --claude-desktop --gemini
@@ -134,7 +151,8 @@ devcoach install
 
 - **Node:** Scoop installs its `nodejs-lts` with devcoach and shims the `devcoach` command. If you
   manage Node yourself (nvm-windows, fnm), the one line keeps its Node private instead.
-- **With the Claude Code plugin:** skip `devcoach install`.
+- **With the Claude Code plugin:** skip `devcoach install`. Claude Desktop is then not connected
+  either: `devcoach install --claude-desktop` afterwards.
 - **Update and remove:** see [Update](#updating) and [Remove](#uninstall). CI updates the bucket at
   every release.
 
@@ -163,7 +181,8 @@ skill in `~\.claude\skills\devcoach\`, Claude Code's server entry, and
 `%APPDATA%\Claude\claude_desktop_config.json`. Scoop keeps devcoach in its `apps\devcoach\current\`,
 and agents start it through `current`, so `scoop update` keeps them working.
 
-### How Claude Code is wired on Windows
+<details id="how-claude-code-is-wired-on-windows">
+<summary>How is Claude Code wired on Windows?</summary>
 
 Each hook, and the MCP server, starts the private `node.exe` with devcoach's script, in the exec form
 (`command` plus `args`). The Stop hook in `~\.claude\settings.json`, for user `x`:
@@ -187,6 +206,8 @@ For every change, CI runs this installer on a Windows runner from a freshly buil
 private Node, the user PATH and this hook, runs the hook and `devcoach doctor`, then uninstalls. It
 does not run the `irm | iex` line or Scoop.
 
+</details>
+
 ## Check it worked
 
 The line ends with `devcoach <version> is installed.` Its window has `devcoach` already; in a
@@ -197,8 +218,8 @@ devcoach --version
 devcoach doctor
 ```
 
-`doctor` checks each part of the wiring. Look for `this devcoach: windows-installer` (`scoop` with
-Scoop) and `Node … via bundled` under **Environment**, then `✓ Stop hook wired` and
+`doctor` checks each part of the wiring. Look for `this devcoach: windows-installer` and
+`Node … via bundled` (`scoop` and `via scoop` with Scoop) under **Environment**, then `✓ Stop hook wired` and
 `✓ UserPromptSubmit priming hook wired` under **Claude Code wiring**. A `shell-form hook on Windows`
 line means hooks written the old way: run `devcoach install` again, as it says.
 
@@ -234,7 +255,8 @@ devcoach install
 **devcoach** and uninstall it. From PowerShell, the same command that entry runs:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$env:LOCALAPPDATA\devcoach\uninstall.ps1"
+$u = "$env:LOCALAPPDATA\devcoach\uninstall.ps1"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File $u
 ```
 
 It runs `devcoach uninstall --all` (devcoach out of every agent), then removes the runtime, the PATH
@@ -256,7 +278,7 @@ might come back).
 | What you see | What to do |
 |---|---|
 | `… is in use - close Claude Code / Claude Desktop (they run devcoach) and re-run.` | An agent is running devcoach and holds `node.exe`. Close them, run the line again |
-| `the release at … has no standalone zip (the first release with one is 2.8.0)` | That release predates Windows support: see [Before 2.8.0](#you-need), or ask for 2.8.0 or newer with the version option ([Options](#options)) |
+| `the release at … has no standalone zip (the first release with one is 2.8.0)` | That release predates Windows support: ask for 2.8.0 or newer with the version option ([Options](#options)) |
 | `node.exe's Authenticode signature is …` | The downloaded Node is not signed as expected, so the install stops. The signature option in [Options](#options) overrides it |
 | `devcoach install exited with …` | Open a new terminal and run `devcoach install` |
 | `devcoach` not found in a terminal you had open | Open a new one: the PATH change reaches new processes only |
@@ -269,9 +291,8 @@ Anything else: [Troubleshooting](../troubleshooting.md).
 ## npm instead
 
 `npm install -g devcoach`, then `devcoach install`: it registers `node.exe` and devcoach's script,
-never the `.cmd` shim, which cannot start without a shell. Under nvm-windows, fnm or Volta, devcoach
-lives in one Node version's folder: run `devcoach install --force` after switching
-([more](./npx.md)).
+never the `.cmd` shim, which cannot start without a shell. With nvm-windows or fnm, read
+[Node version managers](./npx.md#node-version-managers) first.
 
 The [Claude Code plugin](./claude-code-plugin.md) needs Node 24 or newer on the PATH Claude Code uses
 (`winget install OpenJS.NodeJS.LTS`); the [Claude Desktop extension](./claude-desktop.md) runs on
