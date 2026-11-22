@@ -8,6 +8,7 @@ keywords: [why devcoach, AI and developer skills, skill erosion, validating AI c
 
 import { Card, Cards } from "@site/src/components/Cards";
 import ValidationGap from "@site/src/components/ValidationGap";
+import TwoSpeeds from "@site/src/components/TwoSpeeds";
 
 **In short**
 
@@ -74,6 +75,32 @@ The expertise we stop maintaining is exactly the safety net that catches what th
 makes AI-assisted development safe is a human who still understands the fundamentals well enough to
 review, push back, and override. Keeping that human sharp is the control that makes delegation
 trustworthy in the first place.
+
+## Fast judgment runs on slow thinking
+
+The psychologist Daniel Kahneman describes two ways we think, in
+[*Thinking, Fast and Slow*](https://en.wikipedia.org/wiki/Thinking,_Fast_and_Slow). **Fast thinking** is
+automatic and takes almost no effort: you glance at a diff and something looks off. **Slow thinking** is
+deliberate and takes effort: you trace the code path, hold the edge cases in your head and work out why.
+He calls the two ["fictitious characters"](https://www.apa.org/monitor/2012/02/conclusions): a way to
+talk about how the mind works.
+
+<TwoSpeeds />
+
+The two are linked. Fast judgment in a field is what long, effortful practice leaves behind. Kahneman
+and Gary Klein, who studied expert intuition from opposite sides,
+[agreed on when a gut feeling deserves trust](https://pubmed.ncbi.nlm.nih.gov/19739881/): when the field
+is regular enough to learn from, and when you have had the chance to learn it. They also concluded that
+how sure a judgment feels says little about how accurate it is.
+
+An agent changes who does which part. It does the slow work: it reads the code, weighs the options and
+finds the bug. You keep the fast part: a look at the diff, then "approve". Nothing warns you when this
+starts to cost you. The review can feel as sure as ever while the practice that trained it now happens
+somewhere else.
+
+devcoach hands a little of the slow part back. When [a lesson](./usage/coaching.md#your-first-lesson)
+is due, it asks for a short stretch of slow thinking on something the task just touched: why it is
+right, how it goes wrong, and, with the question at the end, whether you followed.
 
 ## You can't cram competence
 
