@@ -322,6 +322,15 @@ choices and typed ones as text, keeps code in the seed's language (only JS-famil
 runner; the rest get simulations / predict-the-output / spot-the-bug), and **both hooks pause
 lesson cues while a course is active** (`db.hasActiveCourse`, no counter bump). `/devcoach:course`
 is the plugin command.
+**The docs home runs the demo course** (`website/src/components/Tour`, the Courses tab): the
+`devcoach-demo-course` plugin in `website/docusaurus.config.ts` reads the screenshot fixture's course
+out of `scripts/screenshots/fixture.zip` (`website/src/lib/zipEntry.ts`, Node built-ins) and emits
+it at `/demo/course.html`, prepared the way the dashboard serves one: `highlighterBlock()` from
+`src/core/highlighter.ts` and `assets/static/course-frame.js` appended, the file itself untouched;
+the dashboard's CSP header travels as a `<meta>` (GitHub Pages sends none of ours) and the frame is
+`sandbox="allow-scripts allow-forms"`. The Tour is the docs-side twin of `course-viewer.js` (same
+`devcoach:course` / `devcoach:theme` messages), so a change to that protocol, to the bridge or to
+the highlighter block changes the docs site too.
 
 ## Rate-limit logic (`core/coach.ts`)
 

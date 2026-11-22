@@ -1,0 +1,358 @@
+/* Tabs on the left, one screen on the right; under 997px (Docusaurus' desktop breakpoint) the
+   tabs become a 2 × 2 grid above it. Colours come from Infima and the site's tokens
+   (src/css/custom.css); the terminal uses --dc-term-*, dark in both themes. */
+.tour {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1.25rem;
+  align-items: start;
+  margin: 1rem 0 3rem;
+}
+@media (min-width: 997px) {
+  .tour {
+    grid-template-columns: minmax(0, 16rem) minmax(0, 1fr);
+    gap: 2rem;
+  }
+}
+
+.tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+@media (min-width: 997px) {
+  .tabs {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.tab {
+  display: grid;
+  gap: 0.15rem;
+  padding: 0.7rem 0.9rem;
+  border: 1px solid transparent;
+  border-radius: var(--dc-radius);
+  background: none;
+  color: var(--dc-text-muted);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.tab b {
+  color: var(--ifm-font-color-base);
+  font-weight: 700;
+}
+.tab span {
+  display: none;
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+@media (min-width: 997px) {
+  .tab span {
+    display: block;
+  }
+}
+.tab:hover {
+  border-color: var(--dc-border);
+}
+.tab[aria-selected="true"] {
+  border-color: var(--devcoach-accent);
+  background: var(--ifm-background-surface-color);
+}
+.tab:focus-visible,
+.hosts button:focus-visible,
+.steps button:focus-visible,
+.termCode:focus-visible,
+.appCode:focus-visible {
+  outline: 2px solid var(--devcoach-accent);
+  outline-offset: 2px;
+}
+
+.panels {
+  min-width: 0;
+}
+
+/* One frame for every screen: a thin bar that names what you are looking at, then the screen. */
+.frame {
+  border: 1px solid var(--dc-border);
+  border-radius: var(--dc-radius);
+  background: var(--ifm-background-surface-color);
+  overflow: hidden;
+}
+.bar {
+  padding: 0.45rem 0.9rem;
+  border-bottom: 1px solid var(--dc-border);
+  color: var(--dc-text-muted);
+  font-family: var(--ifm-font-family-monospace);
+  font-size: 0.72rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* No `display`: ThemedImage shows one of the pair by display (see ThemedShot's stylesheet).
+   A window onto the capture, at most 16:10: a tall page shows its top, a wide one (the lessons
+   table) shows whole. The 16:10 box holds the place until the image loads. */
+.capture {
+  container-type: inline-size;
+}
+.shot {
+  width: 100%;
+  vertical-align: top;
+  aspect-ratio: auto 16 / 10;
+  max-height: 62.5cqw;
+  object-fit: cover;
+  object-position: top left;
+}
+/* A desktop capture on a phone: show its top-left corner larger rather than all of it tiny. */
+@media (max-width: 600px) {
+  .shot {
+    aspect-ratio: 1 / 1;
+    max-height: none;
+  }
+}
+
+.caption {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem 1.5rem;
+  margin: 0.8rem 0 0;
+  font-size: 0.92rem;
+  color: var(--ifm-color-emphasis-800);
+}
+.caption > span:first-child {
+  flex: 1 1 22rem;
+  min-width: 0;
+}
+.captionActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 1rem;
+}
+.note {
+  margin: 0.5rem 0 0;
+  font-size: 0.85rem;
+  color: var(--dc-warn);
+}
+
+/* In your agent: the two hosts. */
+.hosts {
+  display: inline-flex;
+  margin-bottom: 0.6rem;
+  border: 1px solid var(--dc-border);
+  border-radius: 999px;
+}
+/* The outer corners on the buttons, not overflow: hidden on the group, which clipped the focus ring. */
+.hosts button:first-child {
+  border-radius: 999px 0 0 999px;
+}
+.hosts button:last-child {
+  border-radius: 0 999px 999px 0;
+}
+.hosts button {
+  padding: 0.3rem 0.9rem;
+  border: 0;
+  background: none;
+  color: var(--dc-text-muted);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.hosts button[aria-pressed="true"] {
+  background: var(--ifm-color-primary);
+  color: var(--dc-on-primary);
+}
+
+.term {
+  border-color: var(--dc-term-line);
+  background: var(--dc-term-bg);
+  color: var(--dc-term-fg);
+}
+.term .bar {
+  border-color: var(--dc-term-line);
+  background: var(--dc-term-bar);
+  color: var(--dc-term-dim);
+}
+.termBody {
+  padding: 1rem 1.2rem 1.1rem;
+  font-family: var(--ifm-font-family-monospace);
+  font-size: 0.8rem;
+  line-height: 1.6;
+}
+.termBody p {
+  margin: 0 0 0.5rem;
+}
+.termBody strong {
+  color: var(--dc-term-strong);
+}
+.termReply {
+  color: var(--dc-term-fg);
+}
+.termDot {
+  color: var(--dc-term-ok);
+}
+/* The card: a faint teal rule on its left, as in the hero's demo. */
+.termCard {
+  margin: 0.9rem 0;
+  padding-left: 0.9rem;
+  border-left: 2px solid var(--dc-term-rule);
+}
+.termCard p:last-child {
+  margin-bottom: 0;
+}
+.termBand {
+  color: var(--dc-term-accent);
+  font-weight: 600;
+}
+.termCode {
+  margin: 0 0 0.5rem;
+  padding: 0.6rem 0.8rem;
+  border-radius: 8px;
+  background: var(--dc-term-code-bg);
+  color: var(--dc-term-code);
+  font-size: inherit;
+  line-height: 1.55;
+  overflow-x: auto;
+}
+.termAsk {
+  color: var(--dc-term-dim);
+}
+.termPrompt {
+  color: var(--dc-term-strong);
+}
+.termPrompt span {
+  color: var(--dc-term-dim);
+}
+.termBody .termPrompt {
+  margin: 0;
+}
+
+/* The desktop app renders the same markdown as rich text, in the site's theme. */
+.appBody {
+  padding: 1.1rem 1.4rem 0.4rem;
+  font-size: 0.92rem;
+  line-height: 1.6;
+}
+.appBody p {
+  margin: 0 0 0.7rem;
+}
+.appReply {
+  color: var(--ifm-color-emphasis-700);
+}
+/* A paragraph like the rest of the card (no heading: the rules are a drawing, not an outline). */
+.appBody .appBand {
+  margin: 1rem 0 0.6rem;
+  font-size: 1.02rem;
+  font-weight: 700;
+  line-height: 1.3;
+  /* The card's rules are one line of text: let a narrow window cut them rather than wrap them. */
+  white-space: nowrap;
+  overflow: hidden;
+}
+.appCode {
+  margin: 0 0 0.7rem;
+  padding: 0.7rem 0.9rem;
+  border-radius: 8px;
+  background: var(--ifm-color-emphasis-100);
+  font-size: 0.8rem;
+  line-height: 1.55;
+  overflow-x: auto;
+}
+.appInput {
+  margin: 0.4rem 1.2rem 1.2rem;
+  padding: 0.6rem 0.9rem;
+  border: 1px solid var(--dc-border);
+  border-radius: var(--dc-radius);
+  background: var(--ifm-background-color);
+  font-size: 0.92rem;
+}
+
+/* The running course: its steps beside the document, as on the dashboard's course page. The
+   canvas is the dashboard's, which the embedded document expects behind it. */
+.course {
+  background: var(--dc-course-canvas);
+}
+.courseGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.75rem;
+  padding: 0.9rem;
+}
+@media (min-width: 720px) {
+  .courseGrid {
+    grid-template-columns: minmax(0, 12.5rem) minmax(0, 1fr);
+    gap: 1.25rem;
+    align-items: start;
+  }
+}
+/* A row that scrolls sideways on a phone: padded so a focused step's ring is not clipped. */
+.steps {
+  display: flex;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  overflow-x: auto;
+}
+@media (min-width: 720px) {
+  .steps {
+    display: grid;
+    padding: 0;
+    position: sticky;
+    top: calc(var(--ifm-navbar-height) + 1rem);
+  }
+}
+.steps li {
+  flex: none;
+  margin: 0;
+}
+.steps button {
+  display: grid;
+  gap: 0.1rem;
+  width: 100%;
+  padding: 0.45rem 0.65rem;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--ifm-color-emphasis-800);
+  font: inherit;
+  font-size: 0.85rem;
+  line-height: 1.35;
+  text-align: left;
+  cursor: pointer;
+}
+.steps button b {
+  font-weight: 600;
+}
+.steps button span {
+  font-family: var(--ifm-font-family-monospace);
+  font-size: 0.7rem;
+  color: var(--dc-text-muted);
+}
+.steps button:hover {
+  background: var(--ifm-color-emphasis-200);
+}
+.steps button[aria-current="step"] {
+  background: color-mix(in srgb, var(--devcoach-accent) 16%, transparent);
+  color: var(--ifm-font-color-base);
+}
+/* Until the document answers, a line on the empty frame says it is coming. */
+.docArea {
+  position: relative;
+  min-width: 0;
+}
+.loading {
+  position: absolute;
+  top: 1rem;
+  left: 1rem;
+  margin: 0;
+  color: var(--dc-text-muted);
+  font-size: 0.9rem;
+}
+.doc {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  border: 0;
+}

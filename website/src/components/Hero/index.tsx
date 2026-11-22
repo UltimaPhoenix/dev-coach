@@ -89,7 +89,7 @@ export default function Hero(): ReactNode {
       </div>
       <div className={styles.demo}>
         <LessonLoop />
-        <a className={styles.demoLink} href="#what-happens">
+        <a className={styles.demoLink} href="#see-it">
           Read a full lesson card ↓
         </a>
       </div>
@@ -130,5 +130,29 @@ export function Steps(): ReactNode {
         </li>
       ))}
     </ol>
+  );
+}
+
+/** The home's last word: what stays on your machine first, then why devcoach exists. */
+export function Closing(): ReactNode {
+  return (
+    <section className={`${styles.closing} dc-wide`}>
+      <div>
+        <h2 className={styles.closingTitle}>Private by design</h2>
+        <p>
+          Everything stays on your machine, in one SQLite file. No account, no telemetry, no calls home. The
+          default setup reads file and activity metadata only, never your prompts.
+        </p>
+        <Link to="/reference/privacy">Privacy &amp; security →</Link>
+      </div>
+      <div>
+        <h2 className={styles.closingTitle}>Why it exists</h2>
+        <p>
+          AI agents write more of your code every month. The skill that stays scarce is telling when they are
+          wrong, and it only survives if you keep learning.
+        </p>
+        <Link to="/why">Why devcoach exists →</Link>
+      </div>
+    </section>
   );
 }

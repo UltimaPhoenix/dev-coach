@@ -23,7 +23,7 @@
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--ifm-color-emphasis-600);
+  color: var(--dc-text-muted);
   text-wrap: balance;
 }
 .title {
@@ -35,7 +35,7 @@
   text-wrap: balance;
 }
 .accent {
-  color: var(--devcoach-accent);
+  color: var(--devcoach-accent); /* display type: 36px and up, 3.7:1 on white is enough */
 }
 .lead {
   margin: 1.1rem 0 1.4rem;
@@ -79,7 +79,7 @@
 .facts li {
   margin: 0;
   padding: 0.2rem 0.7rem;
-  border: 1px solid var(--ifm-color-emphasis-300);
+  border: 1px solid var(--dc-border);
   border-radius: 999px;
   font-size: 0.8rem;
   color: var(--ifm-color-emphasis-800);
@@ -113,8 +113,8 @@
   gap: 0.8rem;
   margin: 0;
   padding: 1rem 1.1rem;
-  border: 1px solid var(--ifm-color-emphasis-200);
-  border-radius: 12px;
+  border: 1px solid var(--dc-border);
+  border-radius: var(--dc-radius);
   background: var(--ifm-background-surface-color);
 }
 .stepN {
@@ -124,7 +124,7 @@
   height: 1.8rem;
   border-radius: 50%;
   border: 1px solid var(--devcoach-accent);
-  color: var(--devcoach-accent);
+  color: var(--dc-accent-text);
   font-weight: 700;
   font-size: 0.85rem;
 }
@@ -135,5 +135,28 @@
 .stepBody {
   margin: 0;
   font-size: 0.9rem;
+  color: var(--ifm-color-emphasis-800);
+}
+
+/* Closing band: privacy first, then the why. Two columns, one under 768px. */
+.closing {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1.5rem 3rem;
+  margin: 0 0 1rem;
+  padding: 2rem 0 0;
+  border-top: 1px solid var(--ifm-color-emphasis-200);
+}
+@media (min-width: 768px) {
+  .closing {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+.closingTitle {
+  margin: 0 0 0.4rem;
+  font-size: 1.25rem;
+}
+.closing p {
+  margin: 0 0 0.5rem;
   color: var(--ifm-color-emphasis-800);
 }

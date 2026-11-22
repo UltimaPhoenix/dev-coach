@@ -1,7 +1,21 @@
 /* Global styles. Infima is bundled by the classic theme. devcoach brand = the dashboard's teal
    (assets/static/style.css --dc-accent-*) on its IDE-grey dark ramp. Primary = the dashboard's
    link colour per theme (accent-600 light, accent-300 dark): both clear WCAG AA as text and as a
-   button fill. */
+   button fill.
+
+   The site's own tokens (--dc-*) are the only colours a component should name besides Infima's
+   emphasis ramp for borders and body text. src/css/tokens.test.ts reads the hex values below and
+   holds WCAG AA for every pair the components use, in both themes: change a value here and the
+   test says whether it still reads. In short:
+   - Text in the brand teal, at any size under 24px: --dc-accent-text. --devcoach-accent is for
+     fills, borders, focus rings and display type (24px and up) only: in light it is 3.7:1 on
+     white, under the 4.5:1 small text needs.
+   - Secondary text (labels, eyebrows, the kind of a step): --dc-text-muted, never emphasis-600,
+     which is 3.1:1 on white.
+   - Text on a primary fill (a pressed button, the picked choice): --dc-on-primary.
+   - A terminal, dark in both themes: --dc-term-*. Status colours: --dc-ok / -warn / -danger,
+     with a matching -soft background.
+   - Frames: --dc-border and --dc-radius. Text only screen readers get: class="dc-sr-only". */
 
 :root {
   --ifm-color-primary: #0f766e;
@@ -16,8 +30,46 @@
   --ifm-code-font-size: 95%;
   --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.1);
 
-  /* Brand accent: the teal of "coach" in the social card. Darker on light backgrounds for contrast. */
+  /* The page and a card on it. Light: Infima's own values (a transparent page over the white
+     canvas, a white surface), written out so the contrast test can read them. */
+  --dc-page-bg: #ffffff;
+  --dc-surface: #ffffff;
+  --ifm-background-surface-color: var(--dc-surface);
+
+  /* Brand accent: the teal of "coach" in the social card. Fills, borders, focus rings and display
+     type only (3.7:1 on white); text uses --dc-accent-text. */
   --devcoach-accent: #0d9488;
+  --dc-accent-text: #0f766e;
+  --dc-text-muted: #606770;
+  --dc-on-primary: #ffffff;
+
+  /* Status text, and the soft background it sits on in a chip or a box. */
+  --dc-ok: #15803d;
+  --dc-ok-soft: #f0fdf4;
+  --dc-warn: #a16207;
+  --dc-warn-soft: #fefce8;
+  --dc-danger: #b91c1c;
+  --dc-danger-soft: #fef2f2;
+
+  /* The canvas a course document expects behind it (the dashboard's page colour). */
+  --dc-course-canvas: #f9fafb;
+
+  /* A terminal looks like a terminal in both themes: the dashboard's IDE ramp, its teal. */
+  --dc-term-bg: #1e1f22;
+  --dc-term-bar: #2b2d30;
+  --dc-term-line: #393b40;
+  --dc-term-fg: #c9ced3;
+  --dc-term-strong: #ffffff;
+  --dc-term-dim: #9da0a8;
+  --dc-term-accent: #5eead4;
+  --dc-term-ok: #7ee2a8;
+  --dc-term-code-bg: #17181b;
+  --dc-term-code: #9cdcfe;
+  --dc-term-rule: rgba(94, 234, 212, 0.35);
+
+  /* Frames: cards, chats, captures, trees. */
+  --dc-border: var(--ifm-color-emphasis-300);
+  --dc-radius: 12px;
 }
 
 .footer--dark {
@@ -35,18 +87,46 @@ html[data-theme="dark"] {
   --ifm-color-primary-lightest: #b5f5eb;
   --ifm-color-primary-contrast-background: #1d3331;
   --ifm-color-primary-contrast-foreground: #ccfbf1;
-  --ifm-background-color: #1e1f22;
-  --ifm-background-surface-color: #2b2d30;
+  --dc-page-bg: #1e1f22;
+  --dc-surface: #2b2d30;
+  --ifm-background-color: var(--dc-page-bg);
+  --ifm-background-surface-color: var(--dc-surface);
   --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.3);
 
   /* Bright teal reads better on the dark navbar — matches the social card exactly. */
   --devcoach-accent: #5eead4;
+  --dc-accent-text: #5eead4;
+  --dc-text-muted: #ccd0d5;
+  --dc-on-primary: #1e1f22;
+
+  --dc-ok: #86efac;
+  --dc-ok-soft: color-mix(in srgb, var(--dc-ok) 12%, var(--dc-surface));
+  --dc-warn: #fde047;
+  --dc-warn-soft: color-mix(in srgb, var(--dc-warn) 12%, var(--dc-surface));
+  --dc-danger: #fca5a5;
+  --dc-danger-soft: color-mix(in srgb, var(--dc-danger) 12%, var(--dc-surface));
+
+  --dc-course-canvas: #1e1f22;
+}
+
+/* Text for screen readers only (one definition for every component). */
+.dc-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 /*
- * Brand wordmark: "dev" in the theme foreground, "coach" in the teal accent — the
- * social-card treatment. The real "devcoach" title text is kept in the DOM (font-size:0)
- * for the link's accessible name; the two-tone version is drawn with ::before/::after.
+ * Brand wordmark: "dev" in the theme foreground, "coach" in the teal. The real "devcoach" title
+ * text stays in the DOM (font-size: 0) and is the link's whole accessible name: the two-tone copy
+ * drawn with ::before/::after has an empty alternative (`/ ""`; the line before it is the fallback
+ * for engines without that syntax), and the logo's alt is empty (docusaurus.config.ts).
  */
 .navbar__title {
   font-size: 0;
@@ -61,16 +141,19 @@ html[data-theme="dark"] {
 }
 .navbar__title::before {
   content: "dev";
+  content: "dev" / "";
   color: var(--ifm-navbar-link-color);
 }
 .navbar__title::after {
   content: "coach";
-  color: var(--devcoach-accent);
+  content: "coach" / "";
+  color: var(--dc-accent-text);
 }
 
-/* Docs home = the landing page: no breadcrumbs, and the prose under the hero keeps a readable
+/* Docs home = the landing page: no breadcrumbs, no "Edit this page" row, and the prose under the hero keeps a readable
    measure while the hero and the steps (.dc-wide) use the full width. */
-.docs-doc-id-index .theme-doc-breadcrumbs {
+.docs-doc-id-index .theme-doc-breadcrumbs,
+.docs-doc-id-index .theme-doc-footer {
   display: none;
 }
 .docs-doc-id-index .theme-doc-markdown > :not(.dc-wide) {
@@ -83,5 +166,168 @@ html[data-theme="dark"] {
   letter-spacing: -0.02em;
 }
 .devcoach-wm > span {
-  color: var(--devcoach-accent);
+  color: var(--dc-accent-text);
+}
+
+/*
+ * Mermaid diagrams in the site's look, in both themes, for every diagram on every page: nodes on
+ * the surface colour with a thin border, subgraphs as a faint panel with a readable title, edges
+ * and arrowheads in one mid grey (#8d949e: 3.3:1 on white, 5.6:1 on #1e1f22), edge labels on the
+ * page colour, the site's font (themeConfig.mermaid.options, so Mermaid measures with it). The
+ * accent marks only what a diagram calls primary: `A:::primary` or `class A primary`.
+ *
+ * Mermaid scopes its own styles under the SVG's id (#mermaid-svg-123 .node rect): the
+ * `:is(…, #dc-mermaid)` below gives these rules an id's weight without needing that id (#dc-mermaid
+ * never matches). They stay below an author's own `style` / `classDef`, which Mermaid inlines or
+ * marks !important. Only Mermaid's own !important rules (ER markers) are answered with one.
+ */
+.docusaurus-mermaid-container {
+  --dm-page: var(--ifm-background-surface-color);
+  --dm-node: var(--ifm-background-surface-color);
+  --dm-border: color-mix(in srgb, var(--ifm-color-emphasis-500) 50%, var(--ifm-color-emphasis-600));
+  --dm-panel: color-mix(in srgb, var(--ifm-font-color-base) 4%, transparent);
+  --dm-panel-border: var(--ifm-color-emphasis-300);
+  --dm-note: color-mix(in srgb, var(--ifm-font-color-base) 5%, var(--dm-page)); /* opaque: lifelines pass behind */
+  --dm-zebra: color-mix(in srgb, var(--ifm-font-color-base) 4%, var(--dm-node));
+  --dm-text: var(--ifm-font-color-base);
+  --dm-muted: var(--ifm-color-emphasis-800);
+  --dm-line: #8d949e;
+  --dm-primary: color-mix(in srgb, var(--devcoach-accent) 14%, var(--dm-node));
+  margin-bottom: var(--ifm-leading);
+}
+html[data-theme="dark"] .docusaurus-mermaid-container {
+  --dm-page: var(--ifm-background-color);
+  --dm-border: var(--ifm-color-emphasis-300);
+  --dm-panel-border: var(--ifm-color-emphasis-200);
+  --dm-muted: var(--ifm-color-emphasis-700);
+}
+
+/* Text: one font, the page's colours. */
+:is(.docusaurus-mermaid-container, #dc-mermaid) svg {
+  font-family: var(--ifm-font-family-base);
+}
+:is(.docusaurus-mermaid-container, #dc-mermaid) svg :is(.label, .nodeLabel, .label span, span) {
+  color: var(--dm-text);
+}
+:is(.docusaurus-mermaid-container, #dc-mermaid) svg :is(.label text, text.actor > tspan, .labelText, .noteText, .noteText > tspan) {
+  fill: var(--dm-text);
+}
+
+/* Flowchart nodes (and ER entity outlines): surface fill, thin border. */
+:is(.docusaurus-mermaid-container, #dc-mermaid) svg .node :is(rect, circle, ellipse, polygon, path) {
+  fill: var(--dm-node);
+  stroke: var(--dm-border);
+  stroke-width: 1px;
+}
+:is(.docusaurus-mermaid-container, #dc-mermaid) svg .node path[fill="none"] {
+  fill: none;
+}
+:is(.docusaurus-mermaid-container, #dc-mermaid) svg .node path[stroke="none"] {
+  stroke: none;
+}
+/* What a diagram marks as primary: a teal-tinted node with an accent border. */
+:is(.docusaurus-mermaid-container, #dc-mermaid) svg .node.primary :is(rect, circle, ellipse, polygon, path:not([fill="none"])) {
+  fill: var(--dm-primary);
+}
+:is(.docusaurus-mermaid-container, #dc-mermaid) svg .node.primary :is(rect, circle, ellipse, polygon, path:not([stroke="none"])) {
+  stroke: var(--devcoach-accent);
+  stroke-width: 1.5px;
+}
+
+/* Subgraphs: a faint panel, a quiet border, a title that reads. */
+:is(.docusaurus-mermaid-container, #dc-mermaid) svg .cluster rect {
+  fill: var(--dm-panel);
+  stroke: var(--dm-panel-border);
+  stroke-width: 1px;
+  rx: 8px;
+  ry: 8px;
+}
+:is(.docusaurus-mermaid-container, #dc-mermaid) svg :is(.cluster-label span, .cluster span) {
+  color: var(--dm-muted);
+  font-size: 0.85em;
+  font-weight: 600;
+}
+:is(.docusaurus-mermaid-container, #dc-mermaid) svg :is(.cluster-label text, .cluster text) {
+  fill: var(--dm-muted);
+}
+
+/* Edges and arrowheads in one mid grey; their labels on the page colour, not grey stickers. */
+:is(.docusaurus-mermaid-container, #dc-mermaid) svg :is(.flowchart-link, .edgePath .path, .relationshipLine) {
+  stroke: var(--dm-line);
+}
+:is(.docusaurus-mermaid-container, #dc-mermaid) svg :is(.marker, .arrowheadPath, .arrowMarkerPath) {
+  fill: var(--dm-line);
+  stroke: var(--dm-line);
+}
+:is(.docusaurus-mermaid-container, #dc-mermaid) svg :is(.edgeLabel, .edgeLabel p, .labelBkg) {
+  background-color: var(--dm-page);
+  color: var(--dm-muted);
+}
+:is(.docusaurus-mermaid-container, #dc-mermaid) svg .edgeLabel rect {
+  fill: var(--dm-page);
+  opacity: 1;
+}
+:is(.docusaurus-mermaid-container, #dc-mermaid) svg :is(.edgeLabel .label text, .edgeLabel span) {
+  fill: var(--dm-muted);
+  color: var(--dm-muted);
+}
+
+/* Sequence diagrams: participants as nodes, lifelines and messages in the edge grey. */
+:is(.docusaurus-mermaid-container, #dc-mermaid) svg :is(rect.actor, .activation0, .activation1, .activation2) {
+  fill: var(--dm-node);
+  stroke: var(--dm-border);
+}
+:is(.docusaurus-mermaid-container, #dc-mermaid) svg .actor-line {
+  stroke: var(--dm-panel-border);
+}
+:is(.docusaurus-mermaid-container, #dc-mermaid) svg .actor-man :is(line, circle) {
+  fill: var(--dm-node);
+  stroke: var(--dm-muted);
+}
+:is(.docusaurus-mermaid-container, #dc-mermaid) svg :is(.messageLine0, .messageLine1) {
+  stroke: var(--dm-line);
+}
+:is(.docusaurus-mermaid-container, #dc-mermaid) svg [id$="-arrowhead"] path {
+  fill: var(--dm-line);
+  stroke: var(--dm-line);
+}
+:is(.docusaurus-mermaid-container, #dc-mermaid) svg :is(.messageText, .loopText, .loopText > tspan, .sectionTitle) {
+  fill: var(--dm-muted);
+}
+:is(.docusaurus-mermaid-container, #dc-mermaid) svg [id$="-sequencenumber"] {
+  fill: var(--dm-text);
+}
+:is(.docusaurus-mermaid-container, #dc-mermaid) svg .sequenceNumber {
+  fill: var(--dm-page);
+  font-family: var(--ifm-font-family-base);
+  font-weight: 700;
+}
+:is(.docusaurus-mermaid-container, #dc-mermaid) svg .note {
+  fill: var(--dm-note);
+  stroke: var(--dm-panel-border);
+}
+:is(.docusaurus-mermaid-container, #dc-mermaid) svg .labelBox {
+  fill: var(--dm-node);
+  stroke: var(--dm-border);
+}
+:is(.docusaurus-mermaid-container, #dc-mermaid) svg .loopLine {
+  stroke: var(--dm-border);
+  fill: none;
+}
+
+/* ER diagrams: entity rows as a light zebra, crow's feet in the edge grey. */
+:is(.docusaurus-mermaid-container, #dc-mermaid) svg .row-rect-odd path:not([fill="none"]) {
+  fill: var(--dm-node);
+}
+:is(.docusaurus-mermaid-container, #dc-mermaid) svg .row-rect-even path:not([fill="none"]) {
+  fill: var(--dm-zebra);
+}
+:is(.docusaurus-mermaid-container, #dc-mermaid) svg :is(.row-rect-odd, .row-rect-even, .divider) path[fill="none"] {
+  stroke: var(--dm-border);
+}
+:is(.docusaurus-mermaid-container, #dc-mermaid) svg .marker.er {
+  stroke: var(--dm-line) !important;
+}
+:is(.docusaurus-mermaid-container, #dc-mermaid) svg .marker.er circle {
+  fill: var(--dm-page);
 }

@@ -8,140 +8,32 @@ hide_table_of_contents: true
 displayed_sidebar: null
 ---
 
-import ThemedShot from "@site/src/components/ThemedShot";
-import Hero, { Steps } from "@site/src/components/Hero";
+import Hero, { Closing, Steps } from "@site/src/components/Hero";
+import Tour from "@site/src/components/Tour";
 
 <Hero />
 
 <Steps />
 
-## What happens
+## See it
 
-You work on a task with your AI agent as usual. When it finishes, devcoach appends a lesson. A
-rail runs down the whole of it, so it never blends into the agent's reply:
+Four screens of devcoach. The guides have the rest.
 
-> `🎓 devcoach` · typescript · mid
->
-> **Promise.allSettled vs Promise.all — don't let one failure sink the batch**
->
-> Promise.all rejects the moment any promise rejects, and you lose the results of the ones that
-> already succeeded. For independent work (fan-out fetches, batch writes) that's usually the wrong
-> default.
->
-> Promise.allSettled always resolves, giving you a status for every promise:
->
-> ```ts
-> const results = await Promise.allSettled(ids.map(fetchUser));
-> const ok = results.filter((r) => r.status === "fulfilled").map((r) => r.value);
-> ```
->
-> Use Promise.all when the tasks are genuinely all-or-nothing; reach for allSettled when partial
-> success is meaningful and you want to report failures.
->
-> 💡 **Senior tip:** for work that *should* cancel its siblings on failure, a shared
-> AbortController gives you all-or-nothing with prompt cancellation.
-
-Did that land? ✅ knew it (y) · 💡 understood (u) · ❌ couldn't follow (n)
-
-In Claude Code the same card shows a `▎` rail on every line, in italics; in Claude Desktop and
-claude.ai, a bar on the left as above. Your log keeps the lesson alone, without the quote.
-
----
-
-## Using devcoach
-
-### Onboarding in one pass
-
-The first time your agent connects, devcoach scans your **local Claude Code history** — every project you've worked in, file and activity metadata only — and builds your knowledge map (topics, confidence scores, groups) plus your coaching notebook **in one pass, with no questions**. You review the result afterwards, not before. Prefer more control? **Automatic (Deep)** is an opt-in tier that also reads your local session transcripts for a sharper profile; **Guided** walks through your stack in conversation; **Import backup** restores a previous profile.
-
-**[Onboarding, step by step →](./usage/coaching#onboarding)**
-
-### Feedback in one keystroke, coaching that stays quiet
-
-Under every lesson card: `Did that land? ✅ knew it (y) · 💡 understood (u) · ❌ couldn't follow (n)`. Reply `y` when you already knew it (confidence on that topic goes up, so the next lessons there go deeper), `u` when it was new and clear, `n` when it was too dense (it's kept as a seed for a step-by-step course) — or just keep working: no reply means no change. By default devcoach delivers **at most 2 lessons a day, at least 4 hours apart**, cues one only every ~10 interactions per chat session, and never during plan-mode turns.
-
-**[The feedback loop →](./usage/coaching#the-feedback-loop)**
-
-### Your knowledge map, in a dashboard
-
-`devcoach ui` opens a local dashboard: adjust confidence and groups inline, browse and filter your lesson history, tune the pacing and rate limits, back up or restore everything, and read your coaching notebook.
-
-<ThemedShot
-  alt="Knowledge map"
-  light={require("./screenshots/knowledge-map-light.png").default}
-  dark={require("./screenshots/knowledge-map-dark.png").default}
+<Tour
+  shots={{
+    lessons: {
+      light: require("./screenshots/lessons-light.png").default,
+      dark: require("./screenshots/lessons-dark.png").default,
+    },
+    map: {
+      light: require("./screenshots/knowledge-map-light.png").default,
+      dark: require("./screenshots/knowledge-map-dark.png").default,
+    },
+    course: {
+      light: require("./screenshots/course-cache-stampede-light.png").default,
+      dark: require("./screenshots/course-cache-stampede-dark.png").default,
+    },
+  }}
 />
 
-<ThemedShot
-  alt="Lessons"
-  light={require("./screenshots/lessons-light.png").default}
-  dark={require("./screenshots/lessons-dark.png").default}
-/>
-
-Terminal person? The same data is one command away: `devcoach stats`, `devcoach lessons --period week`, `devcoach backup`.
-
-**[Web dashboard →](./usage/web-ui)** · **[CLI reference →](./usage/cli)**
-
-### Share what landed
-
-A lesson that clicked for you is one click away from a teammate: as copyable text, a server-less
-link, or a `.devcoach.md` file — from the dashboard, the terminal or your agent. Imported lessons
-join the receiver's log as *shared by you* and never touch their daily limit.
-→ **[Sharing lessons](./usage/sharing)**
-
-### The coaching notebook
-
-Every lesson is tied to **where it happened** — project folder, repository, branch, commit — and your agent keeps a **coaching notebook** at `~/.devcoach/learning-state.md`: written at onboarding, refreshed every 10 lessons, and yours to annotate. Flag what didn't click or mark what has sunk in, and the next lessons follow your notes. It stays local and it's optional.
-
----
-
-## How to get started
-
-1. **[Install](./install)** — choose your method (Homebrew, Windows one-liner or Scoop, Claude Code plugin, npx, or Claude Desktop)
-2. **[Let onboarding build your profile](./usage/coaching.md)** — one pass, no questions
-3. **Start working** — coaching happens automatically
-
-Everything's local. No data leaves your machine. One SQLite file.
-
----
-
-## Why devcoach exists
-
-AI agents now write much of our code. Velocity is up. So is a quieter cost: when the machine does the thinking, it's easy to accept the result and learn nothing from it.
-
-Competence is built slowly. You can't cram it on demand. The moment you need it most — a correctness bug the model missed, a 2 a.m. outage, an architectural call the AI got wrong — the depth either exists or it doesn't.
-
-devcoach's bet is simple: a few minutes of genuine learning, delivered in context and spaced across the work you already do, compounds. It's learning on the job, automated.
-
-**[Read the full story →](./why)**
-
----
-
-## Privacy by design
-
-Everything stays on your machine. No telemetry, no accounts, no calls home. Just one SQLite file.
-
-**[Privacy & security →](./reference/privacy)**
-
----
-
-## Roadmap & community
-
-- **[Vision & roadmap](./vision)** — free, local, not commercialized; ideas we're exploring next
-- **[GitHub Issues](https://github.com/UltimaPhoenix/dev-coach/issues)** — feature requests, feedback and questions: open an issue
-- **[Star on GitHub](https://github.com/UltimaPhoenix/dev-coach)** ⭐
-
----
-
-## All guides
-
-- **[Coaching in your agent](./usage/coaching)** — onboarding, your first lesson and the feedback loop
-- **[Sharing lessons](./usage/sharing)** — hand a lesson to a teammate as text, link or file
-- **[Web dashboard](./usage/web-ui)** — manage your knowledge map
-- **[CLI reference](./usage/cli)** — all commands
-- **[Installation](./install)** — every install method, agent by agent
-- **[How it works](./how-it-works)** — the coaching loop and decision flow
-- **[MCP server reference](./reference/mcp-server)** — all tools and resources
-- **[Configuration](./reference/configuration)** — rate limits, pacing, data location
-- **[License & commercial use](./reference/license)** — free & open source (AGPL-3.0); what that means for closed-source use
-- **[Contributing](https://github.com/UltimaPhoenix/dev-coach/blob/main/CONTRIBUTING.md)** — fork, develop, submit a PR
+<Closing />

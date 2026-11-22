@@ -2,9 +2,14 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import type * as Preset from "@docusaurus/preset-classic";
 import type { Config } from "@docusaurus/types";
-import { themes as prismThemes } from "prism-react-renderer";
+import type { Compiler, Configuration } from "webpack";
+import { darkCodeTheme, lightCodeTheme } from "./src/lib/codeThemes.ts";
+import { type DemoCourse, loadDemoCourse } from "./src/lib/demoCourse.ts";
 
 // Runs in Node.js — no client-side code here.
+
+/** The demo course's step list, as the tour reads it from the plugin's global data. */
+export type { DemoCourse };
 
 const SITE_URL = "https://ultimaphoenix.github.io/dev-coach/";
 // DOCS_NEXT=1 builds the same tree for the unreleased `develop` branch; .github/workflows/docs.yml
@@ -74,6 +79,69 @@ function llmsFullTxtPlugin() {
   };
 }
 
+// Inline plugin (zero-dep): keep Mermaid's parser off the pages that have no diagram. Docusaurus
+// puts every module shared by half the pages' chunks into one `common` chunk that every page
+// loads. Mermaid's diagram chunks all share @mermaid-js/parser (Langium + Chevrotain grammars for
+// pie, git graph, architecture…), so that chunk was 650 KB of parser next to 2 KB of MDX runtime,
+// on every page. Mermaid's own modules now stay out of `common`: they load with a diagram, only
+// on the pages that draw one, and the flowcharts the docs draw do not use that parser at all.
+const MERMAID_ONLY = /[\\/]node_modules[\\/](?:mermaid|@mermaid-js|langium|chevrotain[\w-]*|@chevrotain|vscode-[\w-]+|lodash-es)[\\/]/;
+
+function lazyMermaidPlugin() {
+  return {
+    name: "devcoach-lazy-mermaid",
+    configureWebpack(config: Configuration, isServer: boolean) {
+      const groups = config.optimization?.splitChunks ? config.optimization.splitChunks.cacheGroups : undefined;
+      const common = groups?.common;
+      if (isServer || !common || typeof common !== "object" || common instanceof RegExp) return {};
+      if (common.test !== undefined) throw new Error("devcoach-lazy-mermaid: Docusaurus' common chunk has a test now");
+      common.test = (module: { nameForCondition?: () => string | null | undefined }) =>
+        !MERMAID_ONLY.test(module.nameForCondition?.() ?? "");
+      return {};
+    },
+  };
+}
+
+// Inline plugin (zero-dep): the home page's tour can run a real course. This emits the demo course
+// of the screenshot fixture as its own file, /demo/course.html, which a sandboxed frame loads on
+// demand (website/src/components/Tour). The document is prepared the way the dashboard serves
+// one (src/web/app.ts): highlighted on the way out, then the frame bridge; the fixture is not
+// modified. GitHub Pages sends no headers of ours, so the policy the dashboard sends as a header
+// travels as a <meta> instead. A <meta> policy cannot carry `sandbox` or `frame-ancestors`: the
+// frame's own sandbox attribute confines the framed document, but opened on its own (by its URL)
+// it is not sandboxed as the dashboard's copy is. Nothing on the site links to it: the tour's
+// step list is made of buttons that move the frame.
+function demoCoursePlugin(context: { siteDir: string }) {
+  const name = "devcoach-demo-course";
+  const demo = loadDemoCourse(path.join(context.siteDir, ".."));
+  return {
+    name,
+    async contentLoaded({ actions }: { actions: { setGlobalData(data: DemoCourse): void } }) {
+      actions.setGlobalData(demo.data);
+    },
+    // An emitted asset rather than a file under static/: nothing generated lands in the source
+    // tree, and `docusaurus start` serves it too.
+    configureWebpack(_config: unknown, isServer: boolean) {
+      if (isServer) return {};
+      return {
+        plugins: [
+          {
+            apply(compiler: Compiler) {
+              const { Compilation, sources } = compiler.webpack;
+              compiler.hooks.thisCompilation.tap(name, (compilation) => {
+                compilation.hooks.processAssets.tap(
+                  { name, stage: Compilation.PROCESS_ASSETS_STAGE_ADDITIONAL },
+                  () => compilation.emitAsset(demo.data.file, new sources.RawSource(demo.html)),
+                );
+              });
+            },
+          },
+        ],
+      };
+    },
+  };
+}
+
 const config: Config = {
   title: "devcoach",
   tagline: "One short lesson on what you don't know yet, drawn from a task your AI agent just finished",
@@ -116,7 +184,7 @@ const config: Config = {
     ],
   ],
 
-  plugins: [llmsFullTxtPlugin],
+  plugins: [llmsFullTxtPlugin, demoCoursePlugin, lazyMermaidPlugin],
 
   // Site-wide JSON-LD so search & answer engines model devcoach as a free developer tool
   // (released docs only — the /next/ copy must not duplicate the @ids).
@@ -191,11 +259,20 @@ const config: Config = {
       { name: "twitter:card", content: "summary_large_image" },
     ],
     colorMode: { defaultMode: "dark", respectPrefersColorScheme: true },
-    // Cleaner mermaid presets (closer to the old Material look) instead of the harsh default.
-    mermaid: { theme: { light: "neutral", dark: "dark" } },
+    // Cleaner mermaid presets (closer to the old Material look) instead of the harsh default; the
+    // colours are restyled in src/css/custom.css. The font is set here, not in CSS: Mermaid sizes
+    // every box to its text, so it has to measure with the font the page shows (Infima's base).
+    mermaid: {
+      theme: { light: "neutral", dark: "dark" },
+      options: {
+        fontFamily:
+          'system-ui, -apple-system, "Segoe UI", Roboto, Ubuntu, Cantarell, "Noto Sans", sans-serif, BlinkMacSystemFont, Helvetica, Arial',
+      },
+    },
     navbar: {
       title: "devcoach",
-      logo: { alt: "devcoach", src: "img/favicon.svg" },
+      // The title next to it is the link's name: the logo is decoration (alt="").
+      logo: { alt: "", src: "img/favicon.svg" },
       items: [
         // The home page has no sidebar (it's the landing page), so the way into the docs is here.
         { to: "/usage/coaching", label: "Docs", position: "left", activeBaseRegex: "/(usage|reference|how-it-works|faq)" },
@@ -210,30 +287,57 @@ const config: Config = {
     },
     footer: {
       style: "dark",
+      // The home page has no sidebar, so the footer is the site's map: every guide, four columns.
       links: [
         {
-          title: "Docs",
+          title: "Use it",
           items: [
             { label: "Coaching in your agent", to: "/usage/coaching" },
+            { label: "Courses", to: "/usage/courses" },
+            { label: "Sharing lessons", to: "/usage/sharing" },
             { label: "Web dashboard", to: "/usage/web-ui" },
-            { label: "Installation", to: "/install" },
-            { label: "MCP server", to: "/reference/mcp-server" },
+            { label: "Command line (CLI)", to: "/usage/cli" },
           ],
         },
         {
-          title: "More",
+          title: "Install",
           items: [
-            { label: "npm", href: "https://www.npmjs.com/package/devcoach" },
-            { label: "GitHub", href: "https://github.com/UltimaPhoenix/dev-coach" },
+            { label: "Choose your setup", to: "/install" },
+            { label: "Claude Code plugin", to: "/install/claude-code-plugin" },
+            { label: "Homebrew", to: "/install/homebrew" },
+            { label: "Windows", to: "/install/windows" },
+            { label: "Claude Desktop", to: "/install/claude-desktop" },
+          ],
+        },
+        {
+          title: "Reference",
+          items: [
+            { label: "How it works", to: "/how-it-works" },
+            { label: "Configuration", to: "/reference/configuration" },
+            { label: "MCP server", to: "/reference/mcp-server" },
+            { label: "Privacy & security", to: "/reference/privacy" },
+            { label: "Troubleshooting", to: "/troubleshooting" },
+            { label: "FAQ", to: "/faq" },
+          ],
+        },
+        {
+          title: "Project",
+          items: [
+            { label: "Why devcoach", to: "/why" },
+            { label: "Vision & roadmap", to: "/vision" },
             { label: "License", to: "/reference/license" },
+            { label: "GitHub", href: "https://github.com/UltimaPhoenix/dev-coach" },
+            { label: "Issues & feedback", href: "https://github.com/UltimaPhoenix/dev-coach/issues" },
+            { label: "npm", href: "https://www.npmjs.com/package/devcoach" },
           ],
         },
       ],
       copyright: `Copyright © ${new Date().getFullYear()} UltimaPhoenix · AGPL-3.0`,
     },
+    // prism-react-renderer's github / dracula, with the colours that fell under AA fixed.
     prism: {
-      theme: prismThemes.github,
-      darkTheme: prismThemes.dracula,
+      theme: lightCodeTheme,
+      darkTheme: darkCodeTheme,
       additionalLanguages: ["bash", "json", "powershell", "sql"],
     },
   } satisfies Preset.ThemeConfig,
