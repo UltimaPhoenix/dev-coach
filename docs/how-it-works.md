@@ -169,8 +169,8 @@ The code in each box is how that check's line starts in `~/.devcoach/hook.log`, 
 writes to when `DEVCOACH_HOOK_DEBUG=1` is set in your agent's environment. A full line reads, for
 example, `rate limited: Too soon: last lesson 0m ago, minimum interval is 4h 0m (3h 59m remaining)`.
 Two lines can also come before check 1: `hook-forced continuation`, for the extra turn that a
-request from the stop hook starts (never counted), and `read-only: database newer than this build`,
-when a newer devcoach has upgraded your database. `devcoach doctor` shows the profile, count and
+request from the stop hook starts (never counted), and one starting `error: SchemaTooNewError:` when
+a newer devcoach has upgraded your database (the hooks then stay silent). `devcoach doctor` shows the profile, count and
 limit checks for your next turn under **Verdict**.
 
 :::
