@@ -129,7 +129,8 @@ export default function ValidationGap(): ReactNode {
       <Sketch layout={WIDE} className={styles.wide} />
       <Sketch layout={NARROW} className={styles.narrow} />
       <figcaption className={styles.caption}>
-        <strong>The validation gap.</strong> Conceptual sketch, not measured data.
+        <strong>The validation gap</strong>: the distance between what you ship and what you could check on your own.
+        Conceptual sketch, not measured data.
       </figcaption>
     </figure>
   );

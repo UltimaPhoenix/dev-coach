@@ -1,6 +1,6 @@
 ---
 title: Why devcoach
-description: Why devcoach exists — AI writes more of our code, so the scarce skill becomes validating what it produces. devcoach keeps you sharp with one short, in-context lesson at a time.
+description: AI writes more of our code, so the scarce skill is checking what it ships. devcoach keeps it alive with short lessons on your own work.
 keywords: [why devcoach, AI and developer skills, skill erosion, validating AI code, continuous learning for developers]
 ---
 
@@ -47,9 +47,6 @@ task touched and you don't know yet — pitched at your level, in the context wh
 It is learning on the job,
 automated: the lesson arrives at the exact moment the concept is concrete, then gets out of your way.
 
-That is the everyday value. But there is a larger reason the project exists, and it gets more important
-with every model release.
-
 ## We're learning differently now
 
 There is a behavioural shift underneath all of this. We used to learn a thing *before* we used it — skim
@@ -57,8 +54,8 @@ the docs, work an example, build the mental model first. Increasingly we don't: 
 do it, studying it up front feels like wasted effort. It is the same trade we made when search engines
 replaced the trip to the library — why hold in your head what you can look up on demand?
 
-And most days that is fine. You skip the deep dive, the task ships, the tests pass, you move on. The
-problem is not any single skipped dive; it is what their accumulation quietly costs you.
+And most days that is fine. You skip the deep dive, the task ships, the tests pass, you move on. Each
+skipped dive is harmless on its own; together they quietly cost you.
 
 ## The thing we quietly stand to lose
 
@@ -70,13 +67,13 @@ ability to *tell when it is wrong*.
 Validation — reading a diff and knowing it's subtly off, smelling a
 design that will not scale, recognizing the security hole the model didn't mention — is a skill, and skills
 decay when they go unused. As more work is delegated, fewer people exercise the judgment that catches the
-mistakes. The failure mode isn't a dramatic one; it's a slow erosion where the human in the loop is still
-*present* but no longer actually *able* to evaluate what they're approving.
+mistakes. The failure is quiet, a slow erosion: the human in the loop is still *present* but no
+longer actually *able* to evaluate what they're approving.
 
 The expertise we stop maintaining is exactly the safety net that catches what the machine gets wrong. What
 makes AI-assisted development safe is a human who still understands the fundamentals well enough to
-review, push back, and override. Keeping that human sharp is not nostalgia for doing things by hand; it
-is the control that makes delegation trustworthy in the first place.
+review, push back, and override. Keeping that human sharp is the control that makes delegation
+trustworthy in the first place.
 
 ## You can't cram competence
 
@@ -109,14 +106,12 @@ you can prevent.
 
 ## Teacher today, hedge for tomorrow
 
-devcoach plays both roles at once. Day to day it is a teacher — a patient mentor that grows your
-competence a little at a time, the *why* behind the fix and the failure modes to watch for, so you
-understand more of what you ship rather than less. Over the long run it is a hedge: a steady, low-friction
-way to keep developers fluent enough to validate AI output, precisely as that ability becomes harder to
-maintain and more valuable to have.
+Day to day devcoach is a teacher. Over the long run it is a hedge: a steady, low-friction way to keep
+developers fluent enough to validate AI output, precisely as that ability becomes harder to maintain and
+more valuable to have.
 
-It is deliberately small and unobtrusive — one lesson at a time, rate-limited, entirely local, nothing to
-open. The bet is simple: a few minutes of genuine learning, delivered in context and spaced out over the
+It is deliberately small and unobtrusive — one lesson at a time, rate-limited, running on your machine,
+nothing to open. The bet is simple: a few minutes of genuine learning, delivered in context and spaced out over the
 work you already do, compounds. The developers who keep learning while the tools get stronger are the ones
 who stay in control of the result.
 
@@ -129,7 +124,7 @@ who stay in control of the result.
 | **devcoach** | **Pros:** in context, after real work (or when you ask); skips what you already know; paced, and calibrated to your stack and level; runs on your machine.<br />**Cons:** needs an AI agent with MCP support; automatic lessons only in Claude Code, Gemini CLI and Codex CLI (elsewhere you ask); a lesson only when one is due, at most 2 a day by default; written by your agent's model, so a lesson can be wrong too. |
 | **Online courses** | **Pros:** comprehensive, structured, often free.<br />**Cons:** deferred, generic, easy to procrastinate on. |
 | **Reading docs / StackOverflow** | **Pros:** fast lookup; official docs are the authoritative source.<br />**Cons:** you only read what you think to look up; nothing tracks what you learned. |
-| **Asking your agent to explain** | **Pros:** immediate, in context.<br />**Cons:** only when you think to ask; often just the answer, without the "why" or the anti-patterns; no memory of what you already know. |
+| **Asking your agent to explain** | **Pros:** immediate, in context.<br />**Cons:** only when you think to ask; the why and the pitfalls only if you ask for them; no memory of what you already know. |
 | **Books & deep dives** | **Pros:** deep, thorough, timeless.<br />**Cons:** require sustained time you don't have; easy to skip. |
 | **Doing nothing** | **Pros:** no friction.<br />**Cons:** skill erosion; can't validate what ships. |
 
