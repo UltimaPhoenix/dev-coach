@@ -66,7 +66,7 @@ or local scope, `devcoach doctor` reports no hooks and tells you to run `devcoac
 would wire the hooks a second time.
 
 No restart is needed. If Claude Code leaves devcoach pending, run `/reload-plugins --force` or start
-a new session. The marketplace carries every UltimaPhoenix plugin.
+a new session.
 
 :::warning[Don't also run `devcoach install`]
 
@@ -91,7 +91,7 @@ Every green push to `develop` builds a canary (the `next` prerelease on GitHub, 
 ```
 
 The beta keeps the plugin's name, so its tools, commands and skill have the same names as the
-release's. Update it as in [Update](#update), from the `ultimaphoenix-beta` marketplace; the
+release's. Update it as in [Update](#updating), from the `ultimaphoenix-beta` marketplace; the
 [`next` prerelease](https://github.com/UltimaPhoenix/dev-coach/releases/tag/next) notes say which
 commit it is. Canaries are unreleased and may break.
 
@@ -174,12 +174,14 @@ CLAUDE_PLUGIN_DATA=~/.claude/plugins/data/devcoach-ultimaphoenix \
 <Terminal
   command="node …/scripts/launch.mjs doctor"
   output={doctorPlugin}
-  caption="Right after install. Runtime names the plugin's own copy of devcoach; the hooks and the skill come from the plugin."
+  caption="Right after install, home shown as ~. Runtime names the plugin's own copy of devcoach; the hooks and the skill come from the plugin."
 />
 
 The first line picks the newest version (Claude Code keeps the previous one for a while after an
 update). `CLAUDE_PLUGIN_DATA` names the plugin's data folder: without it, a launcher started from a
-terminal installs a second copy of devcoach inside the plugin folder.
+terminal installs a second copy of devcoach inside the plugin folder. Beta channel: use
+`ultimaphoenix-beta` in place of `ultimaphoenix` in both paths. Zip install: run the
+`scripts/launch.mjs` in your unzipped `plugin/` folder, with `devcoach-devcoach` as the data folder.
 
 ## First run
 
@@ -191,52 +193,7 @@ From then on, when your agent finishes a task and a lesson is due, devcoach teac
 on something that task touched. The pace is yours to set:
 [Coaching in your agent](../usage/coaching.md).
 
-## The CLI next to the plugin
-
-The [command line (CLI)](../usage/cli.md) gives you the dashboard, stats, lessons, sharing, backups
-and `doctor` without a Claude session. The plugin does not add it to your PATH. Three ways to reach it:
-
-<Tabs>
-<TabItem value="claude-code" label="In Claude Code" default>
-
-**Nothing to install.** Type `/devcoach:ui` (a port is optional, as in `/devcoach:ui 8080`;
-`/devcoach:ui stop` stops it), or ask *"open the devcoach dashboard"*. Claude reports the URL
-(default http://localhost:7860). The other commands:
-
-- `/devcoach:share [last | <id> | about <topic>] [as link|file]` and `/devcoach:import <code or link>`
-  for [sharing lessons](../usage/sharing.md),
-- `/devcoach:course [last | a few words of the lesson's title | a concept] [continue]` for a
-  [step-by-step course](../usage/courses.md).
-
-Claude runs them with the plugin's own copy of devcoach.
-
-</TabItem>
-<TabItem value="npx" label="npx, no install">
-
-**From a terminal, without installing:** prefix any [CLI command](../usage/cli.md) with `npx -y`.
-
-```bash
-npx -y devcoach ui
-npx -y devcoach stats
-```
-
-</TabItem>
-<TabItem value="global" label="Bare command">
-
-**A bare `devcoach` command:** install the npm package globally (`npm install -g devcoach`) or with
-[Homebrew](./homebrew.md), and skip its `devcoach install` step ([why](#install)). Running both is
-fine:
-
-- both read the same `~/.devcoach/`,
-- the plugin brings the hooks and the skill, current with each release once auto-update is on
-  ([Update](#update)); a Homebrew-only install needs `devcoach install` again after each
-  `brew upgrade` for that,
-- and Homebrew gives you the CLI.
-
-</TabItem>
-</Tabs>
-
-## Update
+## Update {/* #updating */}
 
 Claude Code updates a plugin on its own only when its marketplace has auto-update on, and that is
 **off by default** for third-party marketplaces like `ultimaphoenix` (pinned to each devcoach
@@ -296,8 +253,19 @@ npx -y devcoach uninstall --claude-code --data
 
 Claude Code could not start devcoach's server. The same causes make the hooks show a notice,
 *devcoach is not running*, at most once a day and without interrupting your work. Run
-**`/devcoach:setup`**: its first step prints the reason. The [terminal check](#check-it-worked)
-prints the launcher's whole diagnosis:
+**`/devcoach:setup`**: its first step prints the reason.
+
+| The reason | Fix |
+|---|---|
+| `Node 22.x is too old` | Install Node 24 or newer, then restart Claude Code. With a version manager, make 24 the **default**: Claude Code uses the `node` on its own PATH, not your shell's current pick |
+| `` `npm` was not found `` | Install Node with npm (`brew install node`), then restart |
+| `could not install devcoach … from npm`, or `… took longer than 180 s` | The first start needs the network; `install.log` shows why (a proxy, no connection). Restart once online |
+| `devcoach … could not start` | An incomplete copy is removed and reinstalled on the next start. If the reason comes back, start over (below) |
+
+<details>
+<summary>What does the launcher's whole diagnosis look like?</summary>
+
+The [terminal check](#check-it-worked) prints it, for example:
 
 <Tabs>
 <TabItem value="node" label="Node too old" default>
@@ -317,12 +285,7 @@ prints the launcher's whole diagnosis:
 </TabItem>
 </Tabs>
 
-| The reason | Fix |
-|---|---|
-| `Node 22.x is too old` | Install Node 24 or newer, then restart Claude Code. With a version manager, make 24 the **default**: Claude Code uses the `node` on its own PATH, not your shell's current pick |
-| `` `npm` was not found `` | Install Node with npm (`brew install node`), then restart |
-| `could not install devcoach … from npm`, or `… took longer than 180 s` | The first start needs the network; `install.log` shows why (a proxy, no connection). Restart once online |
-| `devcoach … could not start` | An incomplete copy is removed and reinstalled on the next start. If the reason comes back, start over (below) |
+</details>
 
 After a fix, reconnect without restarting: `/mcp` → `plugin:devcoach:devcoach` → *Reconnect*. For
 the full story of one failed start, run `claude --debug` and read `~/.claude/debug/<session-id>.txt`:
@@ -336,7 +299,8 @@ Still stuck? Start over from a clean copy; `~/.devcoach/` is not touched
 rm -rf ~/.claude/plugins/data/devcoach-ultimaphoenix
 ```
 
-Then `/mcp` → *Reconnect*.
+(Beta channel: `devcoach-ultimaphoenix-beta`; zip install: `devcoach-devcoach`.) Then `/mcp` →
+*Reconnect*.
 
 ### Coaching never starts
 
@@ -345,6 +309,51 @@ is cued after about ten interactions in a chat session, at most two a day and at
 apart (each a [setting](../reference/configuration.md)), and cues pause while a course is in
 progress. The [terminal check](#check-it-worked) ends with a verdict on the next stop. Anything else:
 [Troubleshooting](../troubleshooting.md).
+
+## The CLI next to the plugin
+
+The [command line (CLI)](../usage/cli.md) gives you the dashboard, stats, lessons, sharing, backups
+and `doctor` without a Claude session. The plugin does not add it to your PATH. Three ways to reach it:
+
+<Tabs>
+<TabItem value="claude-code" label="In Claude Code" default>
+
+**Nothing to install.** Type `/devcoach:ui` (a port is optional, as in `/devcoach:ui 8080`;
+`/devcoach:ui stop` stops it), or ask *"open the devcoach dashboard"*. Claude reports the URL
+(default http://localhost:7860). The other commands:
+
+- `/devcoach:share [last | <id> | about <topic>] [as link|file]` and `/devcoach:import <code or link>`
+  for [sharing lessons](../usage/sharing.md),
+- `/devcoach:course [last | a few words of the lesson's title | a concept] [continue]` for a
+  [step-by-step course](../usage/courses.md).
+
+Claude runs them with the plugin's own copy of devcoach.
+
+</TabItem>
+<TabItem value="npx" label="npx, no install">
+
+**From a terminal, without installing:** prefix any [CLI command](../usage/cli.md) with `npx -y`.
+
+```bash
+npx -y devcoach ui
+npx -y devcoach stats
+```
+
+</TabItem>
+<TabItem value="global" label="Bare command">
+
+**A bare `devcoach` command:** install the npm package globally (`npm install -g devcoach`) or with
+[Homebrew](./homebrew.md), and skip its `devcoach install` step ([why](#install)). Claude Desktop is
+then not connected either: `devcoach install --claude-desktop` afterwards. Running both is fine:
+
+- both read the same `~/.devcoach/`,
+- the plugin brings the hooks and the skill, current with each release once auto-update is on
+  ([Update](#updating)); a Homebrew-only install needs `devcoach install` again after each
+  `brew upgrade` for that,
+- and Homebrew gives you the CLI.
+
+</TabItem>
+</Tabs>
 
 <Cards>
   <Card label="Next" title="Coaching in your agent" to="/usage/coaching">
