@@ -1,6 +1,6 @@
 /* Tabs on the left, one screen on the right; under 997px (Docusaurus' desktop breakpoint) the
-   tabs become a 2 × 2 grid above it. Colours come from Infima and the brand accent, except the
-   terminal, which looks like a terminal in both themes. */
+   tabs become a 2 × 2 grid above it. Colours come from Infima and the site's tokens
+   (src/css/custom.css); the terminal uses --dc-term-*, dark in both themes. */
 .tour {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -30,9 +30,9 @@
   gap: 0.15rem;
   padding: 0.7rem 0.9rem;
   border: 1px solid transparent;
-  border-radius: 12px;
+  border-radius: var(--dc-radius);
   background: none;
-  color: var(--ifm-color-emphasis-700);
+  color: var(--dc-text-muted);
   font: inherit;
   text-align: left;
   cursor: pointer;
@@ -52,7 +52,7 @@
   }
 }
 .tab:hover {
-  border-color: var(--ifm-color-emphasis-300);
+  border-color: var(--dc-border);
 }
 .tab[aria-selected="true"] {
   border-color: var(--devcoach-accent);
@@ -60,7 +60,9 @@
 }
 .tab:focus-visible,
 .hosts button:focus-visible,
-.steps a:focus-visible {
+.steps button:focus-visible,
+.termCode:focus-visible,
+.appCode:focus-visible {
   outline: 2px solid var(--devcoach-accent);
   outline-offset: 2px;
 }
@@ -71,24 +73,25 @@
 
 /* One frame for every screen: a thin bar that names what you are looking at, then the screen. */
 .frame {
-  border: 1px solid var(--ifm-color-emphasis-300);
-  border-radius: 12px;
+  border: 1px solid var(--dc-border);
+  border-radius: var(--dc-radius);
   background: var(--ifm-background-surface-color);
   overflow: hidden;
 }
 .bar {
   padding: 0.45rem 0.9rem;
-  border-bottom: 1px solid var(--ifm-color-emphasis-300);
-  color: var(--ifm-color-emphasis-700);
+  border-bottom: 1px solid var(--dc-border);
+  color: var(--dc-text-muted);
   font-family: var(--ifm-font-family-monospace);
   font-size: 0.72rem;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* No `display`: ThemedImage shows one of the pair by display (see ThemedShot's stylesheet). */
 .shot {
-  display: block;
   width: 100%;
+  vertical-align: top;
   aspect-ratio: 16 / 10;
   object-fit: cover;
   object-position: top left;
@@ -98,10 +101,6 @@
   .shot {
     aspect-ratio: 1 / 1;
   }
-}
-:global([data-theme="light"]) .dark,
-:global([data-theme="dark"]) .light {
-  display: none;
 }
 
 .caption {
@@ -126,25 +125,28 @@
 .note {
   margin: 0.5rem 0 0;
   font-size: 0.85rem;
-  color: var(--ifm-color-warning-darkest);
-}
-:global([data-theme="dark"]) .note {
-  color: var(--ifm-color-warning-lightest);
+  color: var(--dc-warn);
 }
 
 /* In your agent: the two hosts. */
 .hosts {
   display: inline-flex;
   margin-bottom: 0.6rem;
-  border: 1px solid var(--ifm-color-emphasis-300);
+  border: 1px solid var(--dc-border);
   border-radius: 999px;
-  overflow: hidden;
+}
+/* The outer corners on the buttons, not overflow: hidden on the group, which clipped the focus ring. */
+.hosts button:first-child {
+  border-radius: 999px 0 0 999px;
+}
+.hosts button:last-child {
+  border-radius: 0 999px 999px 0;
 }
 .hosts button {
   padding: 0.3rem 0.9rem;
   border: 0;
   background: none;
-  color: var(--ifm-color-emphasis-700);
+  color: var(--dc-text-muted);
   font: inherit;
   font-size: 0.85rem;
   font-weight: 600;
@@ -152,29 +154,18 @@
 }
 .hosts button[aria-pressed="true"] {
   background: var(--ifm-color-primary);
-  color: #fff;
-}
-:global([data-theme="dark"]) .hosts button[aria-pressed="true"] {
-  color: #1e1f22;
+  color: var(--dc-on-primary);
 }
 
 .term {
-  --term-bg: #1e1f22;
-  --term-bar: #2b2d30;
-  --term-line: #393b40;
-  --term-fg: #c8cdd1;
-  --term-dim: #8b9196;
-  --term-strong: #ffffff;
-  --term-accent: #5eead4;
-  --term-ok: #7ee2a8;
-  border-color: var(--term-line);
-  background: var(--term-bg);
-  color: var(--term-fg);
+  border-color: var(--dc-term-line);
+  background: var(--dc-term-bg);
+  color: var(--dc-term-fg);
 }
 .term .bar {
-  border-color: var(--term-line);
-  background: var(--term-bar);
-  color: var(--term-dim);
+  border-color: var(--dc-term-line);
+  background: var(--dc-term-bar);
+  color: var(--dc-term-dim);
 }
 .termBody {
   padding: 1rem 1.2rem 1.1rem;
@@ -186,45 +177,45 @@
   margin: 0 0 0.5rem;
 }
 .termBody strong {
-  color: var(--term-strong);
+  color: var(--dc-term-strong);
 }
 .termReply {
-  color: var(--term-fg);
+  color: var(--dc-term-fg);
 }
 .termDot {
-  color: var(--term-ok);
+  color: var(--dc-term-ok);
 }
 /* The card: a faint teal rule on its left, as in the hero's demo. */
 .termCard {
   margin: 0.9rem 0;
   padding-left: 0.9rem;
-  border-left: 2px solid rgba(94, 234, 212, 0.35);
+  border-left: 2px solid var(--dc-term-rule);
 }
 .termCard p:last-child {
   margin-bottom: 0;
 }
 .termBand {
-  color: var(--term-accent);
+  color: var(--dc-term-accent);
   font-weight: 600;
 }
 .termCode {
   margin: 0 0 0.5rem;
   padding: 0.6rem 0.8rem;
   border-radius: 8px;
-  background: #17181b;
-  color: #9cdcfe;
+  background: var(--dc-term-code-bg);
+  color: var(--dc-term-code);
   font-size: inherit;
   line-height: 1.55;
   overflow-x: auto;
 }
 .termAsk {
-  color: var(--term-dim);
+  color: var(--dc-term-dim);
 }
 .termPrompt {
-  color: var(--term-strong);
+  color: var(--dc-term-strong);
 }
 .termPrompt span {
-  color: var(--term-dim);
+  color: var(--dc-term-dim);
 }
 .termBody .termPrompt {
   margin: 0;
@@ -242,7 +233,8 @@
 .appReply {
   color: var(--ifm-color-emphasis-700);
 }
-.appBand {
+/* A paragraph like the rest of the card (no heading: the rules are a drawing, not an outline). */
+.appBody .appBand {
   margin: 1rem 0 0.6rem;
   font-size: 1.02rem;
   font-weight: 700;
@@ -263,8 +255,8 @@
 .appInput {
   margin: 0.4rem 1.2rem 1.2rem;
   padding: 0.6rem 0.9rem;
-  border: 1px solid var(--ifm-color-emphasis-300);
-  border-radius: 12px;
+  border: 1px solid var(--dc-border);
+  border-radius: var(--dc-radius);
   background: var(--ifm-background-color);
   font-size: 0.92rem;
 }
@@ -272,10 +264,7 @@
 /* The running course: its steps beside the document, as on the dashboard's course page. The
    canvas is the dashboard's, which the embedded document expects behind it. */
 .course {
-  background: #f9fafb;
-}
-:global([data-theme="dark"]) .course {
-  background: #1e1f22;
+  background: var(--dc-course-canvas);
 }
 .courseGrid {
   display: grid;
@@ -290,17 +279,19 @@
     align-items: start;
   }
 }
+/* A row that scrolls sideways on a phone: padded so a focused step's ring is not clipped. */
 .steps {
   display: flex;
   gap: 0.4rem;
   margin: 0;
-  padding: 0;
+  padding: 4px;
   list-style: none;
   overflow-x: auto;
 }
 @media (min-width: 720px) {
   .steps {
     display: grid;
+    padding: 0;
     position: sticky;
     top: calc(var(--ifm-navbar-height) + 1rem);
   }
@@ -309,30 +300,48 @@
   flex: none;
   margin: 0;
 }
-.steps a {
+.steps button {
   display: grid;
   gap: 0.1rem;
+  width: 100%;
   padding: 0.45rem 0.65rem;
+  border: 0;
   border-radius: 8px;
+  background: none;
   color: var(--ifm-color-emphasis-800);
+  font: inherit;
   font-size: 0.85rem;
   line-height: 1.35;
-  text-decoration: none;
+  text-align: left;
+  cursor: pointer;
 }
-.steps a b {
+.steps button b {
   font-weight: 600;
 }
-.steps a span {
+.steps button span {
   font-family: var(--ifm-font-family-monospace);
   font-size: 0.7rem;
-  color: var(--ifm-color-emphasis-600);
+  color: var(--dc-text-muted);
 }
-.steps a:hover {
+.steps button:hover {
   background: var(--ifm-color-emphasis-200);
 }
-.steps a[aria-current="step"] {
+.steps button[aria-current="step"] {
   background: color-mix(in srgb, var(--devcoach-accent) 16%, transparent);
   color: var(--ifm-font-color-base);
+}
+/* Until the document answers, a line on the empty frame says it is coming. */
+.docArea {
+  position: relative;
+  min-width: 0;
+}
+.loading {
+  position: absolute;
+  top: 1rem;
+  left: 1rem;
+  margin: 0;
+  color: var(--dc-text-muted);
+  font-size: 0.9rem;
 }
 .doc {
   display: block;

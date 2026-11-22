@@ -1,0 +1,146 @@
+/* A directory tree. The connectors are borders on each entry (no images, no box-drawing text):
+   a vertical one down the left of every entry, cut at its middle for the last one, and a short
+   horizontal one into the icon. Folders and files differ by icon shape, weight and a trailing "/"
+   in the name as written, not by colour. */
+.tree {
+  margin: 1.25rem 0 1.75rem;
+}
+.box {
+  --icon: 1rem;
+  --gap: 0.45rem;
+  --indent: 1.2rem;
+  --step: calc(var(--indent) + var(--icon) / 2);
+  --row: 1.9rem;
+  --line: var(--ifm-color-emphasis-400);
+  container-type: inline-size;
+  padding: 0.8rem 1.1rem 0.9rem;
+  border: 1px solid var(--dc-border);
+  border-radius: var(--dc-radius);
+  background: var(--ifm-background-surface-color);
+  font-size: 0.9rem;
+}
+
+.root,
+.folder,
+.file {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--gap);
+  min-width: 0;
+}
+.root {
+  padding: 0.2rem 0;
+  line-height: 1.5rem;
+}
+.root .name {
+  font-weight: 700;
+}
+
+.icon {
+  flex: none;
+  width: var(--icon);
+  height: var(--icon);
+  fill: none;
+  stroke: var(--ifm-color-emphasis-600);
+  stroke-width: 1.25;
+  stroke-linejoin: round;
+}
+.root .icon,
+.folder .icon {
+  fill: color-mix(in srgb, var(--devcoach-accent) 22%, transparent);
+  stroke: var(--devcoach-accent);
+}
+
+.name {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ifm-font-color-base);
+  font-size: 0.84rem;
+  line-height: inherit;
+  white-space: nowrap;
+  overflow-wrap: normal;
+}
+.folder .name {
+  font-weight: 600;
+}
+
+.list {
+  margin: 0;
+  padding: 0 0 0 calc(var(--icon) / 2);
+  list-style: none;
+}
+.item {
+  position: relative;
+  margin: 0;
+  padding-left: var(--indent);
+}
+/* Vertical connector: the whole entry (and its children) for every entry but the last. */
+.item::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  border-left: 1px solid var(--line);
+}
+.item:last-child::before {
+  bottom: auto;
+  height: calc(var(--row) / 2);
+}
+/* Horizontal connector into the icon. */
+.item::after {
+  content: "";
+  position: absolute;
+  top: calc(var(--row) / 2);
+  left: 0;
+  width: calc(var(--indent) - 0.3rem);
+  border-top: 1px solid var(--line);
+}
+
+.entry {
+  display: flex;
+  flex-wrap: wrap;
+  /* Top-aligned with equal line boxes: an icon has no baseline to align on. */
+  align-items: flex-start;
+  column-gap: 1.25rem;
+  padding: 0.2rem 0;
+  line-height: 1.5rem;
+}
+/* Wide enough: every note starts in the same column, after the longest name at its depth. */
+.entry .name {
+  min-width: calc(var(--names) - var(--depth) * var(--step));
+}
+.note {
+  flex: 1 1 12rem;
+  min-width: 0;
+  color: var(--ifm-color-emphasis-800);
+  font-size: 0.88rem;
+  line-height: 1.5rem;
+}
+
+/* Narrow (a phone): each note goes under its name, indented to the name. */
+@container (max-width: 34rem) {
+  .entry {
+    flex-direction: column;
+    align-items: stretch;
+    row-gap: 0;
+  }
+  .entry .name {
+    min-width: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .note {
+    flex: none;
+    padding: 0 0 0.25rem calc(var(--icon) + var(--gap));
+    line-height: 1.45;
+  }
+}
+
+.caption {
+  margin-top: 0.6rem;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: var(--ifm-color-emphasis-800);
+}

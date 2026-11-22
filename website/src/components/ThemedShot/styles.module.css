@@ -1,7 +1,7 @@
 .shot {
   margin: 0 0 1.5rem;
-  border: 1px solid var(--ifm-toc-border-color);
-  border-radius: 12px;
+  border: 1px solid var(--dc-border);
+  border-radius: var(--dc-radius);
   overflow: hidden;
 }
 
@@ -11,7 +11,7 @@
   gap: 0;
   padding: 0.4rem 0.55rem;
   background: var(--ifm-background-surface-color);
-  border-bottom: 1px solid var(--ifm-toc-border-color);
+  border-bottom: 1px solid var(--dc-border);
 }
 
 .btn {
@@ -19,14 +19,19 @@
   font-size: 0.78rem;
   font-weight: 600;
   padding: 0.18rem 0.75rem;
-  border: 1px solid var(--ifm-color-emphasis-300);
+  border: 1px solid var(--dc-border);
   background: transparent;
-  color: var(--ifm-color-emphasis-700);
+  color: var(--dc-text-muted);
   cursor: pointer;
   transition:
     background-color 0.15s ease,
     color 0.15s ease,
     border-color 0.15s ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .btn {
+    transition: none;
+  }
 }
 
 .btnDark {
@@ -49,30 +54,21 @@
   cursor: pointer;
 }
 
+/* No `display` here: ThemedImage shows one image of the pair by display (in a cascade layer, which
+   any unlayered display would override, showing both). vertical-align drops the inline gap. */
 .img {
-  display: block;
   width: 100%;
   height: auto;
+  vertical-align: top;
 }
 
-/* Default (data-override="auto"): show whichever matches the global docs theme. */
-:global([data-theme="light"]) .shot[data-override="auto"] .dark,
-:global([data-theme="dark"]) .shot[data-override="auto"] .light {
-  display: none;
-}
-
-/* Manual override wins regardless of the docs theme. */
-.shot[data-override="light"] .dark,
-.shot[data-override="dark"] .light {
-  display: none;
-}
-
-/* Highlight the button matching the image currently shown. */
+/* The button matching the image on screen. Following the theme, CSS picks it from [data-theme],
+   so the server-rendered page shows it before React knows the theme (aria-pressed says it after). */
 :global([data-theme="dark"]) .shot[data-override="auto"] .btnDark,
 :global([data-theme="light"]) .shot[data-override="auto"] .btnLight,
 .shot[data-override="dark"] .btnDark,
 .shot[data-override="light"] .btnLight {
   background: var(--ifm-color-primary);
   border-color: var(--ifm-color-primary);
-  color: #fff;
+  color: var(--dc-on-primary);
 }
