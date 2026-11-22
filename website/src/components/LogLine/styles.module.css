@@ -1,0 +1,81 @@
+/* One log line on the terminal canvas (--dc-term-*, dark in both themes; the pairs used here are
+   the Terminal's own: fg 10.4:1, dim 6.3:1, accent 11.1:1 on --dc-term-bg), then a numbered list on
+   the page. The line wraps: between parts, and inside a long path when it must. */
+.figure {
+  margin: 1.25rem 0 1.75rem;
+}
+.box {
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--dc-term-line);
+  border-radius: var(--dc-radius);
+  background: var(--dc-term-bg);
+}
+.line {
+  display: block;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--dc-term-fg);
+  font-size: 0.84rem;
+  line-height: 1.9;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.sep {
+  color: var(--dc-term-dim);
+  white-space: pre;
+}
+.part {
+  border-bottom: 1px dashed var(--dc-term-rule);
+}
+
+/* The number before each part, and the same number in the list. Shapes and digits, not colour,
+   tie a part to its explanation. */
+.badge,
+.number {
+  display: inline-grid;
+  place-items: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 50%;
+  font-family: var(--ifm-font-family-base);
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1;
+}
+.badge {
+  margin-right: 0.35rem;
+  border: 1px solid var(--dc-term-accent);
+  color: var(--dc-term-accent);
+  vertical-align: 0.1em;
+}
+
+.list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr));
+  gap: 0.6rem 1.5rem;
+  margin: 0.85rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+.item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+.number {
+  flex: none;
+  margin-top: 0.1rem;
+  border: 1px solid var(--dc-accent-text);
+  color: var(--dc-accent-text);
+}
+
+.caption {
+  margin-top: 0.7rem;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: var(--ifm-color-emphasis-800);
+}
