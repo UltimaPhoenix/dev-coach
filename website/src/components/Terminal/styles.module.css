@@ -1,17 +1,18 @@
-/* A terminal window: dark in both site themes, like the Tour's terminal (same canvas, bar and
-   line colours). The ANSI palette is our own, tuned for that canvas: every colour, dim included,
-   is at least 4.5:1 against #1e1f22 (WCAG AA for normal text); cyan is the brand teal. */
+/* A terminal window: dark in both site themes, on the site's terminal palette (--dc-term-* in
+   src/css/custom.css, shared with the Tour and the hero). The ANSI palette is our own, tuned for
+   that canvas: every colour, dim included, is at least 4.5:1 against #1e1f22 (WCAG AA for normal
+   text; src/css/tokens.test.ts holds it); cyan is the brand teal. */
 .figure {
   margin: 1.25rem 0 1.75rem;
 }
 .window {
-  --term-bg: #1e1f22;
-  --term-bar: #2b2d30;
-  --term-line: #393b40;
-  --term-fg: #c9ced3; /* 10.4:1 */
-  --term-strong: #ffffff; /* bold text without a colour: 16.5:1 */
-  --term-dim: #8e949a; /* 5.4:1 */
-  --ansi-black: #8e949a; /* black on a black canvas would vanish: drawn as the dim grey, 5.4:1 */
+  --term-bg: var(--dc-term-bg);
+  --term-bar: var(--dc-term-bar);
+  --term-line: var(--dc-term-line);
+  --term-fg: var(--dc-term-fg); /* 10.4:1 */
+  --term-strong: var(--dc-term-strong); /* bold text without a colour: 16.5:1 */
+  --term-dim: var(--dc-term-dim); /* 6.3:1, 5.3:1 on the bar */
+  --ansi-black: var(--dc-term-dim); /* black on a black canvas would vanish: drawn as the dim grey */
   --ansi-red: #f8837b; /* 6.7:1 */
   --ansi-green: #6fdc9c; /* 9.7:1 */
   --ansi-yellow: #f2c661; /* 10.2:1 */
@@ -28,7 +29,7 @@
   --ansi-bright-cyan: #a5f5e8; /* 13.2:1 */
   --ansi-bright-white: #ffffff; /* 16.5:1 */
   border: 1px solid var(--term-line);
-  border-radius: 12px;
+  border-radius: var(--dc-radius);
   background: var(--term-bg);
   color: var(--term-fg);
   overflow: hidden;
