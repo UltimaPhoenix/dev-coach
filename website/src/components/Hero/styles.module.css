@@ -16,6 +16,8 @@
 }
 .copy {
   min-width: 0;
+  /* The install tabs lay themselves out by this column's width, not the window's. */
+  container-type: inline-size;
 }
 .eyebrow {
   margin: 0 0 0.9rem;
@@ -44,8 +46,15 @@
   line-height: 1.55;
   color: var(--ifm-color-emphasis-800);
 }
-/* Eight tabs in a grid, so the rows line up and none hides off-screen: two rows of four, three
-   columns on a phone. Labels never break. */
+/* One question above the tabs. */
+.pick {
+  margin: 0 0 0.35rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--dc-text-muted);
+}
+/* Five agents in a grid, so none hides off-screen: one row when the column is wide enough, three
+   columns otherwise (a phone, or the hero's narrower column on a small laptop). Labels never break. */
 .tabs {
   display: grid;
   grid-template-columns: repeat(3, auto);
@@ -57,14 +66,30 @@
   font-size: 0.85rem;
   white-space: nowrap;
 }
-@media (min-width: 520px) {
+@container (min-width: 36rem) {
   .tabs {
-    grid-template-columns: repeat(4, auto);
+    grid-template-columns: repeat(5, auto);
   }
   .tabs :global(.tabs__item) {
     padding: 0.45rem 0.75rem;
     font-size: 0.9rem;
   }
+}
+/* What this agent gets, above its command: a lesson by itself (accent) or one when you ask. */
+.gets {
+  margin: 0.6rem 0 0.45rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--dc-text-muted);
+}
+.auto {
+  color: var(--dc-accent-text);
+}
+.beta {
+  font-weight: 600;
+  color: var(--dc-text-muted);
 }
 .tabs + div :global(.theme-code-block) {
   margin-bottom: 0.5rem;
@@ -92,8 +117,8 @@
   font-size: 0.95rem;
   color: var(--ifm-font-color-base);
 }
-/* Which agents bring a lesson on their own: under the tabs, for whichever one is open. */
-.agents {
+/* The routes that install the `devcoach` command: links, a second choice under the agent's own route. */
+.more {
   margin: 1rem 0 0;
   font-size: 0.9rem;
   color: var(--ifm-color-emphasis-800);

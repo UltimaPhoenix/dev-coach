@@ -1,90 +1,91 @@
 // The docs home's opening: what devcoach does in two lines, how to install it for your agent,
-// and the coaching loop playing next to it. Commands mirror the per-agent install pages, in the
-// order the docs list install methods everywhere.
+// and the coaching loop playing next to it.
+//
+// The install box asks one question, "which agent do you use?", and each answer shows that agent's
+// shortest route and what it gets (lessons by themselves, or when you ask). The routes that install
+// the `devcoach` command instead (Homebrew, Windows, npx / npm) are one line of links under it:
+// they are a second choice, and the Install page compares them. Commands mirror the install pages.
 import Link from "@docusaurus/Link";
-import useDocusaurusContext from "@docusaurus/useDocusaurusContext";
 import CodeBlock from "@theme/CodeBlock";
 import TabItem from "@theme/TabItem";
 import Tabs from "@theme/Tabs";
+import clsx from "clsx";
 import type { ReactNode } from "react";
 import { Card, Cards } from "../Cards";
 import LessonLoop from "../LessonLoop";
 import styles from "./styles.module.css";
 
-function InstallTabs(): ReactNode {
-  // The released site (/dev-coach/) is published with a release, so it gives the release line; the
-  // unreleased docs (/dev-coach/next/, DOCS_NEXT=1) give the canary built from develop.
-  const next = useDocusaurusContext().siteConfig.baseUrl.endsWith("/next/");
+/** What the agent gets once devcoach is in it: a lesson by itself when one is due, or one when you ask. */
+function Gets({ auto = false, beta = false }: { auto?: boolean; beta?: boolean }): ReactNode {
   return (
-    <Tabs groupId="agent" className={styles.tabs}>
-      <TabItem value="claude-code" label="Claude Code" default>
-        <CodeBlock language="text">
-          {"/plugin marketplace add UltimaPhoenix/claude-plugins-marketplace\n/plugin install devcoach@ultimaphoenix"}
-        </CodeBlock>
-        <p className={styles.hint}>
-          Type both lines in Claude Code, then choose <strong>Install for you (user scope)</strong>. Needs
-          Node.js 24 or newer. <Link to="/install/claude-code-plugin">Plugin guide →</Link>
-        </p>
-      </TabItem>
-      <TabItem value="homebrew" label="Homebrew">
-        <CodeBlock language="bash">{"brew install UltimaPhoenix/tap/devcoach\ndevcoach install"}</CodeBlock>
-        <p className={styles.hint}>
-          macOS and Linux. Brings Node.js and adds the <code>devcoach</code> command.{" "}
-          <Link to="/install/homebrew">Homebrew guide →</Link>
-        </p>
-      </TabItem>
-      <TabItem value="windows" label="Windows">
-        <CodeBlock language="powershell">
-          {next
-            ? '$env:DEVCOACH_CHANNEL = "next"\nirm https://ultimaphoenix.github.io/dev-coach/next/install.ps1 | iex'
-            : "irm https://ultimaphoenix.github.io/dev-coach/install.ps1 | iex"}
-        </CodeBlock>
-        <p className={styles.hint}>
-          Beta.{" "}
-          {next ? "These docs are for the unreleased develop branch, so the line installs its canary build. " : ""}
-          No admin; brings its own Node.js. <Link to="/install/windows">Windows guide →</Link>
-        </p>
-      </TabItem>
-      <TabItem value="npx" label="npx">
-        <CodeBlock language="bash">{"npx -y devcoach install"}</CodeBlock>
-        <p className={styles.hint}>
-          Needs Node.js 24 or newer. <Link to="/install/npx">npx guide →</Link>
-        </p>
-      </TabItem>
-      <TabItem value="desktop" label="Claude Desktop">
-        <p className={styles.desktop}>
-          Download <code>devcoach-&lt;version&gt;.mcpb</code> from the{" "}
-          <a href="https://github.com/UltimaPhoenix/dev-coach/releases/latest">latest release</a>, then
-          double-click it or drag it onto Claude Desktop.
-        </p>
-        <p className={styles.hint}>
-          Beta. No terminal, no Node.js to set up. <Link to="/install/claude-desktop">Claude Desktop guide →</Link>
-        </p>
-      </TabItem>
-      <TabItem value="gemini" label="Gemini CLI">
-        <CodeBlock language="bash">{"npm install -g devcoach\ndevcoach install --gemini"}</CodeBlock>
-        <p className={styles.hint}>
-          Beta. Needs Node.js 24 or newer. Have the <code>devcoach</code> command already? Skip the first line.{" "}
-          <Link to="/install/gemini-cli">Gemini CLI guide →</Link>
-        </p>
-      </TabItem>
-      <TabItem value="codex" label="Codex CLI">
-        <CodeBlock language="bash">{"npm install -g devcoach\ndevcoach install --codex"}</CodeBlock>
-        <p className={styles.hint}>
-          Beta. Needs Node.js 24 or newer. Have the <code>devcoach</code> command already? Skip the first line.
-          Then trust its two hooks when Codex asks. <Link to="/install/codex">Codex CLI guide →</Link>
-        </p>
-      </TabItem>
-      <TabItem value="other" label="Other agents">
-        <p className={styles.desktop}>
-          Cursor, Windsurf, Cline, Continue and Zed each take devcoach as an MCP server entry in their own
-          settings.
-        </p>
-        <p className={styles.hint}>
-          <Link to="/install/other-agents">Other MCP agents guide →</Link>
-        </p>
-      </TabItem>
-    </Tabs>
+    <p className={clsx(styles.gets, auto && styles.auto)}>
+      {auto ? "Automatic lessons" : "Lessons when you ask"}
+      {beta && <span className={styles.beta}> · beta</span>}
+    </p>
+  );
+}
+
+function InstallTabs(): ReactNode {
+  return (
+    <>
+      <p className={styles.pick}>
+        Which agent do you use?
+      </p>
+      <Tabs groupId="agent" className={styles.tabs}>
+        <TabItem value="claude-code" label="Claude Code" default>
+          <Gets auto />
+          <CodeBlock language="text">
+            {"/plugin marketplace add UltimaPhoenix/claude-plugins-marketplace\n/plugin install devcoach@ultimaphoenix"}
+          </CodeBlock>
+          <p className={styles.hint}>
+            Type both lines in Claude Code, then choose <strong>Install for you (user scope)</strong>. Needs
+            Node.js 24 or newer. <Link to="/install/claude-code-plugin">Plugin guide →</Link>
+          </p>
+        </TabItem>
+        <TabItem value="desktop" label="Claude Desktop">
+          <Gets beta />
+          <p className={styles.desktop}>
+            Download <code>devcoach-&lt;version&gt;.mcpb</code> from the{" "}
+            <a href="https://github.com/UltimaPhoenix/dev-coach/releases/latest">latest release</a>, then
+            double-click it or drag it onto Claude Desktop.
+          </p>
+          <p className={styles.hint}>
+            No terminal, no Node.js to set up. <Link to="/install/claude-desktop">Claude Desktop guide →</Link>
+          </p>
+        </TabItem>
+        <TabItem value="gemini" label="Gemini CLI">
+          <Gets auto beta />
+          <CodeBlock language="bash">{"npm install -g devcoach\ndevcoach install --gemini"}</CodeBlock>
+          <p className={styles.hint}>
+            Needs Node.js 24 or newer. Have the <code>devcoach</code> command already? Skip the first line.{" "}
+            <Link to="/install/gemini-cli">Gemini CLI guide →</Link>
+          </p>
+        </TabItem>
+        <TabItem value="codex" label="Codex CLI">
+          <Gets auto beta />
+          <CodeBlock language="bash">{"npm install -g devcoach\ndevcoach install --codex"}</CodeBlock>
+          <p className={styles.hint}>
+            Needs Node.js 24 or newer. Have the <code>devcoach</code> command already? Skip the first line. Then
+            trust its two hooks when Codex asks. <Link to="/install/codex">Codex CLI guide →</Link>
+          </p>
+        </TabItem>
+        <TabItem value="other" label="Other agents">
+          <Gets />
+          <p className={styles.desktop}>
+            Cursor, Windsurf, Cline, Continue and Zed each take devcoach as an MCP server entry in their own
+            settings.
+          </p>
+          <p className={styles.hint}>
+            <Link to="/install/other-agents">Other MCP agents guide →</Link>
+          </p>
+        </TabItem>
+      </Tabs>
+      <p className={styles.more}>
+        Want the <code>devcoach</code> command too? <Link to="/install/homebrew">Homebrew</Link> ·{" "}
+        <Link to="/install/windows">Windows</Link> · <Link to="/install/npx">npx / npm</Link>.{" "}
+        <Link to="/install">Compare all methods →</Link>
+      </p>
+    </>
   );
 }
 
@@ -101,10 +102,6 @@ export default function Hero(): ReactNode {
           don't know yet: a short lesson, right in the conversation. Free, local, and quiet by design.
         </p>
         <InstallTabs />
-        <p className={styles.agents}>
-          Automatic lessons in Claude Code, Gemini CLI and Codex CLI; on request in Claude Desktop and other
-          agents. <Link to="/install">What each agent gets →</Link>
-        </p>
         <ul className={styles.facts}>
           <li>No account, no telemetry</li>
           <li>After the task, at your pace</li>
