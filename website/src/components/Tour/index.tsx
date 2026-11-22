@@ -460,7 +460,7 @@ export default function Tour({ shots }: Props): ReactNode {
           />
           <p className={styles.caption}>
             <span>
-              Built from your recent projects in one pass. Each lesson is pitched at your level on its topic;
+              Built at setup, from your recent projects when it can. Each lesson is pitched at your level on its topic;
               adjust any score.
             </span>
             <Link to="/usage/coaching#onboarding">How onboarding works →</Link>

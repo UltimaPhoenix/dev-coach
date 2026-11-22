@@ -2,6 +2,7 @@
 // and the coaching loop playing next to it. Commands mirror the per-agent install pages, in the
 // order the docs list install methods everywhere.
 import Link from "@docusaurus/Link";
+import useDocusaurusContext from "@docusaurus/useDocusaurusContext";
 import CodeBlock from "@theme/CodeBlock";
 import TabItem from "@theme/TabItem";
 import Tabs from "@theme/Tabs";
@@ -11,6 +12,9 @@ import LessonLoop from "../LessonLoop";
 import styles from "./styles.module.css";
 
 function InstallTabs(): ReactNode {
+  // The released site (/dev-coach/) is published with a release, so it gives the release line; the
+  // unreleased docs (/dev-coach/next/, DOCS_NEXT=1) give the canary built from develop.
+  const next = useDocusaurusContext().siteConfig.baseUrl.endsWith("/next/");
   return (
     <Tabs groupId="agent" className={styles.tabs}>
       <TabItem value="claude-code" label="Claude Code" default>
@@ -18,8 +22,8 @@ function InstallTabs(): ReactNode {
           {"/plugin marketplace add UltimaPhoenix/claude-plugins-marketplace\n/plugin install devcoach@ultimaphoenix"}
         </CodeBlock>
         <p className={styles.hint}>
-          Type both lines in Claude Code, then choose <strong>Install for you (user scope)</strong>.{" "}
-          <Link to="/install/claude-code-plugin">Plugin guide →</Link>
+          Type both lines in Claude Code, then choose <strong>Install for you (user scope)</strong>. Needs
+          Node.js 24 or newer. <Link to="/install/claude-code-plugin">Plugin guide →</Link>
         </p>
       </TabItem>
       <TabItem value="homebrew" label="Homebrew">
@@ -29,16 +33,16 @@ function InstallTabs(): ReactNode {
           <Link to="/install/homebrew">Homebrew guide →</Link>
         </p>
       </TabItem>
-      {/* Windows support ships in 2.8.0: until then the release site serves no installer, so the
-          tab gives the canary line, as docs/install/windows.md does. At 2.8.0, both switch to
-          `irm https://ultimaphoenix.github.io/dev-coach/install.ps1 | iex`. */}
       <TabItem value="windows" label="Windows">
         <CodeBlock language="powershell">
-          {'$env:DEVCOACH_CHANNEL = "next"\nirm https://ultimaphoenix.github.io/dev-coach/next/install.ps1 | iex'}
+          {next
+            ? '$env:DEVCOACH_CHANNEL = "next"\nirm https://ultimaphoenix.github.io/dev-coach/next/install.ps1 | iex'
+            : "irm https://ultimaphoenix.github.io/dev-coach/install.ps1 | iex"}
         </CodeBlock>
         <p className={styles.hint}>
-          Beta, from devcoach 2.8.0. Until it is out, this installs the unreleased canary. No admin; brings
-          its own Node.js. <Link to="/install/windows">Windows guide →</Link>
+          Beta.{" "}
+          {next ? "These docs are for the unreleased develop branch, so the line installs its canary build. " : ""}
+          No admin; brings its own Node.js. <Link to="/install/windows">Windows guide →</Link>
         </p>
       </TabItem>
       <TabItem value="npx" label="npx">
@@ -60,15 +64,15 @@ function InstallTabs(): ReactNode {
       <TabItem value="gemini" label="Gemini CLI">
         <CodeBlock language="bash">{"npm install -g devcoach\ndevcoach install --gemini"}</CodeBlock>
         <p className={styles.hint}>
-          Beta. Have the <code>devcoach</code> command already? Skip the first line.{" "}
+          Beta. Needs Node.js 24 or newer. Have the <code>devcoach</code> command already? Skip the first line.{" "}
           <Link to="/install/gemini-cli">Gemini CLI guide →</Link>
         </p>
       </TabItem>
       <TabItem value="codex" label="Codex CLI">
         <CodeBlock language="bash">{"npm install -g devcoach\ndevcoach install --codex"}</CodeBlock>
         <p className={styles.hint}>
-          Beta. Have the <code>devcoach</code> command already? Skip the first line. Then trust its two hooks
-          when Codex asks. <Link to="/install/codex">Codex CLI guide →</Link>
+          Beta. Needs Node.js 24 or newer. Have the <code>devcoach</code> command already? Skip the first line.
+          Then trust its two hooks when Codex asks. <Link to="/install/codex">Codex CLI guide →</Link>
         </p>
       </TabItem>
       <TabItem value="other" label="Other agents">
@@ -94,7 +98,7 @@ export default function Hero(): ReactNode {
         </h1>
         <p className={styles.lead}>
           When your agent finishes a task and a lesson is due, devcoach teaches you one thing from it that you
-          don't know yet: a short lesson, right in the conversation. Free, 100% local, and quiet by design.
+          don't know yet: a short lesson, right in the conversation. Free, local, and quiet by design.
         </p>
         <InstallTabs />
         <p className={styles.agents}>
@@ -162,7 +166,8 @@ export function Closing(): ReactNode {
         <p>
           Your coaching data stays on your computer, in <code>~/.devcoach</code>. No account, no telemetry, no
           update check. It leaves only when you share a lesson or publish a course; your agent's model sees
-          what the agent reads, as in any session. Setup never keeps your prompts.
+          what the agent reads, as in any session. Profile setup reads project metadata and short notes, not
+          your conversations, unless you choose Automatic (Deep).
         </p>
         <Link to="/reference/privacy">Privacy &amp; security →</Link>
       </div>
