@@ -115,7 +115,7 @@ colour is its band, and the band sets how deep the lessons on that topic go:
 | `⇄` | Moves a topic to another group |
 | `×` beside a topic | Removes the topic |
 | `+ topic` in a group's header | Adds a topic to that group |
-| `+ Add topic` at the top | Adds a topic to Other |
+| `+ Add topic` at the top | Adds a topic, with its confidence and group (Other unless you pick one) |
 | `+ Add group` at the top | Creates a group (Languages, DevOps, Frontend…) |
 | `×` beside a group's name | Deletes the group; its topics move to Other |
 
@@ -174,8 +174,8 @@ period or a date range is set, **Search all time**, which drops only that.
 <details>
 <summary>Which columns are there, and how do I sort and resize them?</summary>
 
-- **Columns:** ★, Date, Topic, Title, Level, Categories, Feedback, ↗. A narrower window hides
-  Feedback first (under 1280 px), then Categories (under 1024 px), then Topic (under 640 px).
+- **Columns:** ★, Date, Topic, Title, Level, Categories, Feedback, Share (`↗`). A narrower
+  window hides Feedback first (under 1280 px), then Categories (under 1024 px), then Topic (under 640 px).
 - **Topic** carries `🤝 <sender>` under it for a lesson someone shared with you. **Feedback** shows
   `✓ Knew it`, `💡 Understood` or `✗ Couldn't follow`, or nothing yet.
 - **Sort:** click the Date, Topic, Title, Level or Feedback header; click again to reverse.
@@ -212,19 +212,13 @@ set up your profile if you haven't, and gives the diagnostic command for your in
 
 ## Lesson detail (`/lessons/<id>`)
 
-<div className="row">
-<div className="col col--5">
-
 <ThemedShot
   alt="A lesson's page: title row, metadata, TL;DR, the lesson with its code, context, where it happened, the feedback buttons and the ID"
   light={require("../screenshots/lesson-docker-layer-cache-light.png").default}
   dark={require("../screenshots/lesson-docker-layer-cache-dark.png").default}
 />
 
-</div>
-<div className="col col--7">
-
-From top to bottom (click the picture to see it at full size):
+From top to bottom (on a small screen, click the picture to see it at full size):
 
 1. **Title row:** star, title, level pill (click it to list that level), **⋯** (🗑 Delete lesson…)
    and **↗ Share**. `← Back to lessons` is above the card.
@@ -240,9 +234,6 @@ From top to bottom (click the picture to see it at full size):
    confidence on the topic goes up by one, and **Clear** takes it back
    ([the three answers](./coaching.md#the-feedback-loop)).
 8. **ID,** for `devcoach lesson <id>` and the other commands that take one.
-
-</div>
-</div>
 
 ## Courses (`/courses`)
 
@@ -345,4 +336,5 @@ move your profile to another machine, or keep a copy before a big change.
   the lessons you already have.
 
 **Coaching Notebook** shows `~/.devcoach/learning-state.md`, the notes devcoach keeps on how you
-learn, read-only, with *Preview* / *Source*, **↓ Download** and *Open in VS Code*.
+learn. It is read-only here: *Preview* / *Source* switch the view, **↓ Download** saves a copy, and
+*Open in VS Code* opens the file in VS Code.
