@@ -38,11 +38,11 @@
   left: 50%;
   height: 1.5rem;
   transform: translateX(-50%);
-  color: var(--ifm-color-emphasis-600);
+  color: var(--dc-text-muted);
   line-height: 1.5rem;
 }
 .when {
-  color: var(--devcoach-accent);
+  color: var(--dc-accent-text);
   font-size: 0.7rem;
   font-weight: 700;
   letter-spacing: 0.04em;

@@ -1,3 +1,7 @@
+---
+description: The 25 tools, 11 resources and 1 prompt of devcoach's MCP server, with their arguments, results and errors, and the client entry that starts it.
+---
+
 import { Card, Cards } from "@site/src/components/Cards";
 import RefTable, { Tag } from "@site/src/components/RefTable";
 import ToolFlow from "@site/src/components/ToolFlow";
@@ -224,7 +228,7 @@ Every resource is JSON except `notebook`, which is markdown.
 | `devcoach://profile` | Same payload as [`get_profile`](#onboarding-and-state) |
 | `devcoach://notebook` | The coaching notebook, `learning-state.md`, as markdown. Empty when there is none yet |
 | `devcoach://settings` | All seven settings (see [Configuration](configuration.md#settings)) |
-| `devcoach://rate-limit` | `allowed`, `total_lessons` (shared lessons included) and `reason` when a lesson is not allowed now (see [Rate limits](configuration.md#rate-limits)) |
+| `devcoach://rate-limit` | `allowed`, `total_lessons` (shared lessons included) and `reason` when a lesson is not allowed now (see [How pacing works](configuration.md#rate-limits)) |
 | `devcoach://stats` | `total_lessons`; `lessons_today` (last 24 h) and `lessons_this_week` (last 7 days), both counting your own lessons only; `imported_lessons`; and the five `weakest_topics` and five `strongest_topics` (`topic`, `confidence`) |
 | `devcoach://taught-topics` | Every `topic_id` that has a lesson, shared lessons included |
 | `devcoach://lessons/recent` | Up to 10 lessons from the last 7 days, newest first, shaped like [`get_lessons`](#data-models) |
@@ -286,7 +290,7 @@ takes these arguments (snake_case, checked by Zod):
   its repository's or folder's name). Where git gives none, `repository`, `branch` and
   `repository_platform` fall back to your most used values.
 
-Lessons returned by `get_lessons`, `import_lesson` and the lesson resources add five fields:
+Lessons returned by `log_lesson`, `get_lessons`, `import_lesson` and the lesson resources add five fields:
 
 <RefTable>
 
