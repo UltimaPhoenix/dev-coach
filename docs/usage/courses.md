@@ -7,6 +7,7 @@ description: "A course is a step-by-step path from a lesson you couldn't follow:
 # Courses
 
 import ThemedShot from "@site/src/components/ThemedShot";
+import Link from "@docusaurus/Link";
 import Tabs from "@theme/Tabs";
 import TabItem from "@theme/TabItem";
 import { Chat, Say, Choices } from "@site/src/components/Chat";
@@ -112,7 +113,7 @@ Check questions come as choices when the answer is a pick (an order, a yes/no, o
 candidates), with *Not sure* last, and as free text when you have to write an output or an
 explanation.
 
-<a id="what-happens-next" />
+<Link id="what-happens-next" />
 
 - Say *skip* to skip a step, *later* to pause; `/devcoach:course continue` resumes (or say
   *continue the course*).
