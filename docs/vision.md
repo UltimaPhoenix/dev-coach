@@ -1,17 +1,16 @@
 ---
 title: Vision & roadmap
 sidebar_label: Vision & roadmap
-description: "Free, local, open source and not for sale. Shipped: lesson sharing and courses. Exploring: short links, gap-driven learning paths, team visibility."
-keywords: [devcoach roadmap, open source AI coaching, learning paths, developer knowledge map, team learning]
+description: "Free, local, open source and not for sale. Two ideas we're exploring: a learning path across topics, and a course offered when a topic keeps coming back."
+keywords: [devcoach roadmap, open source AI coaching, learning paths, developer knowledge map]
 ---
 
 # Vision & roadmap
 
 import { Card, Cards } from "@site/src/components/Cards";
-import { Stop, Timeline } from "@site/src/components/Timeline";
 
-Where devcoach is going, and what stays the same on the way: the promises first, then what has
-shipped and what we're exploring next.
+Where devcoach is going, and what stays the same on the way: the promises first, then the ideas
+we're exploring.
 
 ## What never changes
 
@@ -51,59 +50,26 @@ covered; if that is ever your case, open an issue and it will be considered case
 
 ## Roadmap
 
-What shipped from earlier ideas, and what we're exploring now. Nothing below is a commitment or a
-price list.
-
-<Timeline
-  label="devcoach releases with their dates, then what comes next"
-  caption={<>Release dates from the <a href="https://github.com/UltimaPhoenix/dev-coach/blob/main/CHANGELOG.md">changelog</a>.</>}
->
-<Stop version="1.0" date="2026-08-27" title="First stable release" to="/install">Claude Code plugin; Gemini CLI and Codex CLI (beta).</Stop>
-<Stop version="2.1.0" date="2026-09-14" title="Lesson sharing" to="/usage/sharing">A lesson travels as text, a link or a file.</Stop>
-<Stop version="2.5.0" date="2026-09-28" title="Courses" to="/usage/courses">Step by step, from a lesson you couldn't follow.</Stop>
-<Stop version="2.7.0" date="2026-10-06" title="Guided setup" to="/install/claude-code-plugin">`/devcoach:setup`; `doctor` checks Claude Desktop.</Stop>
-<Stop version="2.8.0" when="next" status="next" title="Windows" to="/install/windows">A one-line installer, and Scoop (beta).</Stop>
-<Stop when="exploring" status="exploring" title="Ideas" to="#exploring">Short links, learning paths, team visibility.</Stop>
-</Timeline>
-
-### Exploring
-
-Directions we find interesting, written down to invite discussion.
+Ideas we're exploring, written down to invite discussion. Nothing here is a commitment. What has
+already shipped is in the [changelog](https://github.com/UltimaPhoenix/dev-coach/blob/main/CHANGELOG.md).
 
 <Cards columns={2}>
-<Card title="Lesson sharing, next">
+<Card title="A learning path across topics">
 
-- **Short links**: a secret Gist behind the long link, revocable from the CLI.
-- **Ephemeral one-use links**: zero-knowledge. The key stays in the URL fragment; the server holds
-  only ciphertext that self-destructs on first read.
-- **Curated collections of lessons per stack** that a team or a community can maintain.
-
-</Card>
-<Card title="Gap-driven learning paths">
-
-devcoach already learns where you're weak: topics with low confidence on your knowledge map,
-lessons you marked ❌, patterns the notebook flags. Connecting those gaps to a structured
-progression, the next thing to learn in order, is a natural extension of that.
+devcoach already knows where you're weak: topics with low confidence on your knowledge map, lessons
+you marked ❌, patterns the notebook flags. Today each lesson still starts from the task your agent
+just finished. The idea is to connect those gaps into an order: the next thing to learn, and the one
+after.
 
 </Card>
-<Card title="Courses from a wall you keep hitting">
+<Card title="A course when a topic keeps coming back">
 
-When you've hit the same wall three times, devcoach would offer a course on exactly that concept.
-Today the coach offers one when you answer *couldn't follow* under a card, or starts one when you
-ask.
-
-</Card>
-<Card title="Team-level visibility">
-
-Built from each developer's own knowledge map: which topics a team is collectively strong or weak
-on, where coverage is thin, and where skills are concentrated in one person. Enough signal to plan
-onboarding and spot gaps before they become incidents.
+Today the coach offers a [course](./usage/courses.md) once, when you answer *couldn't follow* under a
+lesson, or starts one when you ask. The idea is to offer one by itself when the same topic keeps
+getting ❌.
 
 </Card>
 </Cards>
-
-The individual, local experience stays private by default; anything team-shaped would be an
-opt-in layer on top, never a change to how the solo tool works.
 
 ## Shape the roadmap
 
