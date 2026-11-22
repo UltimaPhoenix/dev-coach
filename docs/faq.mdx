@@ -46,7 +46,7 @@ export const faq = [
       {
         id: "why-no-lesson-yet",
         q: "Why haven't I had a lesson yet?",
-        a: "Your profile comes first: after your first task, devcoach offers to set it up. Then the pace is quiet on purpose: by default a lesson is cued about every 10 interactions in a chat session, at most 2 a day and at least 4 hours apart, and only Claude Code, Gemini CLI and Codex CLI get lessons automatically. `devcoach doctor` says why the next turn would or would not bring one.",
+        a: "Your profile comes first: after your first task, devcoach offers to set it up. Then the pace is quiet on purpose: by default a lesson is cued about every 10 interactions in a chat session, at most 2 a day and at least 4 hours apart, and only Claude Code, Gemini CLI and Codex CLI get lessons automatically. `devcoach doctor` says why the next turn would or would not bring one; with the Claude Code plugin, `/devcoach:setup` runs the same check.",
         more: { label: "Troubleshooting: no lessons appear", to: "/troubleshooting#coaching-isnt-firing--no-lessons-appear" },
       },
       {
@@ -106,20 +106,20 @@ export const faq = [
       {
         id: "how-do-i-install-devcoach",
         q: "How do I install devcoach?",
-        a: "In Claude Code, add the plugin (two slash commands); on macOS or Linux, use Homebrew; on Windows, the one-line PowerShell installer or Scoop; anywhere with Node.js 24, `npx -y devcoach install`. Claude Desktop, Gemini CLI, Codex CLI and other MCP agents each have a short page of their own. devcoach is also listed in the MCP Registry as `io.github.UltimaPhoenix/devcoach`.",
+        a: "In Claude Code, add the plugin (two slash commands); on macOS or Linux, use Homebrew; on [Windows (beta)](/install/windows), the one-line PowerShell installer or Scoop; anywhere with Node.js 24 or newer, `npx -y devcoach install`. Claude Desktop, Gemini CLI, Codex CLI and other MCP agents each have a short page of their own. devcoach is also listed in the MCP Registry as `io.github.UltimaPhoenix/devcoach`.",
         more: { label: "Choose your setup", to: "/install" },
       },
       {
         id: "what-do-i-need-to-run-it",
         q: "What do I need to run it?",
-        a: "macOS, Linux or Windows (Windows from devcoach 2.8.0, in beta), and Node.js 24 or newer. npx, a global npm install and the Claude Code plugin use the `node` on your PATH; Homebrew, Scoop and the Windows installer install Node for you. The Claude Desktop extension runs on Claude Desktop's built-in Node.",
+        a: "macOS, Linux or [Windows (beta)](/install/windows), and Node.js 24 or newer. npx, a global npm install and the Claude Code plugin use the `node` on your PATH; Homebrew, Scoop and the Windows installer install Node for you. The Claude Desktop extension runs on Claude Desktop's built-in Node.",
         more: { label: "Choose your setup", to: "/install" },
       },
       {
         id: "how-do-i-pause-or-uninstall-it",
         q: "How do I pause or uninstall it?",
-        a: "There is no pause switch: for fewer lessons, lower `max_per_day` or raise `nudge_every` (`0` means every turn, not off), and the Claude Code plugin can be disabled from `/plugin` and enabled again later. To remove devcoach, run `devcoach uninstall` before you remove the program, or `/plugin uninstall devcoach@ultimaphoenix` for the plugin. Your data in `~/.devcoach/` stays unless you add `--data` to `devcoach uninstall`, so back it up first.",
-        more: { label: "Troubleshooting: uninstalling", to: "/troubleshooting#uninstalling" },
+        a: "There is no pause switch: for fewer lessons, lower `max_per_day` or raise `nudge_every` (`0` means every turn, not off), and the Claude Code plugin can be disabled from `/plugin` and enabled again later. To remove devcoach, run `devcoach uninstall` before you remove the program, or `/plugin uninstall devcoach@ultimaphoenix` for the plugin. Your data in `~/.devcoach/` stays; adding `--data` to `devcoach uninstall` deletes it (it asks first), so run `devcoach backup` before that if you may want it back.",
+        more: { label: "Choose your setup", to: "/install" },
       },
     ],
   },
