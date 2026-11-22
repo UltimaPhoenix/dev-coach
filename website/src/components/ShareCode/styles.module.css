@@ -1,0 +1,85 @@
+/* A share link taken apart: the link on one wrapping line, each part tinted and numbered, then a
+   numbered legend. Link-only parts sit on a grey tint, the code's parts on a teal one; the numbers,
+   not the tints, are what pair a part with its line in the legend. */
+.figure {
+  margin: 1.25rem 0 1.75rem;
+}
+.box {
+  padding: 1rem 1.1rem 1.05rem;
+  border: 1px solid var(--dc-border);
+  border-radius: var(--dc-radius);
+  background: var(--ifm-background-surface-color);
+}
+
+.strip {
+  margin: 0 0 1rem;
+  font-family: var(--ifm-font-family-monospace);
+  font-size: 0.86rem;
+  line-height: 2.15;
+  overflow-wrap: anywhere;
+  color: var(--ifm-font-color-base);
+}
+.group {
+  white-space: nowrap;
+}
+.wraps {
+  white-space: normal;
+}
+.link,
+.code {
+  padding: 0.18rem 0.3rem;
+  border-radius: 4px;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+.link {
+  background: var(--ifm-color-emphasis-200);
+}
+.code {
+  background: color-mix(in srgb, var(--devcoach-accent) 16%, transparent);
+}
+.sep {
+  padding: 0 0.1rem;
+}
+
+.badge {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 1.15rem;
+  height: 1.15rem;
+  margin: 0 0.25rem 0 0.15rem;
+  border-radius: 50%;
+  background: var(--ifm-color-primary);
+  color: var(--dc-on-primary);
+  font: 700 0.68rem / 1 var(--ifm-font-family-base);
+  vertical-align: 0.45em;
+}
+
+.legend {
+  display: grid;
+  gap: 0.55rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+.legend li {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.55rem;
+  align-items: start;
+  margin: 0;
+}
+.legend .badge {
+  margin: 0.12rem 0 0;
+  vertical-align: baseline;
+}
+
+.caption {
+  margin-top: 0.55rem;
+  color: var(--dc-text-muted);
+  font-size: 0.86rem;
+}
