@@ -1,0 +1,57 @@
+/* The index: groups flow into two columns on wide screens, one on a phone. */
+.index {
+  columns: 2 17rem;
+  column-gap: 0.9rem;
+  margin: 1.25rem 0 2rem;
+}
+.group {
+  break-inside: avoid;
+  margin: 0 0 0.9rem;
+  padding: 0.9rem 1.1rem;
+  border: 1px solid var(--ifm-color-emphasis-200);
+  border-radius: 12px;
+  background: var(--ifm-background-surface-color);
+}
+.groupTitle,
+.groupTitle:hover {
+  display: block;
+  margin-bottom: 0.35rem;
+  font-family: var(--ifm-font-family-monospace);
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--dc-accent-text, var(--devcoach-accent));
+  text-decoration: none;
+}
+.list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+.list li {
+  margin: 0;
+  padding: 0.22rem 0;
+}
+.list li + li {
+  border-top: 1px solid var(--ifm-color-emphasis-100);
+}
+.list a {
+  color: var(--ifm-font-color-base);
+}
+.list a:hover {
+  color: var(--dc-accent-text, var(--devcoach-accent));
+}
+
+/* One question: the answer, then one quiet line to the page that owns the topic. */
+.answer {
+  margin-bottom: 0.35rem;
+}
+.more {
+  margin-bottom: 1.6rem;
+  font-size: 0.9rem;
+}
+.more a::before {
+  content: "→ ";
+}
