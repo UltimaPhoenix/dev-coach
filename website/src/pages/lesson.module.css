@@ -24,8 +24,8 @@
   }
 }
 .panel {
-  border: 1px solid var(--ifm-color-emphasis-200);
-  border-radius: 14px;
+  border: 1px solid var(--dc-border);
+  border-radius: var(--dc-radius);
   background: var(--ifm-background-surface-color);
   padding: 1.25rem 1.5rem;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
@@ -52,7 +52,7 @@
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--ifm-color-emphasis-600);
+  color: var(--dc-text-muted);
   margin-bottom: 0.75rem;
 }
 .buttons {
@@ -69,12 +69,12 @@
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--ifm-color-emphasis-600);
+  color: var(--dc-text-muted);
   margin-bottom: 0.75rem;
 }
 .card {
-  border: 1px solid var(--ifm-color-emphasis-200);
-  border-radius: 14px;
+  border: 1px solid var(--dc-border);
+  border-radius: var(--dc-radius);
   background: var(--ifm-background-surface-color);
   padding: 1.5rem 1.75rem;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
@@ -98,12 +98,24 @@
   font-weight: 700;
   padding: 0.15rem 0.55rem;
   border-radius: 999px;
-  border: 1px solid;
+  border: 1px solid color-mix(in srgb, var(--tone) 45%, transparent);
+  background: var(--tone-soft);
+  color: var(--tone);
   text-transform: lowercase;
 }
-.junior { color: #15803d; border-color: #86efac; background: rgba(134, 239, 172, 0.15); }
-.mid { color: #a16207; border-color: #fde047; background: rgba(253, 224, 71, 0.15); }
-.senior { color: #b91c1c; border-color: #fca5a5; background: rgba(252, 165, 165, 0.15); }
+/* The level's colour per theme (src/css/custom.css): the text reads on its own soft background. */
+.junior {
+  --tone: var(--dc-ok);
+  --tone-soft: var(--dc-ok-soft);
+}
+.mid {
+  --tone: var(--dc-warn);
+  --tone-soft: var(--dc-warn-soft);
+}
+.senior {
+  --tone: var(--dc-danger);
+  --tone-soft: var(--dc-danger-soft);
+}
 .meta {
   display: flex;
   flex-wrap: wrap;
@@ -113,7 +125,10 @@
   color: var(--ifm-color-emphasis-700);
   margin-bottom: 1.25rem;
 }
-.topic { color: var(--devcoach-accent); font-family: var(--ifm-font-family-monospace); }
+.topic {
+  color: var(--dc-accent-text);
+  font-family: var(--ifm-font-family-monospace);
+}
 .chip {
   font-size: 0.75rem;
   padding: 0.1rem 0.5rem;
@@ -134,7 +149,7 @@
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--ifm-color-primary);
+  color: var(--dc-accent-text);
   margin-bottom: 0.25rem;
 }
 .context {
@@ -150,7 +165,9 @@
   color: var(--ifm-color-emphasis-700);
   margin: 0;
 }
-.status.up { color: #15803d; }
+.status.up {
+  color: var(--dc-ok);
+}
 .retry {
   background: none;
   border: 0;
@@ -170,6 +187,7 @@
 }
 .portField input {
   width: 6rem;
+  min-height: 2rem;
   padding: 0.25rem 0.4rem;
   border: 1px solid var(--ifm-color-emphasis-300);
   border-radius: 6px;
@@ -177,6 +195,14 @@
   color: inherit;
   font: inherit;
   font-size: 0.8rem;
+}
+.portField input[aria-invalid="true"] {
+  border-color: var(--dc-danger);
+}
+.portError {
+  margin: 0.35rem 0 0;
+  font-size: 0.8rem;
+  color: var(--dc-danger);
 }
 .hint {
   margin-top: 1rem;
@@ -197,9 +223,9 @@
   font-size: 0.8rem;
 }
 .error {
-  border: 1px solid #fca5a5;
-  background: rgba(252, 165, 165, 0.12);
-  color: #b91c1c;
+  border: 1px solid color-mix(in srgb, var(--dc-danger) 45%, transparent);
+  background: var(--dc-danger-soft);
+  color: var(--dc-danger);
   border-radius: 10px;
   padding: 0.6rem 0.9rem;
   margin-bottom: 1rem;
@@ -209,7 +235,7 @@
   margin-top: 1.25rem;
   text-align: center;
   font-size: 0.8rem;
-  color: var(--ifm-color-emphasis-600);
+  color: var(--dc-text-muted);
 }
 /* The wordmark link follows the navbar treatment ("dev" in the theme foreground, "coach" in the
    teal accent), not the link colour — and never an underline. */
