@@ -5,6 +5,7 @@ keywords: [devcoach cursor, devcoach windsurf, devcoach cline, devcoach continue
 ---
 
 import { Card, Cards } from "@site/src/components/Cards";
+import WrapTabs from "@site/src/components/WrapTabs";
 import Tabs from "@theme/Tabs";
 import TabItem from "@theme/TabItem";
 
@@ -50,7 +51,7 @@ Every agent starts the same command, `npx -y devcoach mcp`: the program `npx` wi
 `-y`, `devcoach` and `mcp`. Only the place and the format differ. Pick your agent: Cursor, Windsurf,
 Cline, Continue or Zed.
 
-<Tabs>
+<WrapTabs>
 <TabItem value="cursor" label="Cursor" default>
 
 **File:** `~/.cursor/mcp.json` in your home folder, for every project. For one project only, use
@@ -153,7 +154,7 @@ Continue uses MCP servers in **agent mode** only.
 ```
 
 </TabItem>
-</Tabs>
+</WrapTabs>
 
 If the agent was already open and devcoach does not show up, restart the agent.
 
@@ -191,8 +192,9 @@ does by default).
 
 :::tip[The full coaching rules]
 
-If your agent lists MCP prompts (Cursor does), add **devcoach_instructions**, titled *devcoach
-coaching instructions*. It hands your agent the devcoach skill and its reference files.
+If your agent supports MCP prompts (Cursor and Zed do), add the **devcoach_instructions** prompt,
+titled *devcoach coaching instructions*, where your agent lists MCP prompts. It hands your agent the
+devcoach skill and its reference files.
 
 :::
 
@@ -218,7 +220,7 @@ that uses devcoach. To delete them too, back up first if you might come back
 
 ## If it doesn't work
 
-| What you see | Fix |
+| What you see | What to do |
 |---|---|
 | The agent cannot find `npx` or `node` (for example `spawn npx ENOENT`) | Give it [full paths](#npx-or-node-not-found), below |
 | `devcoach 2.7.1 needs Node 24 or newer`, then the Node it found and where | That Node is older. Make Node 24 or newer your default (check `node --version` in a new terminal), or put a Node 24 in the [full paths](#npx-or-node-not-found) |
