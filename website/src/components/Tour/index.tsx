@@ -9,9 +9,10 @@ import useBaseUrl from "@docusaurus/useBaseUrl";
 import { usePluginData } from "@docusaurus/useGlobalData";
 import ThemedImage from "@theme/ThemedImage";
 import clsx from "clsx";
-import type { KeyboardEvent, ReactNode } from "react";
+import type { CSSProperties, KeyboardEvent, ReactNode } from "react";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import type { DemoCourse as DemoCourseData } from "../../../docusaurus.config";
+import { Zoomable } from "../ThemedShot";
 import styles from "./styles.module.css";
 
 export interface Shot {
@@ -142,8 +143,8 @@ export function LessonHosts({ caption = true }: { caption?: boolean }): ReactNod
       {caption && (
         <p className={styles.caption}>
           <span>
-            The same card wherever your agent runs. It appears only when a lesson is due, and you set how
-            often. Answer with one key, or just keep working.
+            The same card in the terminal and in the desktop app. It appears only when a lesson is due, and
+            you set how often. Answer with one key, or just keep working.
           </span>
           <Link to="/usage/coaching#your-first-lesson">Your first lesson →</Link>
         </p>
@@ -152,11 +153,21 @@ export function LessonHosts({ caption = true }: { caption?: boolean }): ReactNod
   );
 }
 
-function Capture({ shot, label, alt }: { shot: Shot; label: string; alt: string }): ReactNode {
+/**
+ * A dashboard capture in its labelled frame, opening at full size on a click or tap (the guides'
+ * zoom). `crop` is how much of the capture shows, as its height over its width (default 16:10):
+ * the image scales with the frame, so one number ends the window on the same row at every width.
+ */
+function Capture({ shot, label, alt, crop }: { shot: Shot; label: string; alt: string; crop?: number }): ReactNode {
   return (
-    <div className={clsx(styles.frame, styles.capture)}>
+    <div
+      className={clsx(styles.frame, styles.capture)}
+      style={crop ? ({ "--crop": crop } as CSSProperties) : undefined}
+    >
       <div className={styles.bar}>{label}</div>
-      <ThemedImage className={styles.shot} sources={shot} alt={alt} loading="lazy" />
+      <Zoomable alt={alt} light={shot.light} dark={shot.dark}>
+        <ThemedImage className={styles.shot} sources={shot} alt={alt} loading="lazy" />
+      </Zoomable>
     </div>
   );
 }
@@ -328,8 +339,8 @@ export function DemoCourse({ shot }: { shot: Shot }): ReactNode {
       </div>
       <p className={styles.caption}>
         <span>
-          This is the course document itself, the one file devcoach writes for you. In the dashboard your progress
-          is saved step by step.
+          This is the course document itself, the one file your agent writes for you. In the dashboard your
+          progress is saved step by step.
         </span>
         <span className={styles.captionActions}>
           <Link to="/usage/courses">Courses →</Link>
@@ -443,12 +454,14 @@ export default function Tour({ shots }: Props): ReactNode {
         <div {...panel("map")}>
           <Capture
             shot={shots.map}
+            crop={0.58}
             label="devcoach ui · Knowledge map"
             alt="The Knowledge Map page of the dashboard: topics grouped by area, each with a confidence bar from 0 to 10"
           />
           <p className={styles.caption}>
             <span>
-              Built from your project history in one pass. Lessons skip what you already know; adjust any score.
+              Built from your recent projects in one pass. Each lesson is pitched at your level on its topic;
+              adjust any score.
             </span>
             <Link to="/usage/coaching#onboarding">How onboarding works →</Link>
           </p>
