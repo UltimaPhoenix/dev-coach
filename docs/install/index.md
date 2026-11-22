@@ -54,9 +54,13 @@ plugin or the extension.
     Uses your Node.js 24. npx adds no command.
   </Card>
   <Card label="Claude Code" title="Plugin + command" to="/install/claude-code-plugin#the-cli-next-to-the-plugin">
-    Skip `devcoach install` (also next to the Desktop extension): it would register devcoach twice.
+    Skip `devcoach install`: it would register devcoach twice.
   </Card>
 </Cards>
+
+Skipped `devcoach install` for the plugin? Claude Desktop is then not connected either:
+`devcoach install --claude-desktop` afterwards. Next to the Desktop extension, connect Claude Code
+alone: `devcoach install --claude-code`.
 
 ## What each agent gets {/* #what-each-agent-gets */}
 
@@ -79,7 +83,7 @@ lesson is due, the agent teaches it. In Claude Desktop and the other agents you 
 
 <Notes>
 <Legend />
-<Note n={1} id="bundled">**Bundled**: updated with the plugin or the extension. Claude Code leaves auto-update off for this marketplace: turn it on in `/plugin` → **Marketplaces** → `ultimaphoenix`, or update the plugin yourself.</Note>
+<Note n={1} id="bundled">**Bundled**: updated with the plugin or the extension. Claude Code leaves auto-update off for this marketplace: turn it on in `/plugin` → **Marketplaces** → `ultimaphoenix`, or update the plugin yourself. Gemini extension: unzip the next release into the same folder, then `gemini extensions update devcoach`.</Note>
 <Note n={2} id="copied">**Copied** by `devcoach install`: run it again after each upgrade (with `--gemini` or `--codex` for those agents). `devcoach doctor` says when the copy is out of date.</Note>
 <Note n={3} id="ask">No hooks there: say *set up devcoach* once, then ask for a lesson (*teach me something from what we just did*). The devcoach skill's rules reach the model only through the **devcoach_instructions** prompt, if you attach it where the agent lists MCP prompts.</Note>
 <Note n={4} id="gemini">Gemini CLI asks you to allow the devcoach skill when it loads it.</Note>
@@ -100,9 +104,9 @@ Each method's page covers install *and* connect.
 | [Windows](./windows.md) *(beta, from 2.8.0)* | <Yes>Installs it</Yes> | <Yes>Yes</Yes> | Re-run the line; Scoop: `devcoach install` again |
 | [npx / npm](./npx.md) | <No>Yours (24+)</No> | <Partly>With npm, not npx</Partly> | `devcoach install` again |
 | [Claude Desktop extension](./claude-desktop.md) *(beta)* | <Yes>Claude Desktop's own</Yes> | <No>No</No> | No hooks or skill |
-| [Gemini CLI](./gemini-cli.md) *(beta)* | <No>Yours (24+)</No> | <No>No</No> | `devcoach install --gemini` again, or the new extension |
-| [Codex CLI](./codex.md) *(beta)* | <No>Yours (24+)</No> | <No>No</No> | `devcoach install --codex` again, then trust changed hooks<Ref n={5} to="codex-trust" /> |
-| [Other MCP agents](./other-agents.md), [MCP Registry](./other-agents.md#mcp-registry) *(beta)* | <No>Yours (24+)</No> | <No>No</No> | No hooks or skill |
+| [Gemini CLI](./gemini-cli.md) *(beta)* | <Partly>With Homebrew or Windows; else yours (24+)</Partly> | <Partly>With Homebrew, npm or Windows</Partly> | `devcoach install --gemini` again, or the new extension |
+| [Codex CLI](./codex.md) *(beta)* | <Partly>With Homebrew or Windows; else yours (24+)</Partly> | <Partly>With Homebrew, npm or Windows</Partly> | `devcoach install --codex` again, then trust changed hooks<Ref n={5} to="codex-trust" /> |
+| [Other MCP agents](./other-agents.md), [MCP Registry](./other-agents.md#mcp-registry) | <No>Yours (24+)</No> | <No>No</No> | No hooks or skill |
 
 </Matrix>
 
