@@ -43,9 +43,9 @@ tool**.
 If anything is ever sold, it would be a **separate, derivative product** built alongside devcoach,
 never a paywall bolted onto the tool you already use.
 
-Using devcoach, at home or at work, never puts your own code under the AGPL. The AGPL's condition is
-about devcoach itself: if you distribute a modified devcoach, or run one as a network service, you
-release your changes under the AGPL too. Embedding devcoach in a **closed-source product** is not
+Using devcoach, at home or at work, never puts your own code under the AGPL. The AGPL's conditions
+are about devcoach itself: a copy you pass on goes with its source, and if you distribute a modified
+devcoach, or run one as a network service, you release your changes under the AGPL too. Embedding devcoach in a **closed-source product** is not
 covered; if that is ever your case, open an issue and it will be considered case by case.
 [License & commercial use](./reference/license) has the details and examples.
 
@@ -62,7 +62,7 @@ price list.
 <Stop version="2.1.0" date="2026-09-14" title="Lesson sharing" to="/usage/sharing">A lesson travels as text, a link or a file.</Stop>
 <Stop version="2.5.0" date="2026-09-28" title="Courses" to="/usage/courses">Step by step, from a lesson you couldn't follow.</Stop>
 <Stop version="2.7.0" date="2026-10-06" title="Guided setup" to="/install/claude-code-plugin">`/devcoach:setup`; `doctor` checks Claude Desktop.</Stop>
-<Stop version="2.8.0" when="next" status="next" title="Windows" to="/install/windows">A one-line installer, and Scoop.</Stop>
+<Stop version="2.8.0" when="next" status="next" title="Windows" to="/install/windows">A one-line installer, and Scoop (beta).</Stop>
 <Stop when="exploring" status="exploring" title="Ideas" to="#exploring">Short links, learning paths, team visibility.</Stop>
 </Timeline>
 
