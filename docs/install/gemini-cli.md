@@ -101,6 +101,75 @@ the extension's. To switch routes, [remove](#remove) the first one before you ad
 
 :::
 
+## Check it worked
+
+<Tabs groupId="gemini-route">
+<TabItem value="command" label="Install command" default>
+
+<Terminal
+  command="devcoach doctor"
+  output={doctorGemini}
+  caption="Right after the install, on a computer with Gemini CLI and no Claude Code."
+/>
+
+Read the **Gemini CLI wiring** section: four ✓, for the two hooks, the skill and the server.
+`devcoach doctor` always checks Claude Code first. If you don't use Claude Code, ignore its lines,
+the red ✗ included. Through npx, each hook adds a `hook runs via npx` line: the cost described in
+[Install](#install).
+
+</TabItem>
+<TabItem value="extension" label="Extension">
+
+The extension adds no `devcoach` command; ask its [launcher](#what-it-set-up) instead (macOS or
+Linux):
+
+```bash
+node ~/.gemini/extensions/devcoach/scripts/launch.mjs doctor
+```
+
+<Terminal
+  command="node …/scripts/launch.mjs doctor"
+  output={doctorExtension}
+  caption={<>Runtime names the extension's own copy of devcoach. The server comes from the extension, so the line about <code>settings.json</code> is expected.</>}
+/>
+
+Read the **Gemini CLI wiring** section. `devcoach doctor` always checks Claude Code first. If you
+don't use Claude Code, ignore its lines, the red ✗ included.
+
+</TabItem>
+</Tabs>
+
+Gemini's own checks: `gemini mcp list` (or `/mcp list` in a session) shows devcoach as
+**Connected**, `gemini skills list` (`/skills list`) shows the devcoach skill and its folder, and
+`/hooks list` in a session shows the two hooks.
+
+## First run
+
+Start a new `gemini` session in a project folder you trust: Gemini loads servers, hooks and skills
+when a session starts, and connects no MCP server in a folder it does not trust.
+
+After your first task devcoach offers to set up your profile and asks how: **Automatic**
+(recommended), **Automatic (Deep)**, **Guided** or **Import backup**.
+
+:::note[Gemini asks you first]
+
+- **The skill.** When the cue has Gemini load the devcoach skill, Gemini asks you to allow it, with
+  the skill's name, purpose and folder. Allow it, or devcoach cannot follow its own rules. Gemini's
+  docs say it asks each time a skill is triggered in a session.
+- **The tools.** Gemini asks before it runs a tool from an MCP server you have not trusted,
+  devcoach's included. You can allow the whole devcoach server instead of each tool.
+
+:::
+
+The pace is yours to set: by default about one cue every 10 interactions in a chat session, at most
+2 lessons a day, at least 4 hours apart, and none while a course is in progress
+([Coaching in your agent](../usage/coaching.md)). Gemini sends its hooks no plan-mode flag, so every
+turn counts, planning included.
+
+**You're set.** The rest of this page is for later:
+[what the install changed](#what-it-set-up), [updating](#update), [removing](#remove) and
+[fixes](#if-it-doesnt-work).
+
 ## What it set up
 
 <Tabs groupId="gemini-route">
@@ -153,70 +222,6 @@ the extension's. To switch routes, [remove](#remove) the first one before you ad
 
 How the hooks decide: [How it works](../how-it-works.md). Your data:
 [Privacy & security](../reference/privacy.md).
-
-## Check it worked
-
-<Tabs groupId="gemini-route">
-<TabItem value="command" label="Install command" default>
-
-<Terminal
-  command="devcoach doctor"
-  output={doctorGemini}
-  caption="Right after the install, on a computer with Gemini CLI and no Claude Code."
-/>
-
-Read the **Gemini CLI wiring** section: four ✓, for the two hooks, the skill and the server.
-`devcoach doctor` always checks Claude Code first. If you don't use Claude Code, ignore its lines,
-the red ✗ included. Through npx, each hook adds a `hook runs via npx` line: the cost described in
-[Install](#install).
-
-</TabItem>
-<TabItem value="extension" label="Extension">
-
-The extension adds no `devcoach` command; ask its launcher instead (macOS or Linux):
-
-```bash
-node ~/.gemini/extensions/devcoach/scripts/launch.mjs doctor
-```
-
-<Terminal
-  command="node …/scripts/launch.mjs doctor"
-  output={doctorExtension}
-  caption={<>Runtime names the extension's own copy of devcoach. The server comes from the extension, so the line about <code>settings.json</code> is expected.</>}
-/>
-
-Read the **Gemini CLI wiring** section. `devcoach doctor` always checks Claude Code first. If you
-don't use Claude Code, ignore its lines, the red ✗ included.
-
-</TabItem>
-</Tabs>
-
-Gemini's own checks: `gemini mcp list` (or `/mcp list` in a session) shows devcoach as
-**Connected**, `gemini skills list` (`/skills list`) shows the devcoach skill and its folder, and
-`/hooks list` in a session shows the two hooks.
-
-## First run
-
-Start a new `gemini` session in a project folder you trust: Gemini loads servers, hooks and skills
-when a session starts, and connects no MCP server in a folder it does not trust.
-
-After your first task devcoach offers to set up your profile and asks how: **Automatic**
-(recommended), **Automatic (Deep)**, **Guided** or **Import backup**.
-
-:::note[Gemini asks you first]
-
-- **The skill.** When the cue has Gemini load the devcoach skill, Gemini asks you to allow it, with
-  the skill's name, purpose and folder. Allow it, or devcoach cannot follow its own rules. Gemini's
-  docs say it asks each time a skill is triggered in a session.
-- **The tools.** Gemini asks before it runs a tool from an MCP server you have not trusted,
-  devcoach's included. You can allow the whole devcoach server instead of each tool.
-
-:::
-
-The pace is yours to set: by default about one cue every 10 interactions in a chat session, at most
-2 lessons a day, at least 4 hours apart, and none while a course is in progress
-([Coaching in your agent](../usage/coaching.md)). Gemini sends its hooks no plan-mode flag, so every
-turn counts, planning included.
 
 ## Update
 

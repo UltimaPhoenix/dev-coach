@@ -156,6 +156,36 @@ devcoach install
 - **Update and remove:** see [Update](#updating) and [Remove](#uninstall). CI updates the bucket at
   every release.
 
+## Check it worked
+
+The line ends with `devcoach <version> is installed.` Its window has `devcoach` already; in a
+terminal opened before, reopen it first:
+
+```powershell
+devcoach --version
+devcoach doctor
+```
+
+`doctor` checks each part of the wiring. Look for `this devcoach: windows-installer` and
+`Node … via bundled` (`scoop` and `via scoop` with Scoop) under **Environment**, then `✓ Stop hook wired` and
+`✓ UserPromptSubmit priming hook wired` under **Claude Code wiring**. A `shell-form hook on Windows`
+line means hooks written the old way: run `devcoach install` again, as it says.
+
+## First run
+
+Start a new Claude Code session and restart Claude Desktop. After your first task devcoach offers to
+set up your profile and asks how: **Automatic** (recommended), **Automatic (Deep)**, **Guided** or
+**Import backup**. In Claude Desktop, say *set up devcoach* once, then ask for a lesson when you want
+one (*teach me something from what we just did*).
+
+From then on, when your agent finishes a task and a lesson is due, devcoach teaches one short lesson
+on something that task touched. The pace is yours to set:
+[Coaching in your agent](../usage/coaching.md).
+
+**You're set.** The rest of this page is for later:
+[what the install changed](#what-it-set-up), [updating](#updating), [removing](#uninstall),
+[fixes](#troubleshooting) and [installing with npm instead](#npm-instead).
+
 ## What it set up
 
 <FileTree
@@ -207,32 +237,6 @@ private Node, the user PATH and this hook, runs the hook and `devcoach doctor`, 
 does not run the `irm | iex` line or Scoop.
 
 </details>
-
-## Check it worked
-
-The line ends with `devcoach <version> is installed.` Its window has `devcoach` already; in a
-terminal opened before, reopen it first:
-
-```powershell
-devcoach --version
-devcoach doctor
-```
-
-`doctor` checks each part of the wiring. Look for `this devcoach: windows-installer` and
-`Node … via bundled` (`scoop` and `via scoop` with Scoop) under **Environment**, then `✓ Stop hook wired` and
-`✓ UserPromptSubmit priming hook wired` under **Claude Code wiring**. A `shell-form hook on Windows`
-line means hooks written the old way: run `devcoach install` again, as it says.
-
-## First run
-
-Start a new Claude Code session and restart Claude Desktop. After your first task devcoach offers to
-set up your profile and asks how: **Automatic** (recommended), **Automatic (Deep)**, **Guided** or
-**Import backup**. In Claude Desktop, say *set up devcoach* once, then ask for a lesson when you want
-one (*teach me something from what we just did*).
-
-From then on, when your agent finishes a task and a lesson is due, devcoach teaches one short lesson
-on something that task touched. The pace is yours to set:
-[Coaching in your agent](../usage/coaching.md).
 
 ## Update {/* #updating */}
 

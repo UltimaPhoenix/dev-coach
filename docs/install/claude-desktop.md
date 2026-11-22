@@ -152,27 +152,6 @@ Then restart Claude Desktop: it reads its list of servers when it starts.
 </TabItem>
 </Tabs>
 
-## What it set up
-
-<FileTree
-  root="~/  (macOS)"
-  items={[
-    { name: "Library/Application Support/Claude/", children: [
-      { name: "Claude Extensions/", note: "the extension, unpacked here by Claude Desktop" },
-      { name: "claude_desktop_config.json", note: <>the entry from <code>devcoach install</code>: the full path of your devcoach, then <code>mcp</code></> },
-    ] },
-    { name: "Library/Logs/Claude/", children: [
-      { name: "mcp-server-devcoach.log", note: "Claude Desktop's log for that entry, with devcoach's own line" },
-    ] },
-    { name: ".devcoach/", note: "your lessons, profile, notebook and courses, created the first time Claude uses devcoach. Shared with every agent" },
-  ]}
-  caption={<>On Windows the first two are under <code>%APPDATA%\Claude\</code>, the log in <code>%APPDATA%\Claude\logs\</code>, your data in <code>%USERPROFILE%\.devcoach\</code>.</>}
-/>
-
-`devcoach install` writes an absolute command, so Claude Desktop does not have to find devcoach on
-its own PATH (on Windows: `node.exe` and devcoach's script). `devcoach doctor`, below, shows the
-entry it wrote.
-
 ## Check it worked
 
 In Claude Desktop, click **+** at the bottom of the chat box, then **Connectors**: devcoach and its
@@ -210,6 +189,31 @@ Claude the devcoach skill and its reference files.
 Web dashboard: ask *open the devcoach dashboard*, or run `devcoach ui` if you have the command. From
 the extension, asking is untested on Claude Desktop's built-in Node; `npx -y devcoach ui` works with
 Node.js 24.
+
+**You're set.** The rest of this page is for later:
+[what the install changed](#what-it-set-up), [updating](#update), [removing](#remove) and
+[fixes](#when-devcoach-does-not-start).
+
+## What it set up
+
+<FileTree
+  root="~/  (macOS)"
+  items={[
+    { name: "Library/Application Support/Claude/", children: [
+      { name: "Claude Extensions/", note: "the extension, unpacked here by Claude Desktop" },
+      { name: "claude_desktop_config.json", note: <>the entry from <code>devcoach install</code>: the full path of your devcoach, then <code>mcp</code></> },
+    ] },
+    { name: "Library/Logs/Claude/", children: [
+      { name: "mcp-server-devcoach.log", note: "Claude Desktop's log for that entry, with devcoach's own line" },
+    ] },
+    { name: ".devcoach/", note: "your lessons, profile, notebook and courses, created the first time Claude uses devcoach. Shared with every agent" },
+  ]}
+  caption={<>On Windows the first two are under <code>%APPDATA%\Claude\</code>, the log in <code>%APPDATA%\Claude\logs\</code>, your data in <code>%USERPROFILE%\.devcoach\</code>.</>}
+/>
+
+`devcoach install` writes an absolute command, so Claude Desktop does not have to find devcoach on
+its own PATH (on Windows: `node.exe` and devcoach's script). `devcoach doctor`,
+[above](#check-it-worked), shows the entry it wrote.
 
 ## Update
 
