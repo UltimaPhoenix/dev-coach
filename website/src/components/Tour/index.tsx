@@ -4,6 +4,7 @@
 // site emits at /demo/course.html (docusaurus.config.ts), framed and driven the way the
 // dashboard does it (assets/static/course-viewer.js).
 import Link from "@docusaurus/Link";
+import { useLocation } from "@docusaurus/router";
 import { useColorMode } from "@docusaurus/theme-common";
 import useBaseUrl from "@docusaurus/useBaseUrl";
 import { usePluginData } from "@docusaurus/useGlobalData";
@@ -163,10 +164,35 @@ function Capture({ shot, label, alt }: { shot: Shot; label: string; alt: string 
 
 const HANDSHAKE_MS = 5000;
 
+/** The sentence under the demo course: before it runs (next to Run) and while it runs (next to Close). */
+export interface DemoCourseCaption {
+  still: ReactNode;
+  running: ReactNode;
+}
+
+/** The home's captions. A guide passes its own `caption`, for both states. */
+const HOME_CAPTION: DemoCourseCaption = {
+  still: (
+    <>
+      A lesson you couldn't follow is kept as the seed of a course: one step at a time, with charts and checks.
+      This one is real, and it runs here.
+    </>
+  ),
+  running: (
+    <>
+      This is the course document itself, the one file your agent writes for you. In the dashboard your progress
+      is saved step by step.
+    </>
+  ),
+};
+
 /** The demo course: its capture, and a button that runs the real document in place. */
-export function DemoCourse({ shot }: { shot: Shot }): ReactNode {
+export function DemoCourse({ shot, caption = HOME_CAPTION }: { shot: Shot; caption?: DemoCourseCaption }): ReactNode {
   const course = usePluginData("devcoach-demo-course") as DemoCourseData;
   const src = useBaseUrl(course.file);
+  // The running caption links to the Courses guide, except on the guide itself.
+  const coursesGuide = useBaseUrl("/usage/courses");
+  const onCoursesGuide = useLocation().pathname.replace(/\/$/, "") === coursesGuide.replace(/\/$/, "");
   const { colorMode } = useColorMode();
   const frame = useRef<HTMLIFrameElement>(null);
   const runButton = useRef<HTMLButtonElement>(null);
@@ -267,10 +293,7 @@ export function DemoCourse({ shot }: { shot: Shot }): ReactNode {
           alt="A course page in the dashboard: five steps on the left, one step open with an explanation, a load chart and a multiple-choice check"
         />
         <p className={styles.caption}>
-          <span>
-            A lesson you couldn't follow is kept as the seed of a course: one step at a time, with charts and
-            checks. This one is real, and it runs here.
-          </span>
+          <span>{caption.still}</span>
           <button ref={runButton} type="button" className="button button--primary button--sm" onClick={() => setState("running")}>
             ▶ Run this course
           </button>
@@ -327,12 +350,9 @@ export function DemoCourse({ shot }: { shot: Shot }): ReactNode {
         </div>
       </div>
       <p className={styles.caption}>
-        <span>
-          This is the course document itself, the one file devcoach writes for you. In the dashboard your progress
-          is saved step by step.
-        </span>
+        <span>{caption.running}</span>
         <span className={styles.captionActions}>
-          <Link to="/usage/courses">Courses →</Link>
+          {!onCoursesGuide && <Link to="/usage/courses">Courses →</Link>}
           <button type="button" className="button button--secondary button--sm" onClick={() => setState("still")}>
             Close
           </button>
