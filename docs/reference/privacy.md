@@ -126,7 +126,7 @@ notebook it builds.
         <td data-label="Keeps or passes on">Your agent gets the topics found</td>
       </tr>
       <tr>
-        <th scope="row">`~/.claude/history.jsonl`</th>
+        <th scope="row">`~/.claude/`<wbr/>`history.jsonl`</th>
         <td data-label="What devcoach reads">Each line is parsed and **only `project` and `timestamp` are kept**. The prompt text is dropped at once</td>
         <td data-label="Keeps or passes on">Your agent gets a prompt count and the last activity date per project. **Never the text**</td>
       </tr>
