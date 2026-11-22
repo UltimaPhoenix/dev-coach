@@ -540,3 +540,27 @@ unverified publisher). The release run also publishes
 `mcp-registry`, tokenless — ownership = repo OIDC + `mcpName` in the npm tarball);
 `scripts/sync-plugin.mjs` pins `server.json`'s versions in the bump commit and
 `tests/mcp-registry.test.ts` fails on drift, like the plugin/gemini-extension pins.
+
+### Before a release: the changelog, the roadmap, the captures
+
+The docs need no version edits at a release (see *The docs describe the version they ship with* under
+Development conventions). Three things are still done by hand, in one PR to `develop`, before the
+release run is dispatched:
+
+1. **`CHANGELOG.md`**: rename `## [Unreleased]` to `## [x.y.z] — YYYY-MM-DD` (the version the run
+   will produce, today's date) and open a new, empty `## [Unreleased]` above it. The release job
+   does not do this. It is also what updates the roadmap: every `<Stop entry="…">` in
+   `docs/vision.md` whose entry is in that section turns from "next" into a shipped stop with that
+   version and date. Do not reword the bold title of an entry a stop points at
+   (`npm test --prefix website` fails if a stop's entry is gone).
+2. **The roadmap (`docs/vision.md`)**: read it once. Keep the timeline to about six stops: when one
+   ships and the row gets crowded, drop the oldest. For the release after this one, add a stop
+   that names its headline changelog entry as soon as that entry exists under `## [Unreleased]`;
+   until then the timeline has no "next" stop. Take out of *Exploring* any idea that has shipped. An
+   idea never gets a version.
+3. **Captures**, when what they show has changed: `npm run docs:cli-output` (the real CLI output the
+   guides print) and the *Update documentation screenshots* workflow, dispatched on `develop`
+   (screenshots and clips).
+
+The release run then deploys both sites itself (`gh workflow run docs.yml --ref main` at the end of
+`bump`), so the released docs and `/next/` are rebuilt from the bump commit.
