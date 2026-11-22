@@ -5,14 +5,12 @@ description: Run devcoach with npx, or install it globally with npm, then connec
 keywords: [devcoach npx, npm install -g devcoach, devcoach node 24, claude code mcp server, claude desktop mcp server, claude mcp add, nvm]
 ---
 
-import cli from "@site/src/data/cli-output.json";
 import { Card, Cards } from "@site/src/components/Cards";
 import FileTree from "@site/src/components/FileTree";
 import Terminal from "@site/src/components/Terminal";
 import Tabs from "@theme/Tabs";
 import TabItem from "@theme/TabItem";
 
-export const npxInstall = "\u001b[1mSetting up devcoach\u001b[22m\u001b[2m  (npx -y devcoach mcp)\u001b[22m\n\n\u001b[1mClaude Code\u001b[22m\n  MCP server…  \u001b[32m✓\u001b[39m Registered via `claude mcp add` (scope: user)\n  Hooks…       \u001b[32m✓\u001b[39m Hooks installed into ~/.claude/settings.json (Stop + UserPromptSubmit)\n  Skill…       \u001b[32m✓\u001b[39m Installed into ~/.claude/skills/devcoach\n\n\u001b[1mClaude Desktop\u001b[22m\n  MCP server…  \u001b[32m✓\u001b[39m Installed into ~/.config/Claude/claude_desktop_config.json\n\n\u001b[33m→\u001b[39m Restart Claude Desktop to pick up the new server.\n\n\u001b[2mTip: run devcoach backup to export your profile, lessons and settings.\n     run devcoach restore <file> to import a backup on a new machine.\n     After upgrading devcoach (npm, Homebrew), re-run devcoach install to refresh the skill.\u001b[22m";
 export const npxDoctor = "\n\u001b[1mdevcoach doctor\u001b[22m \u001b[2mv2.7.1\u001b[22m\n\n\u001b[1mEnvironment\u001b[22m\n  \u001b[32m✓\u001b[39m Node 24.22.3 via nvm (≥ 24)\n  \u001b[32m✓\u001b[39m this devcoach: npx, temporary location (~/.npm/_npx/edf3918481d23863/node_modules/devcoach)\n\u001b[1m\nClaude Code wiring\u001b[22m\n  \u001b[32m✓\u001b[39m Stop hook wired (1 entry)\n  \u001b[32m✓\u001b[39m UserPromptSubmit priming hook wired\n  \u001b[33m→\u001b[39m hook runs via npx — needs the npx cache (or network) on every stop\n  \u001b[33m→\u001b[39m hook runs via npx — needs the npx cache (or network) on every stop\n  \u001b[32m✓\u001b[39m Claude Code skill installed (current version)\n  \u001b[32m✓\u001b[39m MCP server registered (user scope)\n  \u001b[33m→\u001b[39m starts via `npx -y devcoach` — needs the npx cache (or the network) at every start\n\u001b[1m\nClaude Desktop\u001b[22m\n  \u001b[32m✓\u001b[39m registered: npx -y devcoach mcp\n  \u001b[33m→\u001b[39m starts via `npx -y devcoach` — needs the npx cache (or the network) at every start\n\u001b[1m\nDatabase & pacing\u001b[22m\n  \u001b[33m→\u001b[39m no database yet (~/.devcoach/coaching.db) — onboarding runs on the first technical task";
 export const globalDoctor = "\n\u001b[1mdevcoach doctor\u001b[22m \u001b[2mv2.7.1\u001b[22m\n\n\u001b[1mEnvironment\u001b[22m\n  \u001b[32m✓\u001b[39m Node 24.22.3 via nvm (≥ 24)\n  \u001b[32m✓\u001b[39m this devcoach: npm-global, bound to Node v24.22.3 (nvm) (~/.nvm/versions/node/v24.22.3/lib/node_modules/devcoach)\n\u001b[1m\nClaude Code wiring\u001b[22m\n  \u001b[32m✓\u001b[39m Stop hook wired (1 entry)\n  \u001b[32m✓\u001b[39m UserPromptSubmit priming hook wired\n  \u001b[32m✓\u001b[39m Claude Code skill installed (current version)\n  \u001b[32m✓\u001b[39m MCP server registered (user scope)\n  \u001b[32m✓\u001b[39m command resolves to ~/.nvm/versions/node/v24.22.3/bin/devcoach\n  \u001b[33m→\u001b[39m bound to Node v24.22.3 (nvm) — removing or switching that version breaks it with `Failed to spawn process: No such file or directory`; run `devcoach install --force` after\n  \u001b[32m✓\u001b[39m runs on Node 24.22.3 (~/.nvm/versions/node/v24.22.3/bin/node)\n  \u001b[32m✓\u001b[39m it runs devcoach 2.7.1\n\u001b[1m\nClaude Desktop\u001b[22m\n  \u001b[32m✓\u001b[39m registered: ~/.nvm/versions/node/v24.22.3/bin/devcoach mcp\n  \u001b[32m✓\u001b[39m command resolves to ~/.nvm/versions/node/v24.22.3/bin/devcoach\n  \u001b[33m→\u001b[39m bound to Node v24.22.3 (nvm) — removing or switching that version breaks it with `Failed to spawn process: No such file or directory`; run `devcoach install --force` after\n  \u001b[32m✓\u001b[39m runs on Node 24.22.3 (~/.nvm/versions/node/v24.22.3/bin/node)\n  \u001b[32m✓\u001b[39m it runs devcoach 2.7.1\n\u001b[1m\nDatabase & pacing\u001b[22m\n  \u001b[33m→\u001b[39m no database yet (~/.devcoach/coaching.db) — onboarding runs on the first technical task";
 
@@ -62,11 +60,16 @@ devcoach install
 
 Then restart Claude Desktop and start a new Claude Code session: both load devcoach when they start.
 
-### Through npx or installed globally?
+Using Claude Code? The [plugin](./claude-code-plugin.md) can do the coaching while a global install
+only adds the `devcoach` command: then skip `devcoach install` ([why](./claude-code-plugin.md#install)).
+Claude Desktop is then not connected either: `devcoach install --claude-desktop` afterwards.
+
+<details id="through-npx-or-installed-globally">
+<summary>Through npx or installed globally?</summary>
 
 | | Through npx | Installed globally |
 |---|---|---|
-| Agents run | `npx -y devcoach mcp` | devcoach's full path (see [below](#what-it-set-up)) |
+| Agents run | `npx -y devcoach mcp` | devcoach's full path (see [below](#check-it-worked)) |
 | Each start | asks the npm registry first | runs devcoach directly |
 | Offline | slow: over a minute of npm retries in our test | works |
 | Command | no `devcoach`: type `npx -y devcoach …` | `devcoach` |
@@ -75,32 +78,11 @@ Then restart Claude Desktop and start a new Claude Code session: both load devco
 The full path means an agent with a shorter PATH than your shell (Claude Desktop) still finds devcoach.
 On Windows a global install registers `node.exe` and devcoach's script instead.
 
+</details>
+
 ## What it set up
 
-`devcoach install` says what it wrote. Only the header differs between the two ways:
-
-<Tabs groupId="npx-or-global">
-<TabItem value="npx" label="Through npx" default>
-
-<Terminal
-  command="npx -y devcoach install"
-  output={npxInstall}
-  caption="Captured on Linux in a test home, Node 24 from nvm, devcoach 2.7.1 from npm."
-/>
-
-</TabItem>
-<TabItem value="global" label="Installed globally">
-
-<Terminal
-  command="devcoach install"
-  output={cli.install}
-  caption="After npm install -g devcoach, Node 24 from nvm. The yellow line: Node version managers, below."
-/>
-
-</TabItem>
-</Tabs>
-
-Here is every file it touched:
+`devcoach install` writes these files:
 
 <FileTree
   root="~/"
@@ -110,8 +92,8 @@ Here is every file it touched:
       { name: "settings.json", note: <>the two hooks: <code>npx -y devcoach stop-hook</code> and <code>prompt-hook</code></> },
       { name: "skills/devcoach/", note: <>the devcoach skill: <code>SKILL.md</code>, five <code>references/</code>, a version stamp</> },
     ] },
-    { name: ".config/Claude/", children: [
-      { name: "claude_desktop_config.json", note: <>Claude Desktop's server entry (macOS: <code>~/Library/Application Support/Claude/</code>)</> },
+    { name: "Library/Application Support/Claude/", children: [
+      { name: "claude_desktop_config.json", note: <>Claude Desktop's server entry (Linux: <code>~/.config/Claude/</code>; Windows: <code>%APPDATA%\Claude\</code>)</> },
     ] },
     { name: ".npm/_npx/", note: "npx's own copy of devcoach: temporary, npm manages it" },
     { name: ".devcoach/", note: "your lessons, profile, notebook and courses, created when devcoach first runs" },
@@ -129,7 +111,7 @@ Run `devcoach doctor` (through npx: `npx -y devcoach doctor`). It checks each pa
 <Terminal
   command="npx -y devcoach doctor"
   output={npxDoctor}
-  caption="Right after install, same test home. Every line is a check; a ✗ line says what to run."
+  caption="Right after npx -y devcoach install, captured on Linux in a test home (home shown as ~), Node 24 from nvm. Every line is a check; a ✗ line says what to run."
 />
 
 </TabItem>
@@ -138,16 +120,16 @@ Run `devcoach doctor` (through npx: `npx -y devcoach doctor`). It checks each pa
 <Terminal
   command="devcoach doctor"
   output={globalDoctor}
-  caption="Right after install, a test home with a global install. Every line is a check; a ✗ line says what to run."
+  caption="Right after npm install -g devcoach and devcoach install, Node 24 from nvm, same kind of test home. Every line is a check; a ✗ line says what to run."
 />
 
 </TabItem>
 </Tabs>
 
 What to look for: a ✓ on the two hooks, the skill and the server. Through npx, the yellow **runs via
-npx** lines are the trade-off in the table above, not errors. Installed globally, **bound to Node**
-appears only with a Node version manager ([below](#node-version-managers)). **no database yet** is
-normal before your first lesson.
+npx** lines are the trade-off [above](#through-npx-or-installed-globally), not errors. Installed
+globally, **bound to Node** appears only with a Node version manager ([below](#node-version-managers)).
+**no database yet** is normal before your first lesson.
 
 ## First run
 
@@ -164,7 +146,8 @@ on something that task touched. The pace is yours to set:
 <Tabs groupId="npx-or-global">
 <TabItem value="npx" label="Through npx" default>
 
-npx fetches each new release by itself. Refresh the devcoach skill after a release:
+npx fetches each new release by itself. Refresh the devcoach skill after a release (skip this with the
+plugin):
 
 ```bash
 npx -y devcoach install
@@ -175,7 +158,7 @@ npx -y devcoach install
 
 ```bash
 npm install -g devcoach
-# refresh the devcoach skill
+# refresh the devcoach skill (skip this with the plugin)
 devcoach install
 ```
 
@@ -228,9 +211,7 @@ npm uninstall -g devcoach
 </TabItem>
 </Tabs>
 
-<Terminal command="devcoach uninstall" output={cli.uninstall} />
-
-Your lessons, profile, notebook and courses stay in `~/.devcoach/`. Two options of `devcoach uninstall`:
+Then restart Claude Desktop to drop the server. Your lessons, profile, notebook and courses stay in `~/.devcoach/`. Two options of `devcoach uninstall`:
 
 - `--data` deletes them too, after asking. Back up first with `devcoach backup` if you might come back.
 - `--all` also removes devcoach from Gemini CLI and Codex CLI.
@@ -252,7 +233,7 @@ devcoach globally.
 
 ## Node version managers {/* #node-version-managers */}
 
-With nvm, fnm, asdf or mise, each Node version keeps its own global packages: `npm install -g`
+With nvm, nvm-windows, fnm, asdf or mise, each Node version keeps its own global packages: `npm install -g`
 puts devcoach inside the current version's directory (`~/.nvm/versions/node/v24.22.3/…` with nvm).
 
 - **Another Node version** has no devcoach: `devcoach: command not found`.
@@ -275,6 +256,9 @@ Through npx none of this applies: npx runs devcoach on whichever Node is current
 
 To keep your config files under your own control, write the entries `devcoach install` writes
 through npx yourself.
+
+<details>
+<summary>What to write, and where</summary>
 
 **The server**, for all your projects (user scope, like the hooks below; without `--scope user`
 Claude Code registers it for the current project only):
@@ -336,6 +320,8 @@ built-in instruction. `devcoach install` is what writes `~/.claude/skills/devcoa
 With a global install, use devcoach's full path in place of `npx -y devcoach` (no npx cache or network
 needed at hook time). `devcoach install` picks the best command automatically, and repairs older
 two-entry layouts. Run `devcoach doctor` to check the wiring.
+
+</details>
 
 <Cards>
   <Card label="Next" title="Coaching in your agent" to="/usage/coaching">
