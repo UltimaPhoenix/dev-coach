@@ -12,6 +12,12 @@ import Terminal from "@site/src/components/Terminal";
 import WideDiagram from "@site/src/components/WideDiagram";
 import cli from "@site/src/data/cli-output.json";
 
+export const doctorPacing = (() => {
+  const lines = cli.doctor.split("\n");
+  const at = lines.findIndex((line) => line.startsWith("Database & pacing"));
+  return at > 3 ? [...lines.slice(0, 3), "…", ...lines.slice(at - 1)].join("\n") : cli.doctor;
+})();
+
 Every setting devcoach has, the rules that decide when a lesson comes, and everything devcoach keeps on
 your computer.
 
@@ -63,8 +69,9 @@ They live in the `settings` table of the database and travel in every backup.
 
 Your agent sends one key and its value as a string: `{ "key": "max_per_day", "value": "3" }`.
 `devcoach ui` starts the dashboard on port 7860 of `127.0.0.1` only, so other machines cannot reach
-it: `--port <n>` picks another port, `--open` opens your browser, `--stop` stops the dashboard running
-on that port. More on the [web dashboard](../usage/web-ui.md) page.
+it: <code style={{ whiteSpace: "nowrap" }}>{"--port <n>"}</code> picks another port,
+<code style={{ whiteSpace: "nowrap" }}>--open</code> opens your browser,
+<code style={{ whiteSpace: "nowrap" }}>--stop</code> stops the dashboard running on that port. More on the [web dashboard](../usage/web-ui.md) page.
 
 :::warning[Three things to know before you change a setting]
 
@@ -72,10 +79,10 @@ on that port. More on the [web dashboard](../usage/web-ui.md) page.
   of `devcoach set` says `0 = off`. Both are wrong: 0 cues a lesson on every reply. For fewer lessons,
   raise `nudge_every` or lower `max_per_day`. The quietest setting is 1000 for `nudge_every` with 1
   for `max_per_day`.
-- **`devcoach set` does not check ranges.** It checks only that `nudge_every` is a whole number, 0 or
-  more, and that `nudge_scope` is `session` or `global`. Anything else is stored as typed, and a value
-  outside its range, or a word, can stop lessons or remove a limit. Your agent's tool and the dashboard
-  do check.
+- **`devcoach set` does not check ranges.** It checks only that `nudge_every` starts with a whole
+  number of 0 or more (`1.5` and `12abc` pass), that `nudge_scope` is `session` or `global`, and that
+  `share_name` is at most 80 characters. Anything else is stored as typed, and a value outside its
+  range, or a word, can stop lessons or remove a limit. Your agent's tool and the dashboard do check.
 - **The dashboard's gap is a list of presets.** With another value set elsewhere (say 100 minutes), the
   list shows *No cooldown*, and saving the form stores 0. Pick the gap again before you save.
 
@@ -94,11 +101,11 @@ counted: you ask for a lesson. Short sessions may end with no lesson at all; tha
 
 | Reply | Why it is not counted |
 |---|---|
-| in plan mode (Claude Code and Codex CLI) | Planning is not coachable work. |
-| the one your agent writes because devcoach asked for it | It is the turn that answers devcoach's own cue. |
-| any reply before onboarding | The hook offers onboarding instead. |
-| any reply while a course is in progress | Cues pause, so nothing interrupts the course, until you complete or abandon it. |
-| any reply while this devcoach can only read the database | It cannot save anything ([two versions](#two-versions)). |
+| **in plan mode** (Claude Code and Codex CLI) | Planning is not coachable work. |
+| **the one your agent writes because devcoach asked for it** | It is the turn that answers devcoach's own cue. |
+| **any reply before onboarding** | The hook offers onboarding instead. |
+| **any reply while a course is in progress** | Cues pause, so nothing interrupts the course, until you complete or abandon it. |
+| **any reply while this devcoach can only read the database** | It cannot save anything ([two versions](#two-versions)). |
 
 </RefTable>
 
@@ -114,10 +121,10 @@ no counter: every reply that counts gets a cue, within the rate limit.
 
 | After | The next cue needs |
 |---|---|
-| a cue your agent has not answered yet | `min(3, nudge_every)` replies, in any session |
-| a lesson (`log_lesson`) | `nudge_every` replies |
-| a skip (`skip_lesson`), when the work was not technical | `nudge_every` replies |
-| a lesson someone [shared with you](../usage/sharing.md) | Nothing changes: it never counts toward `max_per_day`, never starts the gap and never restarts a counter. |
+| **a cue your agent has not answered yet** | `min(3, nudge_every)` replies in one session (in total with `global`) |
+| **a lesson** (`log_lesson`) | `nudge_every` replies |
+| **a skip** (`skip_lesson`), when the work was not technical | `nudge_every` replies |
+| **a lesson someone [shared with you](../usage/sharing.md)** | Nothing changes: it never counts toward `max_per_day`, never starts the gap and never restarts a counter. |
 
 </RefTable>
 
@@ -129,10 +136,11 @@ card is on [How it works](../how-it-works.md).
 
 <Terminal
   command="devcoach doctor"
-  output={cli.doctor}
+  output={doctorPacing}
   caption={
     <>
-      Read the last two blocks. <em>Database &amp; pacing</em> shows your settings, how many replies
+      Its last two blocks; the three before them (your Node, and how Claude Code and Claude Desktop
+      start devcoach) are cut here. <em>Database &amp; pacing</em> shows your settings, how many replies
       have been counted and the rate limit. <em>Verdict</em> says whether the next reply would get a
       cue, and why. The verdict does not look at courses yet: while a course is in progress, no cue
       comes, whatever it says.
@@ -171,7 +179,8 @@ devcoach set nudge_every 10
 
 ### Environment variables {/* #environment-variables */}
 
-Every variable devcoach reads, and who it is for.
+Every variable devcoach reads, and who it is for. Five more, used only by tests and by the plugin's and
+the extension's launcher, are folded under the table.
 
 <RefTable>
 
@@ -183,18 +192,30 @@ Every variable devcoach reads, and who it is for.
 | `FORCE_HYPERLINK=1` | Clickable links on a terminal devcoach does not recognise, even with `NO_COLOR` or a pipe. | *you* |
 | `COLUMNS` | When the output is not a terminal: the width of the `── title ──` lines in `devcoach lesson`, `course` and `setup` (otherwise 80, at most 100). Tables always fit their content. | *you* |
 | `DEVCOACH_DIR` | Moves the data folder (database, notebook, courses, `hook.log`) away from `~/.devcoach`. `DEVCOACH_DIR=$(mktemp -d) devcoach stats` leaves your real data untouched. | tests, sandboxes |
-| `DEVCOACH_CLAUDE_DIR` | Where the onboarding scan reads Claude Code's history: `~/.claude` and `~/.claude.json` by default, both inside this folder when it is set. Wins over `CLAUDE_CONFIG_DIR`. | tests |
-| `CLAUDE_CONFIG_DIR` | Claude Code's own variable, read the same way by the onboarding scan. `devcoach install` writes its hooks and skill to `~/.claude` either way. | Claude Code |
-| `DEVCOACH_RUNTIME_DIR` | For the Claude Code plugin and the Gemini CLI extension: where their launcher installs its copy of devcoach. | tests |
-| `DEVCOACH_RUNTIME_SPEC` | For the same launcher: which package it installs (by default the version they pin). | tests |
+| `CLAUDE_CONFIG_DIR` | Claude Code's own variable. When it is set, the onboarding scan reads Claude Code's history inside this folder (`~/.claude` and `~/.claude.json` by default). `devcoach install` writes its hooks and skill to `~/.claude` either way. | Claude Code |
 | `HOME` | Where `~` is: the data folder and every agent config devcoach reads or writes (`USERPROFILE` on Windows). `HOME=$(mktemp -d) devcoach …` is a full sandbox. | your system |
 | `XDG_CONFIG_HOME` | On Linux, where `install`, `uninstall` and `doctor` look for Claude Desktop's config, and `doctor` for its log. `APPDATA` does the same on Windows. | your system |
 | `PATH` | How `install` finds the `devcoach` and `node` commands it writes into your agents' config, and how `doctor` checks them (with `PATHEXT` on Windows). | your system |
 | `TERM`, `TERM_PROGRAM` | With a few similar variables: whether to use colours (`TERM=dumb` turns them off) and clickable links. | your terminal |
+
+</RefTable>
+
+<details>
+<summary>For tests and launchers: five more variables</summary>
+
+<RefTable>
+
+| Variable | What it does | For |
+|---|---|---|
+| `DEVCOACH_CLAUDE_DIR` | Where the onboarding scan reads Claude Code's history: `~/.claude` and `~/.claude.json` by default, both inside this folder when it is set. Wins over `CLAUDE_CONFIG_DIR`. | tests |
+| `DEVCOACH_RUNTIME_DIR` | For the Claude Code plugin and the Gemini CLI extension: where their launcher installs its copy of devcoach. | tests |
+| `DEVCOACH_RUNTIME_SPEC` | For the same launcher: which package it installs (by default the version they pin). | tests |
 | `CLAUDE_PLUGIN_DATA` | Set by Claude Code for the plugin: its launcher installs devcoach in this folder. | Claude Code |
 | `DEVCOACH_LAUNCHER` | Set by the plugin's or the extension's launcher; `doctor` prints it as the runtime in use. | the launcher |
 
 </RefTable>
+
+</details>
 
 ## Your data {/* #your-data */}
 
@@ -212,7 +233,7 @@ Your coaching data lives in `~/.devcoach/`: a SQLite database (`coaching.db`), t
     },
     {
       name: "learning-state.md",
-      note: "the coaching notebook. Your agent writes it at onboarding and updates it at notebook checkpoints; you can edit it on the dashboard's Settings page.",
+      note: "the coaching notebook. Your agent writes it at onboarding and updates it at notebook checkpoints. The dashboard's Settings page shows it, read-only; to change it, edit this file.",
     },
     {
       name: "courses/",
@@ -298,7 +319,7 @@ again for the lessons per day and the gap, offering 2 and 240 (not your current 
 Enter resets them. And it leaves the notebook as it was.
 
 **Start from nothing.** Deleting the folder removes the database, the notebook and the courses; on your
-next task, devcoach offers onboarding again.
+next task, devcoach offers onboarding again (in an agent with hooks; elsewhere say *set up devcoach*).
 
 ```bash
 devcoach backup before-reset.zip   # optional
@@ -491,9 +512,9 @@ CREATE INDEX IF NOT EXISTS idx_lessons_topic_id ON lessons (topic_id);
 ```
 
 - `lessons`: `categories` is a JSON array; `level` is `junior`, `mid` or `senior`; `body` is the
-  lesson's markdown; `feedback` is `know`, `understood`, `dont_know` or empty; `repository_platform`
+  lesson's markdown; `feedback` is `know`, `understood`, `dont_know` or NULL; `repository_platform`
   is `github`, `gitlab`, `bitbucket` or `local`; `imported` = 1 marks a lesson shared with you, and
-  `shared_by` holds its sender's name (empty when anonymous). `timestamp` is ISO 8601 in UTC, stamped
+  `shared_by` holds its sender's name (NULL when anonymous). `timestamp` is ISO 8601 in UTC, stamped
   by devcoach when a lesson is saved.
 - `courses` (schema version 5, devcoach 2.5.0): `prerequisites` is a JSON array of `{concept, known}`
   from the questions before a course.
