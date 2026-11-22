@@ -15,7 +15,7 @@ import { OnNext, OnStable } from "@site/src/components/ReleaseChannel";
 
 One PowerShell line, or Scoop: both bring their own Node.js and put the `devcoach` command on your
 PATH, as Homebrew does on macOS. The line also connects your agents; with Scoop you run
-`devcoach install` yourself. Windows support is in beta, from devcoach 2.8.0.
+`devcoach install` yourself. Windows support is in beta.
 
 <Cards columns={3}>
   <Card label="Automatic lessons" title="Claude Code">
@@ -95,7 +95,7 @@ Set a variable before the line, as above, or save the script and pass parameters
 
 ```powershell
 irm https://ultimaphoenix.github.io/dev-coach/install.ps1 -OutFile install.ps1
-powershell -ExecutionPolicy Bypass -File .\install.ps1 -Version 2.8.0
+powershell -ExecutionPolicy Bypass -File .\install.ps1 -InstallDir D:\tools\devcoach
 ```
 
 </OnStable>
@@ -113,7 +113,7 @@ powershell -ExecutionPolicy Bypass -File .\install.ps1 -Channel next
 
 Each as a parameter, or as a variable:
 
-- `-Version 2.8.0`, `DEVCOACH_VERSION`: a specific release (default: the latest).
+- `-Version <x.y.z>`, `DEVCOACH_VERSION`: a specific release (default: the latest).
 - `-Channel next`, `DEVCOACH_CHANNEL`: the canary built from `develop`.
 - `-InstallDir D:\tools\devcoach`, `DEVCOACH_INSTALL_DIR`: another place for the runtime.
 - `-NodeVersion 26.13.0`, `DEVCOACH_NODE_VERSION`: a specific private Node (default: the newest LTS).
@@ -128,7 +128,7 @@ Parameters only:
 
 - `-ConnectArgs --gemini`: arguments for `devcoach install`; they replace the default (here: Gemini
   CLI only).
-- `-Archive path\to\devcoach-2.8.0-standalone.zip`: devcoach from a downloaded zip instead of
+- `-Archive path\to\devcoach-<version>-standalone.zip`: devcoach from a downloaded zip instead of
   GitHub. Node still comes from nodejs.org, unless you use the system Node.
 - `-Uninstall`: runs the uninstaller described in [Remove](#uninstall).
 
@@ -278,7 +278,7 @@ might come back).
 | What you see | What to do |
 |---|---|
 | `… is in use - close Claude Code / Claude Desktop (they run devcoach) and re-run.` | An agent is running devcoach and holds `node.exe`. Close them, run the line again |
-| `the release at … has no standalone zip (the first release with one is 2.8.0)` | That release predates Windows support: ask for 2.8.0 or newer with the version option ([Options](#options)) |
+| `the release at … has no standalone zip …` | That release predates Windows support. The message names the first release that has it: ask for that one or a newer one with the version option ([Options](#options)), or leave the option out for the latest |
 | `node.exe's Authenticode signature is …` | The downloaded Node is not signed as expected, so the install stops. The signature option in [Options](#options) overrides it |
 | `devcoach install exited with …` | Open a new terminal and run `devcoach install` |
 | `devcoach` not found in a terminal you had open | Open a new one: the PATH change reaches new processes only |

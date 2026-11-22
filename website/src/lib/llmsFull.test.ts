@@ -6,6 +6,7 @@ import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import sidebars from "../../sidebars.ts";
 import { docRoute, llmsIntro, mdxToMarkdown, pageTitle, sidebarDocIds } from "./llmsFull.ts";
+import { parseChangelog } from "./changelog.ts";
 
 const SITE = "https://ultimaphoenix.github.io/dev-coach/";
 const website = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -83,6 +84,16 @@ After it.`,
     `**Releases**\n\n- **2.1.0 · 2026-09-14: [Lesson sharing](${SITE}usage/sharing)** A lesson travels as text.\n` +
       "- **2.8.0 · next: Windows** An installer.\n" +
       `- **exploring: [Ideas](${SITE}vision#exploring)** Short links.\n\nAfter it.`,
+  );
+});
+
+test("a stop that names its changelog entry reads next until the release, then its version and date", () => {
+  const stop = '<Timeline label="Releases">\n<Stop entry="Windows, in one line" title="Windows">An installer.</Stop>\n</Timeline>';
+  const text = (changelog: string) => mdxToMarkdown(stop, "vision.md", SITE, parseChangelog(changelog));
+  assert.equal(text("## [Unreleased]\n\n### Added\n- **Windows, in one line.** x\n"), "**Releases**\n\n- **next: Windows** An installer.");
+  assert.equal(
+    text("## [Unreleased]\n\n## [2.8.0] — 2026-11-30\n\n### Added\n- **Windows, in one line.** x\n"),
+    "**Releases**\n\n- **2.8.0 · 2026-11-30: Windows** An installer.",
   );
 });
 

@@ -141,7 +141,7 @@ the extension's. To switch routes, [remove](#remove) the first one before you ad
       { name: "package.json", note: "pins the devcoach version it installs" },
     ] },
     { name: ".devcoach/", note: "your lessons too, once you onboard", children: [
-      { name: "gemini-ext/runtime/2.7.1/", note: "devcoach itself, pinned, downloaded from npm on the first start" },
+      { name: "gemini-ext/runtime/<version>/", note: "devcoach itself, pinned, downloaded from npm on the first start" },
       { name: "gemini-ext/install.log", note: "npm's output from that download" },
     ] },
   ]}

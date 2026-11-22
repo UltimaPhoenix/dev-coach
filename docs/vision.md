@@ -61,7 +61,7 @@ What has shipped, what comes next, and the ideas we're exploring. The ideas are 
 <Stop version="2.1.0" date="2026-09-14" title="Lesson sharing" to="/usage/sharing">A lesson travels as text, a link or a file.</Stop>
 <Stop version="2.5.0" date="2026-09-28" title="Courses" to="/usage/courses">Step by step, from a lesson you couldn't follow.</Stop>
 <Stop version="2.7.0" date="2026-10-06" title="Guided setup" to="/install/claude-code-plugin">`/devcoach:setup`; `doctor` checks Claude Desktop.</Stop>
-<Stop version="2.8.0" when="next" status="next" title="Windows" to="/install/windows">A one-line installer, and Scoop (beta).</Stop>
+<Stop entry="Windows, in one line" title="Windows" to="/install/windows">A one-line installer, and Scoop (beta).</Stop>
 <Stop when="exploring" status="exploring" title="Ideas" to="#exploring">A learning path; a course when a topic keeps coming back.</Stop>
 </Timeline>
 

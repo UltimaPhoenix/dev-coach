@@ -5,12 +5,18 @@
 //
 //   <Timeline label="…" caption={<>…</>}>
 //   <Stop version="2.1.0" date="2026-09-14" title="Lesson sharing" to="/usage/sharing">One short line.</Stop>
-//   <Stop version="2.8.0" when="Next" status="next" title="Windows">…</Stop>
+//   <Stop entry="Windows, in one line" title="Windows">…</Stop>
 //   <Stop when="Exploring" status="exploring" title="Ideas" to="#exploring">…</Stop>
 //   </Timeline>
+//
+// A stop for something not released yet names its changelog entry (`entry`) instead of a version:
+// it reads "next" while the entry is under "Unreleased", and takes the release's version and date
+// by itself once that section is renamed at release time (src/lib/changelog.ts).
 import Link from "@docusaurus/Link";
+import { usePluginData } from "@docusaurus/useGlobalData";
 import clsx from "clsx";
 import type { ReactNode } from "react";
+import { type Changelog, whenShipped } from "../../lib/changelog";
 import styles from "./styles.module.css";
 
 export function Timeline({ label, caption, children }: { label: string; caption?: ReactNode; children: ReactNode }): ReactNode {
@@ -28,8 +34,13 @@ type Status = "shipped" | "next" | "exploring";
 
 interface StopProps {
   title: string;
-  /** A released or announced version, e.g. "2.1.0". */
+  /** A released version, e.g. "2.1.0". Never an unreleased one: use `entry` for that. */
   version?: string;
+  /**
+   * The changelog entry this stop stands for (the bold lead of its bullet, or its beginning).
+   * Version, date and status then come from CHANGELOG.md.
+   */
+  entry?: string;
   /** The release date, ISO `YYYY-MM-DD`. */
   date?: string;
   /** A word in place of a date for what has not shipped: "Next", "Exploring". */
@@ -48,7 +59,18 @@ function formatDate(iso: string): string {
   return `${day} ${MONTHS[month - 1]} ${year}`;
 }
 
-export function Stop({ title, version, date, when, status = "shipped", to, children }: StopProps): ReactNode {
+export function Stop(props: StopProps): ReactNode {
+  const changelog = usePluginData("devcoach-changelog") as Changelog;
+  const { title, to, children } = props;
+  let { version, date, when, status = "shipped" } = props;
+  if (props.entry) {
+    // An entry the changelog no longer has reads as not released; the site's tests name it.
+    const shipped = whenShipped(changelog, props.entry) ?? { status: "next" as const };
+    status = shipped.status;
+    version = shipped.status === "shipped" ? shipped.version : undefined;
+    date = shipped.status === "shipped" ? shipped.date : undefined;
+    when = shipped.status === "shipped" ? undefined : "next";
+  }
   return (
     <li className={clsx(styles.stop, styles[status])}>
       <span className={styles.dot} aria-hidden="true" />

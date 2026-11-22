@@ -22,7 +22,7 @@ with [`devcoach doctor`](#doctor).
 
 | You see | Go to |
 |---|---|
-| `devcoach 2.7.1 needs Node 24 or newer` | [Node too old](#node-version-error) |
+| `devcoach <version> needs Node 24 or newer` | [Node too old](#node-version-error) |
 | `Node 22.22.0 is too old: devcoach needs Node 24 or newer` | [Node too old](#node-version-error) |
 | `plugin:devcoach:devcoach` failed to connect | [Can't start](#mcp-server-not-connecting) |
 | `🎓 devcoach is not running: …` | [Can't start](#mcp-server-not-connecting) |
@@ -286,8 +286,8 @@ One session on the demo data:
 ## A newer devcoach upgraded the database {/* #database-newer */}
 
 <Message
-  where="Every devcoach surface. Reproduced on a test database marked as upgraded by a newer build"
-  text="The coaching database was upgraded by devcoach 2.8.0 (schema v7); this is devcoach 2.7.1 (schema v6). Reads work; writes need devcoach ≥ 2.8.0 — update this install, or use the newer channel."
+  where="Every devcoach surface. The dots stand for the two versions and their schema numbers"
+  text="The coaching database was upgraded by devcoach … (schema v…); this is devcoach … (schema v…). Reads work; writes need devcoach ≥ … — update this install, or use the newer channel."
 />
 
 Every devcoach on your computer shares `~/.devcoach`: the Claude Code plugin, a Homebrew or npm CLI,

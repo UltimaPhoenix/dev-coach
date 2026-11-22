@@ -218,7 +218,7 @@ Then restart Claude Desktop to drop the server. Your lessons, profile, notebook 
 
 ## If it doesn't work
 
-**`devcoach 2.7.1 needs Node 24 or newer`.** The `node` on your PATH is older. Make Node 24 or newer
+**`devcoach <version> needs Node 24 or newer`.** The `node` on your PATH is older. Make Node 24 or newer
 the default, then restart your agent. The hooks stay silent on an older Node, so if lessons never
 come, check `node --version` in a new terminal.
 

@@ -5,6 +5,7 @@ import type { Config } from "@docusaurus/types";
 import type { Compiler, Configuration } from "webpack";
 import sidebars from "./sidebars.ts";
 import { darkCodeTheme, lightCodeTheme } from "./src/lib/codeThemes.ts";
+import { type Changelog, parseChangelog } from "./src/lib/changelog.ts";
 import { type DemoCourse, loadDemoCourse } from "./src/lib/demoCourse.ts";
 import { docRoute, llmsIntro, mdxToMarkdown, pageTitle, sidebarDocIds } from "./src/lib/llmsFull.ts";
 
@@ -34,6 +35,7 @@ function llmsFullTxtPlugin() {
     name: "devcoach-llms-full-txt",
     async postBuild({ siteDir, outDir }: { siteDir: string; outDir: string }) {
       const docsDir = path.join(siteDir, "..", "docs");
+      const changelog = readChangelog(siteDir);
 
       const files: string[] = [];
       const walk = (dir: string) => {
@@ -65,7 +67,7 @@ function llmsFullTxtPlugin() {
         .map((file) => {
           const raw = fs.readFileSync(path.join(docsDir, file), "utf8");
           const route = docRoute(file);
-          const text = route === "" ? intro : mdxToMarkdown(raw, file, OWN_URL);
+          const text = route === "" ? intro : mdxToMarkdown(raw, file, OWN_URL, changelog);
           return `\n\n---\n\n# ${pageTitle(raw, file)}\n\nPage: ${OWN_URL}${route}\n\n${text}`;
         })
         .join("");
@@ -107,6 +109,22 @@ function lazyMermaidPlugin() {
 // frame's own sandbox attribute confines the framed document, but opened on its own (by its URL)
 // it is not sandboxed as the dashboard's copy is. Nothing on the site links to it: the tour's
 // step list is made of buttons that move the frame.
+const readChangelog = (siteDir: string): Changelog =>
+  parseChangelog(fs.readFileSync(path.join(siteDir, "..", "CHANGELOG.md"), "utf8"));
+
+// What the docs read from CHANGELOG.md (src/lib/changelog.ts): which entries are still unreleased
+// and which release each added entry shipped in. The roadmap's timeline uses it, so a stop for the
+// coming release needs no edit when that release is cut.
+function changelogPlugin(context: { siteDir: string }) {
+  const changelog = readChangelog(context.siteDir);
+  return {
+    name: "devcoach-changelog",
+    async contentLoaded({ actions }: { actions: { setGlobalData(data: Changelog): void } }) {
+      actions.setGlobalData(changelog);
+    },
+  };
+}
+
 function demoCoursePlugin(context: { siteDir: string }) {
   const name = "devcoach-demo-course";
   const demo = loadDemoCourse(path.join(context.siteDir, ".."));
@@ -189,7 +207,7 @@ const config: Config = {
     ],
   ],
 
-  plugins: [llmsFullTxtPlugin, demoCoursePlugin, lazyMermaidPlugin],
+  plugins: [llmsFullTxtPlugin, changelogPlugin, demoCoursePlugin, lazyMermaidPlugin],
 
   // Site-wide JSON-LD so search & answer engines model devcoach as a free developer tool
   // (released docs only — the /next/ copy must not duplicate the @ids).

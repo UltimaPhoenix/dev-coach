@@ -4,13 +4,15 @@
 // - a Card becomes its title in bold, then its text; a wrapper with a `label` or `title` (a tab, a
 //   chat, a matrix) gets it as a bold line; a chat line starts with its speaker; Choices lists its
 //   options with the one picked; a timeline's Stop becomes a list item that starts with its version,
-//   its date (or "next", "exploring") and its title, linked;
+//   its date (or "next", "exploring") and its title, linked; one that names a changelog entry takes
+//   them from the changelog (changelog.ts), as the page does;
 // - every other component tag is dropped and its children stay; MDX imports, exports and comments,
 //   <Head> blocks and images are dropped;
 // - links to other pages, to `#anchors` and to `/paths` become full URLs of the site.
 // Code (fenced blocks and `inline` spans) is copied as it is. Node built-ins only, so `npm test`
 // runs it without an install (llmsFull.test.ts).
 import * as path from "node:path";
+import { type Changelog, whenShipped } from "./changelog.ts";
 
 /** The route of a doc file under docs/: `install/index.md` → `install`, `index.mdx` → ``. */
 export function docRoute(relPath: string): string {
@@ -96,7 +98,7 @@ const attr = (attrs: string, key: string) =>
   attrs.match(new RegExp(`(?:^|\\s)${key}=(?:"([^"]*)"|'([^']*)'|\\{\\s*"([^"]*)"\\s*\\})`))?.slice(1).find((v) => v !== undefined);
 
 /** What an opening tag leaves in the Markdown. */
-function openingText(tag: Tag): string {
+function openingText(tag: Tag, changelog?: Changelog): string {
   if (tag.name === "Card") {
     const title = attr(tag.attrs, "title");
     return title ? `\n\n**${title}**\n\n` : "";
@@ -106,7 +108,15 @@ function openingText(tag: Tag): string {
     return `\n\n**${SPEAKER[who] ?? who}:** `;
   }
   if (tag.name === "Stop") {
-    const when = [attr(tag.attrs, "version"), attr(tag.attrs, "date") ?? attr(tag.attrs, "when")].filter(Boolean).join(" · ");
+    // A stop that names its changelog entry gets its version and date from there, as on the page.
+    const entry = attr(tag.attrs, "entry");
+    const shipped = entry && changelog ? (whenShipped(changelog, entry) ?? { status: "next" as const }) : null;
+    const parts = shipped
+      ? shipped.status === "shipped"
+        ? [shipped.version, shipped.date]
+        : ["next"]
+      : [attr(tag.attrs, "version"), attr(tag.attrs, "date") ?? attr(tag.attrs, "when")];
+    const when = parts.filter(Boolean).join(" · ");
     const title = attr(tag.attrs, "title") ?? "";
     const to = attr(tag.attrs, "to");
     return `\n- **${when ? `${when}: ` : ""}${to ? `[${title}](${to})` : title}** `;
@@ -182,7 +192,7 @@ function rewriteProse(prose: string, relPath: string, siteUrl: string): string {
 }
 
 /** One docs page (its raw MDX) as Markdown, without its front matter and its H1. */
-export function mdxToMarkdown(raw: string, relPath: string, siteUrl: string): string {
+export function mdxToMarkdown(raw: string, relPath: string, siteUrl: string, changelog?: Changelog): string {
   const s = dropEsm(raw.replace(/^---\n[\s\S]*?\n---\n/, ""));
   const out: string[] = [];
   let prose = "";
@@ -266,7 +276,7 @@ export function mdxToMarkdown(raw: string, relPath: string, siteUrl: string): st
         i = close === -1 ? s.length : close + tag.name.length + 3;
         continue;
       }
-      prose += openingText(tag);
+      prose += openingText(tag, changelog);
       if (!tag.selfClosing) open.push(tag.name);
     } else {
       prose += c;
