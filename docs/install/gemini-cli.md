@@ -49,10 +49,12 @@ Every agent on this computer shares your profile and lessons in `~/.devcoach/`
 
 ## You need
 
-- **Node.js 24 or newer** on the PATH your agent uses (`node --version`).
+- **Node.js 24 or newer** on the PATH your agent uses (`node --version`). Homebrew, Scoop and the
+  Windows installer install it for you.
 - **devcoach installed** ([Homebrew](./homebrew.md), [npm](./npx.md), [Windows](./windows.md)), or npm
   and the network for npx or the extension.
-- **A Gemini CLI with hooks and skills.** This page was checked with Gemini CLI 0.70.0.
+- **A Gemini CLI with hooks and skills.** This page was checked with Gemini CLI 0.70.0, where hooks
+  are on by default.
 - **macOS or Linux.** This integration is in beta, and on Windows its hooks are untested.
 
 ## Install
@@ -63,17 +65,19 @@ devcoach install --gemini
 
 Most readers should take this route, with devcoach installed: the hooks call it directly, nothing
 downloads on a turn, and you get the `devcoach` command too. Without devcoach installed,
-`npx -y devcoach install --gemini` works as well, but its hooks then start npx twice per turn and need
-npx's cache or the network.
+`npx -y devcoach install --gemini` works as well, but its hooks then start npx twice per turn, and npx
+asks the npm registry at every start. Offline, each hook waits out npm's network retries (over a
+minute in our test), longer than the agent lets a devcoach hook run (60 seconds at most), so no lesson
+is cued.
 
 ### Or the Gemini extension
 
 | | Install command | Extension |
 |---|---|---|
 | npm on the first run | Not with devcoach installed; npx needs it | Yes: the first start downloads devcoach |
-| Offline afterwards | Yes; through npx, from npx's cache | Yes |
+| Offline afterwards | Yes with devcoach installed; through npx, no lesson is cued ([why](#install)) | Yes |
 | Updates | Upgrade devcoach, run the install again | The next release's zip, then `gemini extensions update` |
-| Adds the `devcoach` command | Yes, with devcoach installed | No: `npx -y devcoach …` |
+| The `devcoach` command | Yes, with devcoach installed | No: `npx -y devcoach …` |
 | Remove with | `devcoach uninstall --gemini` | `gemini extensions uninstall devcoach` |
 
 Download `devcoach-gemini-extension-<version>.zip` from the
@@ -284,7 +288,8 @@ Back up with `devcoach backup` if you might come back.
 | What you see | What to do |
 |---|---|
 | `gemini mcp list`: *MCP servers are configured but disabled because this folder is untrusted.* | Gemini connects no MCP server in a folder it does not trust, user-level ones included. Trust the folder when Gemini asks, or with `/permissions trust` |
-| No lessons, and devcoach shows **Disconnected** in `gemini mcp list` (extension) | The extension's launcher could not start devcoach, and its hooks fail silently. The [launcher's check](#check-it-worked) prints why (below) |
+| No lessons, and devcoach shows **Disconnected** in `gemini mcp list` in a trusted folder (extension) | The extension's launcher could not start devcoach, and its hooks fail silently. The [launcher's check](#check-it-worked) prints why (below) |
+| `/hooks list` shows no devcoach hooks | Check that `hooksConfig.enabled` is not `false` in Gemini's `settings.json`, then restart Gemini |
 | `devcoach doctor`: *devcoach hooks are registered TWICE (extension + settings.json)* | Both routes are wired and every turn counts twice. Keep one: `devcoach uninstall --gemini` |
 | `devcoach doctor`: *hook runs via npx* | Expected through npx. Install devcoach, then run `devcoach install --gemini` again |
 
