@@ -19,7 +19,7 @@ import { READING_TIME_PAGES, docId, readingMinutes } from "./readingTime.ts";
 const docs = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "docs");
 
 /** The pages a section or the site opens on: they send the reader on, so they stay short. */
-const LANDING_PAGES = ["index", "install/index", "usage/index", "reference/index", "help"];
+const LANDING_PAGES = ["index", "start", "install/index", "usage/index", "reference/index", "help"];
 
 interface Budget {
   /** How the failure names the page. */

@@ -165,7 +165,8 @@ test("the sidebar lists every docs page once, so llms-full.txt and previous / ne
   const ids = sidebarDocIds(sidebars.docs as unknown[]);
   assert.deepEqual([...ids].sort(), docFiles.map((f) => f.replace(/\.mdx?$/, "")).sort());
   assert.equal(new Set(ids).size, ids.length);
-  assert.equal(ids[0], "index");
+  // Reading order: a section's own page, then its pages. "Start here" opens the list, the home follows.
+  assert.deepEqual(ids.slice(0, 2), ["start", "index"]);
   assert.equal(docRoute("install/index.md"), "install");
   assert.equal(docRoute("index.mdx"), "");
   assert.equal(pageTitle("---\ntitle: FAQ\n---\n# Other", "faq.mdx"), "FAQ");

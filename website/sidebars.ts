@@ -15,6 +15,8 @@ const sidebars: SidebarsConfig = {
       type: "category",
       label: "Start here",
       collapsed: false,
+      // Like the other sections: the label opens a page that sends the reader to the right one.
+      link: { type: "doc", id: "start" },
       items: ["index", "why", "how-it-works"],
     },
     {
