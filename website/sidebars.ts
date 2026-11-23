@@ -51,7 +51,13 @@ const sidebars: SidebarsConfig = {
       label: "Reference",
       collapsed: false,
       link: { type: "doc", id: "reference/index" },
-      items: ["reference/configuration", "reference/privacy", "reference/mcp-server", "reference/license"],
+      items: [
+        "reference/configuration",
+        "reference/data",
+        "reference/privacy",
+        "reference/mcp-server",
+        "reference/license",
+      ],
     },
     {
       type: "category",

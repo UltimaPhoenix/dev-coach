@@ -474,7 +474,7 @@ yourself ([Install](../install/index.md) shows what each agent gets).
 
 ## Data models
 
-The database tables are in [Database schema](configuration.md#database-schema-reference). `log_lesson`
+The database tables are in [Database schema](data.md#database-schema-reference). `log_lesson`
 takes these arguments (snake_case, checked by Zod):
 
 ```json title="log_lesson arguments"

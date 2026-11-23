@@ -376,6 +376,7 @@ const config: Config = {
           title: "Reference",
           items: [
             { label: "Configuration", to: "/reference/configuration" },
+            { label: "Your data", to: "/reference/data" },
             { label: "Privacy & security", to: "/reference/privacy" },
             { label: "MCP server reference", to: "/reference/mcp-server" },
             { label: "License", to: "/reference/license" },

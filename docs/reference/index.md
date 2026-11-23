@@ -13,10 +13,12 @@ The facts to look up. For how to do something, see [Use devcoach](../usage/index
 
 ## What are you looking for?
 
-<Cards columns={2}>
-  <Card label="Settings and data" title="Configuration" to="/reference/configuration">
-    The seven settings and their defaults, how pacing works, environment variables, where your data
-    lives, backup, reset and the database.
+<Cards columns={3}>
+  <Card label="Settings and pacing" title="Configuration" to="/reference/configuration">
+    The seven settings and their defaults, how pacing works and environment variables.
+  </Card>
+  <Card label="On your computer" title="Your data" to="/reference/data">
+    Where your data lives, backup, reset and the database.
   </Card>
   <Card label="What it reads and sends" title="Privacy & security" to="/reference/privacy">
     What devcoach reads to build your profile, what it stores, and when something leaves your
@@ -34,10 +36,10 @@ The facts to look up. For how to do something, see [Use devcoach](../usage/index
 
 | Question | Short answer | Where |
 |---|---|---|
-| Where is my data? | In `~/.devcoach/` on your computer: a database, the coaching notebook and your course files. | [Where it lives](./configuration.md#data-location) |
+| Where is my data? | In `~/.devcoach/` on your computer: a database, the coaching notebook and your course files. | [Where it lives](./data.md#data-location) |
 | How often do lessons come? | By default about one cue every 10 interactions, at most 2 lessons a day, at least 4 hours apart. Every number is a setting. | [How pacing works](./configuration.md#rate-limits) |
 | Does my data leave my computer? | Only when you share a lesson or publish a course. What your agent reads from devcoach is part of its conversation with its model, as with anything in a session. No account, no telemetry, no update check. | [Privacy & security](./privacy.md) |
-| How do I back up? | `devcoach backup`, or **Download backup** on the dashboard's Settings page. The zip is not encrypted. | [Back up and restore](./configuration.md#backup-strategy) |
+| How do I back up? | `devcoach backup`, or **Download backup** on the dashboard's Settings page. The zip is not encrypted. | [Back up and restore](./data.md#backup-strategy) |
 | Can I use it at work? | Yes. It is free for everyone, and using it never puts your own code under the AGPL. | [License](./license.md) |
 | What can my agent call? | 25 tools, 11 resources and 1 prompt. | [MCP server](./mcp-server.md) |
 

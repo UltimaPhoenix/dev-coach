@@ -181,7 +181,7 @@ Your lessons, knowledge map, courses and settings in your browser, where you can
 
 The folder your coaching data lives in: a SQLite database (`coaching.db`), the coaching notebook
 (`learning-state.md`) and your course files (`courses/`). Every agent on the computer uses it.
-[Where it lives →](./reference/configuration.md#data-location)
+[Where it lives →](./reference/data.md#data-location)
 
 ### `devcoach doctor` {/* #doctor */}
 

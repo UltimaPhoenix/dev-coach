@@ -353,7 +353,7 @@ move your profile to another machine, or keep a copy before a big change.
   is not encrypted.
 - **Restore backup:** adds what you are missing from a backup zip, and never removes a lesson, a
   topic or a course. Your settings, your notebook and the confidence of topics you both have take
-  the backup's values ([details](../reference/configuration.md#backup-strategy)).
+  the backup's values ([details](../reference/data.md#backup-strategy)).
 - **Download lessons** and **Import lessons:** your lessons alone, as JSON, and back. An import skips
   the lessons you already have.
 

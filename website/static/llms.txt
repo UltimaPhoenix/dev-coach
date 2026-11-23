@@ -42,7 +42,8 @@ The methods in the order the docs list them; the Claude Code plugin is the recom
 
 ## Reference
 
-- [Configuration](https://ultimaphoenix.github.io/dev-coach/reference/configuration): the seven settings with their defaults and ranges, the pacing rules, the environment variables, your data in `~/.devcoach`, what a backup holds, restore and reset.
+- [Configuration](https://ultimaphoenix.github.io/dev-coach/reference/configuration): the seven settings with their defaults and ranges, the pacing rules and the environment variables.
+- [Your data](https://ultimaphoenix.github.io/dev-coach/reference/data): your data in `~/.devcoach`, what a backup holds, restore and reset, two devcoach versions on one database, and the database tables.
 - [Privacy & security](https://ultimaphoenix.github.io/dev-coach/reference/privacy): what devcoach reads and stores, the one network request it makes when you ask, and when your data leaves your machine.
 - [MCP server reference](https://ultimaphoenix.github.io/dev-coach/reference/mcp-server): the 25 tools, 11 resources and 1 prompt devcoach exposes over MCP.
 - [License](https://ultimaphoenix.github.io/dev-coach/reference/license): AGPL-3.0, free for everyone, at home or at work. Using devcoach never puts your own code under the AGPL. No paid tier, and no commercial licence on offer.
