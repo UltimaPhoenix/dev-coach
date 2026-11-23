@@ -6,6 +6,8 @@ Notable changes to devcoach. Versions follow [Semantic Versioning](https://semve
 
 ## [Unreleased]
 
+## [2.8.0] — 2026-11-23
+
 ### Added
 - **Windows, in one line.** `irm https://ultimaphoenix.github.io/dev-coach/install.ps1 | iex`
   installs a private Node.js LTS (from nodejs.org, checksum-verified, Authenticode-signed) and the
