@@ -1,10 +1,6 @@
 # devcoach
 
-<p align="center">
-  <a href="https://ultimaphoenix.github.io/dev-coach/">
-    <img src="website/static/img/og-card.jpg" alt="devcoach. Learn from the code your AI writes. Free and open source, 100% local, MCP." width="640">
-  </a>
-</p>
+<a href="https://ultimaphoenix.github.io/dev-coach/"><img align="right" width="46%" src="website/static/img/og-card.jpg" alt="devcoach. Learn from the code your AI writes. Pitched at your level. After the task, at your pace. No account, no telemetry. Free and open source."></a>
 
 [![npm](https://img.shields.io/npm/v/devcoach?logo=npm)](https://www.npmjs.com/package/devcoach)
 [![CI](https://github.com/UltimaPhoenix/dev-coach/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/UltimaPhoenix/dev-coach/actions/workflows/ci.yml?query=branch%3Adevelop)
@@ -13,6 +9,12 @@
 [![Node](https://img.shields.io/badge/node-%E2%89%A524-brightgreen?logo=node.js)](https://nodejs.org/)
 [![Docs](https://img.shields.io/badge/docs-GitHub%20Pages-purple)](https://ultimaphoenix.github.io/dev-coach/)
 [![License](https://img.shields.io/badge/license-AGPL%203.0-blue)](https://github.com/UltimaPhoenix/dev-coach/blob/main/LICENSE)
+
+### Learn from the code your AI writes.
+
+**[Documentation](https://ultimaphoenix.github.io/dev-coach/)** · [Install](https://ultimaphoenix.github.io/dev-coach/install) · [How it works](https://ultimaphoenix.github.io/dev-coach/how-it-works) · [Why devcoach](https://ultimaphoenix.github.io/dev-coach/why) · [FAQ](https://ultimaphoenix.github.io/dev-coach/faq)
+
+<br clear="right">
 
 AI agents now write much of our code, which makes it easy to ship more while understanding less.
 devcoach works inside Claude Code, Gemini CLI and Codex CLI: when your agent finishes a task and a
@@ -29,7 +31,7 @@ pitched at your level. Free, open source and local: no account, no telemetry.
 Another agent, or the `devcoach` command line? See [Install](#install).
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/UltimaPhoenix/dev-coach/main/docs/screenshots/lesson-loop.gif" alt="A Claude Code session: the agent adds a Redis cache, then devcoach appends a short lesson on cache stampedes and the developer answers with one key" width="640">
+  <img src="docs/screenshots/lesson-loop.gif" alt="A Claude Code session: the agent adds a Redis cache, then devcoach appends a short lesson on cache stampedes and the developer answers with one key" width="640">
 </p>
 
 ## Install
