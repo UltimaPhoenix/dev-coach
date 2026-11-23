@@ -41,11 +41,16 @@
         max-width: 500px;
         text-wrap: balance;
       }
-      .pills { margin-top: 34px; display: flex; gap: 12px; flex-wrap: wrap; }
+      /* Two rows as wide as the logo line: what a lesson is like, then what it costs you. */
+      .pills { margin-top: 36px; display: grid; gap: 12px; width: 540px; }
+      .pills .row { display: flex; gap: 12px; }
       .pill {
-        font-size: 21px;
+        flex: 1 1 auto;
+        text-align: center;
+        white-space: nowrap;
+        font-size: 20px;
         font-weight: 600;
-        padding: 9px 18px;
+        padding: 10px 14px;
         border-radius: 999px;
         color: #cfe9e3;
         background: rgba(94, 234, 212, 0.10);
@@ -87,9 +92,14 @@
       </div>
       <div class="tagline">Learn from the code your AI writes.</div>
       <div class="pills">
-        <span class="pill">Free &amp; open-source</span>
-        <span class="pill">100% local</span>
-        <span class="pill">MCP</span>
+        <div class="row">
+          <span class="pill">Tailored to you</span>
+          <span class="pill">After the task, at your pace</span>
+        </div>
+        <div class="row">
+          <span class="pill">No account, no telemetry</span>
+          <span class="pill">Free and open source</span>
+        </div>
       </div>
     </div>
     <div class="shot">
