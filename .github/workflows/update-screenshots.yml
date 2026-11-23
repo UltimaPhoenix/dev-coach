@@ -9,6 +9,9 @@ permissions:
 jobs:
   screenshots:
     runs-on: ubuntu-latest
+    # CI_DEVCOACH_TOKEN is a secret of the `publishing` environment (see ci.yml's bump job): the
+    # environment's branch policy admits develop, the branch this workflow is dispatched on.
+    environment: publishing
     steps:
       - uses: actions/checkout@v7
         with:
@@ -16,7 +19,7 @@ jobs:
           # dispatched on — run it on develop (the default GITHUB_TOKEN bot is blocked by the
           # required CLA check). The commit message already carries [skip ci], so this push
           # doesn't re-trigger CI (nor a canary).
-          token: ${{ secrets.RELEASE_TOKEN }}
+          token: ${{ secrets.CI_DEVCOACH_TOKEN }}
       - uses: actions/setup-node@v7
         with:
           node-version-file: .node-version
