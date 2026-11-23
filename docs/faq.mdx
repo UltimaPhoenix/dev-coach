@@ -9,8 +9,10 @@ import { FaqIndex, FaqJsonLd, FaqSections, faqToc } from "@site/src/components/F
 {/*
   ONE source for this page: every question and answer lives in `faq` below. The headings, the
   index, the table of contents and the FAQPage JSON-LD that search engines quote are all rendered
-  from it (website/src/components/Faq). An answer is three sentences at most, with `code`,
-  **bold**, *italic* and [links](/path); `more` is the page that owns the topic.
+  from it (website/src/components/Faq). An answer is a few short sentences: the first one answers
+  the question in 20 words or fewer, and none runs past 25. A list of agents, install methods or
+  settings gets sentences of its own. Marks: `code`, **bold**, *italic* and [links](/path);
+  `more` is the page that owns the topic.
   Keep each `id`: it is the question's anchor.
 */}
 
@@ -22,19 +24,19 @@ export const faq = [
       {
         id: "what-is-devcoach",
         q: "What is devcoach?",
-        a: "devcoach is a free, open-source MCP (Model Context Protocol) server that runs on your machine, next to your AI coding agent. When your agent finishes a task and a lesson is due, devcoach has it teach one short lesson on something that task touched and you don't know yet: the why, and the mistakes to avoid. A private knowledge map of what you already know keeps each lesson at your level, and the pace is yours to set.",
+        a: "devcoach is a free, open-source MCP (Model Context Protocol) server. It runs on your machine, next to your AI coding agent. When your agent finishes a task and a lesson is due, devcoach has it teach one short lesson. The lesson is about something that task touched and you don't know yet. It explains the why, and the mistakes to avoid. A private knowledge map of what you already know keeps each lesson at your level. The pace is yours to set.",
         more: { label: "Why devcoach", to: "/why" },
       },
       {
         id: "how-is-devcoach-different-from-copilot-or-cursor-inline-explanations",
         q: "How is devcoach different from Copilot or Cursor explanations?",
-        a: "Inline explanations answer the question in front of you. devcoach chooses what to teach from your own work and the gaps in your knowledge map, and explains the reasoning and the anti-patterns so the knowledge carries over to the next problem. Lessons come a few at a time and are stored on your machine.",
+        a: "Inline explanations answer the question in front of you. devcoach chooses what to teach from your own work and the gaps in your knowledge map. It explains the reasoning and the anti-patterns, so the knowledge carries over to the next problem. Lessons come a few at a time and are stored on your machine.",
         more: { label: "devcoach vs. other approaches", to: "/why#devcoach-vs-other-approaches" },
       },
       {
         id: "what-is-a-course",
         q: "What is a course?",
-        a: "A course is a step-by-step path through one topic, for a lesson that was too much for one session. Answer ❌ (*couldn't follow*) under a lesson and the coach offers one, or ask for one any time (with the Claude Code plugin: `/devcoach:course`). The coach asks what you already know, writes the course as one HTML document in `~/.devcoach/courses/` and teaches it one step per message; lesson cues pause meanwhile.",
+        a: "A course is a step-by-step path through one topic, for a lesson that was too much for one session. Answer ❌ (*couldn't follow*) under a lesson and the coach offers one. You can also ask for one any time; with the Claude Code plugin, that is `/devcoach:course`. The coach asks what you already know, then writes the course as one HTML document in `~/.devcoach/courses/`. It teaches the course one step per message, and lesson cues pause meanwhile.",
         more: { label: "Courses", to: "/usage/courses" },
       },
     ],
@@ -46,25 +48,25 @@ export const faq = [
       {
         id: "why-no-lesson-yet",
         q: "Why haven't I had a lesson yet?",
-        a: "Your profile comes first: after your first task, devcoach offers to set it up. Then the pace is quiet on purpose: by default a lesson is cued about every 10 interactions in a chat session, at most 2 a day and at least 4 hours apart, and only Claude Code, Gemini CLI and Codex CLI get lessons automatically. `devcoach doctor` says why the next turn would or would not bring one; with the Claude Code plugin, `/devcoach:setup` runs the same check.",
+        a: "Your profile comes first: after your first task, devcoach offers to set it up. Then the pace is quiet on purpose. By default a lesson is cued about every 10 interactions in a chat session. The defaults also allow at most 2 lessons a day, at least 4 hours apart. Only Claude Code, Gemini CLI and Codex CLI get lessons automatically. `devcoach doctor` says why the next turn would or would not bring one. With the Claude Code plugin, `/devcoach:setup` runs the same check.",
         more: { label: "Troubleshooting: no lessons appear", to: "/troubleshooting#coaching-isnt-firing--no-lessons-appear" },
       },
       {
         id: "how-do-i-change-the-pace",
         q: "How do I change the pace?",
-        a: "The pace is yours to set with three settings: `max_per_day` (default 2), `min_gap_minutes` (default 240) and `nudge_every` (default 10 interactions between cues). Change one with `devcoach set max_per_day 3`, on the web dashboard's Settings page, or by asking your agent.",
+        a: "The pace is yours to set with three settings. `max_per_day` defaults to 2 and `min_gap_minutes` to 240. `nudge_every` defaults to 10 interactions between cues. Change one with `devcoach set max_per_day 3`, on the web dashboard's Settings page, or by asking your agent.",
         more: { label: "Configuration: settings", to: "/reference/configuration#settings" },
       },
       {
         id: "can-i-share-a-devcoach-lesson-with-a-colleague",
         q: "Can I share a devcoach lesson with a colleague?",
-        a: "Yes: from the web dashboard (**↗ Share**), the CLI (`devcoach share`) or your agent, a lesson becomes copyable text, a server-less link or a `.devcoach.md` file that your colleague pastes, clicks or drops into their own devcoach. Your name goes with it unless you remove it (it comes from `share_name`, else your git `user.name`; `--anonymous` drops it). Project, branch and task context travel only if you ask, and a local folder path never does.",
+        a: "Yes, from the web dashboard (**↗ Share**), the CLI (`devcoach share`) or your agent. A lesson becomes copyable text, a server-less link or a `.devcoach.md` file. Your colleague pastes the text, clicks the link or drops the file into their own devcoach. Your name goes with the lesson unless you remove it. The name comes from `share_name`, else your git `user.name`; `--anonymous` drops it. Project, branch and task context travel only if you ask, and a local folder path never does.",
         more: { label: "Sharing lessons", to: "/usage/sharing" },
       },
       {
         id: "does-an-imported-lesson-count-against-my-daily-limit",
         q: "Does an imported lesson count against my daily limit?",
-        a: "No. A lesson shared with you joins your log attributed to the sender: its topic counts as taught and feedback works as usual. It never counts against `max_per_day` or the minimum gap, and it never resets the pacing counter.",
+        a: "No. A lesson shared with you joins your log attributed to the sender. Its topic counts as taught and feedback works as usual. It never counts against `max_per_day` or the minimum gap, and it never resets the pacing counter.",
         more: { label: "How an imported lesson behaves", to: "/usage/sharing#how-an-imported-lesson-behaves" },
       },
     ],
@@ -76,19 +78,19 @@ export const faq = [
       {
         id: "does-devcoach-send-my-data-anywhere",
         q: "Does devcoach send my data anywhere?",
-        a: "Not on its own: there is no account, no telemetry and no update check, and its one network request is one you ask for, importing a lesson from a web address. Your data leaves your machine only when you share a lesson or publish a course. As with anything in a session, what your agent reads from devcoach becomes part of its conversation with its model.",
+        a: "Not on its own. There is no account, no telemetry and no update check. Its one network request is one you ask for: importing a lesson from a web address. Your data leaves your machine only when you share a lesson or publish a course. As with anything in a session, what your agent reads from devcoach becomes part of its conversation with its model.",
         more: { label: "Privacy & security", to: "/reference/privacy" },
       },
       {
         id: "where-is-my-data-and-how-do-i-back-it-up",
         q: "Where is my data, and how do I back it up?",
-        a: "Your coaching data lives in `~/.devcoach/`: a SQLite database (`coaching.db`), the coaching notebook (`learning-state.md`) and your course files (`courses/`). `devcoach backup` writes a zip of your settings, knowledge map, lessons, notebook and courses (not encrypted), and `devcoach restore <zip>` brings it back, on this computer or another one. The web dashboard's Settings page does both too.",
+        a: "Your coaching data lives in `~/.devcoach/`: a SQLite database (`coaching.db`), the coaching notebook (`learning-state.md`) and your course files (`courses/`). `devcoach backup` writes a zip of your settings, knowledge map, lessons, notebook and courses. The zip is not encrypted. `devcoach restore <zip>` brings it back, on this computer or another one. The web dashboard's Settings page does both too.",
         more: { label: "Your data: backups", to: "/reference/data#backup-strategy" },
       },
       {
         id: "does-it-work-offline",
         q: "Does it work offline?",
-        a: "devcoach itself does: your data, the CLI and the web dashboard need no network, except when you import a lesson from a web address. Lessons are written by your agent's model, so they need whatever connection your agent needs. Installing needs the network, and so do the Claude Code plugin's first start and npx, which fetch devcoach from npm.",
+        a: "devcoach itself does. Your data, the CLI and the web dashboard need no network, except when you import a lesson from a web address. Lessons are written by your agent's model, so they need whatever connection your agent needs. Installing needs the network, and so do the Claude Code plugin's first start and npx, which fetch devcoach from npm.",
         more: { label: "Privacy & security", to: "/reference/privacy" },
       },
     ],
@@ -100,25 +102,25 @@ export const faq = [
       {
         id: "which-ai-agents-and-tools-does-devcoach-work-with",
         q: "Which AI agents and tools does devcoach work with?",
-        a: "devcoach wires automatic lessons only into Claude Code, Gemini CLI (beta) and Codex CLI (beta, once you trust its hooks). Claude Desktop and other MCP agents (Cursor, Windsurf, Cline, Continue, Zed) get devcoach's tools but no automatic lessons: say *set up devcoach* once, then ask, for example *teach me something from what we just did*. claude.ai on the web is not supported, because it cannot run a local MCP server.",
+        a: "devcoach wires automatic lessons only into Claude Code, Gemini CLI (beta) and Codex CLI (beta). In Codex CLI they start once you trust its hooks. Claude Desktop and other MCP agents (Cursor, Windsurf, Cline, Continue, Zed) get devcoach's tools but no automatic lessons. There, say *set up devcoach* once. Then ask for a lesson, for example *teach me something from what we just did*. On the web, claude.ai is not supported, because it cannot run a local MCP server.",
         more: { label: "What each agent gets", to: "/install" },
       },
       {
         id: "how-do-i-install-devcoach",
         q: "How do I install devcoach?",
-        a: "In Claude Code, add the plugin (two slash commands); on macOS or Linux, use Homebrew; on [Windows (beta)](/install/windows), the one-line PowerShell installer or Scoop; anywhere with Node.js 24 or newer, `npx -y devcoach install`. Claude Desktop, Gemini CLI, Codex CLI and other MCP agents each have a short page of their own. devcoach is also listed in the MCP Registry as `io.github.UltimaPhoenix/devcoach`.",
+        a: "In Claude Code, add the plugin with two slash commands. On macOS or Linux, use Homebrew. On [Windows (beta)](/install/windows), use the one-line PowerShell installer or Scoop. Anywhere with Node.js 24 or newer, run `npx -y devcoach install`. Claude Desktop, Gemini CLI, Codex CLI and other MCP agents each have a short page of their own. The MCP Registry also lists devcoach, as `io.github.UltimaPhoenix/devcoach`.",
         more: { label: "Choose your setup", to: "/install" },
       },
       {
         id: "what-do-i-need-to-run-it",
         q: "What do I need to run it?",
-        a: "macOS, Linux or [Windows (beta)](/install/windows), and Node.js 24 or newer. npx, a global npm install and the Claude Code plugin use the `node` on your PATH; Homebrew, Scoop and the Windows installer install Node for you. The Claude Desktop extension runs on Claude Desktop's built-in Node.",
+        a: "macOS, Linux or [Windows (beta)](/install/windows), and Node.js 24 or newer. With npx, a global npm install or the Claude Code plugin, devcoach uses the `node` on your PATH. Homebrew, Scoop and the Windows installer install Node for you. The Claude Desktop extension runs on Claude Desktop's built-in Node.",
         more: { label: "Choose your setup", to: "/install" },
       },
       {
         id: "how-do-i-pause-or-uninstall-it",
         q: "How do I pause or uninstall it?",
-        a: "There is no pause switch: for fewer lessons, lower `max_per_day` or raise `nudge_every` (`0` means every turn, not off), and the Claude Code plugin can be disabled from `/plugin` and enabled again later. To remove devcoach, run `devcoach uninstall` before you remove the program, or `/plugin uninstall devcoach@ultimaphoenix` for the plugin. Your data in `~/.devcoach/` stays; adding `--data` to `devcoach uninstall` deletes it (it asks first), so run `devcoach backup` before that if you may want it back.",
+        a: "There is no pause switch. For fewer lessons, lower `max_per_day` or raise `nudge_every`. Setting `nudge_every` to `0` means every turn, not off. The Claude Code plugin can be disabled from `/plugin` and enabled again later. To remove devcoach, run `devcoach uninstall` before you remove the program. For the plugin, run `/plugin uninstall devcoach@ultimaphoenix` instead. Your data in `~/.devcoach/` stays. Adding `--data` to `devcoach uninstall` deletes it, and the command asks first. So run `devcoach backup` before that if you may want your data back.",
         more: { label: "Choose your setup", to: "/install" },
       },
     ],
@@ -130,13 +132,13 @@ export const faq = [
       {
         id: "how-much-does-devcoach-cost",
         q: "How much does devcoach cost?",
-        a: "Nothing: devcoach is free for everyone, at home or at work, under the AGPL-3.0 license. There is no paid tier, no subscription, no account and no commercial license on offer; to embed devcoach in a closed-source product, open an issue and ask.",
+        a: "Nothing: devcoach is free for everyone, at home or at work, under the AGPL-3.0 license. There is no paid tier, no subscription, no account and no commercial license on offer. To embed devcoach in a closed-source product, open an issue and ask.",
         more: { label: "License & commercial use", to: "/reference/license" },
       },
       {
         id: "do-lessons-use-my-agents-tokens",
         q: "Do lessons use my agent's tokens?",
-        a: "Yes: your agent's model writes each lesson, so a lesson uses some of your plan's usage or API tokens, like any reply. devcoach itself calls no model and charges nothing. To use less, lower `max_per_day` or raise `nudge_every`.",
+        a: "Yes: your agent's model writes each lesson. So a lesson uses some of your plan's usage or API tokens, like any reply. devcoach itself calls no model and charges nothing. To use less, lower `max_per_day` or raise `nudge_every`.",
         more: { label: "Configuration: settings", to: "/reference/configuration#settings" },
       },
     ],

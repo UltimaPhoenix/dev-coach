@@ -52,6 +52,7 @@ The methods in the order the docs list them; the Claude Code plugin is the recom
 
 - [Troubleshooting](https://ultimaphoenix.github.io/dev-coach/troubleshooting): `devcoach doctor`, what each symptom means and its fix, the known limitations, and how to uninstall cleanly.
 - [FAQ](https://ultimaphoenix.github.io/dev-coach/faq): short answers on what devcoach is, when lessons come and how to change the pace, which agents it works with, where your data lives, what it costs, and how to install or remove it.
+- [Glossary](https://ultimaphoenix.github.io/dev-coach/glossary): the words the docs use, each in a sentence or two with a link to the page that owns it: agent, MCP server, hook, the devcoach skill, lesson card, knowledge map, confidence, pace, cue, course, share code and more.
 
 ## Optional
 

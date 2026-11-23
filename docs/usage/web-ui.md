@@ -49,28 +49,31 @@ npx -y devcoach ui --open       # also open it in your default browser
 
 Installed devcoach globally or with Homebrew? Drop the `npx -y` and run `devcoach ui`.
 
-- **The URL is a link.** Most terminals open it on a click (or Cmd/Ctrl-click).
+- **The URL is a link.** Most terminals open it on a click, or on a Cmd/Ctrl-click.
 - **Local only.** The dashboard listens on `127.0.0.1` only, so no other machine can reach it.
 - **Where it opens:** your lessons once you have one, the knowledge map before that.
   Settings → *Home page* picks one for good.
-- **Port taken?** `devcoach ui` tells you whether a dashboard is already running there (open it, or
-  `--stop` it) or another program holds the port (pick another with `--port`).
+- **Port taken?** `devcoach ui` tells you what holds it. A dashboard already running there: open it,
+  or `--stop` it. Another program: pick another port with `--port`.
 
-Or ask your agent to *open the devcoach dashboard* (it calls the `open_ui` tool). With the
-[Claude Code plugin](../install/claude-code-plugin.md), type `/devcoach:ui` (or `/devcoach:ui 8080`):
-Claude starts it and gives you the URL, with no install and nothing on your PATH.
+Or ask your agent to *open the devcoach dashboard*: it calls the `open_ui` tool. With the
+[Claude Code plugin](../install/claude-code-plugin.md), type `/devcoach:ui`, or `/devcoach:ui 8080`
+to pick the port. Claude starts it and gives you the URL, with no install and nothing on your PATH.
 
 ## Stop
 
 - **In the terminal that runs `devcoach ui`:** press **Ctrl+C**. The dashboard stops taking new
-  requests, lets the ones in progress finish (up to 2 seconds) and exits. A second Ctrl+C exits at
-  once.
+  requests, gives the ones in progress up to 2 seconds to finish, and exits. A second Ctrl+C exits
+  at once.
 - **From any terminal:** `npx -y devcoach ui --stop`, with `--port 8080` if you changed the port.
-- **Started by your agent** (`open_ui`, `/devcoach:ui`): it runs in the background, so Ctrl+C cannot
-  reach it. Ask the agent to close it (`/devcoach:ui stop`, or *stop the devcoach dashboard*, which
-  calls the `stop_ui` tool), or use `--stop` as above. Both stop any dashboard on that port.
+- **Started by your agent** with `open_ui` or `/devcoach:ui`: it runs in the background, so Ctrl+C
+  cannot reach it. Ask the agent to close it: type `/devcoach:ui stop`, or say *stop the devcoach
+  dashboard*, which calls the `stop_ui` tool. Or use `--stop` as above. Both stop any dashboard on
+  that port.
 
-## Profile: the knowledge map (`/knowledge`) {/* #knowledge-map-knowledge */}
+## Profile: the knowledge map {/* #knowledge-map-knowledge */}
+
+Address: `/knowledge`
 
 <Clip
   alt="The knowledge map: Edit is pressed, the plus beside django raises it from 3 (red) to 4 (yellow), and Done leaves edit mode"
@@ -92,9 +95,9 @@ colour is its band, and the band sets how deep the lessons on that topic go:
   ]}
   caption={
     <>
-      Junior lessons (from scratch, no jargon) up to 3, mid (the why, the alternatives, the
-      trade-offs) from 4 to 6, senior (edge cases, production trade-offs) from 7 to 9. At 10, only
-      something new from the last six months or so.
+      Junior lessons up to 3: from scratch, no jargon. Mid lessons from 4 to 6: the why, the
+      alternatives, the trade-offs. Senior lessons from 7 to 9: edge cases, production trade-offs.
+      At 10, only something new from the last six months or so.
     </>
   }
 />
@@ -132,7 +135,9 @@ colour is its band, and the band sets how deep the lessons on that topic go:
 
 </details>
 
-## Lessons (`/lessons`)
+## Lessons {/* #lessons-lessons */}
+
+Address: `/lessons`
 
 <Clip
   alt="The Lessons page: typing cache in the search box, clicking a senior level pill to filter by it, then opening a lesson"
@@ -145,12 +150,13 @@ colour is its band, and the band sets how deep the lessons on that topic go:
 
 Every lesson you received or imported, newest first, 25 to a page.
 
-- **Find a lesson.** Type in the search box, use the filters (period, feedback, level, category,
-  project and more), or click a level pill or a category chip in a row. Each active filter shows as
-  a chip above the table; its `×` removes it.
+- **Find a lesson.** Type in the search box, use the filters, or click a level pill or a category
+  chip in a row. The filters cover period, feedback, level, category, project and more. Each active
+  filter shows as a chip above the table; its `×` removes it.
 - **Open it** by clicking anywhere else on its row. **Star it** with `☆`.
-- **Share it** with `↗`, which appears at the end of the row when you point at it. **＋ Import**, at
-  the right of the toolbar, adds one someone sent you ([Sharing a lesson](#sharing-a-lesson)).
+- **Share it** with `↗`, which appears at the end of the row when you point at it.
+- **Add one someone sent you** with **＋ Import**, at the right of the toolbar. More under
+  [Sharing a lesson](#sharing-a-lesson).
 
 <details>
 <summary>Which filters are there?</summary>
@@ -210,7 +216,9 @@ set up your profile if you haven't, and gives the diagnostic command for your in
 
 </details>
 
-## Lesson detail (`/lessons/<id>`)
+## Lesson detail {/* #lesson-detail-lessonsid */}
+
+Address: `/lessons/<id>`
 
 <ThemedShot
   alt="A lesson's page: title row, metadata, TL;DR, the lesson with its code, context, where it happened, the feedback buttons and the ID"
@@ -218,24 +226,26 @@ set up your profile if you haven't, and gives the diagnostic command for your in
   dark={require("../screenshots/lesson-docker-layer-cache-dark.png").default}
 />
 
-From top to bottom (on a small screen, click the picture to see it at full size):
+On a small screen, click the picture to see it at full size. From top to bottom:
 
-1. **Title row:** star, title, level pill (click it to list that level), **⋯** (🗑 Delete lesson…)
-   and **↗ Share**. `← Back to lessons` is above the card.
-2. **Metadata:** date (point at it for the exact time), topic, categories and, once you answer, your
-   answer with **Clear**. A shared lesson adds `🤝 shared by <name>`, a lesson that seeded a course a
-   `🎓 Course · N/M` link.
+1. **Title row:** star, title, level pill, **⋯** and **↗ Share**. Click the pill to list that level;
+   🗑 Delete lesson… is under **⋯**. `← Back to lessons` is above the card.
+2. **Metadata:** date, topic, categories and, once you answer, your answer with **Clear**. Point at
+   the date for the exact time. A shared lesson adds `🤝 shared by <name>`, a lesson that seeded a
+   course a `🎓 Course · N/M` link.
 3. **TL;DR:** the lesson in one sentence.
 4. **The lesson,** with highlighted code.
 5. **Context:** the task you were doing, when it was recorded.
 6. **Where it happened:** project, repo, branch, commit, folder. The repository and the commit open
    on GitHub, GitLab or Bitbucket; the folder and a local repository open in VS Code.
 7. **Feedback buttons,** gone once you answer. Only **✓ I knew this** changes something now: your
-   confidence on the topic goes up by one, and **Clear** takes it back
-   ([the three answers](./coaching.md#the-feedback-loop)).
+   confidence on the topic goes up by one, and **Clear** takes it back. More on
+   [the three answers](./coaching.md#the-feedback-loop).
 8. **ID,** for `devcoach lesson <id>` and the other commands that take one.
 
-## Courses (`/courses`)
+## Courses {/* #courses-courses */}
+
+Address: `/courses`
 
 <Clip
   alt="A course page: the step list at the left, the document on its current step; clicking step 3 switches to it, and Mark done moves the progress to 3 of 5"
@@ -248,14 +258,14 @@ From top to bottom (on a small screen, click the picture to see it at full size)
 
 **Courses** lists every step-by-step [course](./courses.md) with its status, its progress and the
 lesson it grew from. A course page shows its document one step at a time, under a bar that stays in
-view: back, title, status, progress and **⋯ → Delete course…**, which removes the course and its
-folder and keeps the lesson.
+view. On the bar: back, title, status, progress and **⋯ → Delete course…**, which removes the course
+and its folder and keeps the lesson.
 
 - **The step list:** **Mark done**, **Skip** or **Reopen** a step, or click one to show it without a
   reload. *About this course* opens the goal, the lesson it grew from and the ✓/✗ prerequisites.
-- **The document** follows the dashboard's light or dark theme, and its frame takes the height of the
-  step, so the page scrolls, not the frame. It runs sandboxed, also when you open it on its own
-  ([what it can do](./courses.md#the-dashboard)).
+- **The document** follows the dashboard's light or dark theme. Its frame takes the height of the
+  step, so the page scrolls, not the frame. It runs sandboxed, also when you open it on its own.
+  See [what it can do](./courses.md#the-dashboard).
 
 ## Sharing a lesson
 
@@ -283,20 +293,23 @@ folder and keeps the lesson.
 </Tabs>
 
 - **Share:** **↗ Share** on a lesson's page, or `↗` at the end of its row to stay on the list. The
-  panel holds your name (from the *Your name* setting, else your git `user.name`; edit it, or empty it
-  to share anonymously), *Include where it happened* (off by default), and **Copy text**,
-  **Copy link**, **Download .md**.
+  panel holds your name, *Include where it happened* and three buttons: **Copy text**,
+  **Copy link**, **Download .md**. Your name comes from the *Your name* setting, else from your git
+  `user.name`. Edit it, or empty it to share anonymously. *Include where it happened* is off by
+  default.
 - **Import:** **＋ Import** on the Lessons page takes a code, a link, a web address, the whole copied
-  card or a lessons JSON export, or a `.devcoach.md` file you pick or drop anywhere on the page. A share link's
-  **Import** button opens a preview here instead; nothing is saved until you click
-  **Add to my lessons**.
+  card or a lessons JSON export. It also takes a `.devcoach.md` file, which you pick or drop
+  anywhere on the page. A share link's **Import** button opens a preview here instead; nothing is
+  saved until you click **Add to my lessons**.
 - **A shared lesson** shows its sender under the topic and a `🤝 shared by` line on its page. The
   **🤝 Shared** filter lists them, per sender too. It never counts against your daily limit.
 
 What each way carries, what travels with a lesson and how an imported lesson behaves:
 [Sharing lessons](./sharing.md).
 
-## Settings (`/settings`)
+## Settings {/* #settings-settings */}
+
+Address: `/settings`
 
 <Peek show={0.37} label="Show the coaching notebook">
   <ThemedShot
@@ -307,19 +320,28 @@ What each way carries, what travels with a lesson and how an imported lesson beh
 </Peek>
 
 ⚙️ **Settings**, at the top right of every page, opens it. The theme button beside it shows the theme
-you see now and switches it in this browser only, until you save a theme here; *System* follows your
-OS as it changes. The page has three panels.
+you see now. It switches the theme in this browser only, until you save a theme here. *System*
+follows your OS as it changes. The page has three panels.
 
-**Coaching** holds the seven settings, applied with *Save settings*: *Max lessons per day*
-(`max_per_day`), *Minimum gap between lessons* (`min_gap_minutes`), *Interactions between lessons*
-(`nudge_every`), *Count interactions* (`nudge_scope`), *Your name (for sharing)* (`share_name`),
-*UI theme* (`ui_theme`) and *Home page* (`ui_home`). What each one does, its range and its default:
+**Coaching** holds the seven settings, applied with *Save settings*:
+
+| On the form | Setting |
+|---|---|
+| Max lessons per day | `max_per_day` |
+| Minimum gap between lessons | `min_gap_minutes` |
+| Interactions between lessons | `nudge_every` |
+| Count interactions | `nudge_scope` |
+| Your name (for sharing) | `share_name` |
+| UI theme | `ui_theme` |
+| Home page | `ui_home` |
+
+What each one does, its range and its default:
 [Configuration](../reference/configuration.md#settings).
 
 :::warning[The gap is a list of 12 choices]
 
 *No cooldown*, 15 or 30 minutes, 1 hour, 1 hour 30 min, and 2, 3, 4, 6, 8, 12 or 24 hours. A gap
-set elsewhere to another value (say 100 minutes) shows as *No cooldown*, and saving the form then
+set elsewhere to another value, say 100 minutes, shows as *No cooldown*, and saving the form then
 stores 0. Pick the gap again before you save.
 
 :::

@@ -8,6 +8,7 @@ import { darkCodeTheme, lightCodeTheme } from "./src/lib/codeThemes.ts";
 import { type Changelog, parseChangelog } from "./src/lib/changelog.ts";
 import { type DemoCourse, loadDemoCourse } from "./src/lib/demoCourse.ts";
 import { docRoute, llmsIntro, mdxToMarkdown, pageTitle, sidebarDocIds } from "./src/lib/llmsFull.ts";
+import { READING_TIME_PAGES, type ReadingTimes, labelMinutes, readingMinutes } from "./src/lib/readingTime.ts";
 
 // Runs in Node.js — no client-side code here.
 
@@ -125,6 +126,26 @@ function changelogPlugin(context: { siteDir: string }) {
   };
 }
 
+// The guides and the essays say how long they take: "N min read" under the title, drawn by
+// src/theme/MDXComponents/Heading. The minutes are measured from each page's source
+// (src/lib/readingTime.ts, which also lists the pages that show the line); a page off that list
+// gets no number. src/lib/readingBudget.test.ts holds the ceilings with the same measure.
+function readingTimePlugin(context: { siteDir: string }) {
+  const docsDir = path.join(context.siteDir, "..", "docs");
+  const minutes: ReadingTimes = {};
+  for (const id of READING_TIME_PAGES) {
+    const file = [`${id}.md`, `${id}.mdx`].map((name) => path.join(docsDir, name)).find((name) => fs.existsSync(name));
+    if (!file) throw new Error(`devcoach-reading-time: READING_TIME_PAGES lists "${id}", and docs/ has no such page`);
+    minutes[id] = labelMinutes(readingMinutes(fs.readFileSync(file, "utf8")));
+  }
+  return {
+    name: "devcoach-reading-time",
+    async contentLoaded({ actions }: { actions: { setGlobalData(data: ReadingTimes): void } }) {
+      actions.setGlobalData(minutes);
+    },
+  };
+}
+
 function demoCoursePlugin(context: { siteDir: string }) {
   const name = "devcoach-demo-course";
   const demo = loadDemoCourse(path.join(context.siteDir, ".."));
@@ -207,7 +228,7 @@ const config: Config = {
     ],
   ],
 
-  plugins: [llmsFullTxtPlugin, changelogPlugin, demoCoursePlugin, lazyMermaidPlugin],
+  plugins: [llmsFullTxtPlugin, changelogPlugin, readingTimePlugin, demoCoursePlugin, lazyMermaidPlugin],
 
   // Site-wide JSON-LD so search & answer engines model devcoach as a free developer tool
   // (released docs only — the /next/ copy must not duplicate the @ids).
@@ -304,7 +325,7 @@ const config: Config = {
           to: "/usage/coaching",
           label: "Docs",
           position: "left",
-          activeBaseRegex: `^${BASE_URL}(how-it-works|usage|reference|troubleshooting|faq|vision)(/|$)`,
+          activeBaseRegex: `^${BASE_URL}(how-it-works|usage|reference|troubleshooting|faq|glossary|vision)(/|$)`,
         },
         { to: "/install", label: "Install", position: "left", activeBaseRegex: `^${BASE_URL}install(/|$)` },
         { to: "/why", label: "Why devcoach", position: "left" },
@@ -366,6 +387,7 @@ const config: Config = {
           items: [
             { label: "Troubleshooting", to: "/troubleshooting" },
             { label: "FAQ", to: "/faq" },
+            { label: "Glossary", to: "/glossary" },
             { label: "Issues & feedback", href: "https://github.com/UltimaPhoenix/dev-coach/issues" },
           ],
         },

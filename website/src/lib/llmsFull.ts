@@ -134,7 +134,7 @@ function openingText(tag: Tag, changelog?: Changelog): string {
 }
 
 /** Drops a page's MDX imports and exports: a statement runs until its brackets close. */
-function dropEsm(source: string): string {
+export function dropEsm(source: string): string {
   const lines = source.split("\n");
   const kept: string[] = [];
   let fence = "";

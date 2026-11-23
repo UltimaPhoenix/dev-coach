@@ -62,6 +62,9 @@ No `devcoach` command on your computer? `npx -y devcoach doctor` runs the same c
   <Card title="Cost and license" to="/faq#cost-and-license">
     Free for everyone, and what AGPL-3.0 means for you.
   </Card>
+  <Card title="What a word means" to="/glossary">
+    Hook, cue, skill, pace and the rest, each in a sentence or two.
+  </Card>
 </Cards>
 
 ## Still stuck?

@@ -64,7 +64,7 @@ const sidebars: SidebarsConfig = {
       label: "Help",
       collapsed: false,
       link: { type: "doc", id: "help" },
-      items: ["troubleshooting", "faq"],
+      items: ["troubleshooting", "faq", "glossary"],
     },
     "vision",
   ],
