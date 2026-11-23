@@ -69,6 +69,33 @@ that trust by default. Homebrew advises trusting only the formula you install;
 command instead, `brew install UltimaPhoenix/tap/devcoach` taps, trusts this formula only and
 installs it; then run `devcoach install`.
 
+## Check it worked
+
+Run `devcoach doctor`. It checks each part of the wiring:
+
+<Terminal
+  command="devcoach doctor"
+  output={brewDoctor}
+  caption="Right after install, captured on Linux in a test home (home shown as ~, Homebrew under ~/.linuxbrew). Your Node line shows the version Homebrew installed. Every line is a check; a ✗ line says what to run."
+/>
+
+What to look for: a ✓ on the two hooks, the skill and the server, and under each agent **command
+resolves to** your Homebrew `bin/devcoach`. **no database yet** is normal before your first lesson.
+
+## First run
+
+After your first task devcoach offers to set up your profile and asks how: **Automatic**
+(recommended), **Automatic (Deep)**, **Guided** or **Import backup**. In Claude Desktop, say *set up
+devcoach* once, then ask for a lesson when you want one (*teach me something from what we just did*).
+
+From then on, when your agent finishes a task and a lesson is due, devcoach teaches one short lesson
+on something that task touched. The pace is yours to set:
+[Coaching in your agent](../usage/coaching.md).
+
+**You're set.** The rest of this page is for later:
+[what the install changed](#what-it-set-up), [updating](#update), [removing](#remove),
+[fixes](#if-it-doesnt-work) and [Homebrew next to the plugin](#with-the-claude-code-plugin).
+
 ## What it set up
 
 `devcoach install` says what it wrote:
@@ -99,29 +126,6 @@ touched:
   ]}
   caption="What devcoach install writes. devcoach uninstall removes all of it except ~/.devcoach/."
 />
-
-## Check it worked
-
-Run `devcoach doctor`. It checks each part of the wiring:
-
-<Terminal
-  command="devcoach doctor"
-  output={brewDoctor}
-  caption="Right after install, same test home. Your Node line shows the version Homebrew installed. Every line is a check; a ✗ line says what to run."
-/>
-
-What to look for: a ✓ on the two hooks, the skill and the server, and under each agent **command
-resolves to** your Homebrew `bin/devcoach`. **no database yet** is normal before your first lesson.
-
-## First run
-
-After your first task devcoach offers to set up your profile and asks how: **Automatic**
-(recommended), **Automatic (Deep)**, **Guided** or **Import backup**. In Claude Desktop, say *set up
-devcoach* once, then ask for a lesson when you want one (*teach me something from what we just did*).
-
-From then on, when your agent finishes a task and a lesson is due, devcoach teaches one short lesson
-on something that task touched. The pace is yours to set:
-[Coaching in your agent](../usage/coaching.md).
 
 ## Update
 

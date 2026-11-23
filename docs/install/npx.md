@@ -80,27 +80,6 @@ On Windows a global install registers `node.exe` and devcoach's script instead.
 
 </details>
 
-## What it set up
-
-`devcoach install` writes these files:
-
-<FileTree
-  root="~/"
-  items={[
-    { name: ".claude.json", note: <>Claude Code's server entry <code>devcoach</code>, for all your projects</> },
-    { name: ".claude/", children: [
-      { name: "settings.json", note: <>the two hooks: <code>npx -y devcoach stop-hook</code> and <code>prompt-hook</code></> },
-      { name: "skills/devcoach/", note: <>the devcoach skill: <code>SKILL.md</code>, five <code>references/</code>, a version stamp</> },
-    ] },
-    { name: "Library/Application Support/Claude/", children: [
-      { name: "claude_desktop_config.json", note: <>Claude Desktop's server entry (Linux: <code>~/.config/Claude/</code>; Windows: <code>%APPDATA%\Claude\</code>)</> },
-    ] },
-    { name: ".npm/_npx/", note: "npx's own copy of devcoach: temporary, npm manages it" },
-    { name: ".devcoach/", note: "your lessons, profile, notebook and courses, created when devcoach first runs" },
-  ]}
-  caption="What npx -y devcoach install writes. devcoach uninstall removes all of it except ~/.devcoach/ (and npx's copy)."
-/>
-
 ## Check it worked
 
 Run `devcoach doctor` (through npx: `npx -y devcoach doctor`). It checks each part of the wiring:
@@ -140,6 +119,32 @@ devcoach* once, then ask for a lesson when you want one (*teach me something fro
 From then on, when your agent finishes a task and a lesson is due, devcoach teaches one short lesson
 on something that task touched. The pace is yours to set:
 [Coaching in your agent](../usage/coaching.md).
+
+**You're set.** The rest of this page is for later:
+[what the install changed](#what-it-set-up), [updating](#update), [removing](#remove),
+[fixes](#if-it-doesnt-work), [Node version managers](#node-version-managers) and
+[wiring it by hand](#wire-it-by-hand).
+
+## What it set up
+
+`devcoach install` writes these files:
+
+<FileTree
+  root="~/"
+  items={[
+    { name: ".claude.json", note: <>Claude Code's server entry <code>devcoach</code>, for all your projects</> },
+    { name: ".claude/", children: [
+      { name: "settings.json", note: <>the two hooks: <code>npx -y devcoach stop-hook</code> and <code>prompt-hook</code></> },
+      { name: "skills/devcoach/", note: <>the devcoach skill: <code>SKILL.md</code>, five <code>references/</code>, a version stamp</> },
+    ] },
+    { name: "Library/Application Support/Claude/", children: [
+      { name: "claude_desktop_config.json", note: <>Claude Desktop's server entry (Linux: <code>~/.config/Claude/</code>; Windows: <code>%APPDATA%\Claude\</code>)</> },
+    ] },
+    { name: ".npm/_npx/", note: "npx's own copy of devcoach: temporary, npm manages it" },
+    { name: ".devcoach/", note: "your lessons, profile, notebook and courses, created when devcoach first runs" },
+  ]}
+  caption="What npx -y devcoach install writes. devcoach uninstall removes all of it except ~/.devcoach/ (and npx's copy)."
+/>
 
 ## Update
 

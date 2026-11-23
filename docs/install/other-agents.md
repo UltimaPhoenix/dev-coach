@@ -201,6 +201,9 @@ devcoach skill and its reference files.
 Then ask for a lesson when you want one. The web dashboard: ask *open the devcoach dashboard*, or run
 `npx -y devcoach ui`.
 
+**You're set.** The rest of this page is for later: [updating](#update), [removing](#remove) and
+[fixes](#if-it-doesnt-work).
+
 ## Update
 
 npx fetches each new release by itself. Your agent runs it the next time it starts devcoach: restart

@@ -108,32 +108,6 @@ args = ["-y", "devcoach", "mcp"]
 Without the table Codex still runs the hooks and loads the skill, but has none of the tools a lesson
 needs.
 
-## What it set up
-
-<Terminal
-  command="devcoach install --codex"
-  output={cli.installCodex}
-  caption={<>Captured after the Gemini CLI install, so the shared skill was already there. Your home shows as <code>~</code> here; your own output prints the full path, which the TOML table needs.</>}
-/>
-
-<FileTree
-  root="~/"
-  items={[
-    { name: ".codex/hooks.json", note: <>the hooks <code>Stop</code> and <code>UserPromptSubmit</code></> },
-    { name: ".codex/config.toml", note: <>the <code>[mcp_servers.devcoach]</code> table, written by <code>codex mcp add</code> or by you. Codex keeps its trust records for the hooks here too</> },
-    { name: ".agents/skills/devcoach/", note: "the devcoach skill, shared with Gemini CLI", children: [
-      { name: "SKILL.md", note: "how to teach you" },
-      { name: "references/", note: "five more files: onboarding, calibration, review, sharing, courses" },
-      { name: ".devcoach-version", note: "the version this copy came from" },
-    ] },
-    { name: ".devcoach/", note: "your lessons, profile, notebook and courses: created at onboarding, shared with every agent" },
-  ]}
-  caption={<>What the install writes: <code>hooks.json</code> and the skill. devcoach never writes <code>config.toml</code>.</>}
-/>
-
-How the hooks decide: [How it works](../how-it-works.md). Your data:
-[Privacy & security](../reference/privacy.md).
-
 ## Check it worked
 
 <Terminal
@@ -188,6 +162,36 @@ The pace is yours to set: by default about one cue every 10 interactions in a ch
 2 lessons a day, at least 4 hours apart, and none while a course is in progress
 ([Coaching in your agent](../usage/coaching.md)). Codex tells its hooks when you are in plan mode,
 and plan-mode turns do not count.
+
+**You're set.** The rest of this page is for later:
+[what the install changed](#what-it-set-up), [updating](#update), [removing](#remove) and
+[fixes](#if-it-doesnt-work).
+
+## What it set up
+
+<Terminal
+  command="devcoach install --codex"
+  output={cli.installCodex}
+  caption={<>Captured after the Gemini CLI install, so the shared skill was already there. Your home shows as <code>~</code> here; your own output prints the full path, which the TOML table needs.</>}
+/>
+
+<FileTree
+  root="~/"
+  items={[
+    { name: ".codex/hooks.json", note: <>the hooks <code>Stop</code> and <code>UserPromptSubmit</code></> },
+    { name: ".codex/config.toml", note: <>the <code>[mcp_servers.devcoach]</code> table, written by <code>codex mcp add</code> or by you. Codex keeps its trust records for the hooks here too</> },
+    { name: ".agents/skills/devcoach/", note: "the devcoach skill, shared with Gemini CLI", children: [
+      { name: "SKILL.md", note: "how to teach you" },
+      { name: "references/", note: "five more files: onboarding, calibration, review, sharing, courses" },
+      { name: ".devcoach-version", note: "the version this copy came from" },
+    ] },
+    { name: ".devcoach/", note: "your lessons, profile, notebook and courses: created at onboarding, shared with every agent" },
+  ]}
+  caption={<>What the install writes: <code>hooks.json</code> and the skill. devcoach never writes <code>config.toml</code>.</>}
+/>
+
+How the hooks decide: [How it works](../how-it-works.md). Your data:
+[Privacy & security](../reference/privacy.md).
 
 ## Update
 

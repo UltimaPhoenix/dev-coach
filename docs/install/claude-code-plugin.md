@@ -125,6 +125,46 @@ same folder and run `/reload-plugins`. Its data folder is `~/.claude/plugins/dat
 
 </details>
 
+## Check it worked
+
+Type **`/devcoach:setup`** in Claude Code. It checks that devcoach can run on this machine and that
+its server is connected, then sets up your profile ([First run](#first-run)). Run it again any time:
+it tells you what is already in place.
+
+From a terminal (macOS or Linux), you can ask the plugin's [launcher](#what-it-set-up) directly:
+
+```bash
+plugin=$(ls -d ~/.claude/plugins/cache/ultimaphoenix/devcoach/*/ | sort -V | tail -1)
+CLAUDE_PLUGIN_DATA=~/.claude/plugins/data/devcoach-ultimaphoenix \
+  node "${plugin}scripts/launch.mjs" doctor
+```
+
+<Terminal
+  command="node …/scripts/launch.mjs doctor"
+  output={doctorPlugin}
+  caption="Right after install, home shown as ~. Runtime names the plugin's own copy of devcoach; the hooks and the skill come from the plugin."
+/>
+
+The first line picks the newest version (Claude Code keeps the previous one for a while after an
+update). `CLAUDE_PLUGIN_DATA` names the plugin's data folder: without it, a launcher started from a
+terminal installs a second copy of devcoach inside the plugin folder. Beta channel: use
+`ultimaphoenix-beta` in place of `ultimaphoenix` in both paths. Zip install: run the
+`scripts/launch.mjs` in your unzipped `plugin/` folder, with `devcoach-devcoach` as the data folder.
+
+## First run
+
+After your first task devcoach offers to set up your profile and asks how: **Automatic**
+(recommended), **Automatic (Deep)**, **Guided** or **Import backup**. `/devcoach:setup` starts the same
+setup right away, and `/devcoach:setup redo` rebuilds the profile from scratch.
+
+From then on, when your agent finishes a task and a lesson is due, devcoach teaches one short lesson
+on something that task touched. The pace is yours to set:
+[Coaching in your agent](../usage/coaching.md).
+
+**You're set.** The rest of this page is for later:
+[what the install changed](#what-it-set-up), [updating](#updating), [removing](#remove),
+[fixes](#troubleshooting) and [the command line](#the-cli-next-to-the-plugin).
+
 ## What it set up
 
 Claude Code keeps the plugin in two folders of its own. Your lessons live apart from both:
@@ -156,42 +196,6 @@ Claude Code keeps the plugin in two folders of its own. Your lessons live apart 
 The plugin is configuration plus a small launcher. Every hook run and server start goes through the
 launcher, which runs the pinned devcoach with `node`, with no `npx` start each time. How the hooks
 decide: [How it works](../how-it-works.md). Your data: [Privacy & security](../reference/privacy.md).
-
-## Check it worked
-
-Type **`/devcoach:setup`** in Claude Code. It checks that devcoach can run on this machine and that
-its server is connected, then sets up your profile ([First run](#first-run)). Run it again any time:
-it tells you what is already in place.
-
-From a terminal (macOS or Linux), you can ask the plugin's launcher directly:
-
-```bash
-plugin=$(ls -d ~/.claude/plugins/cache/ultimaphoenix/devcoach/*/ | sort -V | tail -1)
-CLAUDE_PLUGIN_DATA=~/.claude/plugins/data/devcoach-ultimaphoenix \
-  node "${plugin}scripts/launch.mjs" doctor
-```
-
-<Terminal
-  command="node …/scripts/launch.mjs doctor"
-  output={doctorPlugin}
-  caption="Right after install, home shown as ~. Runtime names the plugin's own copy of devcoach; the hooks and the skill come from the plugin."
-/>
-
-The first line picks the newest version (Claude Code keeps the previous one for a while after an
-update). `CLAUDE_PLUGIN_DATA` names the plugin's data folder: without it, a launcher started from a
-terminal installs a second copy of devcoach inside the plugin folder. Beta channel: use
-`ultimaphoenix-beta` in place of `ultimaphoenix` in both paths. Zip install: run the
-`scripts/launch.mjs` in your unzipped `plugin/` folder, with `devcoach-devcoach` as the data folder.
-
-## First run
-
-After your first task devcoach offers to set up your profile and asks how: **Automatic**
-(recommended), **Automatic (Deep)**, **Guided** or **Import backup**. `/devcoach:setup` starts the same
-setup right away, and `/devcoach:setup redo` rebuilds the profile from scratch.
-
-From then on, when your agent finishes a task and a lesson is due, devcoach teaches one short lesson
-on something that task touched. The pace is yours to set:
-[Coaching in your agent](../usage/coaching.md).
 
 ## Update {/* #updating */}
 
