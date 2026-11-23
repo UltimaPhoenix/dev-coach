@@ -1,5 +1,11 @@
 # devcoach
 
+<p align="center">
+  <a href="https://ultimaphoenix.github.io/dev-coach/">
+    <img src="website/static/img/og-card.jpg" alt="devcoach. Learn from the code your AI writes. Free and open source, 100% local, MCP." width="640">
+  </a>
+</p>
+
 [![npm](https://img.shields.io/npm/v/devcoach?logo=npm)](https://www.npmjs.com/package/devcoach)
 [![CI](https://github.com/UltimaPhoenix/dev-coach/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/UltimaPhoenix/dev-coach/actions/workflows/ci.yml?query=branch%3Adevelop)
 [![Quality Gate](https://sonarcloud.io/api/project_badges/measure?project=UltimaPhoenix_dev-coach&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=UltimaPhoenix_dev-coach)
@@ -7,8 +13,6 @@
 [![Node](https://img.shields.io/badge/node-%E2%89%A524-brightgreen?logo=node.js)](https://nodejs.org/)
 [![Docs](https://img.shields.io/badge/docs-GitHub%20Pages-purple)](https://ultimaphoenix.github.io/dev-coach/)
 [![License](https://img.shields.io/badge/license-AGPL%203.0-blue)](https://github.com/UltimaPhoenix/dev-coach/blob/main/LICENSE)
-
-**Learn from the code your AI writes.**
 
 AI agents now write much of our code, which makes it easy to ship more while understanding less.
 devcoach works inside Claude Code, Gemini CLI and Codex CLI: when your agent finishes a task and a
