@@ -133,23 +133,25 @@ notebook and courses are restored. What a restore keeps and replaces is in
 
 ## Your first lesson
 
-You work on a task as normal. When a lesson is due, your agent ends its reply with a lesson card:
+You work on a task as normal. When a lesson is due, your agent ends its reply with a lesson card: one
+quote, from the `🎓 devcoach` label to the tip.
 
-```
-### ──────── 🎓 devcoach ────────
-
-**Promise.allSettled vs Promise.all** · TypeScript · Mid
-
-Promise.all rejects the moment any promise rejects, and you lose the results of the ones that
-already succeeded. For independent work, reach for Promise.allSettled… [3–6 short paragraphs]
-
-💡 *Senior tip:* map each task to a `{ ok, value }` / `{ ok, error }` result up front so callers
-never have to branch on `status` strings.
-
-### ──────── typescript · mid ────────
+> `🎓 devcoach` · typescript · mid
+>
+> **Promise.allSettled vs Promise.all**
+>
+> Promise.all rejects the moment any promise rejects, and you lose the results of the ones that
+> already succeeded. For independent work, reach for Promise.allSettled… [3–6 short paragraphs,
+> code blocks included]
+>
+> 💡 **Senior tip:** map each task to a `{ ok, value }` / `{ ok, error }` result up front so callers
+> never have to branch on `status` strings.
 
 Did that land? ✅ knew it (y) · 💡 understood (u) · ❌ couldn't follow (n)
-```
+
+The quote is only how the lesson looks in the chat. What devcoach saves, and what the dashboard,
+`devcoach lessons` and a shared lesson show, is the lesson itself: the label, the title line and the
+feedback line are never part of it.
 
 Each lesson is saved with where it happened: project folder, repository, branch and commit. Now and
 then Claude Code also shows *🎓 devcoach: checking whether a lesson is due…* next to a generic *Stop

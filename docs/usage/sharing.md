@@ -102,11 +102,12 @@ What **Copy text** and `devcoach share` produce: the card people can read, then 
 devcoach reads. The code is shortened here; a real one is one line of about 1,500 to 2,500 characters.
 
 ```text
-### ─────────── 🎓 devcoach ───────────
-**Docker layer caching — why COPY order decides your build speed** · docker · infrastructure · Junior
-
-Every `RUN`, `COPY`, and `ADD` instruction in a Dockerfile creates a new layer. Docker caches each
-layer by its content hash; if the hash matches what's already on disk, it reuses the cached result…
+> `🎓 devcoach` · docker_layer_caching · junior
+>
+> **Docker layer caching — why COPY order decides your build speed**
+>
+> Every `RUN`, `COPY`, and `ADD` instruction in a Dockerfile creates a new layer. Docker caches each
+> layer by its content hash; if the hash matches what's already on disk, it reuses the cached result…
 
 Shared by Ada with devcoach — paste it to your agent or run: devcoach import
 devcoach:lesson:1:dVZdbhs3EL7KYAskgKBd_RhNEeXJqBugaBsXtougqQsvtaQk2rvkluRKWQQBeoai70Wv1hP0CPmGS…

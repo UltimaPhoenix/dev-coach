@@ -93,14 +93,14 @@
 .agent {
   color: var(--dc-term-fg);
 }
-/* The card: a faint teal rule on its left draws the eye to what devcoach added. */
-.band,
+/* The card is one quote: a faint teal rail on its left, from the label to the tip, as the chat draws it. */
+.label,
 .title,
 .text {
   border-left: 2px solid var(--dc-term-rule);
   padding-left: 0.8rem;
 }
-.band {
+.label {
   color: var(--dc-term-accent);
   font-weight: 600;
 }

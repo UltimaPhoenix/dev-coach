@@ -139,7 +139,7 @@ One entry per tool, in the order of the tables above.
 
 #### `log_lesson` <Tag>write</Tag> {/* #log_lesson */}
 
-Save a delivered lesson — a **pure save** that never elicits feedback. Auto-fills git context, stamps the timestamp server-side, resets the pacing counters, and returns the saved lesson plus a `reply_check` self-check reminding the model that tool arguments are invisible to the user and the card must be written as the final text of the turn.
+Save a delivered lesson — a **pure save** that never elicits feedback. The body is stored without the chat card: quote markers, the `🎓 devcoach` header, the title line and the feedback line come off. Auto-fills git context, stamps the timestamp server-side, resets the pacing counters, and returns the saved lesson plus a `reply_check` self-check reminding the model that tool arguments are invisible to the user and the card must be written as the final text of the turn.
 
 Its arguments are under [Data models](#data-models).
 
