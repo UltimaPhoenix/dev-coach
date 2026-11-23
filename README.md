@@ -1,6 +1,6 @@
 # devcoach
 
-<a href="https://ultimaphoenix.github.io/dev-coach/"><img align="right" width="46%" src="website/static/img/og-card.jpg" alt="devcoach. Learn from the code your AI writes. Pitched at your level. After the task, at your pace. 100% local. Free and open source."></a>
+<a href="https://ultimaphoenix.github.io/dev-coach/"><img align="right" width="46%" src="website/static/img/og-card.jpg" alt="devcoach. Learn from the code your AI writes. 100% local, tailored to you. After the task, at your pace. Free and open source."></a>
 
 [![npm](https://img.shields.io/npm/v/devcoach?logo=npm)](https://www.npmjs.com/package/devcoach)
 [![CI](https://github.com/UltimaPhoenix/dev-coach/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/UltimaPhoenix/dev-coach/actions/workflows/ci.yml?query=branch%3Adevelop)
