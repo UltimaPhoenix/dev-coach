@@ -78,7 +78,7 @@ trustworthy in the first place.
 
 ## Fast judgment runs on slow thinking
 
-The psychologist Daniel Kahneman describes two ways we think, in his research[^kahneman-2002] and in the
+The psychologist Daniel Kahneman describes two ways we think, in his research[^kahneman-2002]<sup>,</sup>[^kahneman-2003] and in the
 book that made it widely known, *Thinking, Fast and Slow*.[^kahneman-2011] **Fast thinking** is
 automatic and takes almost no effort: you glance at a diff and something looks off. **Slow thinking** is
 deliberate and takes effort: you trace the code path, hold the edge cases in your head and work out why.
@@ -87,7 +87,7 @@ He calls the two "fictitious characters":[^winerman-2012] a way to talk about ho
 <TwoSpeeds />
 
 The two are linked. Fast judgment in a field is what long, effortful practice[^ericsson-1993] leaves
-behind: skill makes the useful response come to mind by itself.[^kahneman-2002] Kahneman and Gary Klein,
+behind: skill makes the useful response come to mind by itself.[^kahneman-2002-p453] Kahneman and Gary Klein,
 who studied expert intuition from opposite sides, agreed on when a gut feeling deserves
 trust:[^kahneman-klein-2009] when the field is regular enough to learn from, and when you have had the
 chance to learn it. They also concluded that how sure a judgment feels says little about how accurate it
@@ -187,21 +187,27 @@ devcoach targets the gap: sustained learning at low friction, spaced and calibra
 to connect it to your agent.
 
 {/* References: the site lists these notes, cited above as [^…], at the end of the page under "References".
-    Each one was checked at its source (Crossref, PubMed, arXiv, the publisher's or author's page) and says
-    whether it is free to read. Keep that up when you add one. */}
+    One note is one work, written as a plain reference: authors, year, title, where it was published, volume,
+    issue and pages, then its DOI. A title is a link only where the full text is free at that address. A book
+    names the chapter the text relies on. No remarks about access or about what the work says. Check each
+    one at its source (Crossref, PubMed, arXiv, the publisher's or the author's page, a library catalogue). */}
 
-[^kahneman-2002]: Kahneman, D. (2002). [Maps of bounded rationality: A perspective on intuitive judgment and choice](https://www.nobelprize.org/uploads/2018/06/kahnemann-lecture.pdf). Nobel Prize lecture, 8 December 2002. Free to read (PDF). The journal article on the same ground: Kahneman, D. (2003). A perspective on judgment and choice: Mapping bounded rationality. *American Psychologist*, 58(9), 697–720. [doi:10.1037/0003-066X.58.9.697](https://doi.org/10.1037/0003-066X.58.9.697). Behind a paywall; [the abstract is free](https://pubmed.ncbi.nlm.nih.gov/14584987/).
+[^kahneman-2002]: Kahneman, D. (2003). [Maps of bounded rationality: A perspective on intuitive judgment and choice](https://www.nobelprize.org/uploads/2018/06/kahnemann-lecture.pdf). In T. Frängsmyr (Ed.), *Les Prix Nobel. The Nobel Prizes 2002* (pp. 449–489). Nobel Foundation. Prize lecture, 8 December 2002.
 
-[^kahneman-2011]: Kahneman, D. (2011). *Thinking, Fast and Slow*. Farrar, Straus and Giroux. ISBN 978-0-374-27563-1. A book, not free to read; [about it on Wikipedia](https://en.wikipedia.org/wiki/Thinking,_Fast_and_Slow).
+[^kahneman-2003]: Kahneman, D. (2003). A perspective on judgment and choice: Mapping bounded rationality. *American Psychologist*, 58(9), 697–720. [doi:10.1037/0003-066X.58.9.697](https://doi.org/10.1037/0003-066X.58.9.697)
 
-[^winerman-2012]: Winerman, L. (2012). [A machine for jumping to conclusions](https://www.apa.org/monitor/2012/02/conclusions). *Monitor on Psychology*, 43(2), 24. Free to read. An interview with Kahneman, who says of the two systems: "They are expository fictions, and I write the book as a psychodrama between two fictitious characters."
+[^kahneman-2011]: Kahneman, D. (2011). *Thinking, Fast and Slow*. Farrar, Straus and Giroux. Chapter 1, "The Characters of the Story", pp. 19–30. ISBN 978-0-374-27563-1.
 
-[^ericsson-1993]: Ericsson, K. A., Krampe, R. T., & Tesch-Römer, C. (1993). The role of deliberate practice in the acquisition of expert performance. *Psychological Review*, 100(3), 363–406. [doi:10.1037/0033-295X.100.3.363](https://doi.org/10.1037/0033-295X.100.3.363). Behind a paywall.
+[^winerman-2012]: Winerman, L. (2012). [A machine for jumping to conclusions](https://www.apa.org/monitor/2012/02/conclusions). *Monitor on Psychology*, 43(2), 24.
 
-[^kahneman-klein-2009]: Kahneman, D., & Klein, G. (2009). Conditions for intuitive expertise: A failure to disagree. *American Psychologist*, 64(6), 515–526. [doi:10.1037/a0016755](https://doi.org/10.1037/a0016755). Behind a paywall; [the abstract is free](https://pubmed.ncbi.nlm.nih.gov/19739881/).
+[^ericsson-1993]: Ericsson, K. A., Krampe, R. T., & Tesch-Römer, C. (1993). The role of deliberate practice in the acquisition of expert performance. *Psychological Review*, 100(3), 363–406. [doi:10.1037/0033-295X.100.3.363](https://doi.org/10.1037/0033-295X.100.3.363)
 
-[^bainbridge-1983]: Bainbridge, L. (1983). Ironies of automation. *Automatica*, 19(6), 775–779. [doi:10.1016/0005-1098(83)90046-8](https://doi.org/10.1016/0005-1098(83)90046-8). Behind a paywall; [summary on Wikipedia](https://en.wikipedia.org/wiki/Ironies_of_Automation).
+[^kahneman-2002-p453]: Kahneman (2003), *Maps of bounded rationality*, p. 453.
 
-[^shen-tamkin-2026]: Shen, J. H., & Tamkin, A. (2026). [How AI impacts skill formation](https://arxiv.org/abs/2601.20245). arXiv:2601.20245. Free to read. A preprint.
+[^kahneman-klein-2009]: Kahneman, D., & Klein, G. (2009). Conditions for intuitive expertise: A failure to disagree. *American Psychologist*, 64(6), 515–526. [doi:10.1037/a0016755](https://doi.org/10.1037/a0016755)
 
-[^bastani-2025]: Bastani, H., Bastani, O., Sungu, A., Ge, H., Kabakcı, Ö., & Mariman, R. (2025). [Generative AI without guardrails can harm learning: Evidence from high school mathematics](https://doi.org/10.1073/pnas.2422633122). *Proceedings of the National Academy of Sciences*, 122(26), e2422633122. Free to read.
+[^bainbridge-1983]: Bainbridge, L. (1983). Ironies of automation. *Automatica*, 19(6), 775–779. [doi:10.1016/0005-1098(83)90046-8](https://doi.org/10.1016/0005-1098(83)90046-8)
+
+[^shen-tamkin-2026]: Shen, J. H., & Tamkin, A. (2026). [How AI impacts skill formation](https://arxiv.org/abs/2601.20245). arXiv preprint arXiv:2601.20245.
+
+[^bastani-2025]: Bastani, H., Bastani, O., Sungu, A., Ge, H., Kabakcı, Ö., & Mariman, R. (2025). Generative AI without guardrails can harm learning: Evidence from high school mathematics. *Proceedings of the National Academy of Sciences*, 122(26), e2422633122. [doi:10.1073/pnas.2422633122](https://doi.org/10.1073/pnas.2422633122)
