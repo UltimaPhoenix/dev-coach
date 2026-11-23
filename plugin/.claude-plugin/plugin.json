@@ -1,7 +1,7 @@
 {
   "name": "devcoach",
   "description": "Learn from the code your AI writes: one short lesson at a time on what you don't know yet, drawn from what Claude Code just built. Knowledge map, coaching notebook, web dashboard, all local. Bundles the devcoach MCP server, the Stop hooks and the coaching skill.",
-  "version": "2.7.1",
+  "version": "2.8.0",
   "author": {
     "name": "UltimaPhoenix",
     "url": "https://github.com/UltimaPhoenix"

@@ -3,7 +3,7 @@
   "manifest_version": "0.4",
   "name": "devcoach",
   "display_name": "devcoach",
-  "version": "2.7.1",
+  "version": "2.8.0",
   "description": "Learn from the code your AI writes: one short, local lesson on what you don't know yet.",
   "long_description": "devcoach is a local MCP server that acts as your personal technical mentor. It tracks your knowledge map across topics, respects a configurable rate limit, and, when your agent completes a task, teaches you something from it that you don't know yet, pitched at your level. It runs on Claude Desktop's bundled Node runtime and stores everything locally in ~/.devcoach.",
   "author": {

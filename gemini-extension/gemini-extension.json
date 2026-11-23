@@ -1,6 +1,6 @@
 {
   "name": "devcoach",
-  "version": "2.7.1",
+  "version": "2.8.0",
   "description": "Learn from the code your AI writes: one short lesson at a time on what you don't know yet, drawn from what Gemini CLI just built. Knowledge map, all local. Bundles the devcoach MCP server + AfterAgent hooks + coaching skill.",
   "mcpServers": {
     "devcoach": {
