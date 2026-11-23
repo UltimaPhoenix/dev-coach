@@ -33,9 +33,12 @@ jobs:
       - run: npm install --no-save playwright
       - run: npx playwright install --with-deps chromium
       - run: node scripts/screenshots.mjs
+      # The clips and the GIF below are encoded with ffmpeg (libx264). The ubuntu-latest image no
+      # longer ships it, and Playwright's own ffmpeg is a WebM-only build, so it comes from apt.
+      - run: sudo apt-get install -y --no-install-recommends ffmpeg
       # The dashboard clips the guides play (docs/clips): same fixture, encoded with ffmpeg.
       - run: node scripts/docs-clips.mjs
-      # The README's demo GIF, recorded from the docs home's terminal demo (ffmpeg ships with the runner).
+      # The README's demo GIF, recorded from the docs home's terminal demo.
       - run: node scripts/demo-gif.mjs
       - name: Commit refreshed screenshots
         run: |
