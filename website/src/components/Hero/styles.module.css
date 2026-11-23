@@ -16,6 +16,8 @@
 }
 .copy {
   min-width: 0;
+  /* The install tabs lay themselves out by this column's width, not the window's. */
+  container-type: inline-size;
 }
 .eyebrow {
   margin: 0 0 0.9rem;
@@ -44,18 +46,65 @@
   line-height: 1.55;
   color: var(--ifm-color-emphasis-800);
 }
-/* Six agents: labels never break, the row wraps instead of hiding the last tabs off-screen. */
+/* One question above the tabs. */
+.pick {
+  margin: 0 0 0.35rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--dc-text-muted);
+}
+/* Five agents in a grid, so none hides off-screen: one row when the column is wide enough, three
+   columns otherwise (a phone, or the hero's narrower column on a small laptop). Labels never break. */
 .tabs {
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(3, auto);
+  justify-content: start;
   margin-bottom: 0.25rem;
 }
 .tabs :global(.tabs__item) {
-  padding: 0.45rem 0.75rem;
-  font-size: 0.9rem;
+  padding: 0.4rem 0.55rem;
+  font-size: 0.85rem;
   white-space: nowrap;
+}
+@container (min-width: 36rem) {
+  .tabs {
+    grid-template-columns: repeat(5, auto);
+  }
+  .tabs :global(.tabs__item) {
+    padding: 0.45rem 0.75rem;
+    font-size: 0.9rem;
+  }
+}
+/* What this agent gets, above its command: a lesson by itself (accent) or one when you ask. */
+.gets {
+  margin: 0.6rem 0 0.45rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--dc-text-muted);
+}
+.auto {
+  color: var(--dc-accent-text);
+}
+.beta {
+  font-weight: 600;
+  color: var(--dc-text-muted);
 }
 .tabs + div :global(.theme-code-block) {
   margin-bottom: 0.5rem;
+}
+/* A command never scrolls sideways: a long one wraps, its continuation indented so it does not
+   read as a second command. Slightly smaller type keeps every line whole on a desktop. */
+.tabs + div :global(.theme-code-block) code {
+  font-size: 0.85rem;
+}
+.tabs + div :global(.theme-code-block) :global(.token-line) {
+  display: block;
+  padding-left: 2ch;
+  text-indent: -2ch;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 .hint,
 .desktop {
@@ -67,6 +116,12 @@
   margin: 0.75rem 0 0.5rem;
   font-size: 0.95rem;
   color: var(--ifm-font-color-base);
+}
+/* The routes that install the `devcoach` command: links, a second choice under the agent's own route. */
+.more {
+  margin: 1rem 0 0;
+  font-size: 0.9rem;
+  color: var(--ifm-color-emphasis-800);
 }
 .facts {
   display: flex;
@@ -94,48 +149,9 @@
   font-size: 0.85rem;
 }
 
-.steps {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 1rem;
+/* The three steps are Cards (../Cards): only the space around them is set here. */
+.steps > div {
   margin: 0 0 2.5rem;
-  padding: 0;
-  list-style: none;
-}
-@media (min-width: 768px) {
-  .steps {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
-.step {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: 0.8rem;
-  margin: 0;
-  padding: 1rem 1.1rem;
-  border: 1px solid var(--dc-border);
-  border-radius: var(--dc-radius);
-  background: var(--ifm-background-surface-color);
-}
-.stepN {
-  display: inline-grid;
-  place-items: center;
-  width: 1.8rem;
-  height: 1.8rem;
-  border-radius: 50%;
-  border: 1px solid var(--devcoach-accent);
-  color: var(--dc-accent-text);
-  font-weight: 700;
-  font-size: 0.85rem;
-}
-.stepTitle {
-  margin: 0 0 0.25rem;
-  font-weight: 700;
-}
-.stepBody {
-  margin: 0;
-  font-size: 0.9rem;
-  color: var(--ifm-color-emphasis-800);
 }
 
 /* Closing band: privacy first, then the why. Two columns, one under 768px. */

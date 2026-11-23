@@ -51,17 +51,20 @@ The tag under each tool name below is the annotation the tool declares to your c
 - <Tag>· open-world</Tag> reaches outside devcoach's database: a web address for `import_lesson`,
   the dashboard process on `127.0.0.1` for `open_ui` and `stop_ui`.
 
+Each name links to the tool's entry under [Tool details](#tool-details): its arguments, its defaults
+and what it returns.
+
 ### Lessons
 
 <RefTable>
 
 | Tool | Purpose | Annotation |
 |---|---|---|
-| `log_lesson` | Save a delivered lesson — a **pure save** that never elicits feedback. The body is stored without the chat card: quote markers, the `🎓 devcoach` header, the title line and the feedback line come off. Auto-fills git context, stamps the timestamp server-side, resets the pacing counters, and returns the saved lesson plus a `reply_check` self-check reminding the model that tool arguments are invisible to the user and the card must be written as the final text of the turn | write |
-| `skip_lesson` | Decline a lesson cue with a one-line `reason`, which `devcoach doctor` shows. Re-arms the pacing counter | write |
-| `get_lessons` | Query lesson history, newest first. Filters combine: `period` (`today`, `week`, `month`, `year`, `all`), `category`, `level`, `project` / `repository` / `branch` / `commit` (partial match), `starred`, `imported`, `shared_by`, `feedback` (or `none`), `search` (every word must match the title, topic, summary, body or sender), `date_from` / `date_to`. `limit` defaults to 10, `0` = all. Returns a JSON list of [lessons](#data-models) | *read-only* |
-| `star_lesson` | Star or unstar a lesson. Returns `false` when the id does not exist | write |
-| `delete_lesson` | Permanently delete a lesson. Returns `false` when the id does not exist | **destructive** |
+| [`log_lesson`](#log_lesson) | Save a delivered lesson | write |
+| [`skip_lesson`](#skip_lesson) | Decline a lesson cue, with a reason | write |
+| [`get_lessons`](#get_lessons) | Query lesson history, newest first, with filters | *read-only* |
+| [`star_lesson`](#star_lesson) | Star or unstar a lesson | write |
+| [`delete_lesson`](#delete_lesson) | Permanently delete a lesson | **destructive** |
 
 </RefTable>
 
@@ -71,12 +74,12 @@ The tag under each tool name below is the annotation the tool declares to your c
 
 | Tool | Purpose | Annotation |
 |---|---|---|
-| `submit_feedback` | Record the answer under a lesson card: `know`, `understood`, `dont_know`, or `clear` to remove it. Only `know` moves confidence: +1 when it is set, −1 when it is changed or cleared. Repeating the stored answer changes nothing. Returns `false` when the lesson does not exist | write |
-| `update_knowledge` | Add a signed `delta` to a topic's confidence, clamped 0–10. A topic that does not exist starts from 5. Returns the new confidence | write |
-| `add_topic` | Add a topic, or set the confidence of one that exists (`confidence` 0–10, default 5). An optional `group` puts it in that group, created if needed | write |
-| `remove_topic` | Remove a topic from the knowledge map and from its group. Returns `false` when it did not exist | **destructive** |
-| `add_group` | Create an empty knowledge group. Returns `true`, also when the group already exists | write |
-| `remove_group` | Delete a group; its topics move to Other. Returns `false` when it did not exist | **destructive** |
+| [`submit_feedback`](#submit_feedback) | Record the answer under a lesson card | write |
+| [`update_knowledge`](#update_knowledge) | Move a topic's confidence up or down | write |
+| [`add_topic`](#add_topic) | Add a topic, or set the confidence of one that exists | write |
+| [`remove_topic`](#remove_topic) | Remove a topic from the knowledge map and from its group | **destructive** |
+| [`add_group`](#add_group) | Create an empty knowledge group | write |
+| [`remove_group`](#remove_group) | Delete a group; its topics move to Other | **destructive** |
 
 </RefTable>
 
@@ -86,13 +89,126 @@ The tag under each tool name below is the annotation the tool declares to your c
 
 | Tool | Purpose | Annotation |
 |---|---|---|
-| `get_briefing` | Everything the skill reads before a lesson, in one call: `onboarding` (`knowledge_ready`, `notebook_ready`, `needs_onboarding`), `rate_limit` (`allowed`, `total_lessons`, and `reason` when a lesson is not allowed now), `taught_topics`, `profile`, `compat`, the `notebook` text and `notebook_path`, the file the model edits directly. Same payload as `devcoach://briefing` | *read-only* |
-| `get_onboarding` | What onboarding needs: the same three flags; `detected_stack` (`{topic: suggested confidence}`, from the current folder and the 15 most recently active projects in your Claude Code history); `detected_projects` (per project: `name`, `path`, `topics`, `prompt_count`, `last_activity`, and `memory`, an excerpt of its Claude Code memory file); `scanned_projects`; `default_topics`; `context_ready` (a git branch was found); `notebook_path`; `compat`; and `next_step`, what the model should do with this payload (`null` once onboarding is done). Same payload as `devcoach://onboarding` | *read-only* |
-| `get_profile` | The knowledge map: `knowledge` (`topic`, `confidence`), `groups` (`name`, `topics`) and `compat`. Same payload as `devcoach://profile` | *read-only* |
-| `preview_deep_scan` | Metadata-only pre-check for Automatic (Deep) onboarding. `months` (1–24, default 3) sets a rolling window. Returns `window_months`, `cutoff`, `candidate_count`, `over_soft_limit` (more than 8 candidates; the skill then asks you to narrow the window, go on, or pick projects) and up to 50 `candidates` (`name`, `path`, `last_activity`, `prompt_count`). Uses only project paths and activity timestamps, and returns no prompt text | *read-only* |
-| `complete_onboarding` | Replace the whole knowledge map with `topics` (`{topic: 0–10}`) and optional `groups` (`{group: [topics]}`; ungrouped topics go to Other). Every existing topic and group is deleted first. Creates a placeholder notebook if there is none; the model then writes the real one to `notebook_path`. Returns the new profile | **destructive** |
+| [`get_briefing`](#get_briefing) | Everything the skill reads before a lesson, in one call | *read-only* |
+| [`get_onboarding`](#get_onboarding) | What onboarding needs: status, detected stack and next step | *read-only* |
+| [`get_profile`](#get_profile) | The knowledge map: topics, confidence and groups | *read-only* |
+| [`preview_deep_scan`](#preview_deep_scan) | Metadata-only pre-check for Automatic (Deep) onboarding | *read-only* |
+| [`complete_onboarding`](#complete_onboarding) | Replace the whole knowledge map with new topics and groups | **destructive** |
 
 </RefTable>
+
+### Sharing
+
+<RefTable>
+
+| Tool | Purpose | Annotation |
+|---|---|---|
+| [`share_lesson`](#share_lesson) | Hand a lesson to another person as text, link or file | *read-only* |
+| [`import_lesson`](#import_lesson) | Store a lesson someone shared | write · open-world |
+
+</RefTable>
+
+### Courses
+
+<RefTable>
+
+| Tool | Purpose | Annotation |
+|---|---|---|
+| [`create_course`](#create_course) | Start a course from a seed lesson or from a concept | write |
+| [`add_course_step`](#add_course_step) | Register a section of the course document as a step | write |
+| [`update_course_progress`](#update_course_progress) | Set the status of a step, or of the whole course | write |
+| [`get_courses`](#get_courses) | List courses with their steps | *read-only* |
+
+</RefTable>
+
+### Dashboard and settings
+
+<RefTable>
+
+| Tool | Purpose | Annotation |
+|---|---|---|
+| [`open_ui`](#open_ui) | Start the web dashboard in the background | write · open-world |
+| [`stop_ui`](#stop_ui) | Stop the dashboard, whoever started it | write · open-world |
+| [`update_settings`](#update_settings) | Set one setting by key | write |
+
+</RefTable>
+
+### Tool details
+
+One entry per tool, in the order of the tables above.
+
+#### `log_lesson` <Tag>write</Tag> {/* #log_lesson */}
+
+Save a delivered lesson — a **pure save** that never elicits feedback. The body is stored without the chat card: quote markers, the `🎓 devcoach` header, the title line and the feedback line come off. Auto-fills git context, stamps the timestamp server-side, resets the pacing counters, and returns the saved lesson plus a `reply_check` self-check reminding the model that tool arguments are invisible to the user and the card must be written as the final text of the turn.
+
+Its arguments are under [Data models](#data-models).
+
+#### `skip_lesson` <Tag>write</Tag> {/* #skip_lesson */}
+
+Decline a lesson cue with a one-line `reason`, which `devcoach doctor` shows. Re-arms the pacing
+counter.
+
+#### `get_lessons` <Tag kind="calm">read-only</Tag> {/* #get_lessons */}
+
+Query lesson history, newest first. Filters combine:
+
+- `period`: `today`, `week`, `month`, `year`, `all`
+- `category`, `level`
+- `project` / `repository` / `branch` / `commit`: partial match
+- `starred`, `imported`, `shared_by`
+- `feedback` (or `none`)
+- `search`: every word must match the title, topic, summary, body or sender
+- `date_from` / `date_to`
+
+`limit` defaults to 10, `0` = all. Returns a JSON list of [lessons](#data-models).
+
+#### `star_lesson` <Tag>write</Tag> {/* #star_lesson */}
+
+Star or unstar a lesson. Returns `false` when the id does not exist.
+
+#### `delete_lesson` <Tag kind="warn">destructive</Tag> {/* #delete_lesson */}
+
+Permanently delete a lesson. Returns `false` when the id does not exist.
+
+#### `submit_feedback` <Tag>write</Tag> {/* #submit_feedback */}
+
+Record the answer under a lesson card: `know`, `understood`, `dont_know`, or `clear` to remove it.
+Only `know` moves confidence: +1 when it is set, −1 when it is changed or cleared. Repeating the
+stored answer changes nothing. Returns `false` when the lesson does not exist.
+
+#### `update_knowledge` <Tag>write</Tag> {/* #update_knowledge */}
+
+Add a signed `delta` to a topic's confidence, clamped 0–10. A topic that does not exist starts from 5.
+Returns the new confidence.
+
+#### `add_topic` <Tag>write</Tag> {/* #add_topic */}
+
+Add a topic, or set the confidence of one that exists (`confidence` 0–10, default 5). An optional
+`group` puts it in that group, created if needed.
+
+#### `remove_topic` <Tag kind="warn">destructive</Tag> {/* #remove_topic */}
+
+Remove a topic from the knowledge map and from its group. Returns `false` when it did not exist.
+
+#### `add_group` <Tag>write</Tag> {/* #add_group */}
+
+Create an empty knowledge group. Returns `true`, also when the group already exists.
+
+#### `remove_group` <Tag kind="warn">destructive</Tag> {/* #remove_group */}
+
+Delete a group; its topics move to Other. Returns `false` when it did not exist.
+
+#### `get_briefing` <Tag kind="calm">read-only</Tag> {/* #get_briefing */}
+
+Everything the skill reads before a lesson, in one call:
+
+- `onboarding`: `knowledge_ready`, `notebook_ready`, `needs_onboarding`
+- `rate_limit`: `allowed`, `total_lessons`, and `reason` when a lesson is not allowed now
+- `taught_topics`, `profile`, `compat`
+- the `notebook` text
+- `notebook_path`, the file the model edits directly
+
+Same payload as `devcoach://briefing`.
 
 <details>
 <summary>A real `get_briefing` result (demo data)</summary>
@@ -129,6 +245,22 @@ The tag under each tool name below is the annotation the tool declares to your c
 
 </details>
 
+#### `get_onboarding` <Tag kind="calm">read-only</Tag> {/* #get_onboarding */}
+
+What onboarding needs:
+
+- the three flags of `get_briefing`: `knowledge_ready`, `notebook_ready`, `needs_onboarding`
+- `detected_stack`: `{topic: suggested confidence}`, from the current folder and the 15 most recently
+  active projects in your Claude Code history
+- `detected_projects`, per project: `name`, `path`, `topics`, `prompt_count`, `last_activity`, and
+  `memory`, an excerpt of its Claude Code memory file
+- `scanned_projects` and `default_topics`
+- `context_ready`: a git branch was found
+- `notebook_path` and `compat`
+- `next_step`: what the model should do with this payload, `null` once onboarding is done
+
+Same payload as `devcoach://onboarding`.
+
 <details>
 <summary>A real `get_onboarding` result on a computer with no Claude Code history</summary>
 
@@ -155,6 +287,11 @@ The tag under each tool name below is the annotation the tool declares to your c
 
 </details>
 
+#### `get_profile` <Tag kind="calm">read-only</Tag> {/* #get_profile */}
+
+The knowledge map: `knowledge` (`topic`, `confidence`), `groups` (`name`, `topics`) and `compat`. Same
+payload as `devcoach://profile`.
+
 :::note[When `compat` is not `null`]
 
 `get_briefing`, `get_onboarding` and `get_profile` carry `compat`. It is `null` normally. When another
@@ -164,41 +301,114 @@ work, and every tool that writes to it fails until you update.
 
 :::
 
-### Sharing
+#### `preview_deep_scan` <Tag kind="calm">read-only</Tag> {/* #preview_deep_scan */}
 
-<RefTable>
+Metadata-only pre-check for Automatic (Deep) onboarding. `months` (1–24, default 3) sets a rolling
+window. Returns:
 
-| Tool | Purpose | Annotation |
-|---|---|---|
-| `share_lesson` | Hand a lesson to another person. `transport`: `text` (default: the card plus one `devcoach:lesson:1:…` line), `link` (a server-less URL on the docs site) or `file` (`.devcoach.md` contents and a `filename`). `include_context: true` adds project, branch, commit and task, and the repository when it is on GitHub, GitLab or Bitbucket; a local folder path never travels. The sender name is `shared_by` when you pass it (an empty string shares anonymously), else the `share_name` setting, else your git `user.name`. Returns the `code`, the chosen form, and a `reply_check` that says how the model must reply for that transport | *read-only* |
-| `import_lesson` | Store a lesson someone shared. `payload` is what you were handed, verbatim: the code, the whole card, a share link (decoded on your machine), a web address (downloaded: public hosts only, 5 s, 256 KB, at most 3 redirects), `.devcoach.md` text or a lessons JSON export. Returns `kind`, `inserted`, `duplicated`, `invalid`, `lesson`, `topic_tracked` and a `reply_check`; a duplicate is a normal outcome, not an error. Imported lessons never count against the daily limit | write · open-world |
+- `window_months`, `cutoff`, `candidate_count`
+- `over_soft_limit`: more than 8 candidates; the skill then asks you to narrow the window, go on, or
+  pick projects
+- up to 50 `candidates`: `name`, `path`, `last_activity`, `prompt_count`
 
-</RefTable>
+Uses only project paths and activity timestamps, and returns no prompt text.
 
-### Courses
+#### `complete_onboarding` <Tag kind="warn">destructive</Tag> {/* #complete_onboarding */}
 
-<RefTable>
+Replace the whole knowledge map with `topics` (`{topic: 0–10}`) and optional `groups`
+(`{group: [topics]}`; ungrouped topics go to Other). Every existing topic and group is deleted first.
 
-| Tool | Purpose | Annotation |
-|---|---|---|
-| `create_course` | Start a [course](../usage/courses.md) from a seed lesson (`lesson_id`) or from a concept, with the prerequisite chain explored with you (`[{concept, known}]`). The id is a slug of the title (`-2`, `-3` on a clash); an unknown `lesson_id` fails. Returns the course, `course_dir`, `document_path` (where the model writes the single HTML document itself), `seed_context` (the seed lesson's task, project, repository and branch) and a `reply_check` | write |
-| `add_course_step` | Register a section of the course document as a step: `anchor` is the section's `id` and must already be in the document; `kind` is `concept`, `example`, `practice` or `check`. Appended, or inserted with `after` (`0` = first; the following steps are renumbered). Registering a step, or changing its status, also fills the document's code-highlighter placeholder when the document has code | write |
-| `update_course_progress` | With `position`: set that step to `todo`, `done` or `skipped` (the course completes itself once every step is done or skipped). Without it: set the course to `active`, `completed` or `abandoned`. Returns the course with its steps | write |
-| `get_courses` | Courses with their steps and `course_dir`, filtered by `course_id`, seed `lesson_id` or `status` | *read-only* |
+Creates a placeholder notebook if there is none; the model then writes the real one to
+`notebook_path`. Returns the new profile.
 
-</RefTable>
+#### `share_lesson` <Tag kind="calm">read-only</Tag> {/* #share_lesson */}
 
-### Dashboard and settings
+Hand a lesson to another person. `transport` is one of:
 
-<RefTable>
+- `text` (default): the card plus one `devcoach:lesson:1:…` line
+- `link`: a server-less URL on the docs site
+- `file`: `.devcoach.md` contents and a `filename`
 
-| Tool | Purpose | Annotation |
-|---|---|---|
-| `open_ui` | Start the [web dashboard](../usage/web-ui.md) in the background on `port` (1024–65535, default 7860). It listens on `127.0.0.1` only. Replies with the address and opens no browser; says so when a dashboard already runs on that port | write · open-world |
-| `stop_ui` | Stop the dashboard on `port` (default 7860), whoever started it. Requests in flight finish first. Returns `stopped: false` when nothing runs there | write · open-world |
-| `update_settings` | Set one setting by key: `max_per_day` (1–20), `min_gap_minutes` (0–1440), `nudge_every` (0–1000), `nudge_scope` (`session` \| `global`) or `share_name` (≤ 80 chars, empty clears); `value` is always passed as a string. Returns all seven settings. `ui_theme` and `ui_home` are set on the dashboard | write |
+`include_context: true` adds project, branch, commit and task, and the repository when it is on
+GitHub, GitLab or Bitbucket; a local folder path never travels.
 
-</RefTable>
+The sender name is `shared_by` when you pass it (an empty string shares anonymously), else the
+`share_name` setting, else your git `user.name`.
+
+Returns the `code`, the chosen form, and a `reply_check` that says how the model must reply for that
+transport.
+
+#### `import_lesson` <Tag>write · open-world</Tag> {/* #import_lesson */}
+
+Store a lesson someone shared. `payload` is what you were handed, verbatim:
+
+- the code
+- the whole card
+- a share link (decoded on your machine)
+- a web address (downloaded: public hosts only, 5 s, 256 KB, at most 3 redirects)
+- `.devcoach.md` text
+- a lessons JSON export
+
+Returns `kind`, `inserted`, `duplicated`, `invalid`, `lesson`, `topic_tracked` and a `reply_check`; a
+duplicate is a normal outcome, not an error. Imported lessons never count against the daily limit.
+
+#### `create_course` <Tag>write</Tag> {/* #create_course */}
+
+Start a [course](../usage/courses.md) from a seed lesson (`lesson_id`) or from a concept, with the
+prerequisite chain explored with you (`[{concept, known}]`). The id is a slug of the title (`-2`, `-3`
+on a clash); an unknown `lesson_id` fails. Returns:
+
+- the course and `course_dir`
+- `document_path`: where the model writes the single HTML document itself
+- `seed_context`: the seed lesson's task, project, repository and branch
+- a `reply_check`
+
+#### `add_course_step` <Tag>write</Tag> {/* #add_course_step */}
+
+Register a section of the course document as a step:
+
+- `anchor` is the section's `id` and must already be in the document.
+- `kind` is `concept`, `example`, `practice` or `check`.
+- The step is appended, or inserted with `after` (`0` = first; the following steps are renumbered).
+
+Registering a step, or changing its status, also fills the document's code-highlighter placeholder
+when the document has code.
+
+#### `update_course_progress` <Tag>write</Tag> {/* #update_course_progress */}
+
+- With `position`: set that step to `todo`, `done` or `skipped`. The course completes itself once
+  every step is done or skipped.
+- Without it: set the course to `active`, `completed` or `abandoned`.
+
+Returns the course with its steps.
+
+#### `get_courses` <Tag kind="calm">read-only</Tag> {/* #get_courses */}
+
+Courses with their steps and `course_dir`, filtered by `course_id`, seed `lesson_id` or `status`.
+
+#### `open_ui` <Tag>write · open-world</Tag> {/* #open_ui */}
+
+Start the [web dashboard](../usage/web-ui.md) in the background on `port` (1024–65535, default 7860).
+It listens on `127.0.0.1` only. Replies with the address and opens no browser; says so when a
+dashboard already runs on that port.
+
+#### `stop_ui` <Tag>write · open-world</Tag> {/* #stop_ui */}
+
+Stop the dashboard on `port` (default 7860), whoever started it. Requests in flight finish first.
+Returns `stopped: false` when nothing runs there.
+
+#### `update_settings` <Tag>write</Tag> {/* #update_settings */}
+
+Set one setting by key:
+
+- `max_per_day`: 1–20
+- `min_gap_minutes`: 0–1440
+- `nudge_every`: 0–1000
+- `nudge_scope`: `session` or `global`
+- `share_name`: ≤ 80 chars, empty clears
+
+`value` is always passed as a string. Returns all seven settings. `ui_theme` and `ui_home` are set on
+the dashboard.
 
 ### When a call fails
 
@@ -223,9 +433,9 @@ Every resource is JSON except `notebook`, which is markdown.
 
 | Resource | Returns |
 |---|---|
-| `devcoach://briefing` | The pre-lesson read. Same payload as [`get_briefing`](#onboarding-and-state) |
-| `devcoach://onboarding` | Same payload as [`get_onboarding`](#onboarding-and-state) |
-| `devcoach://profile` | Same payload as [`get_profile`](#onboarding-and-state) |
+| `devcoach://briefing` | The pre-lesson read. Same payload as [`get_briefing`](#get_briefing) |
+| `devcoach://onboarding` | Same payload as [`get_onboarding`](#get_onboarding) |
+| `devcoach://profile` | Same payload as [`get_profile`](#get_profile) |
 | `devcoach://notebook` | The coaching notebook, `learning-state.md`, as markdown. Empty when there is none yet |
 | `devcoach://settings` | All seven settings (see [Configuration](configuration.md#settings)) |
 | `devcoach://rate-limit` | `allowed`, `total_lessons` (shared lessons included) and `reason` when a lesson is not allowed now (see [How pacing works](configuration.md#rate-limits)) |

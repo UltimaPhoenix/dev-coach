@@ -7,11 +7,13 @@ name: Docs
 on:
   push:
     branches: [main, develop]
-    # The last four feed the home page's demo course (website/docusaurus.config.ts).
+    # CHANGELOG.md dates the roadmap's timeline; the last four feed the home page's demo course
+    # (both in website/docusaurus.config.ts).
     paths:
       - "docs/**"
       - "website/**"
       - ".github/workflows/docs.yml"
+      - "CHANGELOG.md"
       - "scripts/screenshots/fixture.zip"
       - "src/core/highlighter.ts"
       - "assets/static/course-frame.js"

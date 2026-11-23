@@ -134,7 +134,7 @@ Claude Code keeps the plugin in two folders of its own. Your lessons live apart 
   items={[
     { name: ".claude/plugins/", children: [
       { name: "cache/ultimaphoenix/devcoach/", children: [
-        { name: "2.7.1/", note: "the plugin, one folder per version", children: [
+        { name: "<version>/", note: "the plugin, one folder per version", children: [
           { name: ".mcp.json", note: "starts the MCP server through the launcher" },
           { name: "hooks/hooks.json", note: "the Stop and UserPromptSubmit hooks, same launcher" },
           { name: "commands/", note: "the five slash commands" },
@@ -144,7 +144,7 @@ Claude Code keeps the plugin in two folders of its own. Your lessons live apart 
         ] },
       ] },
       { name: "data/devcoach-ultimaphoenix/", note: "the plugin's data folder, kept across updates", children: [
-        { name: "runtime/2.7.1/", note: "devcoach itself, downloaded from npm on the first start" },
+        { name: "runtime/<version>/", note: "devcoach itself, downloaded from npm on the first start" },
         { name: "install.log", note: "npm's output from that download" },
       ] },
     ] },

@@ -17,8 +17,8 @@ import cli from "@site/src/data/cli-output.json";
 # Sharing lessons
 
 A lesson that landed for you is often exactly what a teammate is missing. devcoach lets you hand one
-over without any account or server: the lesson itself travels, in a form the receiver can paste, click
-or drop wherever they use devcoach, and it joins their coaching log as a lesson shared by you.
+over without any account or server. The lesson itself travels, in a form the receiver can paste, click
+or drop wherever they use devcoach. It joins their coaching log as a lesson shared by you.
 
 ```mermaid
 ---
@@ -65,7 +65,145 @@ The lesson card as markdown, then one `devcoach:lesson:1:…` line.
 The text and the link carry the lesson as a code; the file spells the same payload out as front
 matter. A share is a plain string or file that you hand over yourself: nothing is uploaded anywhere.
 
+A share never carries the local folder path, with or without context, nor your answer under the lesson
+and its star. Your name goes with it unless you remove it.
+[What travels](#what-travels--and-what-never-does) lists every field.
+
 <ShareCode />
+
+## From the dashboard
+
+<Clip
+  alt="The Lessons page: hovering a row shows ↗ at its end; a click opens the share panel next to the row, with the name Alex, an Include where it happened checkbox, Copy text, Copy link and Download .md; Copy link turns into Copied"
+  mp4={require("../clips/share-lesson.mp4").default}
+  webm={require("../clips/share-lesson.webm").default}
+  poster={require("../clips/share-lesson.png").default}
+  width={1640}
+  height={922}
+/>
+
+Open a lesson and click **↗ Share**. Or hover a row on the Lessons page and click the `↗` that appears
+at its end. The same panel opens next to the row, so you never leave the list. The panel shows your
+name, an *Include where it happened* checkbox (off by default) and three actions: **Copy text**,
+**Copy link**, **Download .md**.
+
+## From the terminal
+
+```bash
+devcoach share --last                 # card + code line → paste anywhere
+devcoach share <id> --link            # the share link
+devcoach share <id> --file            # writes <id>.devcoach.md
+devcoach share <id> --with-context    # also project / branch / commit / task
+devcoach share <id> --by "Ada"        # sender name (remembered as share_name if none is set)
+devcoach share <id> --anonymous       # no sender name
+```
+
+What **Copy text** and `devcoach share` produce: the card people can read, then the one line
+devcoach reads. The code is shortened here; a real one is one line of about 1,500 to 2,500 characters.
+
+```text
+> `🎓 devcoach` · docker_layer_caching · junior
+>
+> **Docker layer caching — why COPY order decides your build speed**
+>
+> Every `RUN`, `COPY`, and `ADD` instruction in a Dockerfile creates a new layer. Docker caches each
+> layer by its content hash; if the hash matches what's already on disk, it reuses the cached result…
+
+Shared by Ada with devcoach — paste it to your agent or run: devcoach import
+devcoach:lesson:1:dVZdbhs3EL7KYAskgKBd_RhNEeXJqBugaBsXtougqQsvtaQk2rvkluRKWQQBeoai70Wv1hP0CPmGS…
+```
+
+Paste the whole thing anywhere: chat, an issue, an email. The receiver never has to find the code
+in it: every importer does.
+
+## From your agent
+
+Ask in plain words: *"share the last lesson"*, *"share the lesson about WAL mode as a link"*, *"share it
+as a file, anonymously"*. The agent calls the `share_lesson` tool. It replies with the card and the
+code in a fenced block, or with the link, or it writes the file. With the Claude Code plugin,
+`/devcoach:share` does the same: `/devcoach:share last as link`,
+`/devcoach:share about docker with context`.
+
+The coach never offers to share on its own, with one exception. Right after you **star** a lesson,
+it asks once whether you want to hand it to a teammate.
+
+## Receiving a lesson
+
+Every way in leads to the same place: the lesson joins your log, attributed to the sender.
+
+### In the dashboard
+
+<Clip
+  alt="Importing in the dashboard: ＋ Import opens a box, a code is pasted and imported; the lesson page shows Imported, shared by Sam, and the list now has the new lesson on top with the sender's name"
+  mp4={require("../clips/import-lesson.mp4").default}
+  webm={require("../clips/import-lesson.webm").default}
+  poster={require("../clips/import-lesson.png").default}
+  width={1640}
+  height={922}
+/>
+
+On the Lessons page, **＋ Import** takes a shared lesson in three ways:
+
+- **Paste** the code, the link or the whole copied card. A URL works too when its body is a shared
+  lesson (a raw gist, a file in a repo).
+- **Pick** a `.devcoach.md`.
+- **Drop the file anywhere** on the page.
+
+For a URL, devcoach downloads that one page (public hosts only, at most 256 KB).
+
+### From a link
+
+The share page shows the lesson. When your dashboard is running, **Import into my devcoach** opens
+a preview on `127.0.0.1` with a single **Add to my lessons** button. Nothing is saved until you click
+it. The page also offers **Copy code** and **Download .devcoach.md**.
+
+<Tabs>
+  <TabItem value="link" label="1 · The link opens" default>
+    <ThemedShot
+      alt="The share link's page on the docs site: the lesson rendered, and Import into my devcoach when a dashboard is running"
+      light={require("../screenshots/lesson-link-page-light.png").default}
+      dark={require("../screenshots/lesson-link-page-dark.png").default}
+    />
+  </TabItem>
+  <TabItem value="preview" label="2 · Preview in the dashboard">
+    <ThemedShot
+      alt="Shared lesson preview in the dashboard, with a single Add to my lessons button"
+      light={require("../screenshots/lesson-import-preview-light.png").default}
+      dark={require("../screenshots/lesson-import-preview-dark.png").default}
+    />
+  </TabItem>
+  <TabItem value="imported" label="3 · Imported">
+    <ThemedShot
+      alt="The lesson page right after the import, with the confirmation banner and the shared-by line"
+      light={require("../screenshots/lesson-imported-light.png").default}
+      dark={require("../screenshots/lesson-imported-dark.png").default}
+    />
+
+*This capture shows another shared lesson, WAL mode from Ada: the banner and the shared-by line are the same for every import.*
+
+  </TabItem>
+</Tabs>
+
+### In the terminal
+
+`devcoach import` with no argument reads your clipboard; otherwise pass the code, the link, a URL, a
+file path, or `-` for stdin. The same import from the terminal, twice. The second time, devcoach
+recognises the share:
+
+```text
+$ devcoach import ~/Downloads/lesson-docker-layer-cache-001.devcoach.md
+✓ Imported "Docker layer caching — why COPY order decides your build speed" (shared by Ada) as lesson-docker-layer-cache-001 — topic docker_layer_caching
+Topic 'docker_layer_caching' is not in your knowledge map — track it with: devcoach knowledge-add docker_layer_caching
+
+$ devcoach import ~/Downloads/lesson-docker-layer-cache-001.devcoach.md
+Already in your log as lesson-docker-layer-cache-001 (shared by Ada)
+Topic 'docker_layer_caching' is not in your knowledge map — track it with: devcoach knowledge-add docker_layer_caching
+```
+
+### In your agent
+
+Hand it whatever you were given and say *"import this devcoach lesson"* (plugin:
+`/devcoach:import <code or link>`). Then *"show me the lesson Ada shared"* renders it as a card.
 
 ## What travels — and what never does
 
@@ -146,140 +284,12 @@ There is no setting that makes every share anonymous: an empty `share_name` mean
 The lesson sits in the URL fragment (after `#`), which browsers never send to the site. The page
 decodes it locally; the only request it makes is a best-effort `GET /ping` to your own dashboard on
 `127.0.0.1` to say whether it is running. That check needs a one-time *Local network access*
-permission in Chrome 142+ and is not possible at all in Safari (see [Troubleshooting](#troubleshooting)).
+permission in Chrome 142+ and is not possible at all in Safari (see [Troubleshooting](../troubleshooting.md#sharing)).
 **Import** works whenever your dashboard is running, whatever the check says.
 
 :::
 
 See [Privacy & security](../reference/privacy.md#sharing-is-explicit) for the full statement.
-
-## From the dashboard
-
-<Clip
-  alt="The Lessons page: hovering a row shows ↗ at its end; a click opens the share panel next to the row, with the name Alex, an Include where it happened checkbox, Copy text, Copy link and Download .md; Copy link turns into Copied"
-  mp4={require("../clips/share-lesson.mp4").default}
-  webm={require("../clips/share-lesson.webm").default}
-  poster={require("../clips/share-lesson.png").default}
-  width={1640}
-  height={922}
-/>
-
-Open a lesson and click **↗ Share**, or hover a row on the Lessons page and click the `↗` that appears
-at its end: the same panel opens next to the row, so you never leave the list. The panel shows your
-name, an *Include where it happened* checkbox (off by default) and three actions: **Copy text**,
-**Copy link**, **Download .md**.
-
-## From the terminal
-
-```bash
-devcoach share --last                 # card + code line → paste anywhere
-devcoach share <id> --link            # the share link
-devcoach share <id> --file            # writes <id>.devcoach.md
-devcoach share <id> --with-context    # also project / branch / commit / task
-devcoach share <id> --by "Ada"        # sender name (remembered as share_name if none is set)
-devcoach share <id> --anonymous       # no sender name
-```
-
-What **Copy text** and `devcoach share` produce: the card people can read, then the one line
-devcoach reads (shortened here; a real code is one line of about 1,500 to 2,500 characters):
-
-```text
-> `🎓 devcoach` · docker_layer_caching · junior
->
-> **Docker layer caching — why COPY order decides your build speed**
->
-> Every `RUN`, `COPY`, and `ADD` instruction in a Dockerfile creates a new layer. Docker caches each
-> layer by its content hash; if the hash matches what's already on disk, it reuses the cached result…
-
-Shared by Ada with devcoach — paste it to your agent or run: devcoach import
-devcoach:lesson:1:dVZdbhs3EL7KYAskgKBd_RhNEeXJqBugaBsXtougqQsvtaQk2rvkluRKWQQBeoai70Wv1hP0CPmGS…
-```
-
-Paste the whole thing anywhere: chat, an issue, an email. The receiver never has to find the code
-in it: every importer does.
-
-## From your agent
-
-Ask in plain words: *"share the last lesson"*, *"share the lesson about WAL mode as a link"*, *"share it
-as a file, anonymously"*. The agent calls the `share_lesson` tool and replies with the card and the
-code in a fenced block (or the link, or writes the file). With the Claude Code plugin, `/devcoach:share`
-does the same: `/devcoach:share last as link`, `/devcoach:share about docker with context`.
-
-The coach never offers to share on its own, with one exception: right after you **star** a lesson,
-it asks once whether you want to hand it to a teammate.
-
-## Receiving a lesson
-
-Every way in leads to the same place: the lesson joins your log, attributed to the sender.
-
-### In the dashboard
-
-<Clip
-  alt="Importing in the dashboard: ＋ Import opens a box, a code is pasted and imported; the lesson page shows Imported, shared by Sam, and the list now has the new lesson on top with the sender's name"
-  mp4={require("../clips/import-lesson.mp4").default}
-  webm={require("../clips/import-lesson.webm").default}
-  poster={require("../clips/import-lesson.png").default}
-  width={1640}
-  height={922}
-/>
-
-**＋ Import** on the Lessons page: paste the code, the link, a URL whose body is a shared lesson (a raw
-gist, a file in a repo), or the whole copied card; pick a `.devcoach.md`; or **drop the file anywhere**
-on the page. For a URL, devcoach downloads that one page (public hosts only, at most 256 KB).
-
-### From a link
-
-The share page shows the lesson and, when your dashboard is running, **Import into my devcoach** opens
-a preview on `127.0.0.1` with a single **Add to my lessons** button. Nothing is saved until you click
-it. The page also offers **Copy code** and **Download .devcoach.md**.
-
-<Tabs>
-  <TabItem value="link" label="1 · The link opens" default>
-    <ThemedShot
-      alt="The share link's page on the docs site: the lesson rendered, and Import into my devcoach when a dashboard is running"
-      light={require("../screenshots/lesson-link-page-light.png").default}
-      dark={require("../screenshots/lesson-link-page-dark.png").default}
-    />
-  </TabItem>
-  <TabItem value="preview" label="2 · Preview in the dashboard">
-    <ThemedShot
-      alt="Shared lesson preview in the dashboard, with a single Add to my lessons button"
-      light={require("../screenshots/lesson-import-preview-light.png").default}
-      dark={require("../screenshots/lesson-import-preview-dark.png").default}
-    />
-  </TabItem>
-  <TabItem value="imported" label="3 · Imported">
-    <ThemedShot
-      alt="The lesson page right after the import, with the confirmation banner and the shared-by line"
-      light={require("../screenshots/lesson-imported-light.png").default}
-      dark={require("../screenshots/lesson-imported-dark.png").default}
-    />
-
-*This capture shows another shared lesson, WAL mode from Ada: the banner and the shared-by line are the same for every import.*
-
-  </TabItem>
-</Tabs>
-
-### In the terminal
-
-`devcoach import` with no argument reads your clipboard; otherwise pass the code, the link, a URL, a
-file path, or `-` for stdin. The same import from the terminal, twice. The second time, devcoach
-recognises the share:
-
-```text
-$ devcoach import ~/Downloads/lesson-docker-layer-cache-001.devcoach.md
-✓ Imported "Docker layer caching — why COPY order decides your build speed" (shared by Ada) as lesson-docker-layer-cache-001 — topic docker_layer_caching
-Topic 'docker_layer_caching' is not in your knowledge map — track it with: devcoach knowledge-add docker_layer_caching
-
-$ devcoach import ~/Downloads/lesson-docker-layer-cache-001.devcoach.md
-Already in your log as lesson-docker-layer-cache-001 (shared by Ada)
-Topic 'docker_layer_caching' is not in your knowledge map — track it with: devcoach knowledge-add docker_layer_caching
-```
-
-### In your agent
-
-Hand it whatever you were given and say *"import this devcoach lesson"* (plugin:
-`/devcoach:import <code or link>`). Then *"show me the lesson Ada shared"* renders it as a card.
 
 ## How an imported lesson behaves
 
@@ -300,9 +310,9 @@ Hand it whatever you were given and say *"import this devcoach lesson"* (plugin:
   </TabItem>
 </Tabs>
 
-It appears in your log with a **🤝 shared by** line and can be filtered with
-`devcoach lessons --imported` / `--from <name>`, `get_lessons({imported: true})` /
-`({shared_by: "<name>"})`, or the dashboard's **🤝 Shared** filter:
+It appears in your log with a **🤝 shared by** line. To list shared lessons only, use the dashboard's
+**🤝 Shared** filter. Your agent filters with `get_lessons({imported: true})` or
+`({shared_by: "<name>"})`. In the terminal, it is `devcoach lessons --imported` or `--from <name>`:
 
 <Terminal command="devcoach lessons --imported" output={cli.lessonsImported} />
 
@@ -315,12 +325,15 @@ It appears in your log with a **🤝 shared by** line and can be filtered with
 :::note[Someone else's text is stored inert]
 
 Terminal escape sequences and control characters (a screen clear, a hidden link, a clipboard write, a
-right-to-left override) are removed on import, and the CLI strips them again before it prints any
+right-to-left override) are removed on import. The CLI strips them again before it prints any
 lesson.
 
 :::
 
 ## The `.devcoach.md` format
+
+<details>
+<summary>What is inside a <code>.devcoach.md</code> file, and can other tools write one?</summary>
 
 ```markdown title="wal-mode-readers.devcoach.md"
 ---
@@ -350,15 +363,9 @@ flow lists (`[a, b]`) and `null`.
 Optional keys, present only when context was included: `task_context`, `project`, `repository`,
 `branch`, `commit_hash`, `repository_platform`. `folder` is never written.
 
+</details>
+
 ## Troubleshooting
 
-| Symptom | Cause | Fix |
-|---|---|---|
-| *This lesson code is damaged or incomplete* | A character of the code was changed: an email client wrapped it, a chat trimmed it, a model retyped it | Copy the whole text again; devcoach re-joins wrapped lines, but not edited characters |
-| *too large to be a lesson* | The code is bigger than a real lesson (64,000 characters / 256 KB decoded) | Ask the sender for the `.devcoach.md` file instead |
-| *shared by a newer devcoach* | The sender runs a newer share format | Update devcoach the way you installed it (see [Installation](../install/index.md)), for example `npm i -g devcoach@latest` or `brew upgrade devcoach` |
-| *Only public http(s) URLs can be imported* | The URL points at localhost, a private network or a link-local address | Copy the lesson text instead of the URL |
-| The link page says no dashboard answered | The dashboard is not running, or runs on another port | Start it (`devcoach ui`, `/devcoach:ui`) or set the port in the panel, then *retry the check*; the Import button works either way |
-| Safari says it can't check my dashboard | Safari (WebKit) blocks the background request an https page would make to `http://127.0.0.1`, so the page skips the check. Nothing is wrong | If the dashboard is running, **Import** works as usual: it opens your dashboard as a normal link. Otherwise use **Copy code** or **Download .devcoach.md** |
-| Chrome asked to allow local network access, or the page says the browser blocks it | Chrome 142+ asks once before a website may reach `127.0.0.1` | Allow it (icon left of the address bar → *Local network access*), then *retry*; **Import** works whatever the answer |
-| The link page hides the Import button | The code is longer than a URL Node's dashboard accepts (~12,000 characters) | Use **Copy code** or **Download .devcoach.md** and import that |
+A code that will not import, or a share link's page that cannot see your dashboard? Each cause and its
+fix is in [Troubleshooting](../troubleshooting.md#sharing).

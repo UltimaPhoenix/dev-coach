@@ -1,6 +1,6 @@
 ---
 title: Troubleshooting
-description: Find the message on your screen and its fix. What devcoach doctor prints and how to read it, why a lesson did not come, and the errors people hit with Node, the plugin, Claude Desktop, the database and uninstalling.
+description: Find the message on your screen and its fix. What devcoach doctor prints and how to read it, why a lesson did not come, and the errors people hit with Node, the plugin, Claude Desktop, the database, a shared lesson and uninstalling.
 keywords: [devcoach troubleshooting, devcoach doctor, needs Node 24 or newer, plugin:devcoach:devcoach failed to connect, devcoach is not running, Stop hook error occurred, attempt to write a readonly database, devcoach limitations]
 ---
 
@@ -22,7 +22,7 @@ with [`devcoach doctor`](#doctor).
 
 | You see | Go to |
 |---|---|
-| `devcoach 2.7.1 needs Node 24 or newer` | [Node too old](#node-version-error) |
+| `devcoach <version> needs Node 24 or newer` | [Node too old](#node-version-error) |
 | `Node 22.22.0 is too old: devcoach needs Node 24 or newer` | [Node too old](#node-version-error) |
 | `plugin:devcoach:devcoach` failed to connect | [Can't start](#mcp-server-not-connecting) |
 | `🎓 devcoach is not running: …` | [Can't start](#mcp-server-not-connecting) |
@@ -33,6 +33,8 @@ with [`devcoach doctor`](#doctor).
 | `attempt to write a readonly database`, `unable to open database file` or `EACCES: permission denied` | [Can't write](#sqlite-permission-error) |
 | `devcoach hooks are registered TWICE`, `2 devcoach plugins enabled` or `2 devcoach Stop entries` | [Counted twice](#hooks-twice) |
 | `Failed to install plugin devcoach@ultimaphoenix: … invalid manifest` | [Old manifest](#invalid-manifest) |
+| `This lesson code is damaged or incomplete`, `too large to be a lesson`, `shared by a newer devcoach` or `Only public http(s) URLs can be imported` | [Sharing](#sharing) |
+| A share link's page says no dashboard answered, cannot check it, or hides the Import button | [Sharing](#sharing) |
 | No message, and no lesson | [No lesson](#no-lessons) |
 | A `✗` or `→` line in `devcoach doctor` | [Reading doctor](#doctor) |
 
@@ -286,8 +288,8 @@ One session on the demo data:
 ## A newer devcoach upgraded the database {/* #database-newer */}
 
 <Message
-  where="Every devcoach surface. Reproduced on a test database marked as upgraded by a newer build"
-  text="The coaching database was upgraded by devcoach 2.8.0 (schema v7); this is devcoach 2.7.1 (schema v6). Reads work; writes need devcoach ≥ 2.8.0 — update this install, or use the newer channel."
+  where="Every devcoach surface. The dots stand for the two versions and their schema numbers"
+  text="The coaching database was upgraded by devcoach … (schema v…); this is devcoach … (schema v…). Reads work; writes need devcoach ≥ … — update this install, or use the newer channel."
 />
 
 Every devcoach on your computer shares `~/.devcoach`: the Claude Code plugin, a Homebrew or npm CLI,
@@ -381,6 +383,22 @@ latest release, then install again:
 /plugin marketplace update ultimaphoenix
 /plugin install devcoach@ultimaphoenix
 ```
+
+## Sharing or importing a lesson {/* #sharing */}
+
+The first four rows come up when you import a shared lesson, the last four on the share link's page.
+How sharing works is in [Sharing lessons](./usage/sharing.md).
+
+| You see | Cause | Fix |
+|---|---|---|
+| `This lesson code is damaged or incomplete` | A character of the code was changed: an email client wrapped it, a chat trimmed it, a model retyped it | Copy the whole text again; devcoach re-joins wrapped lines, but not edited characters |
+| `too large to be a lesson` | The code is bigger than a real lesson (64,000 characters / 256 KB decoded) | Ask the sender for the `.devcoach.md` file instead |
+| `shared by a newer devcoach` | The sender runs a newer share format | Update devcoach the way you installed it (see [Installation](./install/index.md)), for example `npm i -g devcoach@latest` or `brew upgrade devcoach` |
+| `Only public http(s) URLs can be imported` | The URL points at localhost, a private network or a link-local address | Copy the lesson text instead of the URL |
+| The link page says no dashboard answered | The dashboard is not running, or runs on another port | Start it (`devcoach ui`, `/devcoach:ui`) or set the port in the panel, then *retry the check*; the Import button works either way |
+| Safari says it can't check my dashboard | Safari (WebKit) blocks the background request an https page would make to `http://127.0.0.1`, so the page skips the check. Nothing is wrong | If the dashboard is running, **Import** works as usual: it opens your dashboard as a normal link. Otherwise use **Copy code** or **Download .devcoach.md** |
+| Chrome asked to allow local network access, or the page says the browser blocks it | Chrome 142+ asks once before a website may reach `127.0.0.1` | Allow it (icon left of the address bar → *Local network access*), then *retry*; **Import** works whatever the answer |
+| The link page hides the Import button | The code is longer than a URL Node's dashboard accepts (~12,000 characters) | Use **Copy code** or **Download .devcoach.md** and import that |
 
 ## Known limitations
 

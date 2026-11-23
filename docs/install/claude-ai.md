@@ -1,23 +1,42 @@
 ---
-title: claude.ai web (skill copy)
-sidebar_label: claude.ai web
+title: claude.ai web (not supported)
+sidebar_label: claude.ai web (not supported)
+description: devcoach does not work on claude.ai in the browser. It is a local MCP server, and claude.ai cannot reach a server on your computer. Use Claude Desktop or Claude Code instead.
 ---
 
-# claude.ai web (skill copy)
+import { Card, Cards } from "@site/src/components/Cards";
 
-Claude.ai web cannot run a **local** stdio MCP server like devcoach (it only supports hosted/remote
-connectors), so install the coaching **instructions** as a skill instead — a manual copy, not an
-integration:
+# claude.ai web (not supported)
 
-1. Copy the content of [`assets/SKILL.md`](https://github.com/UltimaPhoenix/dev-coach/blob/main/assets/SKILL.md)
-2. Go to **claude.ai → Settings → Custom instructions** (or Skills, depending on your plan)
-3. Paste the content and save
+devcoach does not work on claude.ai in the browser. devcoach is an MCP server that runs on your
+computer and keeps your data there, and claude.ai supports only hosted, remote connectors, so it
+cannot reach it. [Privacy & security](../reference/privacy.md#why-it-cant-be-a-hosted--remote-connector)
+explains why devcoach stays local.
 
-This gives claude.ai the coaching *behaviour* only — the MCP tools (lesson logging, profile tracking) won't
-work, because there's no local server. See [Privacy & security](../reference/privacy.md) for why a hosted
-connector isn't possible.
+## What you get here
 
-:::note[Keep the skill current]
-For Claude Code / Claude Desktop the skill is served automatically and is always up to date. If you copied
-it manually to claude.ai, re-paste the latest `SKILL.md` after each devcoach update.
-:::
+<Cards columns={3}>
+  <Card label="No" title="devcoach's tools">
+    claude.ai cannot reach the server, so none of its 25 tools.
+  </Card>
+  <Card label="No" title="Lessons">
+    Without the tools there is no profile, no memory of past lessons and no pacing.
+  </Card>
+  <Card label="No" title="The devcoach skill">
+    It would not help: every lesson it describes is built on calls to those tools.
+  </Card>
+</Cards>
+
+## Use one of these instead
+
+<Cards columns={2}>
+  <Card label="No terminal" title="Claude Desktop" to="/install/claude-desktop">
+    The extension *(beta)* adds all 25 tools. You ask for a lesson when you want one.
+  </Card>
+  <Card label="Automatic lessons" title="Claude Code" to="/install/claude-code-plugin">
+    The plugin: when a task ends and a lesson is due, Claude teaches it.
+  </Card>
+</Cards>
+
+Both can run on the same computer and share one profile and one set of lessons (`~/.devcoach/`).
+Other agents: [what each agent gets](./index.md).

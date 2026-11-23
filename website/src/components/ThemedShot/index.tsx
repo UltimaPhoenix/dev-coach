@@ -20,40 +20,31 @@ interface Props {
 const CAPTURE_DENSITY = 2;
 
 /**
- * A screenshot that follows the site's color mode by default, while still letting
- * the reader force Light/Dark for that one image — without touching the docs theme.
- *
- * Following the theme is Docusaurus' own ThemedImage (both images server-rendered, CSS keyed off
- * `[data-theme]` shows one, so the first render matches the server's). A forced theme is one
- * plain image. Dark and Light are toggle buttons pressed for the image on screen; "Follow theme"
- * appears only while a theme is forced, and pressing it hands focus to the button now pressed.
+ * A screenshot made openable at full size: `children` is the image (or the themed pair) on screen.
  *
  * Activating the image opens it at full size (the dashboard's own size) in a modal <dialog>, in
- * the theme on screen: Escape or Close shuts it and focus returns to the image, the page behind
- * stays put, and a large capture scrolls inside it. The opener is a button laid over the image
- * after hydration only, so without JavaScript the image stays a plain image.
+ * the theme on screen (`theme`, else the site's): Escape or Close shuts it and focus returns to the
+ * image, the page behind stays put, and a large capture scrolls inside it. The opener is a button
+ * laid over the image after hydration only, so without JavaScript the image stays a plain image.
+ * ThemedShot uses it, and so does the home's tour (its captures have their own frame).
  */
-export default function ThemedShot({ alt, light, dark }: Props): ReactNode {
-  const [override, setOverride] = useState<Override>("auto");
+export function Zoomable({
+  alt,
+  light,
+  dark,
+  theme,
+  children,
+}: Props & { theme?: "light" | "dark"; children: ReactNode }): ReactNode {
   const { colorMode } = useColorMode();
   const isBrowser = useIsBrowser();
-  const buttons = useRef<Record<"light" | "dark", HTMLButtonElement | null>>({ light: null, dark: null });
   const media = useRef<HTMLDivElement>(null);
   const opener = useRef<HTMLButtonElement>(null);
   const dialog = useRef<HTMLDialogElement>(null);
   const titleId = useId();
   const [zoom, setZoom] = useState<{ src: string; width?: number } | null>(null);
-  // Before hydration the site theme is not known to React: no button claims to be pressed (CSS
-  // still highlights the one that matches [data-theme]).
-  const shown = override !== "auto" ? override : isBrowser ? colorMode : undefined;
-
-  const follow = () => {
-    setOverride("auto");
-    buttons.current[colorMode]?.focus();
-  };
 
   const openZoom = () => {
-    const src = (shown ?? colorMode) === "light" ? light : dark;
+    const src = (theme ?? colorMode) === "light" ? light : dark;
     // The image on screen is loaded: its pixel width gives the full size before the copy loads.
     const onScreen = [...(media.current?.querySelectorAll("img") ?? [])].find(
       (img) => img.getClientRects().length > 0,
@@ -82,34 +73,9 @@ export default function ThemedShot({ alt, light, dark }: Props): ReactNode {
   };
 
   return (
-    <figure className={styles.shot} data-override={override}>
-      <div className={styles.toolbar} role="group" aria-label="Screenshot theme">
-        {(["dark", "light"] as const).map((mode) => (
-          <button
-            key={mode}
-            ref={(el) => {
-              buttons.current[mode] = el;
-            }}
-            type="button"
-            className={clsx(styles.btn, mode === "dark" ? styles.btnDark : styles.btnLight)}
-            aria-pressed={shown === mode}
-            onClick={() => setOverride(mode)}
-          >
-            {mode === "dark" ? "Dark" : "Light"}
-          </button>
-        ))}
-        {override !== "auto" && (
-          <button type="button" className={styles.reset} onClick={follow}>
-            Follow theme
-          </button>
-        )}
-      </div>
+    <>
       <div ref={media} className={styles.media}>
-        {override === "auto" ? (
-          <ThemedImage className={styles.img} sources={{ light, dark }} alt={alt} loading="lazy" />
-        ) : (
-          <img className={styles.img} src={override === "light" ? light : dark} alt={alt} />
-        )}
+        {children}
         {isBrowser && (
           <button
             ref={opener}
@@ -176,6 +142,64 @@ export default function ThemedShot({ alt, light, dark }: Props): ReactNode {
           </div>
         </dialog>
       )}
+    </>
+  );
+}
+
+/**
+ * A screenshot that follows the site's color mode by default, while still letting
+ * the reader force Light/Dark for that one image — without touching the docs theme.
+ *
+ * Following the theme is Docusaurus' own ThemedImage (both images server-rendered, CSS keyed off
+ * `[data-theme]` shows one, so the first render matches the server's). A forced theme is one
+ * plain image. Dark and Light are toggle buttons pressed for the image on screen; "Follow theme"
+ * appears only while a theme is forced, and pressing it hands focus to the button now pressed.
+ * The image opens at full size (Zoomable, above).
+ */
+export default function ThemedShot({ alt, light, dark }: Props): ReactNode {
+  const [override, setOverride] = useState<Override>("auto");
+  const { colorMode } = useColorMode();
+  const isBrowser = useIsBrowser();
+  const buttons = useRef<Record<"light" | "dark", HTMLButtonElement | null>>({ light: null, dark: null });
+  // Before hydration the site theme is not known to React: no button claims to be pressed (CSS
+  // still highlights the one that matches [data-theme]).
+  const shown = override !== "auto" ? override : isBrowser ? colorMode : undefined;
+
+  const follow = () => {
+    setOverride("auto");
+    buttons.current[colorMode]?.focus();
+  };
+
+  return (
+    <figure className={styles.shot} data-override={override}>
+      <div className={styles.toolbar} role="group" aria-label="Screenshot theme">
+        {(["dark", "light"] as const).map((mode) => (
+          <button
+            key={mode}
+            ref={(el) => {
+              buttons.current[mode] = el;
+            }}
+            type="button"
+            className={clsx(styles.btn, mode === "dark" ? styles.btnDark : styles.btnLight)}
+            aria-pressed={shown === mode}
+            onClick={() => setOverride(mode)}
+          >
+            {mode === "dark" ? "Dark" : "Light"}
+          </button>
+        ))}
+        {override !== "auto" && (
+          <button type="button" className={styles.reset} onClick={follow}>
+            Follow theme
+          </button>
+        )}
+      </div>
+      <Zoomable alt={alt} light={light} dark={dark} theme={shown}>
+        {override === "auto" ? (
+          <ThemedImage className={styles.img} sources={{ light, dark }} alt={alt} loading="lazy" />
+        ) : (
+          <img className={styles.img} src={override === "light" ? light : dark} alt={alt} />
+        )}
+      </Zoomable>
     </figure>
   );
 }

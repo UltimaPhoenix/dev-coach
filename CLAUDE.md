@@ -431,6 +431,25 @@ hook (verified empirically) — hence priming-first design; blocks are the rare 
   edit them, run `npm run plugin:sync` (it also pins every manifest version to `package.json`).
   Marketplace entries (public tap + self-marketplace) mirror `plugin.json`'s metadata — change it there.
 - Prefer a Node built-in over a dependency; pin deps at latest stable.
+- **The docs describe the version they ship with** (`docs/`, `website/`). The released site is built
+  from `main` at each release and `/next/` from `develop`, from the same sources, so a page never
+  names the release a feature arrives in ("from 2.8.0") and never shows an unreleased version number.
+  What must differ between the two sites goes in `<OnStable>` / `<OnNext>`
+  (`website/src/components/ReleaseChannel`). The roadmap's timeline (`docs/vision.md`) dates a stop
+  from `CHANGELOG.md` by its entry, `<Stop entry="Windows, in one line">` (`website/src/lib/changelog.ts`,
+  plugin `devcoach-changelog`): it reads "next" while the entry is under `## [Unreleased]` and takes
+  the version and date once that heading becomes `## [x.y.z] — YYYY-MM-DD`, which is the only edit a
+  release needs. A version in an example is written `<version>`; real captures keep the version they
+  were captured with.
+- **Reading time and page budgets** (`website/src/lib/readingTime.ts`): the guides and the essays
+  show "N min read" under their title. `READING_TIME_PAGES` lists them; the minutes are measured
+  from each page's source when the site is built (plugin `devcoach-reading-time`, drawn by
+  `website/src/theme/MDXComponents/Heading`): words at 200 a minute, code by the line, 6 seconds a
+  figure, without what a `<details>` folds and the tabs not shown first. With the same measure,
+  `readingBudget.test.ts` (`npm test --prefix website`) fails when a guide or an essay passes
+  13 minutes, an install page 9 or a landing page 4: shorten the page (move what is looked up to a
+  reference page, fold, split) before raising a ceiling there. Reference and lookup pages have no
+  label and no budget.
 
 ---
 
@@ -530,3 +549,27 @@ unverified publisher). The release run also publishes
 `mcp-registry`, tokenless — ownership = repo OIDC + `mcpName` in the npm tarball);
 `scripts/sync-plugin.mjs` pins `server.json`'s versions in the bump commit and
 `tests/mcp-registry.test.ts` fails on drift, like the plugin/gemini-extension pins.
+
+### Before a release: the changelog, the roadmap, the captures
+
+The docs need no version edits at a release (see *The docs describe the version they ship with* under
+Development conventions). Three things are still done by hand, in one PR to `develop`, before the
+release run is dispatched:
+
+1. **`CHANGELOG.md`**: rename `## [Unreleased]` to `## [x.y.z] — YYYY-MM-DD` (the version the run
+   will produce, today's date) and open a new, empty `## [Unreleased]` above it. The release job
+   does not do this. It is also what updates the roadmap: every `<Stop entry="…">` in
+   `docs/vision.md` whose entry is in that section turns from "next" into a shipped stop with that
+   version and date. Do not reword the bold title of an entry a stop points at
+   (`npm test --prefix website` fails if a stop's entry is gone).
+2. **The roadmap (`docs/vision.md`)**: read it once. Keep the timeline to about six stops: when one
+   ships and the row gets crowded, drop the oldest. For the release after this one, add a stop
+   that names its headline changelog entry as soon as that entry exists under `## [Unreleased]`;
+   until then the timeline has no "next" stop. Take out of *Exploring* any idea that has shipped. An
+   idea never gets a version.
+3. **Captures**, when what they show has changed: `npm run docs:cli-output` (the real CLI output the
+   guides print) and the *Update documentation screenshots* workflow, dispatched on `develop`
+   (screenshots and clips).
+
+The release run then deploys both sites itself (`gh workflow run docs.yml --ref main` at the end of
+`bump`), so the released docs and `/next/` are rebuilt from the bump commit.

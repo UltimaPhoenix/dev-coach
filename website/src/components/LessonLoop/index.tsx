@@ -2,9 +2,10 @@
 // lesson card devcoach adds, a one-key answer. Every line is laid out from the first frame
 // (unrevealed ones are only hidden), so playback never shifts the page. The server-rendered
 // frame is the last one: without JS, or with reduced motion, the whole loop is there at rest.
-// With JS the loop picks up from that frame (the reader first sees the whole card), plays only
-// while it is on screen and the tab is visible, and renders only when a line or a typed letter
-// changes.
+// With JS and motion allowed the terminal starts EMPTY and fills in: the stylesheet keeps the
+// server-rendered card out of sight until this component takes over (`data-live`), so the
+// finished card never flashes before the first keystroke. It plays only while it is on screen
+// and the tab is visible, and renders only when a line or a typed letter changes.
 import clsx from "clsx";
 import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
@@ -71,26 +72,32 @@ export default function LessonLoop(): ReactNode {
   const [t, setT] = useState(LAST);
   const [canAnimate, setCanAnimate] = useState(false);
   const [playing, setPlaying] = useState(false);
+  // False in the server-rendered markup; true once this component decides what to show.
+  const [live, setLive] = useState(false);
   // The reader can't see it (scrolled away, another tab): it waits, wherever it was.
   const [onScreen, setOnScreen] = useState(true);
   const tRef = useRef(LAST);
   const figure = useRef<HTMLElement>(null);
 
-  // Reduced motion, read on mount and followed if the reader changes it: the whole loop at rest.
+  // On mount: with motion allowed, start from the empty prompt; with reduced motion, the whole
+  // loop at rest. Followed if the reader changes the setting while the page is open.
   useEffect(() => {
     const query = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const apply = () => {
+    const apply = (from: number | null) => {
       const still = query.matches;
       setCanAnimate(!still);
       setPlaying(!still);
-      if (still) {
-        tRef.current = LAST;
-        setT(LAST);
+      const at = still ? LAST : from;
+      if (at !== null) {
+        tRef.current = at;
+        setT(at);
       }
     };
-    apply();
-    query.addEventListener("change", apply);
-    return () => query.removeEventListener("change", apply);
+    apply(0);
+    setLive(true);
+    const onChange = () => apply(null);
+    query.addEventListener("change", onChange);
+    return () => query.removeEventListener("change", onChange);
   }, []);
 
   useEffect(() => {
@@ -99,10 +106,15 @@ export default function LessonLoop(): ReactNode {
     let visible = true;
     let intersecting = true;
     const update = () => setOnScreen(visible && intersecting);
-    const observer = new IntersectionObserver(([entry]) => {
-      intersecting = entry.isIntersecting;
-      update();
-    });
+    // "On screen" stops a fifth short of the bottom edge: on a phone the terminal peeks in under
+    // the first screen, and playing there would have it half done by the time it is scrolled to.
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        intersecting = entry.isIntersecting;
+        update();
+      },
+      { rootMargin: "0px 0px -20% 0px" },
+    );
     const onVisibility = () => {
       visible = document.visibilityState === "visible";
       update();
@@ -132,7 +144,7 @@ export default function LessonLoop(): ReactNode {
   const lastShown = lastShownAt(t);
 
   return (
-    <figure ref={figure} className={styles.term}>
+    <figure ref={figure} className={styles.term} data-live={live ? "" : undefined}>
       <div className={styles.bar}>
         <span className={styles.dots} aria-hidden="true">
           <i />

@@ -89,16 +89,17 @@
   text-overflow: ellipsis;
 }
 /* No `display`: ThemedImage shows one of the pair by display (see ThemedShot's stylesheet).
-   A window onto the capture, at most 16:10: a tall page shows its top, a wide one (the lessons
-   table) shows whole. The 16:10 box holds the place until the image loads. */
+   A window onto the capture, at most --crop high (16:10 unless the capture sets it): a tall page
+   shows its top, a wide one (the lessons table) shows whole. The box holds the place until the
+   image loads. The whole capture is one click away (the zoom). */
 .capture {
   container-type: inline-size;
 }
 .shot {
   width: 100%;
   vertical-align: top;
-  aspect-ratio: auto 16 / 10;
-  max-height: 62.5cqw;
+  aspect-ratio: auto 1 / var(--crop, 0.625);
+  max-height: calc(var(--crop, 0.625) * 100cqw);
   object-fit: cover;
   object-position: top left;
 }

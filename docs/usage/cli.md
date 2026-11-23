@@ -57,7 +57,7 @@ one command's options and `devcoach --version` prints the version.
 
 </RefTable>
 
-The output on this page is real: devcoach 2.7.1, installed with npm, on the documentation's demo data,
+The output on this page is real: devcoach installed with npm, on the documentation's demo data,
 in the terminal's colours.
 
 <Terminal

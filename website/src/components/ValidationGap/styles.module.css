@@ -1,0 +1,96 @@
+/* The layout follows the figure's own width (a container query): wide labels beside the line ends
+   from 620 px, stacked labels below that. Text sizes are in viewBox units, chosen so each layout
+   renders its labels at about 13–16 px. */
+.figure {
+  container-type: inline-size;
+  margin: 1.75rem 0 2rem;
+}
+.wide,
+.narrow {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+  font-family: var(--ifm-font-family-base);
+}
+.wide {
+  display: none;
+  max-width: 760px;
+  font-size: 14.5px;
+}
+.narrow {
+  max-width: 460px;
+  font-size: 13px;
+}
+@container (min-width: 620px) {
+  .wide {
+    display: block;
+  }
+  .narrow {
+    display: none;
+  }
+}
+
+.axis {
+  fill: none;
+  stroke: var(--ifm-color-emphasis-500);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.axisLabel {
+  fill: var(--ifm-color-emphasis-700);
+  font-size: 0.92em;
+}
+
+.ship,
+.learning,
+.idle {
+  fill: none;
+  stroke-linecap: round;
+}
+.ship {
+  stroke: var(--devcoach-accent);
+  stroke-width: 3.5;
+}
+.learning {
+  stroke: var(--ifm-color-emphasis-800);
+  stroke-width: 2.5;
+}
+.idle {
+  stroke: var(--ifm-color-emphasis-600);
+  stroke-width: 2.5;
+  stroke-dasharray: 8 8;
+}
+
+.startDot,
+.learningDot {
+  fill: var(--ifm-color-emphasis-800);
+}
+.shipDot {
+  fill: var(--devcoach-accent);
+}
+.idleDot {
+  fill: var(--ifm-background-color);
+  stroke: var(--ifm-color-emphasis-600);
+  stroke-width: 2;
+}
+
+.shipLabel {
+  fill: var(--devcoach-accent);
+  font-weight: 700;
+}
+.label {
+  fill: var(--ifm-font-color-base);
+  font-weight: 600;
+}
+.condition {
+  fill: var(--ifm-color-emphasis-700);
+  font-weight: 400;
+}
+
+.caption {
+  margin-top: 0.6rem;
+  font-size: 0.85rem;
+  color: var(--ifm-color-emphasis-700);
+}
