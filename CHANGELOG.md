@@ -76,6 +76,13 @@ Notable changes to devcoach. Versions follow [Semantic Versioning](https://semve
   devcoach?* panel follows the import panel: what devcoach does in one sentence, **Install
   devcoach**, **See how it works**, and a reminder that the link keeps the lesson for later. With a
   running dashboard the page is unchanged.
+- **The lesson card is one quote.** A rail runs down the whole lesson — the `🎓 devcoach` label
+  with the topic and the level, the title, the text, the tip — so it stands apart from the
+  agent's reply in Claude Code (where the lesson reads in italics) and in Claude Desktop. Code
+  blocks, colours, lists and links work inside it. The feedback line stays under the card. The
+  `###` dash bands are gone. What is saved is the lesson alone: if a model hands the whole card to
+  `log_lesson`, the quote markers, the header, the title and the feedback line are removed before
+  it is stored, so the dashboard and shared lessons never show them.
 
 ### Security
 - **A web page can no longer change your dashboard.** While `devcoach ui` was running, any website

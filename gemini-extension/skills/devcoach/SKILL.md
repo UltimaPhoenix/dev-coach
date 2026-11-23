@@ -143,38 +143,44 @@ raise the bar** — a mediocre lesson wastes the rate limit.
 
 ## Lesson format
 
-Append the lesson at the bottom of the response as a card: plain markdown between two
-band headings (never `> ` blockquotes — they break on paragraphs and fenced code):
+Append the lesson at the bottom of the response as a card: ONE markdown blockquote,
+so a rail runs down the whole lesson and sets it apart from your reply. **Every line
+of the card starts with `>`** — blank lines (a bare `>`) and the lines of a code
+block included; a line without it breaks the rail in two.
 
-```
-### ──────── 🎓 devcoach ────────
-**[Lesson title]** · [Category] · [Junior|Mid|Senior]
+````
+> `🎓 devcoach` · [topic] · [junior|mid|senior]
+>
+> **[Lesson title]**
+>
+> [Body: 3–6 paragraphs. Concise, practical, a code example if useful.
+> Explain the WHY. Connect it to the task just completed.]
+>
+> ```ts
+> // a code block lives inside the quote too: every line behind "> "
+> ```
+>
+> 💡 **Senior tip:** [One sentence a senior would say to a junior on this topic]
+````
 
-[Body: 3–6 paragraphs. Concise, practical, code example if useful.
-Explain the WHY. Connect it to the task just completed.]
-
-💡 *Senior tip:* [One sentence a senior would say to a junior on this topic]
-### ──────── [topic] · [level] ────────
-```
-
-Bands are `###` headings of box-drawing dashes (`─`, U+2500) around a centered title,
-~34 chars wide, top and bottom matching. Tone: direct, like a senior colleague in a
-code review — never academic, never verbose.
+The header is the label `` `🎓 devcoach` `` (in backticks), the topic id and the level,
+lowercase. Bold, inline code, links, lists and fenced code all work inside the quote.
+Tone: direct, like a senior colleague in a code review — never academic, never verbose.
 
 ## Logging and feedback
 
 **Once the lesson is chosen**, call `log_lesson` silently: `id` (a unique kebab-case
 slug of the title), `title`, `topic_id` (the single most characterizing word —
 `sqlite`, `docker`; max 3 words like `ci_cd`), `categories`, `level`, `summary` in
-their own fields; `body` = ONLY the prose + the 💡 tip as CLEAN markdown (no bands, no
-blockquote, no title/`Category · Level` line). Git metadata is auto-detected
+their own fields; `body` = ONLY the prose + the 💡 tip as CLEAN markdown — not the card:
+no `>` markers, no `🎓 devcoach` header, no title line. Git metadata is auto-detected
 server-side — omit it. **When it returns, write the card as the final message of the
-turn**: both bands, the title line, the same prose you passed as `body`, the tip. That
-final message is the only place the user ever sees the lesson.
+turn**: the quoted header, the title, the same prose you passed as `body`, the tip, every
+line behind `>`. That final message is the only place the user ever sees the lesson.
 
 `log_lesson` never asks the user anything — it only saves. Feedback is collected as
-text under the card: append the prompt "Did that land? ✅ knew it (y) · 💡 understood
-(u) · ❌ couldn't follow (n)" DIRECTLY BENEATH the card's closing band — it is the only
+text under the card: after one blank line, OUTSIDE the quote, append the prompt "Did
+that land? ✅ knew it (y) · 💡 understood (u) · ❌ couldn't follow (n)" — it is the only
 line allowed after the card, and it may never appear without the card right above it.
 Read the user's next message loosely: `y` / `yes` / "knew it" / ✅ → `know` ·
 `u` / "understood" / "got it" / 💡 → `understood` · `n` / `no` / "lost me" / ❌ →
@@ -242,5 +248,5 @@ checkpoints, never touch the notebook.
 - The lesson must feel natural and contextual, not a mechanical add-on
 - Nothing interesting to teach → `skip_lesson` (if cued) or stay silent. Better
   nothing than forced.
-- A share or import the user asked for is an ordinary reply, not a lesson: no card
-  bands, no feedback prompt — just what `reply_check` asks for.
+- A share or import the user asked for is an ordinary reply, not a lesson: no card of
+  your own, no feedback prompt — just what `reply_check` asks for.

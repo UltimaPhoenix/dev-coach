@@ -218,12 +218,12 @@ export function buildLessonCue(nextLessonNumber: number, client: HookClient = "c
     "If the devcoach skill is not available, fall back to: call get_briefing (one call: " +
     "profile, taught topics, notebook); pick ONE untaught profile topic at or " +
     "above the user's confidence band; call log_lesson silently (body = 3–6 short paragraphs " +
-    "tied to the task plus a `💡 *Senior tip:*` line, clean markdown without bands or a " +
-    "title line); THEN write the card as the FINAL message of the turn: plain markdown (no " +
-    "'>' blockquote) between two band headings `### ──────── 🎓 devcoach ────────` and " +
-    "`### ──────── [topic] · [level] ────────`, with `**[Title]** · [Category] · [Level]`, " +
-    "the body you passed, and the tip — saving is not showing; the card in the final " +
-    "message is the only thing the user sees. If instead the work does not warrant a lesson " +
+    "tied to the task plus a `💡 **Senior tip:**` line, clean markdown: no '>' markers, no " +
+    "header, no title line); THEN write the card as the FINAL message of the turn: ONE " +
+    "markdown blockquote where EVERY line starts with '>' (blank lines and code lines too) — " +
+    "first `> \\`🎓 devcoach\\` · [topic] · [level]`, then `> **[Title]**`, then the body you " +
+    "passed and the tip — saving is not showing; the card in the final message is the only " +
+    "thing the user sees. If instead the work does not warrant a lesson " +
     "(pure questions, chat, nothing technical), call the devcoach `skip_lesson` tool with a " +
     "one-line reason.\n\n" +
     "The rate-limit check is already done by this hook — skip it. Work in silence: never " +

@@ -29,6 +29,7 @@ import {
   UiHomeSchema,
   UiThemeSchema,
 } from "../core/models";
+import { stripCardChrome } from "../core/prompts";
 import { describeRuntime, displayPath, runtimeLine } from "../core/runtime";
 import {
   buildSharePayload,
@@ -90,8 +91,8 @@ const CARD_REPLY_CHECK =
   "Saved — but saving does NOT display anything. The user sees ONLY plain text you " +
   "write in your reply; the title/body inside this tool call's ARGUMENTS are invisible " +
   "to them, and having composed them does not count as having shown the card. Did you " +
-  "already write the full card (both ### band headings + title line + body + tip) as " +
-  "plain reply text, outside any tool call? If yes: output nothing. If no: write the " +
+  "already write the full card (one quoted block: header + title + body + tip, every line " +
+  "behind '>') as plain reply text, outside any tool call? If yes: output nothing. If no: write the " +
   "card now, as the final text of your reply. Never write it twice.";
 
 /** Present when this devcoach is older than the database it opened (read-only, see core/db). */
@@ -340,9 +341,9 @@ export function createServer(): McpServer {
           .string()
           .min(1)
           .describe(
-            "Clean lesson markdown: the prose + 💡 Senior tip only — NO card bands, NO '>' " +
-              "blockquote, and do not repeat title/category/level (those are their own fields). " +
-              "Required, non-empty.",
+            "Clean lesson markdown: the prose + 💡 Senior tip only — NOT the card: no '>' " +
+              "quote markers, no `🎓 devcoach` header, no title/topic/level line (those are their " +
+              "own fields), no feedback line. Required, non-empty.",
           ),
         task_context: z.string().nullish().describe("What the user was doing when taught"),
         project: z.string().nullish().describe("Project name (auto-detected from git if omitted)"),
@@ -379,7 +380,8 @@ export function createServer(): McpServer {
           title: args.title,
           level: args.level,
           summary: args.summary,
-          body: args.body,
+          // The card is chat chrome: stored, shared and shown on the dashboard is the body alone.
+          body: stripCardChrome(args.body, args.title),
           task_context: args.task_context ?? null,
           project: args.project ?? git.project ?? usage.project ?? null,
           repository: args.repository ?? git.repository ?? usage.repository ?? null,
