@@ -325,7 +325,7 @@ const config: Config = {
           to: "/usage/coaching",
           label: "Docs",
           position: "left",
-          activeBaseRegex: `^${BASE_URL}(how-it-works|usage|reference|troubleshooting|faq|glossary|vision)(/|$)`,
+          activeBaseRegex: `^${BASE_URL}(start|how-it-works|usage|reference|help|troubleshooting|faq|glossary|vision)(/|$)`,
         },
         { to: "/install", label: "Install", position: "left", activeBaseRegex: `^${BASE_URL}install(/|$)` },
         { to: "/why", label: "Why devcoach", position: "left" },
