@@ -19,7 +19,7 @@ export interface FaqItem {
   /** The heading id: keep it stable, other pages and search results link to it. */
   id: string;
   q: string;
-  /** Three sentences at most. */
+  /** Short sentences: the first answers the question in 20 words or fewer, none runs past 25. */
   a: string;
   /** The page that owns the topic. */
   more: { label: string; to: string };
